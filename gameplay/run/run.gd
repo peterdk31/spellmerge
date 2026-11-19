@@ -48,6 +48,9 @@ var save: SaveFile = null
 
 ## The run's biome map (null out of a run).
 var map: BiomeMap = null
+## The run definition it was made from and the run's players (a room reroll makes it again by them).
+var _run_id: StringName = &""
+var _players: int = 0
 
 
 func _ready() -> void:
@@ -67,6 +70,7 @@ func _ready() -> void:
 		push_warning("Run: the Events autoload is missing, so no run can begin.")
 		return
 	events.run_begun.connect(_on_run_begun)
+	events.run_room_reroll_asked.connect(_on_run_room_reroll_asked)
 
 
 ## A run's start: no map until a run begins (`run_begun`).
@@ -106,6 +110,8 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.not_made)])
 		return
 	map = made
+	_run_id = run_id
+	_players = players
 	# The run's own changes of the run stats (connected biomes CB10, `RunStats`), before its rooms.
 	events.run_stats_ruled.emit(definition.stat_changes_by(sim.unlocks))
 	var rules: MapRules = played.biomes[0]
@@ -116,3 +122,26 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 		events.run_room_filled.emit(room, enemies, scale, pace[0], pace[1], pace[2], made.elites_of(room))
 	# A copy: what hears it never holds the run's own map.
 	events.run_biome_chosen.emit(made.copy())
+
+
+## Flow asks for room `room` of `asked` (the biome's map as it is now) rerolled, the run's `roll`th
+## room reroll (`run_room_reroll_asked`; the owner, 2026-11-19): the map made again from the same run
+## definition, content, shapes and players (`BiomeGenerator.reroll_room`) is the run's map from now
+## on and is answered at once (`run_room_rerolled`, a copy, with its fight's pace), or null when no
+## replacement keeps the map valid.
+func _on_run_room_reroll_asked(asked: RefCounted, room: int, roll: int) -> void:
+	var now := asked as BiomeMap
+	var definition: RunDefinition = registry.get_resource(RUN_FOLDER, _run_id) as RunDefinition if registry != null and _run_id != &"" else null
+	var sim: Sim = Sim.found(self)
+	var made: BiomeMap = null
+	if now != null and definition != null and sim != null:
+		var played: RunDefinition = definition.changed_by(sim.unlocks)
+		made = BiomeGenerator.reroll_room(played, registry.run_content(), registry.run_shapes(played), sim, _players, now, room, roll)
+	if made == null:
+		events.run_room_rerolled.emit(room, null, 0, 0, 0.0)
+		return
+	map = made
+	var rules: MapRules = definition.changed_by(sim.unlocks).biomes[0]
+	var enemies: Array[StringName] = made.enemies_of(room)
+	var pace: Array = RoomFill.pace(rules.spawning, RunScaling.scaled_budget(rules.room_budget, made.room_scales[room])) if not enemies.is_empty() else [0, 0, 0.0]
+	events.run_room_rerolled.emit(room, made.copy(), pace[0], pace[1], pace[2])

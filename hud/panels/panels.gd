@@ -150,6 +150,9 @@ const INVENTORY_ACTION: StringName = &"inventory"
 ## else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
 const TAKE_ACTION: StringName = &"take"
+## X in play with no menu open at a doorway it may reroll sends `room_reroll_requested` (the owner,
+## 2026-11-19); in the inventory X drops, in the reward picker it rerolls the offer (their own).
+const REROLL_ACTION: StringName = &"alternate"
 ## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
 ## How far below the online line the stone line sits, in pixels.
@@ -190,6 +193,7 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
+var _seen_reroll: Array[int] = [0, 0, 0, 0]
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
@@ -284,6 +288,7 @@ func _ready() -> void:
 			_seen_inventory[player] = input.get_press_count(player, INVENTORY_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
+			_seen_reroll[player] = input.get_press_count(player, REROLL_ACTION)
 	# The menus' focus moves and backs, heard before any menu hears UIFocus, so it knows a press
 	# was a choice or a back before that menu moves the focus in answer (ui_sounds.gd).
 	_ui_sounds = UiSounds.new()
@@ -459,6 +464,9 @@ func poll() -> void:
 		var take_count: int = input.get_press_count(player, TAKE_ACTION)
 		var take_now: bool = take_count > _seen_take[player]
 		_seen_take[player] = take_count
+		var reroll_count: int = input.get_press_count(player, REROLL_ACTION)
+		var reroll_now: bool = reroll_count > _seen_reroll[player]
+		_seen_reroll[player] = reroll_count
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
 			if _boss_intro.is_open():
@@ -478,6 +486,9 @@ func poll() -> void:
 					events.online_open_requested.emit(player)
 				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
 					_open_reward(player)
+			if reroll_now and _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and events != null and _item_hints.reroll_of(player):
+				_item_hints.reroll_asked(player)
+				events.room_reroll_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and _may_open_menu(player, had_menu):
@@ -548,15 +559,22 @@ func get_reward(player: int) -> RewardMenuScript:
 	return _rewards[player]
 
 
-## A bag of the seat's shown body changed: its currency bag is the purse's coins and its keys.
+## A bag of the seat's shown body changed: its currency bag is the purse's coins, its keys and its
+## rerolls.
 func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
 	if player < 0 or player >= PLAYER_COUNT or bag != ItemKinds.bag_of(ItemKinds.COIN):
 		return
 	var at: int = ids.find(CoinBase.ID)
 	_coins[player] = counts[at] if at >= 0 and at < counts.size() else 0
 	_panels[player].set_purse(_coins[player], _unspent[player])
-	var key_at: int = ids.find(KeyBase.ID)
-	_panels[player].set_keys(counts[key_at] if key_at >= 0 and key_at < counts.size() else 0, false)
+	_panels[player].set_keys(_count_in(ids, counts, KeyBase.ID), false)
+	_panels[player].set_rerolls(_count_in(ids, counts, RerollBase.ROOM), _count_in(ids, counts, RerollBase.REWARD), false)
+
+
+## The count of `id` in a bag's `ids` and `counts` (0 when it holds none).
+static func _count_in(ids: Array[StringName], counts: PackedInt32Array, id: StringName) -> int:
+	var at: int = ids.find(id)
+	return counts[at] if at >= 0 and at < counts.size() else 0
 
 
 func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:

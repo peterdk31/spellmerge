@@ -449,3 +449,65 @@ func test_a_reward_types_glyphs() -> void:
 		check(light.size() == 3, "%s has a light" % id)
 		for owned: StringName in Palette.OWNED:
 			check(light != Palette.shades_of(owned), "%s is in no owned colour" % id)
+
+
+# --- A room reroll (the owner, 2026-11-19): the signs and the open map turn over, Smooth ---------
+
+## The split map as the world has it, its west room a fountain (a reroll's answer).
+func _rerolled_west() -> BiomeMap:
+	var made: BiomeMap = flow.biome.map.copy()
+	made.room_kinds[WEST] = &"fountain"
+	return made
+
+
+func test_a_rerolled_rooms_sign_sinks_out_and_its_new_one_rises() -> void:
+	var map: BiomeMap = _start(1)
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	var into_west: int = -1
+	for mouth in mouths.mouths():
+		if mouths.room_of(mouth) == WEST:
+			into_west = mouth
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	while symbols.is_moving():
+		symbols.advance()
+	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "the fight's sign shown")
+	flow.call(&"_reroll_room", WEST, _rerolled_west(), RoomFight.new())
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	check(symbols.is_turning(into_west), "the sign turns over")
+	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "no jump: the old sign still shows")
+	var rows: Array[int] = []
+	while symbols.is_moving():
+		symbols.advance()
+		rows.append(symbols.rows_of(into_west))
+	check_equal(rows, [6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7] as Array[int], "it sinks out a row a frame and the new one rises")
+	check(not symbols.is_turning(into_west), "turned")
+	check(map != null, "the map")
+
+
+func test_an_open_map_stays_open_over_a_reroll_and_the_room_comes_in_again() -> void:
+	_start(1)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	var views: ScreenViewsScript = _two_views()
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), views)
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "open")
+	check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "the antechamber's symbol drawn")
+	flow.call(&"_reroll_room", WEST, _rerolled_west(), RoomFight.new())
+	view.step(0.0, actors, 1, _grid(), views)
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "still open: a reroll closes nothing")
+	check_equal(view.symbol_rows_of(WEST), 0, "the rerolled room's symbol comes in again")
+	var rows: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		rows.append(view.symbol_rows_of(WEST))
+	check_equal(rows, [1, 2, 3, 4, 5, 6, 7] as Array[int], "a row a frame")
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 0.0)

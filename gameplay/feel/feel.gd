@@ -983,6 +983,7 @@ func _ready() -> void:
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
+	events.room_rerolled.connect(_on_room_rerolled)
 	events.main_menu_requested.connect(_on_main_menu_requested)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
@@ -2506,6 +2507,12 @@ func room_tints() -> RoomTintsScript:
 
 
 ## What each mouth tells of the room behind it and the held Y map (for tests; connected biomes CB9).
+## A room was rerolled (`room_rerolled`): the signs at its mouths turn over (Smooth).
+func _on_room_rerolled(room: int, _kind: StringName) -> void:
+	if _mouth_symbols != null:
+		_mouth_symbols.turn(room)
+
+
 func mouth_symbols() -> MouthSymbolsScript:
 	return _mouth_symbols
 

@@ -68,6 +68,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_begun` | `flow` (a run begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's biome map for them) |
 | `run_room_filled` | `run` (each room's fight of the run's biome map: its enemies, its scale, its pace; connected biomes CB8; before `run_biome_chosen`) | `flow` (the room's `RoomFight`) |
 | `run_biome_chosen` | `run` (the run's biome map, a copy; connected biomes CB8) | `flow` (lays it and plays it) |
+| `run_room_reroll_asked` | `flow` (a room reroll: the map as it is, the room, the run's reroll count; the owner's of 2026-11-19) | `run` (answers at once) |
+| `run_room_rerolled` | `run` (the map with that room rerolled, its fight's pace; null: none valid) | `flow` (lays it) |
+| `room_rerolled` | `flow` (a room rerolled, its new kind, before it is laid anew) | `cover` (its cover at rest), `rewards` (a shop's shelf rolled anew), `feel` (its signs and an open Y map turn over) |
+| `room_reroll_shown` | `flow` (a seat's body at a doorway it may reroll; view only) | `hud` (X "Reroll room") |
+| `room_reroll_refused` | `flow` (none held, or nothing valid; view only) | `hud` (the hint says why) |
 | `run_room_scaled` | `flow` (how much harder the room a fight stands in is: its depth and the run's players, `run_room_filled`'s scale; before each of its enemies stands) | `difficulty` (the level) |
 | `enemy_standing` | `flow` (an enemy or boss body about to stand, not yet in the tree) | `difficulty` (scales it to the room: `Actor.stat_scale`) |
 | `adds_requested` | `actor` (a body's `Phases`: its phase's burst or a wave of adds; boss plan OB13) | `flow` (stands them, for a body it stood) |
@@ -90,6 +95,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |
 | `reward_taken` | `rewards` | none yet (tests) |
 | `reward_refused` | `rewards` (a pick that could not be given: the offer stays) | `hud` (the reward menu opens again, saying why) |
+| `reward_rerolled` | `rewards` (an offer rerolled: one reward reroll spent, its new choices; the owner's of 2026-11-19) | `hud` (the menu turns its cards over) |
+| `reward_reroll_refused` | `rewards` (none held: nothing spent) | `hud` (the menu's title says so) |
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
 | `health_gift_requested` | `rewards` (a fountain's draw), `player` (a potion drunk) | `combat` (it keeps an actor's health) |
@@ -100,6 +107,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `start_stone_changed` | `flow` | `hud`, `feel` |
 | `staff_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
+| `reward_reroll_requested` | HUD (X in the reward picker; a command) | `rewards` |
+| `room_reroll_requested` | HUD (X in play at a doorway; a command) | `flow` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 | `pad_wait_requested` | `core/input` (a command) | `coop` (the game stops while a seat waits for its unplugged gamepad) |

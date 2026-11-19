@@ -11,7 +11,7 @@ extends RefCounted
 ## - `actions`: what can be done with one held (`can`).
 ## - `premade`: the registry folders its premade items are found in (`premade_of`: the hub's rack,
 ##   a `StaffItem`; items I6), apart from its content.
-## - `ids` (only for a kind that shares its bag with another, the currency's coins and keys): the ids
+## - `ids` (only for a kind that shares its bag with another, the currency's coins, keys and rerolls): the ids
 ##   it has, so a stack named by its bag and id alone is known to be of it (`kind_in(bag, id)`).
 ##
 ##     var bag: StringName = ItemKinds.bag_of(ItemKinds.CARD)   # &"cards"
@@ -23,6 +23,7 @@ const RELIC: StringName = &"relic"
 const POTION: StringName = &"potion"
 const COIN: StringName = &"coin"
 const KEY: StringName = &"key"
+const REROLL: StringName = &"reroll"
 
 ## The bags, in the order the inventory shows them (owner, 2026-11-13: Staffs, Cards, Relics, Potions;
 ## the currency after them, connected biomes CB10's follow-up, the owner's of 2026-11-19: the coins
@@ -42,7 +43,9 @@ const USE: StringName = &"use"
 ## `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
 ## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one); a key is a
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
-## room's door (the owner, 2026-11-19: "Keys are also just inventory items"). Everything is dropped
+## room's door (the owner, 2026-11-19: "Keys are also just inventory items"); a reroll is a
+## `RerollBase` (content/rerolls), two stacks beside them, a room reroll and a reward reroll, spent by
+## X at an unvisited doorway or in the reward picker (the owner, 2026-11-19). Everything is dropped
 ## (the owner, 2026-11-19: "Everything is droppable"): a coin or a key one copy at a time, as a potion,
 ## lying as any item, taken by A into the taker's own bag (a dropped coin is not shared: only the
 ## coins a foe dies with are, gameplay/rewards).
@@ -53,6 +56,7 @@ const RULES: Dictionary = {
 	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop", &"use"], "premade": []},
 	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [&"drop"], "premade": [], "ids": [&"coin"]},
 	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [&"drop"], "premade": [], "ids": [&"key"]},
+	&"reroll": {"bag": &"currency", "stacks": true, "content": [&"rerolls"], "type": &"RerollBase", "actions": [&"drop"], "premade": [], "ids": [&"room_reroll", &"reward_reroll"]},
 }
 ## The class of a kind with none of its own yet.
 const NO_CLASS: StringName = &"Resource"

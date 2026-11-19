@@ -126,6 +126,7 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.floor_touched.connect(_on_floor_touched)
 	events.cover_danger_looked.connect(_on_cover_danger_looked)
+	events.room_rerolled.connect(_on_room_rerolled)
 
 
 ## A run's start: the area is a fresh one's (the room laid next sizes it).
@@ -262,6 +263,14 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_rooms.append(CoverRoom.new())
 	_rooms[number].bind(laid)
 	_rooms[number].flush(events, number)
+
+
+## A biome's room was rerolled (`room_rerolled`, Flow's, the owner's of 2026-11-19): nobody has been
+## in it, and its new layout comes next (`room_built`), so its cover begins at rest for that layout.
+func _on_room_rerolled(room: int, _kind: StringName) -> void:
+	if room > 0 and room < _rooms.size():
+		_rooms[room].unbind()
+		_rooms[room] = CoverRoom.new()
 
 
 ## A new world starts in play (`room_entered` of FIRST_ROOM: a run's start, each row room the party

@@ -24,7 +24,7 @@ The game's part of a room's ground cover (ground cover GC5, [docs/milestones/gro
 - **Dependency direction:** `core` ← `gameplay` ← `content`. It uses `core/` (the bus, the actor table, the registry, `CoverLayout`, `Sim`, the projectile manager's grid for where a place is and whether it is awake); it knows nothing of Spells, Combat, the HUD, the AI or `net/`, and calls none.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `cover_changed`, `status_requested`.
-  - Listens to: `room_built` and `room_entered` (flow), `floor_touched` (core/spells), `cover_danger_looked` (ai).
+  - Listens to: `room_built`, `room_entered` and `room_rerolled` (flow: a rerolled room's cover begins at rest), `floor_touched` (core/spells), `cover_danger_looked` (ai).
 
 ## Allowed files
 

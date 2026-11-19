@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RewardTable" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="RewardTable" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://core/base/reward_table.gd" id="1_table"]
 [ext_resource type="Script" path="res://core/base/reward_entry.gd" id="2_entry"]
@@ -59,7 +59,23 @@ count = 1
 weight = 1.0
 price = 9
 
+[sub_resource type="Resource" id="Resource_room_reroll"]
+script = ExtResource("2_entry")
+kind = &"reroll"
+id = &"room_reroll"
+count = 1
+weight = 1.5
+price = 10
+
+[sub_resource type="Resource" id="Resource_reward_reroll"]
+script = ExtResource("2_entry")
+kind = &"reroll"
+id = &"reward_reroll"
+count = 1
+weight = 1.5
+price = 8
+
 [resource]
 script = ExtResource("1_table")
 id = &"shelf"
-entries = Array[ExtResource("2_entry")]([SubResource("Resource_0"), SubResource("Resource_1"), SubResource("Resource_3"), SubResource("Resource_heal"), SubResource("Resource_small"), SubResource("Resource_large"), SubResource("Resource_vigor")])
+entries = Array[ExtResource("2_entry")]([SubResource("Resource_0"), SubResource("Resource_1"), SubResource("Resource_3"), SubResource("Resource_heal"), SubResource("Resource_small"), SubResource("Resource_large"), SubResource("Resource_vigor"), SubResource("Resource_room_reroll"), SubResource("Resource_reward_reroll")])

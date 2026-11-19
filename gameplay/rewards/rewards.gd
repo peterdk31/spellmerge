@@ -20,6 +20,13 @@ extends Node
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
 ##   is the seat's, puts the choice into the seat's own wizard's inventory and goes
 ##   (`reward_taken`). With no room in its bag it stays unspent.
+## - **A reward reroll** (the owner, 2026-11-19: X in the reward picker; `reward_reroll_requested`,
+##   a command at the tick's start): the offer it names, if it is the seat's and its wizard holds a
+##   reward reroll (`RerollBase.REWARD`, its currency bag), spends one and rolls every choice again
+##   from the table and the reward room's type the offer came from (`RewardOffer.table`, `type_row`), as many as it offered, under its own
+##   purpose (REROLL_PURPOSE, keyed by the seat and counted by `_rerolls`, so a reroll never shifts
+##   the seat's later offers); only that offer changes (`reward_rerolled`). With none held, or a
+##   roll that finds nothing, nothing is spent and nothing changes (`reward_reroll_refused`).
 ## - **A reward is an item** (the owner, 2026-11-19: "Every reward is something that can be placed
 ##   in a player's inventory"): a choice is an item kind, its id and a count (`RewardEntry`, a row
 ##   of `ItemKinds.RULES`): a card's copies, potions (a heal, more most health: drunk from the
@@ -54,7 +61,8 @@ extends Node
 ##   none; a boss's go to every player at once, decision 25), each one coin anyone may take: the
 ##   first wizard (seat order) whose feet come within `COIN_REACH` takes it, and every player's coin
 ##   stack gains one. As a seat's wizard first comes in a run its stack gains its player's
-##   `start_coins` (nothing comes back from a run, and the hub has no coins to take along); a seat
+##   `start_coins`, and its `start_room_rerolls` and `start_reward_rerolls` (`RerollBase`, into the
+##   same bag; the owner, 2026-11-19) (nothing comes back from a run, and the hub has no coins to take along); a seat
 ##   that left and comes back has its coins in the inventory its wizard comes back with (Flow's
 ##   `LeftPlayers`; the owner, 2026-11-19), and no second `start_coins`. Spending is one's own (a shop's buy, `spend`).
 ##   The coins, shelves and pools are the world's: a new world (`room_entered` FIRST_ROOM) and a
@@ -104,6 +112,10 @@ const COIN_RADIUS: float = 2.0
 ## The run's chance's purpose for whether a dying foe's coins drop (`EnemyBase.coin_drop_chance`),
 ## keyed by its actor key, counted by `_drops`.
 const DROP_PURPOSE: StringName = &"coin_drop"
+## The chance's purposes of a reward reroll (its lines and its cards of any card), apart from a clear's
+## so a reroll never shifts the seat's later offers.
+const REROLL_PURPOSE: StringName = &"reward_reroll"
+const REROLL_CARD_PURPOSE: StringName = &"reward_reroll_card"
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items"]
@@ -147,6 +159,10 @@ var _pool_left: PackedFloat32Array = PackedFloat32Array()
 var _pool_most: PackedFloat32Array = PackedFloat32Array()
 ## By seat: the rolls it has had this run (its counter of the run's chance, `RewardRoll`).
 var _rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## By seat: the reward rerolls it has spent this run (REROLL_PURPOSE's counter, `RewardRoll`).
+var _rerolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## By room of the biome: how many times it was rerolled (a shop's shelf rolls from that count).
+var _room_rerolls: PackedInt32Array = PackedInt32Array()
 ## By seat: the shelf item (its number) in reach of its standing wizard, last said
 ## (`shelf_near_changed`), -1 for none.
 var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
@@ -187,9 +203,11 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.enemy_died.connect(_on_enemy_died)
 	events.run_stats_ruled.connect(_on_run_stats_ruled)
+	events.room_rerolled.connect(_on_room_rerolled)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"reward_pick_requested", _on_reward_pick_requested)
 	events.listen(&"shelf_buy_requested", _on_shelf_buy_requested)
+	events.listen(&"reward_reroll_requested", _on_reward_reroll_requested)
 
 
 ## A run's start: every offer, coin, shelf and pool goes (each said), and the area is a fresh one's.
@@ -223,6 +241,10 @@ func step(delta: float) -> void:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
 			_add_coins(seat, int(stat_of(seat, &"start_coins")))
+			for id: StringName in RerollBase.START_STATS:
+				var count: int = int(stat_of(seat, RerollBase.START_STATS[id]))
+				if count > 0:
+					_give(seat, ItemKinds.REROLL, id, count)
 			_say_stats(seat)
 			_say_shelf_near(seat)
 	var at: int = 0
@@ -372,6 +394,8 @@ func _roll_clear(room: int, table_id: StringName, type: RewardType) -> void:
 		offer.seat = seat
 		offer.room = room
 		offer.here = body.room == room or body.room == RoomGrid.NO_PLACE
+		offer.table = table_id
+		offer.type_row = type.to_row() if type != null else PackedStringArray()
 		RewardRoll.fill(offer, table, int(stat_of(seat, &"reward_choices")), _sim(), seat, _rolls[seat], cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
 		_rolls[seat] += 1
 		if offer.size() == 0:
@@ -408,6 +432,46 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	if events != null:
 		events.reward_taken.emit(player, offer, choice, _choice_view(row, choice))
 	_say_waiting(player)
+
+
+## Seat `player` asked to reroll its offer `offer` (a command; the class doc): one reward reroll
+## spent from its wizard's currency bag and every choice rolled again from the offer's table, as
+## many as it offered; refused (`reward_reroll_refused`), nothing spent, when the offer is not the
+## seat's, its wizard holds none, or the roll finds nothing.
+func _on_reward_reroll_requested(player: int, offer: int) -> void:
+	var row: RewardOffer = null
+	for each: RewardOffer in _offers:
+		if each.number == offer and each.seat == player:
+			row = each
+			break
+	if row == null:
+		return
+	var body: Actor = _wizard_of(player)
+	var table: RewardTable = registry.get_resource(TABLES, row.table) as RewardTable if registry != null and row.table != &"" else null
+	var held: int = body.inventory.count_of(COIN_BAG, RerollBase.REWARD) if body != null and body.inventory != null else 0
+	if held <= 0 or table == null:
+		_refuse_reroll(player, offer)
+		return
+	var fresh := RewardOffer.new()
+	var type: RewardType = RewardType.from_row(row.type_row) if not row.type_row.is_empty() else null
+	RewardRoll.fill(fresh, table, row.size(), _sim(), player, _rerolls[player], _cards(), REROLL_PURPOSE, REROLL_CARD_PURPOSE, [], type)
+	_rerolls[player] += 1
+	if fresh.size() == 0 or not body.inventory.take(COIN_BAG, RerollBase.REWARD):
+		_refuse_reroll(player, offer)
+		return
+	row.kinds = fresh.kinds
+	row.ids = fresh.ids
+	row.counts = fresh.counts
+	if events != null:
+		var choices: Array[Dictionary] = []
+		choices.assign(_offer_view(row)["choices"])
+		events.reward_rerolled.emit(player, offer, choices)
+	_say_waiting(player)
+
+
+func _refuse_reroll(player: int, offer: int) -> void:
+	if events != null:
+		events.reward_reroll_refused.emit(player, offer)
 
 
 ## A new world (FIRST_ROOM entered): the coins, shelves and pools of the one before are gone with it.
@@ -631,7 +695,9 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 	var cards: RewardCards = _cards()
 	var stock := RewardOffer.new()
 	var lines: Array[RewardEntry] = []
-	RewardRoll.fill(stock, table, spots.size(), _sim(), room, 0, cards, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
+	# A room rerolled before it opened (`room_rerolled`) rolls its shelf anew: its rerolls are the roll.
+	var roll: int = _room_rerolls[room] if room >= 0 and room < _room_rerolls.size() else 0
+	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, cards, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
 	for at in stock.size():
 		_item_numbers.append(_next_item)
 		_next_item += 1
@@ -718,6 +784,17 @@ func _clear_rooms() -> void:
 	_pool_areas.clear()
 	_pool_left.clear()
 	_pool_most.clear()
+	_room_rerolls.clear()
+
+
+## A room of the biome was rerolled (`room_rerolled`, Flow's; the owner, 2026-11-19): its shelf, if it
+## is a shop, is rolled anew as it opens (`_room_rerolls`).
+func _on_room_rerolled(room: int, _kind: StringName) -> void:
+	if room < 0:
+		return
+	if _room_rerolls.size() <= room:
+		_room_rerolls.resize(room + 1)
+	_room_rerolls[room] += 1
 
 
 func _sim() -> Sim:

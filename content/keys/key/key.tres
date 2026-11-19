@@ -6,6 +6,6 @@
 [resource]
 script = ExtResource("1_script")
 id = &"key"
-display_name = "Keys"
+display_name = "Key"
 description = "Opens a treasure room's door, and is used up by it. Your own: walk through the door to spend one."
 icon = ExtResource("2_icon")

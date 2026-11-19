@@ -57,7 +57,7 @@ func _frame() -> void:
 func _roll(seat: int, offer: int, here: bool, waiting: Array[Dictionary] = []) -> Array[Dictionary]:
 	var choices: Array[Dictionary] = [
 		{"kind": &"card", "id": &"fire", "count": 1, "name": "Fire", "icon": null},
-		{"kind": &"coins", "id": &"", "count": 5, "name": "5 coins", "icon": null},
+		{"kind": &"coin", "id": &"coin", "count": 5, "name": "5 coins", "icon": null},
 	]
 	var offers: Array[Dictionary] = waiting.duplicate()
 	offers.append({"offer": offer, "here": here, "choices": choices})

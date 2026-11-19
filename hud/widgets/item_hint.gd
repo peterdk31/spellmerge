@@ -23,8 +23,9 @@ const VERB: String = "Take"
 const BUY: String = "Buy"
 ## A note's words (`show_note`): at a shut key door with no key of one's own (the owner, 2026-11-19).
 const NEEDS_KEY: String = "Needs a key"
-## The item number a note is shown as (it names no item: A does nothing for it).
-const NOTE: int = 0
+## The item number a note is shown as (it names no item: A does nothing for it; never a real
+## item's, so no other hint stacks with it).
+const NOTE: int = -2
 ## The button that takes it (A; F or Enter on the keyboard, never Space, which casts).
 const ACTION: StringName = &"take"
 const FONT_SIZE: int = 8
@@ -213,7 +214,7 @@ func _lay_out() -> void:
 
 
 func _draw() -> void:
-	if _item < 0:
+	if _item < 0 and not _note:
 		return
 	var refused: bool = _shake_left > 0.0
 	draw_rect(Rect2(Vector2.ZERO, size), BACK)

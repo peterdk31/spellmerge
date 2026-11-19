@@ -92,7 +92,7 @@ func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: Scree
 	var split: bool = views != null and views.is_split()
 	for player in PLAYER_COUNT:
 		var hint: ItemHintScript = _hints[player]
-		hint.visible = hint.item() >= 0 and not menus[player]
+		hint.visible = (hint.item() >= 0 or hint.is_note()) and not menus[player]
 		if not hint.visible:
 			continue
 		var place: Vector2 = to_screen * _at[player]
@@ -165,5 +165,5 @@ func _on_item_refused(player: int, item: int) -> void:
 
 
 func _on_shelf_refused(player: int, item: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT and _ground[player] < 0:
+	if player >= 0 and player < PLAYER_COUNT and _ground[player] < 0 and _shelf[player] >= 0:
 		_hints[player].refuse(item)

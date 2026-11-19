@@ -1172,6 +1172,8 @@ func _free_later_mists(forget: bool) -> void:
 
 func _free_mist() -> void:
 	_free_later_mists(false)
+	if light != null:
+		light.read_by(&"mist", null)
 	remove_child(mist)
 	mist.queue_free()
 	mist = null

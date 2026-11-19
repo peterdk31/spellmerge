@@ -1635,7 +1635,8 @@ func _begin_locks(map: BiomeMap) -> void:
 ## necessarily a key for each): with `n` key rooms, 1 to `n` keys (the run's chance, KEY_COUNT_PURPOSE),
 ## each in a room picked by the run's chance (KEY_PURPOSE, keyed by the key) among those reached
 ## without passing a locked door, never the boss's (its clear sends the party home), a room not
-## picked yet first. Empty with no key room, or nowhere to drop one.
+## picked yet first. Empty with no key room or no chance (a test's world: then `LockDoors.begin`
+## gives each key room a key beside it); NO_KEYS when there is nowhere to drop one (no key at all).
 func _key_drops(map: BiomeMap, rules: PackedByteArray, game: Sim) -> PackedInt32Array:
 	var drops := PackedInt32Array()
 	var key_rooms: int = rules.count(LockDoors.RULE_KEY)
@@ -1647,7 +1648,7 @@ func _key_drops(map: BiomeMap, rules: PackedByteArray, game: Sim) -> PackedInt32
 		if not gates.opens_home(room) and (kind == null or kind.fill != RoomKind.FILL_BOSS):
 			may.append(room)
 	if may.is_empty():
-		return drops
+		return LockDoors.NO_KEYS
 	var keys: int = 1 + game.chance_int(KEY_COUNT_PURPOSE, 0, 0, key_rooms)
 	var left: PackedInt32Array = may.duplicate()
 	for key in keys:
@@ -1919,17 +1920,20 @@ func _open_special_room(room: int) -> void:
 ## Room `room` was cleared: each key that drops in it lies at its zone `key`, else its middle, on the
 ## nearest clear ground (connected biomes CB11).
 func _drop_keys(room: int) -> void:
-	var drops: bool = false
+	var count: int = 0
 	for key in locks.key_drops.size():
-		drops = drops or locks.key_drops[key] == room
-	if not drops:
+		if locks.key_drops[key] == room and locks.key_states[key] == LockDoors.KEY_WAITING:
+			count += 1
+	if count == 0:
 		return
 	var places: RoomPlaces = biome.room_places(room)
 	var middle: Vector2 = biome.room_rect(room).get_center()
-	var at: Vector2 = SpecialPlaces.key_spot(places, middle, SpecialPlaces.taken_by(_kind_of(room), places, middle))
+	# Each key its own spot, clear of the room's things, then on the nearest clear ground.
+	var spots: PackedVector2Array = SpecialPlaces.key_spots(places, middle, SpecialPlaces.taken_by(_kind_of(room), places, middle), count)
 	if projectiles != null and world != null:
-		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), PORTAL_GROUND * 0.5))
-	locks.drop_keys(room, at)
+		for at in spots.size():
+			spots[at] = world.to_local(projectiles.grid().nearest_ground(world.to_global(spots[at]), PORTAL_GROUND * 0.5))
+	locks.drop_keys(room, spots)
 
 
 ## Room `room`, cleared, opens the portal home on its floor (connected biomes CB7): at its zone

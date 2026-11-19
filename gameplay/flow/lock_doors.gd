@@ -16,7 +16,7 @@ extends RefCounted
 ##   the run's chance among those reached from the start without passing a locked door,
 ##   `open_rooms`); with none said, one a key room, in the room its bridge hangs off (the shallowest
 ##   beside it). A key drops as its room is cleared (`drop_keys`; a room with no fight is cleared as
-##   it is entered, so its key lies on its floor), two in one room a little apart. It lies there until the first standing wizard (in the
+##   it is entered, so its key lies on its floor), two in one room each on a spot of its own (Flow's). It lies there until the first standing wizard (in the
 ##   party's order) whose feet come within KEY_REACH takes it: the party holds it (shared). With one
 ##   held, the first standing wizard at a shut key door (on its bridge, or on the room's lip outside
 ##   the shut mouth, as at a gather door) opens that room, and one key is spent.
@@ -43,8 +43,8 @@ const KEY_HELD: int = 2
 const KEY_SPENT: int = 3
 ## How near a wizard's feet must come to a key to take it, in pixels (a coin's reach).
 const KEY_REACH: float = 10.0
-## Where two or more keys dropped in one room lie round its spot, in order (pixels).
-const KEY_APART: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(14.0, 0.0), Vector2(-14.0, 0.0)]
+## `begin`'s `drops` for "no key at all" (nowhere to drop one), as against none said (the old rule).
+const NO_KEYS: PackedInt32Array = [-1]
 ## How far round a door's mouth its room's lip counts as at that door (as a gather door's).
 const LIP_REACH: float = 24.0
 ## How near a floor touch's circle must come to a secret door's mouth to break its rock, in pixels.
@@ -212,20 +212,21 @@ func lay(world: BiomeWorld, grid: RoomGrid) -> void:
 		grid.shut_mouth(_mouths[door], not is_open(door_rooms[door]))
 
 
-## Room `room` was cleared: each key still waiting to drop there lies at `at` (the view told).
-func drop_keys(room: int, at: Vector2) -> void:
+## Room `room` was cleared: each key still waiting to drop there lies at the next of `spots` (Flow
+## puts each on clear ground; with fewer spots, the rest on the last), the view told.
+func drop_keys(room: int, spots: PackedVector2Array) -> void:
 	var dropped: int = 0
 	for key in key_drops.size():
 		if key_drops[key] == room and key_states[key] == KEY_WAITING:
 			key_states[key] = KEY_LYING
-			key_at[key] = at + KEY_APART[dropped % KEY_APART.size()]
+			key_at[key] = spots[mini(dropped, spots.size() - 1)] if not spots.is_empty() else Vector2.ZERO
 			dropped += 1
 			_tell_key(key)
 
 
 ## One tick of the locks with `party` (the wizards, in seat order) and `life` the rooms' state
 ## (`rooms()` of them, whose bridges' places follow): each lying key the first standing wizard's feet
-## reach is taken, then each shut key room whose key is held opens once a standing wizard is at one
+## reach is taken, then each shut key room opens, while the party holds any key, once a standing wizard is at one
 ## of its doors (the key spent); the floor touches queued since the last step break their rocks
 ## first. Returns the key room opened (NONE for none; one a tick).
 func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:

@@ -473,13 +473,14 @@ signal room_built(room_id: StringName, room: int, layout_root: Node)
 ## Heard by the cover area, which queues it and fires the `element` triggers of the cells inside the
 ## circle at its next step. Spells knows nothing of cover.
 signal floor_touched(caster: int, element: StringName, at: Vector2, radius: float)
-## Sender: the cover area (ground cover GC5, rule 6). The cells `cells` of the room's cover (its
-## `CoverLayout`'s cell indices) are now in the states `states` (each an index in its kind's
+## Sender: the cover area (ground cover GC5, rule 6). The cells `cells` of the cover of room `room`
+## (the piece's number, as `room_built` gave it: connected biomes CB3b; its `CoverLayout`'s cell
+## indices) are now in the states `states` (each an index in its kind's
 ## `CoverKind.states`; 0 at rest), one event a tick with that tick's changes; after each
 ## `room_built`, every cell not at rest once (a machine that joins mid-fire draws the fire), and after
 ## a restore every cell whose state the view was last told otherwise. Read the arrays while it is
 ## sent; they are reused. Heard by feel (the tufts' look, `cover.gd`).
-signal cover_changed(cells: PackedInt32Array, states: PackedInt32Array)
+signal cover_changed(room: int, cells: PackedInt32Array, states: PackedInt32Array)
 ## Sender: ai (an actor's brain; ground cover GC7, rule 8). The actor `actor` looks at where the floor
 ## within `reach` of `at` would harm a body standing on it: the cover area fills `sight` at once
 ## (`CoverSight`: a window of the room's cover cells, each marked where its state gives a status, as

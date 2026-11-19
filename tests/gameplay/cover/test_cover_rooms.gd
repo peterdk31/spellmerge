@@ -95,7 +95,7 @@ func _fire() -> Array:
 func test_a_room_entered_starts_at_rest() -> void:
 	_play(PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 2, 1))
 	check(cover.layout != null and cover.layout.count() > 0, "the room's cover is worked out")
-	check_equal(cover.get(&"_state").size(), cover.layout.cells.size(), "its state sized to it")
+	check_equal(cover.cell_count(), cover.layout.cells.size(), "its state sized to it")
 	check(cover.active_cells().is_empty(), "at rest")
 	var cell: int = _light(1)
 	check_equal(cover.state_at(cell), BURNING, "fire lights it")

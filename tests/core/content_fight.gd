@@ -185,6 +185,7 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	cover.name = "Cover"
 	cover.events = fight.bus
 	cover.actors = fight.actors
+	cover.projectiles = fight.projectiles
 	cover.use_kinds([GRASS])
 	world.add_child(cover)
 	_lay_cover()

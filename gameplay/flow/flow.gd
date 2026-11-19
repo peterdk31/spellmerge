@@ -1898,7 +1898,7 @@ func _places_for(room: int) -> RoomPlaces:
 
 ## After a snapshot was restored into a biome: the biome laid again where it differs (the world's
 ## own `rebuild_derived`, or here into a world that laid none), its start room's places, and the
-## seals told to the grid again (they are not state there).
+## seals and the places' sleep told to the grid again (they are not state there).
 func _rebuild_biome() -> void:
 	if world == null or not is_instance_valid(world):
 		return
@@ -1915,3 +1915,4 @@ func _rebuild_biome() -> void:
 			_add_camera_over(world, projectiles.bounds())
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
+		life.tell_awake(projectiles.grid())

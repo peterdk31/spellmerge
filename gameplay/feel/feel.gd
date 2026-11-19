@@ -126,6 +126,7 @@ const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
+const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
 const GroundLayoutScript := preload("res://gameplay/feel/ground/ground_layout.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -472,9 +473,10 @@ var _portal_look: PortalLookScript = null
 var _portal_view: PortalView = PortalView.new()
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
-## The room's ground cover (`cover.gd`, ground cover GC3): at the floor marks' z, before the
-## spectacle in the tree, so the marks lie over it.
-var _cover: CoverScript = null
+## The ground cover (ground cover GC3): one view a room (`cover_rooms.gd`, each a `cover.gd`;
+## connected biomes CB3b), at the floor marks' z, before the spectacle in the tree, so the marks lie
+## over it.
+var _cover_rooms: CoverRoomsScript = null
 ## The room's ground, drawn again from its shape as it is laid out (`ground/ground_layout.gd`,
 ## connected biomes CB4).
 var _ground_layout: GroundLayoutScript = null
@@ -744,11 +746,11 @@ func _ready() -> void:
 	_ground_layout.registry = registry
 	add_child(_ground_layout)
 	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
-	_cover = CoverScript.new(MARK_Z)
-	_cover.name = "Cover"
-	_cover.events = events
-	_cover.registry = registry
-	add_child(_cover)
+	_cover_rooms = CoverRoomsScript.new(MARK_Z)
+	_cover_rooms.name = "CoverRooms"
+	_cover_rooms.events = events
+	_cover_rooms.registry = registry
+	add_child(_cover_rooms)
 	_spectacle = SpectacleScript.new()
 	_spectacle.name = "Spectacle"
 	_spectacle.events = events
@@ -756,7 +758,7 @@ func _ready() -> void:
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
 	# Burning cover's embers and smoke cool through the spectacle's ramps (GC8).
-	_cover.motes.ramp_table = _spectacle.ramp_table()
+	_cover_rooms.set_ramp_table(_spectacle.ramp_table())
 	# The floor flashes (a slam's burst and star) share the floor marks' z; at one z the later node
 	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
 	# turns on) is inside it: a new strike shows over the marks earlier ones left.
@@ -975,9 +977,9 @@ func step(real_delta: float) -> void:
 	var picture: Rect2 = party_camera.visible_rect()
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	_cover_rooms.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
-	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
+	_spectacle.hand_bodies(cover().bodies(), cover().body_count())
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
@@ -2329,9 +2331,15 @@ func motes() -> MotesScript:
 	return _spectacle.pool if _spectacle != null else null
 
 
-## The room's ground cover's look (for tests and the screenshots).
+## The first room's ground cover's look (a row run's room, a biome's start room; for tests and the
+## screenshots).
 func cover() -> CoverScript:
-	return _cover
+	return _cover_rooms.first() if _cover_rooms != null else null
+
+
+## Every room's ground cover's look (`cover_rooms.gd`: `view_of(number)`), for tests.
+func cover_rooms() -> CoverRoomsScript:
+	return _cover_rooms
 
 
 ## The floor marks (null with the setting off; for tests and the benchmarks).

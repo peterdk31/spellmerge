@@ -162,7 +162,7 @@ const EVENTS: Dictionary = {
 	&"room_entered": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"room_built": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT], ["layout_root", TYPE_OBJECT]],
 	&"floor_touched": [["caster", TYPE_INT], ["element", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT]],
-	&"cover_changed": [["cells", TYPE_PACKED_INT32_ARRAY], ["states", TYPE_PACKED_INT32_ARRAY]],
+	&"cover_changed": [["room", TYPE_INT], ["cells", TYPE_PACKED_INT32_ARRAY], ["states", TYPE_PACKED_INT32_ARRAY]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],

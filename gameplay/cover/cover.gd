@@ -36,74 +36,63 @@ extends Node
 ## and each room the party goes on into; never a restore), so a snapshot's fire survives the
 ## `room_built` its restore sends. A room where nothing has happened hashes as arrays of zeros.
 ##
+## **A cover a room** (connected biomes CB3b): every piece of the world has its own (`CoverRoom`, by
+## the piece's number: a row run's one room, a biome's rooms then bridges), laid at its place and
+## mirrored with it (`CoverLayout.of_piece`), with its own state and rolls. A room's cells step only
+## while its place is awake (the projectile manager's grid, `RoomGrid.is_awake`, told by Flow's room
+## life), so a sleeping room's fire waits as if no time had passed; a touch lands in whichever rooms
+## its circle reaches, awake or not (it lights, it does not count time), and a sleeping body
+## (`Actors.asleep`) is neither harmed nor counts its time to its next status. Every room's cover is
+## laid as the world is (`room_built`, each piece once), never more than once a piece.
+##
 ## It knows nothing of the HUD, the AI, Spells or Combat, and calls no other area: it hears events and
-## reads the actor table and the registry.
+## reads the actor table, the registry and the projectile manager's grid (core/projectiles).
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const CoverMoves := preload("res://gameplay/cover/cover_moves.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const COVER_FOLDER: StringName = &"cover"
 ## The purpose of a spread's roll (`Sim.chance`).
-const SPREAD: StringName = &"cover_spread"
-## The four neighbours a spread touches, as steps in cells: up, right, down, left.
-const NEIGHBOURS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+const SPREAD: StringName = CoverRoom.SPREAD
 
-## Not state: services, the room's layout (from `room_built`), what this machine's view was told, and
-## scratch emptied within a step (core/sim/README.md).
+## Not state: services, the world's pieces' layouts (from `room_built`), and scratch emptied within a
+## step (core/sim/README.md).
 const DERIVED: Array[StringName] = [
-	&"events", &"actors", &"registry", &"sim", &"layout", &"_moves", &"_given", &"_use_given", &"_said",
-	&"_changed_cells", &"_changed_states", &"_ids", &"_spread_cells", &"_spread_by",
-	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms", &"_harming", &"_harming_rows",
+	&"events", &"actors", &"registry", &"projectiles", &"sim", &"layout", &"_layouts", &"_given", &"_use_given",
+	&"_ids", &"_next_ids", &"_next_keys", &"_next_left",
 ]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads (and the
-## Tick's `sim`).
+## Tick's `sim`). Without a projectile manager every room is awake and found by its grid alone.
 var events: EventsScript = null
 var actors: ActorsScript = null
 var registry: RegistryScript = null
+var projectiles: ProjectileManagerScript = null
 var sim: Sim = null
 
-## The room's cover, worked out from its layout as built (`room_built`); null before a room.
-var layout: CoverLayout = null
-## Its kinds' moves as tables (`cover_moves.gd`), worked out with it.
-var _moves: CoverMoves = null
-## True when a kind with cells in the room gives a status at rest (cobwebs), so a room all at rest still has
-## bodies to look at; false, a step with no cell out of rest and nobody harmed looks at none.
-var _rest_harms: bool = false
-## How many cells are in a state that gives a status now (GC7): worked out from the state as a room is
-## laid, entered or restored, and kept with each cell's change, so a look with none returns at once
-## (ash and grass at rest harm nobody).
-var _harming: int = 0
-## The same count for each row of the room's cells, so a look passes over the rows of its window with
-## none (a fire is a few rows of the room).
-var _harming_rows: PackedInt32Array = PackedInt32Array()
+## The first room's cover (`FIRST_ROOM`: a row run's room, a biome's start room), as built; null
+## before a room. Read only (`layout_of` for another room).
+var layout: CoverLayout:
+	get:
+		return layout_of(EventsScript.FIRST_ROOM)
+## Each piece's cover as laid (`room_built`), by its number: the world's laid last (a new world's
+## first piece, FIRST_ROOM, begins the list again).
+var _layouts: Array[CoverLayout] = []
 ## Kinds given instead of the registry's (`use_kinds`: tests, before the game has cover of its own).
 var _given: Array[CoverKind] = []
 var _use_given: bool = false
-## Each cell's state as this machine's view was last told (`cover_changed`); a new layout is told
-## at rest. Not state: what was said here.
-var _said: PackedByteArray = PackedByteArray()
-## This tick's changes, sent once (`_flush`).
-var _changed_cells: PackedInt32Array = PackedInt32Array()
-var _changed_states: PackedInt32Array = PackedInt32Array()
-## Scratch: the open actor ids, the spreads rolled this step, the harmed bodies being worked out
-## (sized for every actor once, so a step with bodies in harmful cover makes no array).
+## Scratch: the open actor ids, the harmed bodies being worked out (sized for every actor once, so a
+## step with bodies in harmful cover makes no array).
 var _ids: PackedInt32Array = PackedInt32Array()
-var _spread_cells: PackedInt32Array = PackedInt32Array()
-var _spread_by: PackedInt32Array = PackedInt32Array()
 var _next_ids: PackedInt32Array = PackedInt32Array()
 var _next_keys: PackedInt64Array = PackedInt64Array()
 var _next_left: PackedFloat32Array = PackedFloat32Array()
 
-## Each cell's state (its index in its kind's states; 0 at rest) and its seconds in it, the
-## layout's size, or empty for a room with no cover.
-var _state: PackedByteArray = PackedByteArray()
-var _age: PackedFloat32Array = PackedFloat32Array()
-## The cells not at rest, in cell order.
-var _active: PackedInt32Array = PackedInt32Array()
+## Each piece's cover in play, by its number (README, "State").
+var _rooms: Array[CoverRoom] = []
 ## The touches heard since the last step: each element, where and how far.
 var _touch_elements: Array[StringName] = []
 var _touch_at: PackedVector2Array = PackedVector2Array()
@@ -113,8 +102,6 @@ var _touch_radius: PackedFloat32Array = PackedFloat32Array()
 var _harm_ids: PackedInt32Array = PackedInt32Array()
 var _harm_keys: PackedInt64Array = PackedInt64Array()
 var _harm_left: PackedFloat32Array = PackedFloat32Array()
-## The rolls made (the counter of `sim.chance`).
-var _rolls: int = 0
 
 
 func _ready() -> void:
@@ -126,6 +113,8 @@ func _ready() -> void:
 		actors = get_node_or_null(^"/root/Actors") as ActorsScript
 	if registry == null:
 		registry = get_node_or_null(^"/root/Registry") as RegistryScript
+	if projectiles == null:
+		projectiles = get_node_or_null(^"/root/Projectiles") as ProjectileManagerScript
 	_ids.resize(ActorsScript.ACTORS)
 	_next_ids.resize(ActorsScript.ACTORS)
 	_next_keys.resize(ActorsScript.ACTORS)
@@ -170,32 +159,53 @@ func kinds() -> Array[CoverKind]:
 
 # --- Read ------------------------------------------------------------------------------
 
-## The state of cell `cell` (its index in its kind's states; 0 at rest, and for a cell of none).
-func state_at(cell: int) -> int:
-	return _state[cell] if cell >= 0 and cell < _state.size() else 0
+## The cover of piece `number` as laid (null for none laid).
+func layout_of(number: int) -> CoverLayout:
+	return _layouts[number] if number >= 0 and number < _layouts.size() else null
 
 
-## The `CoverState` cell `cell` is in (null for a cell of no cover, or outside the room).
-func cover_state_at(cell: int) -> CoverState:
-	if layout == null:
-		return null
-	var kind: CoverKind = layout.kind_at(cell)
-	return kind.states[state_at(cell)] if kind != null else null
+## The cover in play of piece `number` (null for none). Read only: tests.
+func room(number: int = EventsScript.FIRST_ROOM) -> CoverRoom:
+	return _rooms[number] if number >= 0 and number < _rooms.size() else null
 
 
-## The seconds cell `cell` has been in its state (0 at rest).
-func age_at(cell: int) -> float:
-	return _age[cell] if cell >= 0 and cell < _age.size() else 0.0
+## How many pieces have a cover in play (laid or not).
+func rooms() -> int:
+	return _rooms.size()
 
 
-## The cells not at rest, in cell order. Read only.
-func active_cells() -> PackedInt32Array:
-	return _active
+## The state of cell `cell` of room `number` (its index in its kind's states; 0 at rest, and for a
+## cell of none).
+func state_at(cell: int, number: int = EventsScript.FIRST_ROOM) -> int:
+	return _rooms[number].state_at(cell) if number >= 0 and number < _rooms.size() else 0
 
 
-## The rolls made so far (`sim.chance`'s counter).
+## The `CoverState` cell `cell` of room `number` is in (null for a cell of no cover, or outside it).
+func cover_state_at(cell: int, number: int = EventsScript.FIRST_ROOM) -> CoverState:
+	return _rooms[number].cover_state_at(cell) if number >= 0 and number < _rooms.size() else null
+
+
+## The seconds cell `cell` of room `number` has been in its state (0 at rest).
+func age_at(cell: int, number: int = EventsScript.FIRST_ROOM) -> float:
+	return _rooms[number].age_at(cell) if number >= 0 and number < _rooms.size() else 0.0
+
+
+## The cells of room `number` not at rest, in cell order. Read only.
+func active_cells(number: int = EventsScript.FIRST_ROOM) -> PackedInt32Array:
+	return _rooms[number].active_cells() if number >= 0 and number < _rooms.size() else PackedInt32Array()
+
+
+## How many cells of room `number` the state holds (its layout's, or 0 for a room with no cover).
+func cell_count(number: int = EventsScript.FIRST_ROOM) -> int:
+	return _rooms[number]._state.size() if number >= 0 and number < _rooms.size() else 0
+
+
+## The rolls made so far, every room's (`sim.chance`'s counters).
 func rolls() -> int:
-	return _rolls
+	var made: int = 0
+	for room in _rooms:
+		made += room.rolls()
+	return made
 
 
 ## The bodies standing in harmful cover, in actor id order. Read only.
@@ -203,83 +213,79 @@ func harmed() -> PackedInt32Array:
 	return _harm_ids
 
 
+## The room whose cover lies under `at` (world pixels), or -1: the grid's place there (a biome's), else
+## the first room whose grid holds it (a world with no places: a row run's room).
+func room_at(at: Vector2) -> int:
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	if grid != null and grid.places() > 0:
+		var place: int = grid.place_at(at)
+		return place if place >= 0 and place < _rooms.size() and _rooms[place].holds(at) else -1
+	for number in _rooms.size():
+		if _rooms[number].holds(at):
+			return number
+	return -1
+
+
 ## Fill `sight` with where the floor within `reach` of `at` would harm a body standing on it (rule 8):
-## its window's cells whose state gives a status. Empty in a room with no cover, and at once when no
-## cell is in such a state (`_harming`: grass at rest and ash harm nobody), so a look costs a fight
-## with nothing burning almost nothing. Allocates nothing.
+## its window's cells whose state gives a status, in the room `at` is in. Empty where there is no
+## cover, and at once when no cell of that room is in such a state (`CoverRoom._harming`: grass at
+## rest and ash harm nobody), so a look costs a fight with nothing burning almost nothing. Allocates
+## nothing.
 func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	sight.clear()
-	if layout == null or _state.size() != layout.cells.size() or _state.is_empty() or not at.is_finite():
+	if not at.is_finite():
 		return
-	if _harming == 0:
-		return
-	if not sight.open(at, reach, layout.columns, layout.rows):
-		return
-	var cells: PackedByteArray = layout.cells
-	var harms_table: PackedByteArray = _moves.harms_table
-	var width: int = _moves.width
-	for y in range(sight.origin.y, sight.origin.y + sight.rows):
-		if _harming_rows[y] == 0:
-			continue
-		for x in range(sight.origin.x, sight.origin.x + sight.columns):
-			var cell: int = y * layout.columns + x
-			var kind: int = cells[cell] - 1
-			if kind < 0:
-				continue
-			if harms_table[kind * width + _state[cell]] != 0:
-				sight.mark(x, y)
+	var number: int = room_at(at)
+	if number >= 0:
+		_rooms[number].look(at, reach, sight)
 
 
 # --- Heard -----------------------------------------------------------------------------
 
-## A room was laid out: its cover worked out from its layout. The state is only sized, at rest, when
-## it is empty; then the view is told every cell not at rest.
+## A piece was laid out: its cover worked out from its layout at its place, mirrored with it. Its
+## state is only sized, at rest, when it is empty (a restore's state is kept); then the view is told
+## every cell not at rest. A new world's first piece (FIRST_ROOM) begins the layouts again.
 func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
-	# One room's cover is played: the world's first room's (a biome's start room's, connected biomes
-	# CB3: a biome's others wait for a cover a room; never the whole biome at once).
-	if number != EventsScript.FIRST_ROOM:
+	if number < 0:
 		return
-	# Only where it is laid as its scene is: at the world's origin, unmirrored (a biome's start room
-	# elsewhere, or mirrored, plays no cover until Cover keeps a cover a room: connected biomes CB3).
-	var piece := layout_root as Node2D
-	if piece != null and (piece.position != Vector2.ZERO or (piece.has_meta(PieceShape.GROUND_MIRROR_META) and piece.get_meta(PieceShape.GROUND_MIRROR_META) != Vector2i.ZERO)):
-		layout_root = null
+	if number == EventsScript.FIRST_ROOM:
+		_layouts.clear()
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
-	layout = CoverLayout.of(layout_root, room, kinds())
-	_moves = CoverMoves.of(layout.kinds)
-	# Only a kind with a cell in this room counts (the layout holds every kind given, whatever its biome).
-	_rest_harms = false
-	for kind in layout.kinds:
-		if not kind.states.is_empty() and kind.states[0] != null and kind.states[0].status != &"" and layout.count(kind.id) > 0:
-			_rest_harms = true
-	if _state.is_empty():
-		_size_at_rest()
-	_count_harming()
-	_said.resize(layout.cells.size())
-	_said.fill(0)
-	_tell_all()
-	_flush()
+	var laid: CoverLayout = CoverLayout.of_piece(layout_root, room, kinds())
+	while _layouts.size() <= number:
+		_layouts.append(null)
+	_layouts[number] = laid
+	while _rooms.size() <= number:
+		_rooms.append(CoverRoom.new())
+	_rooms[number].bind(laid)
+	_rooms[number].flush(events, number)
 
 
-## A room starts in play (a run's start, each room the party goes on into; never a restore): every
-## cell at rest, nothing queued and nobody harmed.
+## A new world starts in play (`room_entered` of FIRST_ROOM: a run's start, each row room the party
+## goes on into, a biome's start; never a restore): every piece's cover at rest, nothing queued and
+## nobody harmed. A biome's later rooms' first entries change nothing: what burnt there before
+## anyone came in stays burnt.
 func _on_room_entered(_room_id: StringName, number: int) -> void:
 	if number != EventsScript.FIRST_ROOM:
 		return
-	_size_at_rest()
-	_active.resize(0)
+	_rooms.resize(_layouts.size())
+	for at in _rooms.size():
+		if _rooms[at] == null:
+			_rooms[at] = CoverRoom.new()
+		if _layouts[at] != null:
+			if _rooms[at].layout != _layouts[at]:
+				_rooms[at].bind(_layouts[at])
+			_rooms[at].rest()
 	_clear_touches()
 	_harm_ids.resize(0)
 	_harm_keys.resize(0)
 	_harm_left.resize(0)
-	_count_harming()
-	_tell_all()
 	_flush()
 
 
-## An element touched the floor: queued for the next step (nothing in a room with no cover).
+## An element touched the floor: queued for the next step (nothing in a world with no cover).
 func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
-	if _state.is_empty() or element == &"" or not at.is_finite():
+	if _rooms.is_empty() or element == &"" or not at.is_finite():
 		return
 	_touch_elements.append(element)
 	_touch_at.append(at)
@@ -292,159 +298,63 @@ func _on_cover_danger_looked(_actor: int, at: Vector2, reach: float, sight: Cove
 		look(at, reach, sight)
 
 
-## After a snapshot was restored: the view is told every cell whose state it was told otherwise.
+## After a snapshot was restored: each room bound to its piece's layout again (the restored rooms
+## hold none), and the view told every cell whose state it was told otherwise.
 func rebuild_derived() -> void:
-	_count_harming()
-	_tell_all()
+	for number in _rooms.size():
+		var room: CoverRoom = _rooms[number]
+		var laid: CoverLayout = layout_of(number)
+		if laid == null:
+			continue
+		if room.layout != laid:
+			room.bind(laid)
+		else:
+			room.retell()
 	_flush()
 
 
 # --- The step --------------------------------------------------------------------------
 
-## The tick's step: the touches heard fire their cells' triggers, the cells not at rest step and
-## spread, and the bodies standing in harmful cover are given its status.
+## The tick's step: the touches heard fire their cells' triggers in every room they reach, the cells
+## of each awake room not at rest step and spread, and the bodies standing in harmful cover are given
+## its status.
 func step(delta: float) -> void:
-	if layout == null or _state.is_empty() or _state.size() != layout.cells.size():
-		_clear_touches()
-		return
 	_apply_touches()
-	_step_cells(delta)
+	var game: Sim = sim if sim != null else Sim.found(self)
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	var may_harm: bool = not _harm_ids.is_empty()
+	for number in _rooms.size():
+		var room: CoverRoom = _rooms[number]
+		if not room.plays():
+			continue
+		if grid == null or grid.is_awake(number):
+			room.step_cells(delta, game, number)
+		may_harm = may_harm or room.may_harm()
 	# With every cell at rest, none harmful at rest and nobody harmed, no body can be harmed: the
 	# bodies are not looked at (what a room at rest costs, GC6).
-	if _rest_harms or not _active.is_empty() or not _harm_ids.is_empty():
+	if may_harm:
 		_affect_bodies(delta)
 	_flush()
 
 
-## Every queued touch, in the order heard: the cells inside its circle in cell order.
+## Every queued touch, in the order heard, in every room whose cover its circle reaches (rooms in
+## number order; each room's cells in cell order).
 func _apply_touches() -> void:
-	var cell_size: float = float(CoverLayout.CELL)
-	var cells: PackedByteArray = layout.cells
-	var to_table: PackedInt32Array = _moves.to_table
-	var width: int = _moves.width
-	var elements: int = _moves.elements.size()
 	for t in _touch_elements.size():
 		var at: Vector2 = _touch_at[t]
 		var radius: float = _touch_radius[t]
-		var element: int = _moves.element(_touch_elements[t])
-		if element < 0:
-			continue
-		var centre: int = layout.cell_of(at)
-		var x0: int = maxi(floori((at.x - radius) / cell_size), 0)
-		var x1: int = mini(floori((at.x + radius) / cell_size), layout.columns - 1)
-		var y0: int = maxi(floori((at.y - radius) / cell_size), 0)
-		var y1: int = mini(floori((at.y + radius) / cell_size), layout.rows - 1)
-		for y in range(y0, y1 + 1):
-			for x in range(x0, x1 + 1):
-				var cell: int = y * layout.columns + x
-				var kind: int = cells[cell] - 1
-				if kind < 0:
-					continue
-				var middle := Vector2((float(x) + 0.5) * cell_size, (float(y) + 0.5) * cell_size)
-				if cell == centre or middle.distance_squared_to(at) <= radius * radius:
-					# `_moved_to`, read from the table here: this loop may cover the whole room.
-					var to: int = to_table[(kind * width + _state[cell]) * elements + element]
-					if to >= 0:
-						_enter(cell, to)
+		var reach := Rect2(at - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
+		for room in _rooms:
+			if room.plays() and room.layout.rect().intersects(reach, true):
+				room.touch(_touch_elements[t], at, radius)
 	_clear_touches()
-
-
-## The cells not at rest count on: an `after` trigger moves one on; one that spreads rolls for each
-## of its four neighbours (in NEIGHBOURS' order) that its element would move on, one roll each, the
-## chance its state's `spread_chance` a second. The spreads apply once every cell has stepped. The
-## kinds' moves are read from their tables here (`_moves`, `after` and `_moved_to` inlined): every
-## cell may be burning at once.
-func _step_cells(delta: float) -> void:
-	var game: Sim = sim if sim != null else Sim.found(self)
-	var cells: PackedByteArray = layout.cells
-	var columns: int = layout.columns
-	var rows: int = layout.rows
-	var width: int = _moves.width
-	var elements: int = _moves.elements.size()
-	var to_table: PackedInt32Array = _moves.to_table
-	var spread_table: PackedInt32Array = _moves.spread_table
-	var chance_table: PackedFloat64Array = _moves.chance_table
-	var after_first: PackedInt32Array = _moves.after_first
-	var after_count: PackedInt32Array = _moves.after_count
-	var after_seconds: PackedFloat64Array = _moves.after_seconds
-	var after_to: PackedInt32Array = _moves.after_to
-	var i: int = 0
-	while i < _active.size():
-		var cell: int = _active[i]
-		var row: int = (cells[cell] - 1) * width + _state[cell]
-		_age[cell] += delta
-		var age: float = _age[cell]
-		var to: int = -1
-		var first: int = after_first[row]
-		for at in range(first, first + after_count[row]):
-			if age >= after_seconds[at]:
-				to = after_to[at]
-				break
-		if to >= 0:
-			_enter(cell, to)
-		elif spread_table[row] >= 0:
-			var element: int = spread_table[row]
-			var chance: float = chance_table[row] * delta
-			var x: int = cell % columns
-			var y: int = cell / columns
-			for direction in NEIGHBOURS.size():
-				var nx: int = x + NEIGHBOURS[direction].x
-				var ny: int = y + NEIGHBOURS[direction].y
-				if nx < 0 or ny < 0 or nx >= columns or ny >= rows:
-					continue
-				var other: int = ny * columns + nx
-				var kind: int = cells[other] - 1
-				if kind < 0 or to_table[(kind * width + _state[other]) * elements + element] < 0:
-					continue
-				var roll: float = game.chance(SPREAD, cell * NEIGHBOURS.size() + direction, _rolls)
-				_rolls += 1
-				if roll < chance:
-					_spread_cells.append(other)
-					_spread_by.append(element)
-		# A cell gone to rest left the list; the next is in its place.
-		if i < _active.size() and _active[i] == cell:
-			i += 1
-	for s in _spread_cells.size():
-		_touch_cell(_spread_cells[s], _spread_by[s])
-	_spread_cells.resize(0)
-	_spread_by.resize(0)
-
-
-## `element` (its index in `_moves.elements`) touched cell `cell`: its state's trigger on it (if
-## any) moves it on.
-func _touch_cell(cell: int, element: int) -> void:
-	var to: int = _moved_to(cell, element)
-	if to >= 0:
-		_enter(cell, to)
-
-
-## The state `element` (its index) would move cell `cell` on to, or -1 for none: no cover, no
-## trigger on it, a state its kind lacks, or the state the cell is in (a spread rolls only where
-## this is one).
-func _moved_to(cell: int, element: int) -> int:
-	return _moves.moved_to(layout.cells[cell] - 1, _state[cell], element)
-
-
-## Cell `cell` enters state `to`: its seconds from 0, in or out of the active cells, told.
-func _enter(cell: int, to: int) -> void:
-	var was: int = _state[cell]
-	var row: int = (layout.cells[cell] - 1) * _moves.width
-	var harms: int = int(_moves.harms_table[row + to]) - int(_moves.harms_table[row + was])
-	_harming += harms
-	_harming_rows[cell / layout.columns] += harms
-	_state[cell] = to
-	_age[cell] = 0.0
-	if was == 0 and to != 0:
-		_active.insert(_active.bsearch(cell), cell)
-	elif was != 0 and to == 0:
-		_active.remove_at(_active.bsearch(cell))
-	_tell(cell, to)
 
 
 ## Every open actor's body, in id order, standing in a cell whose state gives a status: asked it at
 ## once and again every `status_every` seconds while it stays in such cover. A body that steps out
 ## keeps its time till its next one running, and is dropped only when it runs out (GC8): stepping
 ## in and out of cobwebs is asked no oftener than standing in them, so a short chill never stacks.
+## A sleeping body (its place asleep, `Actors.asleep`) is asked nothing and its time waits.
 func _affect_bodies(delta: float) -> void:
 	var count: int = actors.open_ids(_ids) if actors != null else 0
 	var old: int = 0
@@ -458,8 +368,18 @@ func _affect_bodies(delta: float) -> void:
 		while old < _harm_ids.size() and _harm_ids[old] < id:
 			old += 1
 		var kept: bool = old < _harm_ids.size() and _harm_ids[old] == id and _harm_keys[old] == key
+		if actors.asleep[id] != 0:
+			# Asleep with its place: its time waits as it is.
+			if kept:
+				_next_ids[harmed] = id
+				_next_keys[harmed] = key
+				_next_left[harmed] = _harm_left[old]
+				harmed += 1
+			continue
 		var left: float = _harm_left[old] - delta if kept else 0.0
-		var state: CoverState = cover_state_at(layout.cell_of(body.global_position))
+		var at: Vector2 = body.global_position
+		var number: int = room_at(at)
+		var state: CoverState = _rooms[number].cover_state_at(_rooms[number].layout.cell_of(at)) if number >= 0 else null
 		if state == null or state.status == &"":
 			# Out of harmful cover: its time runs on, and it is dropped once it is out.
 			if left > 0.0:
@@ -488,32 +408,6 @@ func _affect_bodies(delta: float) -> void:
 
 # --- Upkeep ----------------------------------------------------------------------------
 
-## Every cell at rest, the layout's size (none for a room with no cover).
-func _size_at_rest() -> void:
-	var cells: int = layout.cells.size() if layout != null and layout.count() > 0 else 0
-	_state.resize(cells)
-	_state.fill(0)
-	_age.resize(cells)
-	_age.fill(0.0)
-
-
-## How many cells are in a state that gives a status (`_harming`), from the state.
-func _count_harming() -> void:
-	_harming = 0
-	_harming_rows.resize(0)
-	if layout == null or _moves == null or _state.size() != layout.cells.size():
-		return
-	_harming_rows.resize(layout.rows)
-	_harming_rows.fill(0)
-	var cells: PackedByteArray = layout.cells
-	var harms_table: PackedByteArray = _moves.harms_table
-	var width: int = _moves.width
-	for cell in _state.size():
-		if cells[cell] > 0 and harms_table[(cells[cell] - 1) * width + _state[cell]] != 0:
-			_harming += 1
-			_harming_rows[cell / layout.columns] += 1
-
-
 func _clear_touches() -> void:
 	if _touch_elements.is_empty():
 		return
@@ -522,32 +416,7 @@ func _clear_touches() -> void:
 	_touch_radius.resize(0)
 
 
-## Cell `cell` shows `state` from now on: told at the next `_flush` unless the view already shows it.
-func _tell(cell: int, state: int) -> void:
-	if cell < 0 or cell >= _said.size() or _said[cell] == state:
-		return
-	_said[cell] = state
-	_changed_cells.append(cell)
-	_changed_states.append(state)
-
-
-## Every cell whose state the view was told otherwise (all at rest for a room with no cover).
-func _tell_all() -> void:
-	if layout == null or _said.size() != layout.cells.size():
-		return
-	if _state.size() == _said.size():
-		for cell in _state.size():
-			_tell(cell, _state[cell])
-	elif _state.is_empty():
-		for cell in _said.size():
-			_tell(cell, 0)
-
-
-## The changes told since the last, sent as one `cover_changed`.
+## Each room's changes told since the last, sent as one `cover_changed` a room.
 func _flush() -> void:
-	if _changed_cells.is_empty():
-		return
-	if events != null:
-		events.cover_changed.emit(_changed_cells, _changed_states)
-	_changed_cells.resize(0)
-	_changed_states.resize(0)
+	for number in _rooms.size():
+		_rooms[number].flush(events, number)

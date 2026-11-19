@@ -467,17 +467,18 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 	var carried: int = _coins_in(body)
 	if carried <= 0:
 		return
+	if body.data.boss:
+		# A boss's coins go to every player at once (decision 25): its room's portal home opens as it
+		# is cleared, and nobody should lose them to it. Always, whatever its drop chance (the owner,
+		# 2026-11-19: a boss always pays), so no roll is made.
+		for seat in SEATS:
+			if actors != null and actors.home_of_seat(seat) != ActorsScript.NONE:
+				_add_coins(seat, carried)
+		return
 	var key: int = actors.key_of(body.id) if actors != null and body.id != ActorsScript.NONE else 0
 	var roll: float = _sim().chance(DROP_PURPOSE, key, _drops)
 	_drops += 1
 	if roll >= body.data.coin_drop_chance:
-		return
-	if body.data.boss:
-		# A boss's coins go to every player at once (decision 25): its room's portal home opens as it
-		# is cleared, and nobody should lose them to it.
-		for seat in SEATS:
-			if actors != null and actors.home_of_seat(seat) != ActorsScript.NONE:
-				_add_coins(seat, carried)
 		return
 	for i in carried:
 		var spot: Vector2 = position + COIN_SPREAD[i % COIN_SPREAD.size()]

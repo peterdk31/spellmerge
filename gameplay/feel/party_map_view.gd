@@ -14,8 +14,9 @@ extends CanvasLayer
 ## its hat colour. **A player's own sense** (the run stat `secret_sense`, told for each seat by
 ## `run_stats_told`; the owner's answer of 2026-11-19): on that player's map only, each secret
 ## room (a kind whose door is `RoomKind.DOOR_SECRET`) not otherwise drawn whose rectangle lies within
-## `secret_sense` pixels of a room the party entered is drawn too, in the stone's shadow as a room only
-## shown. It is worked out each frame from the party's map, the pieces and the seat's stat, so it is
+## `secret_sense` pixels of a room the party entered is drawn too, in a look of its own so it reads
+## as secret (the owner, 2026-11-19): a faint void light, the palette's Void shadow and base
+## (`SENSED_STAGES`). It is worked out each frame from the party's map, the pieces and the seat's stat, so it is
 ## the same on every machine and needs nothing of its own saved: per player, and view only.
 ##
 ## **Where:** a frame round the map, centred on the anchor of the player's view (where its wizards are
@@ -26,7 +27,8 @@ extends CanvasLayer
 ##
 ## **Smooth** (docs/STYLE.md): it opens from its middle row out through OPEN_STAGES heights at FPS and
 ## closes the same way back. While it is open, a piece newly drawn comes in through the stone's shades
-## (none, shadow, base, light; a room only shown stops at its shadow, a bridge at its base), a room
+## (none, shadow, base, light; a room only shown stops at its shadow, a bridge at its base; a sensed
+## secret room through the stone's shadow, the void's shadow and the void's base), a room
 ## entered climbs from its shadow to its light, and a symbol rises in by rows, each a step a frame at
 ## FPS; with every map shut they are drawn as they stand. A frame whose size or scale must change (the
 ## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
@@ -82,8 +84,8 @@ var _seen: PackedByteArray = PackedByteArray()
 ## By place: a secret room (1). By seat: its `secret_sense` (pixels; `run_stats_told`).
 var _secret: PackedByteArray = PackedByteArray()
 var _sense: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
-## By seat and place (seat * places + place): a secret room sensed by that seat drawn (0 none, 1 the
-## stone's shadow).
+## By seat and place (seat * places + place): a secret room sensed by that seat drawn (0 none, then
+## its stage of `_sensed_shades`, up to SENSED_STAGES).
 var _sense_shade: PackedInt32Array = PackedInt32Array()
 ## By seat and place: sensed now (1), worked out again only when the party's map, a seat's stat or
 ## the biome changes (`_sensed_stale`).
@@ -110,6 +112,10 @@ var _laid_world: int = -1
 var _clock: float = 0.0
 ## The stone's shades (shadow, base, light).
 var _stone: PackedColorArray = Palette.shades_of(&"stone")
+## A sensed secret room's stages, coming in: as a room only shown (the stone's shadow), then the
+## void's shadow, then its faint light (the void's base; the owner, 2026-11-19).
+const SENSED_STAGES: int = 3
+var _sensed_shades: PackedColorArray = PackedColorArray([Palette.shades_of(&"stone")[0], Palette.shades_of(&"void")[0], Palette.shades_of(&"void")[1]])
 
 
 ## One seat's frame: a Control that clips, drawing its seat's map.
@@ -303,7 +309,7 @@ func _sense_wanted(at: int) -> int:
 		var places: int = _rects.size()
 		_sensed.resize(places * ActorsScript.SEATS)
 		for each in _sensed.size():
-			_sensed[each] = 1 if senses(each / places, each % places) else 0
+			_sensed[each] = SENSED_STAGES if senses(each / places, each % places) else 0
 	return _sensed[at] if at < _sensed.size() else 0
 
 
@@ -445,12 +451,14 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 	var places: int = _rects.size()
 	for place in places:
 		var shade: int = _shade[place]
-		if shade <= 0 and _sense_shade[seat * places + place] > 0:
-			# A secret room this player senses (`secret_sense`): on their map only.
-			shade = 1
+		var colour: Color = _stone[maxi(shade - 1, 0)]
+		var sensed: int = _sense_shade[seat * places + place]
+		if shade <= 0 and sensed > 0:
+			# A secret room this player senses (`secret_sense`): on their map only, in a void light.
+			shade = sensed
+			colour = _sensed_shades[sensed - 1]
 		if shade <= 0:
 			continue
-		var colour: Color = _stone[shade - 1]
 		var at: Vector2 = origin + ((_rects[place].position - _area.position) / MAP_CELL).floor() * scale
 		var texture: ImageTexture = _floors[place]
 		if texture != null:

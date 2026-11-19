@@ -357,6 +357,18 @@ func test_a_bosss_coins_go_to_every_player() -> void:
 	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [10, 10], "every player gains them (decision 25)")
 
 
+## The owner, 2026-11-19: a boss always pays, whatever drop chance its data gives, and rolls nothing.
+func test_a_boss_always_pays_whatever_its_drop_chance() -> void:
+	_wizard(0)
+	_wizard(1, Vector2(40, 0))
+	var data: EnemyBase = _carrying(10)
+	data.boss = true
+	data.coin_drop_chance = 0.0
+	_kill(_foe(data), Vector2(300, 0))
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [10, 10], "a chance of 0: every player still gains them")
+	check_equal(_rewards._drops, 0, "no drop roll is made for a boss")
+
+
 func test_an_add_drops_no_coin() -> void:
 	var add: Actor = _foe(IMP, RoomGrid.NO_PLACE, true)
 	check_equal(add.inventory.count_of(COINS, CoinBase.ID), 0, "an add carries none")

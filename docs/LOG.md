@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-11-19: The keys on the HUD and a rejoin's inventory
+## 2026-11-19: The keys on the HUD, a rejoin's inventory, and three small rules
 
-Two changes the owner decided on 2026-11-19 (docs/milestones/connected-biomes.md, "The keys on the HUD and a rejoin's inventory"). Every corner panel now shows the keys the party holds beside its coins, a small brass key and the count, played in and out by whole pixels (`hud/widgets/key_count.gd`, told by `party_keys_shown` from Flow's LockDoors). A player who leaves and joins again mid-run now gets back its whole inventory (cards, staffs, potions, coins), not only its coins: Flow keeps the leaving wizard's player loadout (`LeftPlayers`) and makes the new wizard from it, once. Tests: test_rejoin.gd, test_key_count.gd, and additions to test_special_rooms.gd and test_rewards.gd.
+Five changes the owner decided on 2026-11-19 (docs/milestones/connected-biomes.md, "The keys on the HUD and a rejoin's inventory"). Every corner panel now shows the keys the party holds beside its coins, a small brass key and the count, played in and out by whole pixels (`hud/widgets/key_count.gd`, told by `party_keys_shown` from Flow's LockDoors). A player who leaves and joins again mid-run now gets back its whole inventory (cards, staffs, potions, coins), not only its coins: Flow keeps the leaving wizard's player loadout (`LeftPlayers`) and makes the new wizard from it, once. Three more small ones: a rolled challenge room now takes its slot before the treasure rooms (the biome generator grants the chance rooms' slots to the lines with the fewest first), a boss always pays its coins whatever its drop chance, and a secret room found by `secret_sense` rests on the Y map in a faint void light of its own. Tests: test_rejoin.gd, test_key_count.gd, and additions to test_special_rooms.gd, test_rewards.gd, test_biome_generator.gd and test_party_map_view.gd.
 
 ## 2026-11-19: Enemy coins and a rejoin's coins
 

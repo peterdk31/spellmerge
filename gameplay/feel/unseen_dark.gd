@@ -1,36 +1,38 @@
 extends Node2D
-## The dark over a biome's rooms nobody has been in yet (connected biomes CB12, decision 30:
-## "Unvisited rooms in a view are dark by a whole-pixel dither, lightening in stages"). View only:
-## nothing in the game reads it.
+## The dark over a biome's rooms nobody has been in yet (connected biomes CB12, decision 30; the
+## owner, 2026-11-19: "unseen rooms are completely covered in darkness"). View only: nothing in the
+## game reads it.
 ##
 ## A room (not a walkway) is visited once the party's map says it was entered (`rooms_seen`, Flow's
 ## state, connected biomes CB9: a room shown on the map but never entered stays dark), so a machine
 ## that joins mid-run (a restore, told `again`) draws the rooms entered before it came lit, as they
-## stand, never played in. An unvisited room's
-## place is drawn over with the void's dark through a 4×4 ordered dither (`DITHER`), DARK_STAGES of
-## its sixteen pixels dark; once visited it lightens a stage a frame at FPS (DARK_STAGES frames),
-## by whole pixels, never a fade. The dither is a tiled texture a stage, made once; it lines up with
-## the world's pixels, as every place stands on the 32 px grid.
+## stand, never played in. An unvisited room's place is covered whole in the void's black
+## (`VoidBackdrop.COLOUR`): nothing in it shows, so it is one with the void round it. Once visited it
+## opens by **shrinking blocks** (docs/STYLE.md, "Smooth"): the place is cut into BLOCK px squares,
+## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 16, 12, 8, 4,
+## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. A
+## stage is a tiled texture made once (the solid stage a plain rectangle); it lines up with the
+## world's pixels, as every place stands on the 32 px grid.
 ##
 ## A child of Feel, top level (world space), over the bodies (what stands in a dark room is dark too)
 ## and under the screen's layers. Feel steps it once a frame (`step`).
 
 const EventsScript := preload("res://core/events/events.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 
 ## Over the bodies and the world's looks, under the labels (22) and the screen's layers.
 const Z: int = 20
 ## Frames a second it lightens at.
 const FPS: float = 12.0
-## How dark an unvisited room is, as dark pixels of 16 a stage, from lit (0) to unvisited (the last).
-const DARK_STAGES: PackedInt32Array = [0, 3, 7, 11, 14]
-## The 4×4 ordered dither: a pixel is dark at a stage when its number is below the stage's count.
-const DITHER: PackedInt32Array = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
-const DITHER_SIDE: int = 4
+## The side of the blocks a room's dark opens by (pixels; a whole number of them on the 32 px grid).
+const BLOCK: int = 16
+## Each stage's black square at a block's middle, from lit (0) to unvisited (the last: BLOCK, solid).
+const BLOCK_SIDES: PackedInt32Array = [0, 4, 8, 12, 16]
 ## A room's level in `rooms_seen` once it was entered (0 unseen, 1 only shown on the map).
 const ENTERED: int = 2
-## The void's dark (the split's divider's).
-const DARK := Color(0.05, 0.04, 0.09)
+## The dark: the void's black.
+const DARK: Color = VoidBackdropScript.COLOUR
 
 ## The pieces (Feel's room hearing: which places are walkways).
 var pieces: RoomHearingScript = null
@@ -54,8 +56,8 @@ func _ready() -> void:
 	z_index = Z
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	for stage in DARK_STAGES.size():
-		_textures.append(_dither_texture(DARK_STAGES[stage]))
+	for stage in BLOCK_SIDES.size():
+		_textures.append(block_texture(BLOCK_SIDES[stage]))
 
 
 func bind(events: EventsScript) -> void:
@@ -63,18 +65,21 @@ func bind(events: EventsScript) -> void:
 		events.rooms_seen.connect(_on_rooms_seen)
 
 
-## The dither of `dark` pixels of 16, as a 4×4 texture to tile (null for none).
-static func _dither_texture(dark: int) -> ImageTexture:
-	if dark <= 0:
+## A BLOCK × BLOCK texture to tile, a black square of side `side` at its middle (null for none, and
+## for a solid block: that stage is drawn as a plain rectangle).
+static func block_texture(side: int) -> ImageTexture:
+	if side <= 0 or side >= BLOCK:
 		return null
-	var image := Image.create(DITHER_SIDE, DITHER_SIDE, false, Image.FORMAT_RGBA8)
-	for y in DITHER_SIDE:
-		for x in DITHER_SIDE:
-			image.set_pixel(x, y, DARK if DITHER[y * DITHER_SIDE + x] < dark else Color(0, 0, 0, 0))
+	var image := Image.create(BLOCK, BLOCK, false, Image.FORMAT_RGBA8)
+	var low: int = (BLOCK - side) / 2
+	for y in BLOCK:
+		for x in BLOCK:
+			var inside: bool = x >= low and x < low + side and y >= low and y < low + side
+			image.set_pixel(x, y, DARK if inside else Color(0, 0, 0, 0))
 	return ImageTexture.create_from_image(image)
 
 
-## How many places it knows, and place `place`'s stage (0 lit ... DARK_STAGES.size() - 1; -1: none).
+## How many places it knows, and place `place`'s stage (0 lit ... BLOCK_SIDES.size() - 1; -1: none).
 func places() -> int:
 	return _rects.size()
 
@@ -83,10 +88,16 @@ func stage_of(place: int) -> int:
 	return _stage[place] if place >= 0 and place < _stage.size() else -1
 
 
-## The dark pixels of 16 drawn over place `place` now.
+## The dark pixels of a block's BLOCK × BLOCK drawn over place `place` now (BLOCK × BLOCK: covered).
 func dark_of(place: int) -> int:
 	var stage: int = stage_of(place)
-	return DARK_STAGES[stage] if stage >= 0 else 0
+	return BLOCK_SIDES[stage] * BLOCK_SIDES[stage] if stage >= 0 else 0
+
+
+## The rectangle place `place`'s dark covers whole (the place's while it is unvisited; none else).
+func covered_of(place: int) -> Rect2:
+	var stage: int = stage_of(place)
+	return _rects[place] if stage >= 0 and BLOCK_SIDES[stage] >= BLOCK else Rect2()
 
 
 func _on_rooms_seen(seen: PackedByteArray, again: bool) -> void:
@@ -135,7 +146,7 @@ func advance() -> void:
 
 func _wanted(place: int) -> int:
 	var entered: bool = place < _seen.size() and _seen[place] >= ENTERED
-	return 0 if _room[place] == 0 or entered else DARK_STAGES.size() - 1
+	return 0 if _room[place] == 0 or entered else BLOCK_SIDES.size() - 1
 
 
 ## A new biome's places, every room dark but those entered already (drawn as it stands: a new world
@@ -155,7 +166,13 @@ func _lay(grid: RoomGrid, places: int) -> void:
 
 func _draw() -> void:
 	for place in _rects.size():
-		var texture: ImageTexture = _textures[_stage[place]] if _stage[place] < _textures.size() else null
+		var stage: int = _stage[place]
+		if stage <= 0:
+			continue
+		if BLOCK_SIDES[stage] >= BLOCK:
+			draw_rect(_rects[place], DARK)
+			continue
+		var texture: ImageTexture = _textures[stage] if stage < _textures.size() else null
 		if texture != null:
 			draw_texture_rect(texture, _rects[place], true)
 

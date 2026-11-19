@@ -28,6 +28,7 @@ extends Node
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
@@ -130,11 +131,11 @@ func view_in_slot(slot: int) -> SubViewport:
 
 ## A drawn frame, `delta` real seconds on: the views for this machine's wizards (`seats`, a bit a
 ## seat) in `table`, split from the world's camera `world_camera`, laid out and drawn.
-func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D) -> void:
+func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D, foes: CloseFoesScript = null) -> void:
 	if _root == null:
 		return
 	var screen: Vector2 = _root.get_visible_rect().size
-	camera.step(delta, table, seats, world_camera, screen)
+	camera.step(delta, table, seats, world_camera, screen, foes)
 	var laid: ScreenViewsScript = camera.views
 	budget.step(delta, laid.count)
 	if laid.count == 0:

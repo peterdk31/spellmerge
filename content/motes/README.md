@@ -63,6 +63,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `rim_drip` | none (named by a `MoteSource`: the drip lines under a room's ground drawn from a shape, hub rework HR2; tools/ground_shape.py) | given off along the bottom of the rock face under an edge: falls slowly away into the void, swaying a little, cooling through the source's ramps (the hub's: the band of the coast it hangs under) | a pixel with a fainter one below it, flickering |
 | `air_dust` | none (named by the crypt's air, `content/rooms/crypt/crypt_air.tres`: `RoomBase.air`) | lit only: dust hanging in a room's air, drifting a few px a second and swaying, seen only in a candle's pool, a wizard's carried light or a passing spell's, in Bone tinted by the light | a pixel |
 | `air_glimmer` | none (named by the hub's air, `content/rooms/hub/hub_air.tres`) | lit only: glimmers rising softly in the hub's air, seen round the wizards' staffs and the spells, in Bone and Spark | a pixel |
+| `void_drift` | none (named by the void's air, `gameplay/feel/presets/void_air.tres`: `Spectacle.void_air`) | not lit only: a sparse drift of single pixels in the black void between a biome's rooms and bridges, given off only outside them (the owner, 2026-11-19) | a pixel |
 | `smoke` | none (named by burning cover's state, `content/cover/hub_grass`: ground cover GC8) | rises slowly off burning cover and sways, starting a shade down (no white heat) and cooling dark, never glowing | a 2x2 puff that thins to a pixel over its life |
 
 ## How to make something in the world give off motes

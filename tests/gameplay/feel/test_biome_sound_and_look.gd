@@ -4,7 +4,8 @@ extends "res://tests/support/suite.gd"
 ## court east, tests/support/biome_maps.gd), Feel's parts stepped by hand. Sound comes only from the
 ## rooms this machine's wizards are in (and the bridges touching them); the music follows the most
 ## intense of them; each mouth shimmers, flares where a shot stops and seals with bars dropping in
-## and a rune, over frames; the unvisited rooms are dark by a dither that lightens a stage a frame;
+## and a rune, over frames; the unvisited rooms are wholly black and open by shrinking blocks a stage
+## a frame; the void between the slabs is black with its own motes;
 ## a gather door's lamps are lit in their wizards' hat colours.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -12,9 +13,13 @@ const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
+const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
 
@@ -205,13 +210,18 @@ func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 	var map: BiomeMap = _start(1)
 	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
 	dark.step(0.0, _grid())
-	var darkest: int = UnseenDarkScript.DARK_STAGES.size() - 1
+	var darkest: int = UnseenDarkScript.BLOCK_SIDES.size() - 1
 	check_equal(dark.places(), 5, "every piece")
 	check_equal(dark.stage_of(0), 0, "the start room, entered, is lit")
 	check_equal(dark.stage_of(1), darkest, "the antechamber, unvisited, is dark")
 	check_equal(dark.stage_of(2), darkest, "and the court")
 	check_equal(dark.stage_of(3), 0, "a bridge is never dark")
-	check(dark.dark_of(1) > 8 and dark.dark_of(1) < 16, "dark by a dither, not wholly: %d of 16" % dark.dark_of(1))
+	var block: int = UnseenDarkScript.BLOCK * UnseenDarkScript.BLOCK
+	check_equal(dark.dark_of(1), block, "dark wholly, no dither")
+	check_equal(dark.covered_of(1), _grid().place_rect(1), "the dark covers the whole unvisited room")
+	check_equal(dark.covered_of(2), _grid().place_rect(2), "and the whole court")
+	check_equal(dark.covered_of(0), Rect2(), "the start room is not covered")
+	check_equal(UnseenDarkScript.DARK, VoidBackdropScript.COLOUR, "in the void's black")
 	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
 	dark.step(0.0, _grid())
 	check_equal(dark.stage_of(1), darkest, "a wizard standing there is not yet the party's map")
@@ -221,25 +231,68 @@ func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 	while dark.is_moving():
 		dark.advance()
 		stages.append(dark.stage_of(1))
-	check_equal(stages, [3, 2, 1, 0] as Array[int], "visited, it lightens a stage a frame")
+	check_equal(stages, [3, 2, 1, 0] as Array[int], "visited, it opens a stage a frame (Smooth: 3 frames between)")
+	check_equal(dark.covered_of(1), Rect2(), "and is no longer covered")
 	check_equal(dark.stage_of(2), darkest, "the court stays dark")
 
 
-func test_a_dither_stage_is_whole_pixels_of_the_voids_dark() -> void:
-	for stage in UnseenDarkScript.DARK_STAGES.size():
-		var count: int = UnseenDarkScript.DARK_STAGES[stage]
-		var texture: ImageTexture = UnseenDarkScript._dither_texture(count)
-		if count == 0:
-			check(texture == null, "a lit stage draws nothing")
+## Each stage between covered and lit is a block of whole black pixels round a block's middle,
+## shrinking stage by stage, so the room shows through a widening grid.
+func test_a_dark_stage_is_a_shrinking_block_of_whole_black_pixels() -> void:
+	var last: int = -1
+	for stage in UnseenDarkScript.BLOCK_SIDES.size():
+		var side: int = UnseenDarkScript.BLOCK_SIDES[stage]
+		var texture: ImageTexture = UnseenDarkScript.block_texture(side)
+		if side == 0 or side >= UnseenDarkScript.BLOCK:
+			check(texture == null, "a lit stage and the solid one need no texture (stage %d)" % stage)
 			continue
 		var image: Image = texture.get_image()
 		var dark: int = 0
 		for y in image.get_height():
 			for x in image.get_width():
 				var pixel: Color = image.get_pixel(x, y)
-				check(pixel.a == 0.0 or pixel.a == 1.0, "a pixel is wholly dark or wholly clear")
+				check(pixel.a == 0.0 or pixel == UnseenDarkScript.DARK, "a pixel is wholly black or wholly clear")
 				dark += 1 if pixel.a == 1.0 else 0
-		check_equal(dark, count, "stage %d darkens %d pixels of 16" % [stage, count])
+		check_equal(dark, side * side, "stage %d is a %d px square" % [stage, side])
+		check(image.get_pixel(UnseenDarkScript.BLOCK / 2, UnseenDarkScript.BLOCK / 2).a == 1.0 and image.get_pixel(0, 0).a == 0.0, "at the block's middle")
+	for stage in UnseenDarkScript.BLOCK_SIDES.size():
+		check(UnseenDarkScript.BLOCK_SIDES[stage] > last, "the blocks grow stage by stage")
+		last = UnseenDarkScript.BLOCK_SIDES[stage]
+	check_equal(UnseenDarkScript.BLOCK_SIDES[UnseenDarkScript.BLOCK_SIDES.size() - 1], UnseenDarkScript.BLOCK, "the last is solid")
+	check(UnseenDarkScript.BLOCK_SIDES.size() - 2 >= 3, "at least 3 frames between covered and lit")
+
+
+## The void between a biome's slabs is pure black under everything, over the biome and past it; its
+## motes drift only outside the places; outside a biome there is neither.
+func test_the_void_is_black_with_motes_outside_the_rooms() -> void:
+	_start(1)
+	feel.call(&"_step_rooms", 0.0, 1)
+	var backdrop: VoidBackdropScript = feel.call(&"void_backdrop") as VoidBackdropScript
+	check(backdrop != null, "Feel has the void")
+	check_equal(VoidBackdropScript.COLOUR, Color(0.0, 0.0, 0.0, 1.0), "pure black")
+	check_equal(backdrop.z_index, RenderingServer.CANVAS_ITEM_Z_MIN, "under everything")
+	var bounds: Rect2 = projectiles.call(&"bounds") as Rect2
+	check(backdrop.rect().encloses(bounds.grow(VoidBackdropScript.GROW - 1.0)), "over the biome and far past it")
+	var spectacle: Node = feel.call(&"spectacle")
+	var air: AirMotesScript = spectacle.get(&"void_air") as AirMotesScript
+	var pool: MotesScript = spectacle.get(&"pool") as MotesScript
+	check(pool != null, "the motes' pool")
+	check(air.look != null and pool.kind_index(air.look.kind) >= 0, "its kind is a good mote kind")
+	var given_before: int = air.given
+	var view := Rect2(bounds.position, bounds.size)
+	for i in 120:
+		air.give_off(float(i) * 0.1, pool, view, Rect2(), SpectacleScript.VOID_SHARE, _grid())
+	check(air.given > given_before, "the void gives off motes (%d)" % (air.given - given_before))
+	check(air.look != null and not registry.call(&"get_resource", &"motes", air.look.kind).lit_only, "seen in the dark: not lit only")
+	# None leaves from a room or a bridge.
+	var seen: int = air.given
+	air.given = 0
+	for i in 200:
+		air.give_off(12.0 + float(i) * 0.1, pool, Rect2(_grid().place_rect(0).get_center() - Vector2(32.0, 32.0), Vector2(64.0, 64.0)), Rect2(), SpectacleScript.VOID_SHARE, _grid())
+	check_equal(air.given, 0, "none from inside a room (%d before)" % seen)
+	flow.stop_run()
+	feel.call(&"_step_rooms", 0.0, 1)
+	check_equal(backdrop.rect(), Rect2(), "outside a biome, no void is drawn")
 
 
 func test_a_gather_doors_lamps_are_lit_in_their_wizards_hat_colours() -> void:

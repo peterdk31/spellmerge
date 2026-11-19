@@ -15,11 +15,20 @@ extends RefCounted
 ##
 ## While it eases it also zooms out as far as needed to keep the party's box in the picture, so
 ## nobody of this machine leaves it while the camera catches up (the view is fitted for where the
-## camera is heading, the box is checked against where it is). It keeps to the camera's limits,
-## never showing past them. After `room_entered`, or on another camera, it jumps to the view
-## instead of easing. Shake (Feel) moves only the camera's `offset`, so the two do not clash.
+## camera is heading, the box is checked against where it is).
+##
+## **Close foes too** (the owner, 2026-11-19): it frames the enemies close to its wizards
+## (`close_foes.gd`, Feel's, handed to `look`: in their place and sealed in or within its reach)
+## besides the wizards, zooming out for them no further than MIN_ZOOM. The wizards always stay in:
+## the foes' part of the box is cut down until the box fits at MIN_ZOOM (`fit_around`). Only the
+## wizards are held at once while easing; the foes are only where it heads, so a foe stepping close
+## or dying eases the picture, never jerks it (docs/STYLE.md, "Smooth").
+##
+## It keeps to the camera's limits, never showing past them. After `room_entered`, or on another
+## camera, it jumps to the view instead of easing. Shake (Feel) moves only the camera's `offset`, so the two do not clash.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0
@@ -40,6 +49,8 @@ var target_zoom: float = 1.0
 ## The box round this machine's wizards, kept in the picture while it eases; a negative size
 ## before the first one found.
 var _party: Rect2 = Rect2(Vector2.ZERO, -Vector2.ONE)
+## The box it frames: the party's with its close foes (cut to fit at MIN_ZOOM), what it heads for.
+var _framed: Rect2 = Rect2(Vector2.ZERO, -Vector2.ONE)
 ## Jump to the next box found (a new room), instead of easing.
 var _snap_next: bool = true
 
@@ -55,25 +66,34 @@ func follow(node: Camera2D) -> void:
 ## A new room: its first view is jumped to.
 func room_entered() -> void:
 	_party = Rect2(Vector2.ZERO, -Vector2.ONE)
+	_framed = _party
 	_snap_next = true
 
 
 ## Find this machine's wizards in the actor table `table` and head for the view that holds them.
 ## `seats` has a bit per seat played here (`Frames.seats_here`); with none of them standing in
-## the world (0: nobody plays here; or their wizards are not made yet) everyone is held.
-func look(table: ActorsScript, seats: int) -> void:
+## the world (0: nobody plays here; or their wizards are not made yet) everyone is held. `foes`
+## (null: none) are the enemies close to each seat's wizards, framed with them.
+func look(table: ActorsScript, seats: int, foes: CloseFoesScript = null) -> void:
 	if table == null:
 		return
 	var party: Rect2 = party_box(table, seats)
+	var held: int = seats
 	if party.size.x < 0.0 and seats != 0:
 		party = party_box(table, 0)
+		held = 0
 	if party.size.x >= 0.0:
-		hold(party)
+		hold(party, foes.box_for(held, party) if foes != null else party)
 
 
-## Head for the view that holds the box `party` (world pixels).
-func hold(party: Rect2) -> void:
+## Head for the view that holds the box `party` (world pixels) and frames `framed` (a box round it,
+## the party's close foes; cut down to fit at MIN_ZOOM; none: the party's alone).
+func hold(party: Rect2, framed: Rect2 = Rect2(Vector2.ZERO, -Vector2.ONE)) -> void:
 	_party = party
+	_framed = party if framed.size.x < 0.0 else framed
+	if _valid():
+		var most: Vector2 = _picture() / maxf(MIN_ZOOM, _min_zoom()) - Vector2.ONE * (CAMERA_MARGIN * 2.0)
+		_framed = fit_around(_party, _framed, most)
 	_aim()
 	if _snap_next and _valid():
 		_snap_next = false
@@ -97,6 +117,25 @@ static func party_box(table: ActorsScript, seats: int) -> Rect2:
 			high = high.max(body.global_position)
 	if low.x > high.x:
 		return Rect2(Vector2.ZERO, -Vector2.ONE)
+	return Rect2(low, high - low)
+
+
+## `framed` (a box round `inner`) cut down, each way, to at most `most` long while still holding
+## `inner` whole: what lies past `inner` on either side shrinks in proportion. `inner` alone when it
+## is already longer than `most`.
+static func fit_around(inner: Rect2, framed: Rect2, most: Vector2) -> Rect2:
+	framed = framed.merge(inner)
+	var low: Vector2 = framed.position
+	var high: Vector2 = framed.end
+	for axis in 2:
+		var over: float = (high[axis] - low[axis]) - most[axis]
+		if over <= 0.0:
+			continue
+		var before: float = inner.position[axis] - low[axis]
+		var after: float = high[axis] - inner.end[axis]
+		var keep: float = clampf(1.0 - over / maxf(before + after, 0.0001), 0.0, 1.0)
+		low[axis] = inner.position[axis] - before * keep
+		high[axis] = inner.end[axis] + after * keep
 	return Rect2(low, high - low)
 
 
@@ -138,10 +177,10 @@ func _aim() -> void:
 	if not _valid():
 		return
 	var picture: Vector2 = _picture()
-	var need: Vector2 = _party.size + Vector2.ONE * (CAMERA_MARGIN * 2.0)
+	var need: Vector2 = _framed.size + Vector2.ONE * (CAMERA_MARGIN * 2.0)
 	var floor_zoom: float = maxf(MIN_ZOOM, _min_zoom())
 	target_zoom = clampf(minf(picture.x / need.x, picture.y / need.y), floor_zoom, maxf(MAX_ZOOM, floor_zoom))
-	target_position = _clamp_centre(_party.get_center(), target_zoom)
+	target_position = _clamp_centre(_framed.get_center(), target_zoom)
 
 
 ## `zoom`, lowered if needed so the party's box is inside a picture centred on `at`.

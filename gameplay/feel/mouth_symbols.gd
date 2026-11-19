@@ -9,14 +9,17 @@ extends Node2D
 ## (`mouth_looks.gd`: each mouth's area and room), the rooms' kinds (Feel's room hearing) and where
 ## this machine's wizards stand; nothing in the game reads it.
 ##
-## **Smooth** (docs/STYLE.md): a mouth's symbol rises in by rows, a row a frame at FPS, while one of
-## this machine's wizards (`Frames.seats_here`, a seat's own body) is within SHOW_REACH of the mouth
-## or on its bridge (so the far end of a long bridge tells as the wizard sets out on it), but not from
-## inside the room it leads into (that tells nothing new), and sinks out
-## the same way once none is; a biome laid (a new one, a restore's) is drawn as it
-## stands. Whole pixels; nothing fades. A room rerolled (`turn`, Feel's of `room_rerolled`; the
-## owner, 2026-11-19) turns its signs over: a mouth into it showing its old kind's symbol sinks that
-## out a row a frame, then its new kind's rises in the same way (while still near), never a jump.
+## **Big and lit** (the owner, 2026-11-19: "room types must be much easier to see"): the sign is
+## drawn SCALE screen pixels a symbol pixel (a 7 px symbol is 21 px, its glyphs 15 px), whole pixels
+## with a dark edge as wide, and lit: a light spot of the kind's light stands on it (`LightSpot`, a
+## marker a sign that tells; the spell light draws it while "Dynamic lighting" is on), so it reads in
+## a dark crypt from the far side of a room. It is always shown in a biome, wherever the wizards are.
+##
+## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) is drawn as it stands; a room
+## rerolled (`turn`, Feel's of `room_rerolled`; the owner, 2026-11-19) turns its signs over: a mouth
+## into it showing its old kind's symbol sinks that out a row a frame at FPS, then its new kind's
+## rises in the same way, never a jump, its light changing while no sign shows. Whole pixels;
+## nothing fades.
 ##
 ## A child of Feel, top level (world space), over the mouths' looks and under the bodies. Feel steps it
 ## once a frame (`step`).
@@ -31,10 +34,13 @@ const RewardGlyphsScript := preload("res://gameplay/feel/reward_glyphs.gd")
 const Z: int = 2
 ## Frames a second it rises and sinks at, a row a frame.
 const FPS: float = 12.0
-## How near a mouth one of this machine's wizards must stand for it to tell (pixels).
-const SHOW_REACH: float = 160.0
+## Screen pixels a symbol pixel (and a glyph pixel).
+const SCALE: int = 3
 ## The gap between a mouth's edge and its symbol (pixels).
 const GAP: int = 4
+## A sign's light: how far it reaches and how bright it is at its middle (`LightSpot`).
+const LIGHT_REACH: float = 56.0
+const LIGHT_STRENGTH: float = 0.6
 
 ## The pieces (Feel's room hearing: each room's kind) and the mouths (Feel's mouth looks).
 var pieces: RoomHearingScript = null
@@ -55,8 +61,8 @@ var _glyph_pixels: Array = []
 var _glyph_shades: Array = []
 var _glyph_at: PackedVector2Array = PackedVector2Array()
 var _glyph_across: PackedByteArray = PackedByteArray()
-## What each mouth wants this frame (1: shown).
-var _near: PackedByteArray = PackedByteArray()
+## By mouth: the light spot on its sign (null: it tells nothing).
+var _lights: Array[Marker2D] = []
 ## The mouths read last: how many and the world they were found in (`RoomHearing.world`).
 var _read_mouths: int = -1
 var _read_world: int = -1
@@ -105,19 +111,18 @@ func tells(mouth: int) -> bool:
 	return mouth >= 0 and mouth < _pixels.size() and not _pixels[mouth].is_empty()
 
 
-## Once a frame, `delta` real seconds on: the mouths read again for a new biome (from `grid`), each
-## mouth told whether one of this machine's wizards (`seats_here` of `table`) is near, and each symbol
-## stepped a row toward it at FPS.
+## Once a frame, `delta` real seconds on: the mouths read again for a new biome (from `grid`), and
+## each symbol turning over stepped a row at FPS. `table` and `seats_here` are no longer read (every
+## sign shows, wherever the wizards are).
 func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
 	var found: int = mouths.mouths() if mouths != null else 0
 	var world_now: int = pieces.world() if pieces != null else 0
 	var places: int = grid.places() if grid != null else 0
 	if found != _read_mouths or world_now != _read_world or places != _read_places:
 		_read_places = places
-		_read(grid, found, world_now, table, seats_here)
+		_read(grid, found, world_now)
 	if _rows.is_empty():
 		return
-	_see(table, seats_here, grid)
 	if not is_moving():
 		_clock = 0.0
 		return
@@ -156,6 +161,7 @@ func advance() -> void:
 			_shades[mouth] = _next_shades[mouth]
 			_glyph_pixels[mouth] = _next_glyphs[mouth]
 			_glyph_shades[mouth] = _next_glyph_shades[mouth]
+			_light(mouth)
 		_rows[mouth] += signi(_wanted(mouth) - _rows[mouth])
 	queue_redraw()
 
@@ -163,33 +169,12 @@ func advance() -> void:
 func _wanted(mouth: int) -> int:
 	if _turning[mouth] != 0:
 		return 0
-	return RoomKind.SYMBOL_SIDE if _near[mouth] != 0 and not _pixels[mouth].is_empty() else 0
-
-
-## Whether one of this machine's wizards stands within SHOW_REACH of each mouth.
-func _see(table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
-	_near.fill(0)
-	if table == null:
-		return
-	for seat in ActorsScript.SEATS:
-		if seats_here & (1 << seat) == 0:
-			continue
-		var body := table.node_of(table.home_of_seat(seat)) as Node2D
-		if body == null or not is_instance_valid(body) or not body.is_inside_tree():
-			continue
-		var at: Vector2 = body.global_position
-		var on: int = grid.place_at(at) if grid != null else RoomGrid.NO_PLACE
-		for mouth in _middle.size():
-			if on != RoomGrid.NO_PLACE and on == mouths.room_of(mouth):
-				# Inside the room the mouth leads into: it tells nothing new.
-				continue
-			if at.distance_to(_middle[mouth]) <= SHOW_REACH or (on != RoomGrid.NO_PLACE and on == _walkway[mouth]):
-				_near[mouth] = 1
+	return RoomKind.SYMBOL_SIDE if not _pixels[mouth].is_empty() else 0
 
 
 ## Every mouth's symbol from the mouths found (`mouths`), each on its bridge's side of its mouth; drawn
 ## as it stands (a world laid is never played in).
-func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seats_here: int) -> void:
+func _read(grid: RoomGrid, found: int, world_now: int) -> void:
 	_read_mouths = found
 	_read_world = world_now
 	# A rerolled room's mouths keep their old sign and rows to sink out (the same mouths, read again).
@@ -219,7 +204,6 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	_middle.resize(found)
 	_walkway.resize(found)
 	_rows.resize(found)
-	_near.resize(found)
 	for mouth in found:
 		var room: int = mouths.room_of(mouth)
 		var kind: RoomKind = pieces.kind_of(room) if pieces != null else null
@@ -240,7 +224,6 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		var across: bool = area.size.x > area.size.y
 		_glyph_across[mouth] = 1 if across else 0
 		_glyph_at[mouth] = glyphs_beside(_at[mouth], across)
-	_see(table, seats_here, grid)
 	for mouth in found:
 		if not old_pixels.is_empty() and _turn_rooms.has(mouths.room_of(mouth)) and mouth < old_rows.size() and old_rows[mouth] > 0:
 			# A rerolled room's sign turns over (its kind and its reward type's glyphs alike).
@@ -258,37 +241,68 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		# The same mouths read again (a reroll's lay): a sign mid-play keeps its rows and plays on.
 		_rows[mouth] = old_rows[mouth] if not old_pixels.is_empty() and mouth < old_rows.size() and old_pixels[mouth] == _pixels[mouth] and old_glyphs[mouth] == _glyph_pixels[mouth] else _wanted(mouth)
 	_turn_rooms.clear()
+	for light in _lights:
+		if light != null:
+			light.queue_free()
+	_lights.clear()
+	_lights.resize(found)
+	for mouth in found:
+		_light(mouth)
 	queue_redraw()
 
 
+## The light spot on mouth `mouth`'s sign made again in its kind's light (none when it tells
+## nothing). Made only as a world is read or a sign turns over, never in a plain frame.
+func _light(mouth: int) -> void:
+	if _lights[mouth] != null:
+		_lights[mouth].queue_free()
+		_lights[mouth] = null
+	if _pixels[mouth].is_empty():
+		return
+	var light := Marker2D.new()
+	light.name = "SignLight%d" % mouth
+	light.position = _at[mouth] + Vector2.ONE * (RoomKind.SYMBOL_SIDE * SCALE * 0.5)
+	LightSpot.mark(light, LIGHT_REACH, LIGHT_STRENGTH, 0.0, _shades[mouth][1])
+	_lights[mouth] = light
+	add_child(light)
+
+
+## The light spot on mouth `mouth`'s sign (null: none; for tests).
+func light_of(mouth: int) -> Marker2D:
+	return _lights[mouth] if mouth >= 0 and mouth < _lights.size() else null
+
+
 ## The corner of a symbol's box beside a mouth of area `area` into a room of rect `room`: on the far
-## side of the mouth from the room's middle (the bridge's), GAP from its edge, centred along it, in
-## whole pixels.
+## side of the mouth from the room's middle (the bridge's), GAP from its edge and from the room's,
+## centred along it, in whole pixels.
 static func corner_beside(area: Rect2i, room: Rect2) -> Vector2:
-	var side: int = RoomKind.SYMBOL_SIDE
+	var side: int = RoomKind.SYMBOL_SIDE * SCALE
 	var middle: Vector2i = area.position + area.size / 2
 	var towards: Vector2 = room.get_center() - Vector2(middle) if room.has_area() else Vector2.DOWN
+	# Clear of the room's own rectangle too (its dark covers it whole until it is entered).
+	var near: Rect2i = area.merge(Rect2i(room)) if room.has_area() else area
 	if area.size.x > area.size.y:
 		var x: int = middle.x - side / 2
-		return Vector2(x, area.position.y - GAP - side) if towards.y > 0.0 else Vector2(x, area.end.y + GAP)
+		return Vector2(x, near.position.y - GAP - side) if towards.y > 0.0 else Vector2(x, near.end.y + GAP)
 	var y: int = middle.y - side / 2
-	return Vector2(area.position.x - GAP - side, y) if towards.x > 0.0 else Vector2(area.end.x + GAP, y)
+	return Vector2(near.position.x - GAP - side, y) if towards.x > 0.0 else Vector2(near.end.x + GAP, y)
 
 
 ## The corner of a reward type's first glyph beside a symbol whose box's corner is `symbol`: on its
 ## right, feet level with its foot, for a mouth across the bridge's way (`across`); else under it,
 ## centred.
 static func glyphs_beside(symbol: Vector2, across: bool) -> Vector2:
-	var side: int = RoomKind.SYMBOL_SIDE
-	var glyph: int = RewardGlyphsScript.SIDE
+	var side: int = RoomKind.SYMBOL_SIDE * SCALE
+	var glyph: int = RewardGlyphsScript.SIDE * SCALE
+	var gap: int = RewardGlyphsScript.GAP * SCALE
 	if across:
-		return symbol + Vector2(side + RewardGlyphsScript.GAP, side - glyph)
-	return symbol + Vector2((side - glyph) / 2, side + RewardGlyphsScript.GAP)
+		return symbol + Vector2(side + gap, side - glyph)
+	return symbol + Vector2((side - glyph) / 2, side + gap)
 
 
 func _draw() -> void:
 	for mouth in _rows.size():
 		if _rows[mouth] > 0:
-			KindSymbolScript.draw(self, _pixels[mouth], _shades[mouth], _at[mouth], _rows[mouth])
+			KindSymbolScript.draw(self, _pixels[mouth], _shades[mouth], _at[mouth], _rows[mouth], SCALE)
 			# Each a typed array as made in `_read` (nothing allocated here).
-			RewardGlyphsScript.draw(self, _glyph_pixels[mouth], _glyph_shades[mouth], _glyph_at[mouth], _glyph_across[mouth] != 0, _rows[mouth])
+			RewardGlyphsScript.draw(self, _glyph_pixels[mouth], _glyph_shades[mouth], _glyph_at[mouth], _glyph_across[mouth] != 0, _rows[mouth], SCALE)

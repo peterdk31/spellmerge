@@ -42,6 +42,9 @@ const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const KindAirScript := preload("res://gameplay/feel/kind_air.gd")
+## The void's air (`void_air`) and the most of the motes' ring it may hold at once.
+const VOID_AIR: MoteSource = preload("res://gameplay/feel/presets/void_air.tres")
+const VOID_SHARE: float = 1.0 / 32.0
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
@@ -218,6 +221,11 @@ var air: AirMotesScript = AirMotesScript.new(_ramp_table)
 ## connected biomes CB12b), given off as the room's air is, laid from the grid first each frame (Feel
 ## hands it its room hearing, `kind_air.pieces`).
 var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
+## What drifts in the void between a biome's slabs (the owner, 2026-11-19: the void is black "with
+## some motes emitted"): `VOID_AIR`'s sparse motes (not lit only: the void has no light), given off
+## over the view outside every place of the grid, within VOID_SHARE of the motes' ring, under the
+## motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
+var void_air: AirMotesScript = AirMotesScript.new(_ramp_table)
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -249,6 +257,7 @@ var _hit_on: bool = false
 
 
 func _ready() -> void:
+	void_air.use(VOID_AIR)
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
@@ -350,6 +359,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 	air.give_off(now, air_pool, view, projectiles.bounds() if projectiles != null else Rect2())
 	kind_air.lay(projectiles.grid() if projectiles != null else null)
 	kind_air.give_off(now, air_pool, view)
+	_give_off_void(now, view)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
@@ -1203,6 +1213,15 @@ func _free_faded() -> void:
 		_free_shadows()
 	if mist != null and not fog and _mist_share <= 0.0:
 		_free_mist()
+
+
+## The void's motes owed since the last frame (`void_air`), over `view` outside the grid's places;
+## none outside a biome (a grid with no places).
+func _give_off_void(now: float, view: Rect2) -> void:
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	var in_biome: bool = grid != null and grid.places() > 0
+	var void_pool: MotesScript = pool if motes_on() and ambient_particles and in_biome else null
+	void_air.give_off(now, void_pool, view, Rect2(), VOID_SHARE, grid if in_biome else null)
 
 
 ## The "Ambient particles" setting (atmosphere B): whether the room's air gives off its dust (while

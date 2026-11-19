@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "path": "art/grounds/crypt_treasure_c/crypt_treasure_c_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt sealed vault's (treasure; connected biomes CB11) floor, drawn per pixel by tools/ground_shape.py from content/rooms/crypt/crypt_treasure_c/crypt_treasure_c.shape.json: a floating slab of large irregular flagstones of one quiet Stone (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/crypt_treasure_c/crypt_treasure_c_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt sealed vault's (treasure; connected biomes CB11) underside, drawn by tools/ground_shape.py from content/rooms/crypt/crypt_treasure_c/crypt_treasure_c.shape.json: the rock of the slab hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/crypt_treasure_c/crypt_treasure_c_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt sealed vault's (treasure; connected biomes CB11) edge glow, drawn at half size by tools/ground_shape.py from content/rooms/crypt/crypt_treasure_c/crypt_treasure_c.shape.json: the crypt edge's faint glow along the slab's edges, added over what lies below it."
+    }
+  ]
+}

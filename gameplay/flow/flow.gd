@@ -172,7 +172,9 @@ const ROOM_KIND_FOLDER: StringName = &"room_kinds"
 ## CB11), and the chance's purpose its element is rolled by.
 const SPELLS_FOLDER: StringName = &"spells"
 const SECRET_PURPOSE: StringName = &"secret_element"
-## The run's chance a treasure room's key's room is picked under (keyed by the treasure room).
+## The run's chance the biome's keys are counted under, and each key's room is picked under (keyed by
+## the key).
+const KEY_COUNT_PURPOSE: StringName = &"key_count"
 const KEY_PURPOSE: StringName = &"key_room"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
@@ -1605,8 +1607,8 @@ func _begin_gates(map: BiomeMap) -> void:
 
 ## The biome's key doors and secret rocks begin from its rooms' kinds (`RoomKind.DOOR_KEY`,
 ## `DOOR_SECRET`; connected biomes CB11), each secret room's element rolled by the run's chance from
-## the elements there are (purpose `SECRET_PURPOSE`, keyed by the room), each key room's key's room
-## by it too (purpose `KEY_PURPOSE`), laid into the grid shut and told to the view.
+## the elements there are (purpose `SECRET_PURPOSE`, keyed by the room), the keys and their rooms by
+## it too (`_key_drops`), laid into the grid shut and told to the view.
 func _begin_locks(map: BiomeMap) -> void:
 	var rules := PackedByteArray()
 	var elements: Array[StringName] = []
@@ -1624,23 +1626,37 @@ func _begin_locks(map: BiomeMap) -> void:
 			if not choices.is_empty() and game != null:
 				element = choices[game.chance_int(SECRET_PURPOSE, room, 0, choices.size())]
 		elements.append(element)
-	# Each key drops in a room picked by the run's chance among those reached without passing a
-	# locked door, never the boss's (its clear sends the party home) (the owner, 2026-11-19).
+	locks.begin(map, rules, elements, _key_drops(map, rules, game))
+	locks.lay(biome, projectiles.grid() if projectiles != null else null)
+	locks.tell_all()
+
+
+## The rooms the biome's keys drop in, one a key (the owner, 2026-11-19: several treasure rooms, not
+## necessarily a key for each): with `n` key rooms, 1 to `n` keys (the run's chance, KEY_COUNT_PURPOSE),
+## each in a room picked by the run's chance (KEY_PURPOSE, keyed by the key) among those reached
+## without passing a locked door, never the boss's (its clear sends the party home), a room not
+## picked yet first. Empty with no key room, or nowhere to drop one.
+func _key_drops(map: BiomeMap, rules: PackedByteArray, game: Sim) -> PackedInt32Array:
 	var drops := PackedInt32Array()
-	drops.resize(map.rooms())
-	drops.fill(-1)
-	var open: PackedInt32Array = LockDoors.open_rooms(map, rules)
+	var key_rooms: int = rules.count(LockDoors.RULE_KEY)
+	if key_rooms == 0 or game == null:
+		return drops
 	var may := PackedInt32Array()
-	for room: int in open:
+	for room: int in LockDoors.open_rooms(map, rules):
 		var kind: RoomKind = _kind_of(room)
 		if not gates.opens_home(room) and (kind == null or kind.fill != RoomKind.FILL_BOSS):
 			may.append(room)
-	for room in map.rooms():
-		if rules[room] == LockDoors.RULE_KEY and not may.is_empty() and game != null:
-			drops[room] = may[game.chance_int(KEY_PURPOSE, room, 0, may.size())]
-	locks.begin(map, rules, elements, drops)
-	locks.lay(biome, projectiles.grid() if projectiles != null else null)
-	locks.tell_all()
+	if may.is_empty():
+		return drops
+	var keys: int = 1 + game.chance_int(KEY_COUNT_PURPOSE, 0, 0, key_rooms)
+	var left: PackedInt32Array = may.duplicate()
+	for key in keys:
+		if left.is_empty():
+			left = may.duplicate()
+		var at: int = game.chance_int(KEY_PURPOSE, key, 0, left.size())
+		drops.append(left[at])
+		left.remove_at(at)
+	return drops
 
 
 ## The ids of every element card the registry has (`ElementBase`), in id order: what a secret rock

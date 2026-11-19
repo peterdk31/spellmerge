@@ -237,7 +237,8 @@ func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	check(drop == 0 or drop == EAST, "the start room or the court, never the treasure room: %d" % drop)
 	var open: PackedInt32Array = LockDoors.open_rooms(map, PackedByteArray([LockDoors.RULE_NONE, LockDoors.RULE_KEY, LockDoors.RULE_NONE]))
 	check_equal(open, PackedInt32Array([0, EAST]), "the open rooms: all but the locked one")
-	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())], "the run's chance, keyed by the treasure room, picks it")
+	check_equal(flow.locks.key_drops.size(), 1, "one treasure room: one key")
+	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, 0, 0, open.size())], "the run's chance, keyed by the key, picks it")
 	# Whatever the seed picked, a fight room's key drops as its fight is cleared: the court's here.
 	flow.locks.key_drops[0] = EAST
 	flow.locks.key_states[0] = LockDoors.KEY_WAITING
@@ -251,8 +252,38 @@ func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	check(not keys.is_empty() and keys.back()[2] and flow.biome.room_rect(EAST).has_point(keys.back()[1]), "its key lies in the court once cleared")
 	var picked: Dictionary = {}
 	for seed in 24:
-		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())]] = true
+		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, 0, 0, open.size())]] = true
 	check_equal(picked.size(), 2, "over seeds, either room")
+
+
+## The owner, 2026-11-19: "Multiple treasures can be in each biome. But there should not necessarily
+## be a key for each treasure room available." Two treasure rooms: 1 or 2 keys (never more), any key
+## opens either door and is spent by it, so with one the party chooses.
+func test_keys_are_any_doors_and_may_be_fewer_than_the_treasure_rooms() -> void:
+	var map: BiomeMap = _start(2, &"treasure", &"treasure")
+	_ticks(1)
+	check_equal(flow.locks.doors(), 2, "a door each")
+	var keys: int = flow.locks.key_drops.size()
+	check(keys >= 1 and keys <= 2, "1 or 2 keys for 2 treasure rooms: %d" % keys)
+	check_equal(keys, 1 + tick.sim.chance_int(FlowScript.KEY_COUNT_PURPOSE, 0, 0, 2), "the run's chance counts them")
+	var counts: Dictionary = {}
+	for seed in 16:
+		counts[1 + Sim.seeded(seed).chance_int(FlowScript.KEY_COUNT_PURPOSE, 0, 0, 2)] = true
+	check_equal(counts.size(), 2, "over seeds, a key short now and then")
+	for key in keys:
+		check_equal(flow.locks.key_drops[key], 0, "each in the one room open to it: the start room")
+		check_equal(flow.locks.key_states[key], LockDoors.KEY_LYING, "lying there")
+	check(keys < 2 or flow.locks.key_at[0] != flow.locks.key_at[1], "two in one room lie apart")
+	# The first key taken opens the court's door (any key, any door).
+	_put(1, flow.locks.key_at[0])
+	_put(0, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
+	check(flow.locks.is_open(EAST), "a key opens the court")
+	check_equal(flow.locks.key_states[0], LockDoors.KEY_SPENT, "and is spent")
+	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
+	_ticks(10)
+	check_equal(flow.locks.is_open(WEST), keys == 2 and flow.locks.key_states[1] == LockDoors.KEY_SPENT, "the antechamber opens only with a second key held")
+	if keys == 1:
+		check(not flow.locks.is_open(WEST), "one key: the party chose the court, the antechamber stays shut")
 
 
 ## A key with no zone lies round the room's middle clear of a fountain's pool or a shop's items.

@@ -9,14 +9,17 @@ extends RefCounted
 ##   `DOOR_SECRET` (a secret room). Each mouth where a bridge meets it is one of its doors, shut
 ##   (`RoomGrid.shut_mouth`: a wall to everything) until the room opens; then all its doors open, for
 ##   everyone (decision 21: a key door opens for all).
-## - **A key** (one a key room, decision 21) drops in a room Flow picks by the run's chance among the
-##   rooms reached from the start without passing a locked door (`open_rooms`; the owner,
-##   2026-11-19: "it should just drop in some random room"), else, with none picked, in the room its
-##   bridge hangs off (the shallowest room beside it), as that room is cleared (`drop_keys`; a room
-##   with no fight is cleared as it is entered, so its key lies on its floor). It lies there until the first standing wizard (in the
-##   party's order) whose feet come within KEY_REACH takes it: the party holds it. With it held, the
-##   first standing wizard at one of its room's doors (on its bridge, or on the room's lip outside the
-##   shut mouth, as at a gather door) opens it, and the key is spent.
+## - **Keys** (decision 21, as the owner changed it on 2026-11-19: "Multiple treasures can be in each
+##   biome. But there should not necessarily be a key for each treasure room available"): a key is
+##   no room's own. Any key opens any key door and is spent by it, and the party chooses which doors
+##   to open. Flow says how many there are and where each drops (`begin`'s `drops`: a room it picks by
+##   the run's chance among those reached from the start without passing a locked door,
+##   `open_rooms`); with none said, one a key room, in the room its bridge hangs off (the shallowest
+##   beside it). A key drops as its room is cleared (`drop_keys`; a room with no fight is cleared as
+##   it is entered, so its key lies on its floor), two in one room a little apart. It lies there until the first standing wizard (in the
+##   party's order) whose feet come within KEY_REACH takes it: the party holds it (shared). With one
+##   held, the first standing wizard at a shut key door (on its bridge, or on the room's lip outside
+##   the shut mouth, as at a gather door) opens that room, and one key is spent.
 ## - **A secret rock** (decision 22) opens to one element, rolled for its room as the biome begins
 ##   (Flow's `_begin_locks`): that element touching the floor (`floor_touched`, queued by
 ##   `queue_touch` and applied at the next `step`, never in the middle of the shots' step) with its
@@ -40,6 +43,8 @@ const KEY_HELD: int = 2
 const KEY_SPENT: int = 3
 ## How near a wizard's feet must come to a key to take it, in pixels (a coin's reach).
 const KEY_REACH: float = 10.0
+## Where two or more keys dropped in one room lie round its spot, in order (pixels).
+const KEY_APART: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(14.0, 0.0), Vector2(-14.0, 0.0)]
 ## How far round a door's mouth its room's lip counts as at that door (as a gather door's).
 const LIP_REACH: float = 24.0
 ## How near a floor touch's circle must come to a secret door's mouth to break its rock, in pixels.
@@ -57,8 +62,7 @@ var elements: Array[StringName] = []
 var door_rooms: PackedInt32Array = PackedInt32Array()
 var door_bridges: PackedInt32Array = PackedInt32Array()
 var door_ends: PackedInt32Array = PackedInt32Array()
-## Each key: the room it opens, the room it drops in, its state (KEY_*) and where it lies.
-var key_rooms: PackedInt32Array = PackedInt32Array()
+## Each key: the room it drops in, its state (KEY_*) and where it lies.
 var key_drops: PackedInt32Array = PackedInt32Array()
 var key_states: PackedByteArray = PackedByteArray()
 var key_at: PackedVector2Array = PackedVector2Array()
@@ -72,9 +76,9 @@ var _mouths: Array[Rect2] = []
 
 ## A biome's locks begin (every door shut, no key dropped): `map`'s rooms, each with its rule of
 ## `room_rules` (RULE_*, by room) and a secret room's element of `room_elements`; a door at each mouth
-## of a locked room, and a key for each key room, dropped in the room `drops` names for it (by room;
-## -1 or none: the room at the other end of its bridge, the shallowest of them). Laid into the grid
-## by `lay`.
+## of a locked room, and the keys: one each room of `drops` names (where it drops), or, with none
+## named, one a key room dropped in the room at the other end of its bridge (the shallowest of
+## them). Laid into the grid by `lay`.
 func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[StringName], drops: PackedInt32Array = PackedInt32Array()) -> void:
 	clear()
 	var count: int = map.rooms() if map != null else 0
@@ -86,6 +90,8 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 	elements.resize(count)
 	if map == null:
 		return
+	# The key rooms whose keys drop beside them (no `drops` said), by the same index as the keys.
+	var beside := PackedInt32Array()
 	for bridge in map.bridges():
 		for end in 2:
 			var room: int = map.end_room(bridge, end)
@@ -95,20 +101,23 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 			door_bridges.append(bridge)
 			door_ends.append(end)
 			var other: int = map.end_room(bridge, 1 - end)
-			var at_key: int = key_rooms.find(room)
-			if rules[room] == RULE_KEY and at_key < 0:
-				key_rooms.append(room)
+			if not drops.is_empty() or rules[room] != RULE_KEY:
+				continue
+			var at_key: int = beside.find(room)
+			if at_key < 0:
+				beside.append(room)
 				key_drops.append(other)
-				key_states.append(KEY_WAITING)
-				key_at.append(Vector2.ZERO)
-			elif at_key >= 0 and other < map.depths.size() and key_drops[at_key] < map.depths.size() and map.depths[other] < map.depths[key_drops[at_key]]:
+			elif other < map.depths.size() and key_drops[at_key] < map.depths.size() and map.depths[other] < map.depths[key_drops[at_key]]:
 				# A key room with more than one bridge: its key drops in the shallowest room beside it,
 				# the one on the way to it.
 				key_drops[at_key] = other
-	for key in key_rooms.size():
-		var room: int = key_rooms[key]
-		if room < drops.size() and drops[room] >= 0 and drops[room] < count:
-			key_drops[key] = drops[room]
+	for room: int in drops:
+		if room >= 0 and room < count:
+			key_drops.append(room)
+	key_states.resize(key_drops.size())
+	key_states.fill(KEY_WAITING)
+	key_at.resize(key_drops.size())
+	key_at.fill(Vector2.ZERO)
 
 
 ## The rooms of `map` the party reaches from its start room (0) without passing a locked door (a
@@ -150,7 +159,6 @@ func clear() -> void:
 	door_rooms.resize(0)
 	door_bridges.resize(0)
 	door_ends.resize(0)
-	key_rooms.resize(0)
 	key_drops.resize(0)
 	key_states.resize(0)
 	key_at.resize(0)
@@ -187,9 +195,9 @@ func mouth_of(door: int) -> Rect2:
 	return _mouths[door] if door >= 0 and door < _mouths.size() else Rect2()
 
 
-## The key that opens room `room` (NONE for none).
-func key_of(room: int) -> int:
-	return key_rooms.find(room)
+## The first key the party holds (NONE for none): any key opens any key door.
+func held_key() -> int:
+	return key_states.find(KEY_HELD)
 
 
 ## Lay the doors into `grid` from the biome laid in `world` (as the biome starts, and after a restore:
@@ -206,10 +214,12 @@ func lay(world: BiomeWorld, grid: RoomGrid) -> void:
 
 ## Room `room` was cleared: each key still waiting to drop there lies at `at` (the view told).
 func drop_keys(room: int, at: Vector2) -> void:
-	for key in key_rooms.size():
+	var dropped: int = 0
+	for key in key_drops.size():
 		if key_drops[key] == room and key_states[key] == KEY_WAITING:
 			key_states[key] = KEY_LYING
-			key_at[key] = at
+			key_at[key] = at + KEY_APART[dropped % KEY_APART.size()]
+			dropped += 1
 			_tell_key(key)
 
 
@@ -224,7 +234,7 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 	touch_elements.clear()
 	touch_at.resize(0)
 	touch_radii.resize(0)
-	for key in key_rooms.size():
+	for key in key_drops.size():
 		if key_states[key] != KEY_LYING:
 			continue
 		for wizard: Node2D in party:
@@ -235,8 +245,8 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 				break
 	for door in doors():
 		var room: int = door_rooms[door]
-		var key: int = key_of(room)
-		if rules[room] != RULE_KEY or is_open(room) or key < 0 or key_states[key] != KEY_HELD:
+		var key: int = held_key()
+		if rules[room] != RULE_KEY or is_open(room) or key < 0:
 			continue
 		var at_door: int = life.rooms() + door_bridges[door] if life != null else NONE
 		for wizard: Node2D in party:
@@ -302,7 +312,7 @@ func rebuild_derived() -> void:
 func tell_all() -> void:
 	for door in doors():
 		_tell_door(door)
-	for key in key_rooms.size():
+	for key in key_drops.size():
 		_tell_key(key)
 
 

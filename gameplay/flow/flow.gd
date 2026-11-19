@@ -172,6 +172,8 @@ const ROOM_KIND_FOLDER: StringName = &"room_kinds"
 ## CB11), and the chance's purpose its element is rolled by.
 const SPELLS_FOLDER: StringName = &"spells"
 const SECRET_PURPOSE: StringName = &"secret_element"
+## The run's chance a treasure room's key's room is picked under (keyed by the treasure room).
+const KEY_PURPOSE: StringName = &"key_room"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
@@ -1603,8 +1605,8 @@ func _begin_gates(map: BiomeMap) -> void:
 
 ## The biome's key doors and secret rocks begin from its rooms' kinds (`RoomKind.DOOR_KEY`,
 ## `DOOR_SECRET`; connected biomes CB11), each secret room's element rolled by the run's chance from
-## the elements there are (purpose `SECRET_PURPOSE`, keyed by the room), laid into the grid shut and
-## told to the view.
+## the elements there are (purpose `SECRET_PURPOSE`, keyed by the room), each key room's key's room
+## by it too (purpose `KEY_PURPOSE`), laid into the grid shut and told to the view.
 func _begin_locks(map: BiomeMap) -> void:
 	var rules := PackedByteArray()
 	var elements: Array[StringName] = []
@@ -1622,7 +1624,21 @@ func _begin_locks(map: BiomeMap) -> void:
 			if not choices.is_empty() and game != null:
 				element = choices[game.chance_int(SECRET_PURPOSE, room, 0, choices.size())]
 		elements.append(element)
-	locks.begin(map, rules, elements)
+	# Each key drops in a room picked by the run's chance among those reached without passing a
+	# locked door, never the boss's (its clear sends the party home) (the owner, 2026-11-19).
+	var drops := PackedInt32Array()
+	drops.resize(map.rooms())
+	drops.fill(-1)
+	var open: PackedInt32Array = LockDoors.open_rooms(map, rules)
+	var may := PackedInt32Array()
+	for room: int in open:
+		var kind: RoomKind = _kind_of(room)
+		if not gates.opens_home(room) and (kind == null or kind.fill != RoomKind.FILL_BOSS):
+			may.append(room)
+	for room in map.rooms():
+		if rules[room] == LockDoors.RULE_KEY and not may.is_empty() and game != null:
+			drops[room] = may[game.chance_int(KEY_PURPOSE, room, 0, may.size())]
+	locks.begin(map, rules, elements, drops)
 	locks.lay(biome, projectiles.grid() if projectiles != null else null)
 	locks.tell_all()
 
@@ -1892,7 +1908,9 @@ func _drop_keys(room: int) -> void:
 		drops = drops or locks.key_drops[key] == room
 	if not drops:
 		return
-	var at: Vector2 = SpecialPlaces.key_spot(biome.room_places(room), biome.room_rect(room).get_center())
+	var places: RoomPlaces = biome.room_places(room)
+	var middle: Vector2 = biome.room_rect(room).get_center()
+	var at: Vector2 = SpecialPlaces.key_spot(places, middle, SpecialPlaces.taken_by(_kind_of(room), places, middle))
 	if projectiles != null and world != null:
 		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), PORTAL_GROUND * 0.5))
 	locks.drop_keys(room, at)

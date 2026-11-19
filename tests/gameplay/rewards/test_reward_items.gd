@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## room (`room_rewards_due`'s spots, by seat), said to the view (`reward_item_changed`); only its own
 ## player's body in reach is told of it (`reward_near_changed`), so only its owner opens it; a pick
 ## takes it off the floor (its pickup said, `item_picked_up`); a player who was not there finds the
-## offer waiting, lying nowhere (rule 4); a new world takes the items off the floor and the offers
-## wait; the items are state: the same through a snapshot, said again after a restore.
+## offer waiting, lying nowhere (rule 4); a new world loses an unopened chest with it; the items are state: the same through a snapshot, said again after a restore.
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -115,15 +114,20 @@ func test_a_pick_takes_it_off_the_floor_and_its_pickup_is_said() -> void:
 	check_equal(_near.back(), [0, -1], "nothing in reach any more")
 
 
-func test_a_new_world_takes_the_items_off_the_floor_and_the_offers_wait() -> void:
+## The owner's answer of 2026-11-19: an unopened chest is lost with its biome; an absent player's
+## waiting offer still waits.
+func test_a_new_world_loses_an_unopened_chest_but_a_waiting_offer_waits() -> void:
 	_world.wizard(0, Vector2(200, 0))
+	var away: Actor = _world.wizard(1, Vector2(400, 0))
+	away.room = 9
 	_clear(2)
 	var mine: int = int(_offer_of(0)["offer"])
 	_items.clear()
 	_world.bus.room_entered.emit(&"next_biome", EventsScript.FIRST_ROOM)
 	check_equal(_items, [[0, mine, SPOTS[0], false]], "gone from the floor with its world")
-	var offer: Dictionary = _offer_of(0)
-	check(not offer.is_empty() and not bool(offer["lying"]), "the offer is never lost: it waits, lying nowhere")
+	check(_rewards.waiting_of(0).is_empty(), "and its offer lost with it")
+	var theirs: Dictionary = _offer_of(1)
+	check(not theirs.is_empty() and not bool(theirs["lying"]), "the absent player's offer still waits")
 
 
 func test_the_items_are_state_through_a_snapshot_and_said_again() -> void:

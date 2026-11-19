@@ -12,7 +12,7 @@ extends Control
 ## Root/Reward4), never by itself (the owner, 2026-11-19: a present player's reward lies as an item
 ## in the room): on the seat's A at its own reward item (`reward_near_changed`; `open_menu(offer)`),
 ## and on the seat's A with no menu open and nothing else for A while it has an offer waiting that
-## lies nowhere (one rolled while it was away, or left behind in another world: `waiting_away`, the
+## lies nowhere (one rolled while it was away: `waiting_away`, the
 ## unspent icon on its corner panel says so; `open_menu()`, the oldest such). It is that seat's
 ## alone and pauses nothing (pillar 2). It closes by itself when the offer it shows is gone. A pick
 ## the Rewards area refuses (`reward_refused`: no room in the bag, a heal while down) opens it again

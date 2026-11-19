@@ -16,8 +16,8 @@ extends Node
 ##   A seat whose wizard was in the room (`here`) has it lie as an item at its spot of the room
 ##   (`room_rewards_due`'s spots; the owner, 2026-11-19: nothing pops up; `reward_item_changed`), and
 ##   its own driven body in reach (REWARD_REACH; `reward_near_changed`) opens it with A (the HUD's);
-##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4), as does
-##   every offer whose item's world was left (`_unlay_rewards`). Nobody
+##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). An item
+##   left lying is lost with its world (the owner, 2026-11-19; `_unlay_rewards`). Nobody
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
@@ -932,15 +932,20 @@ func _look_at_rewards() -> void:
 			_say_reward_near(seat)
 
 
-## Every reward item lying goes from the floor (a new world, a run's start): each offer then waits on
-## its player's corner panel (rule 4: an unspent offer is never lost).
+## Every reward item lying is lost with its world (a new world, a run's start; the owner, 2026-11-19:
+## an unopened chest is gone with the biome): its offer goes, said gone. An offer waiting lying nowhere
+## (its player was away, rule 4) still waits.
 func _unlay_rewards() -> void:
 	var changed: int = 0
-	for offer: RewardOffer in _offers:
+	var at: int = 0
+	while at < _offers.size():
+		var offer: RewardOffer = _offers[at]
 		if offer.lying:
-			offer.lying = false
 			_say_reward_item(offer, false)
 			changed |= 1 << offer.seat
+			_offers.remove_at(at)
+		else:
+			at += 1
 	for seat in SEATS:
 		if changed & (1 << seat) != 0:
 			_say_waiting(seat)

@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-11-19: Reward items, pick 1 of 3, a shop's reroll sign, pickup sounds, RT opens a bag
 
-Five asks of the owner (docs/milestones/connected-biomes.md, "Reward items, pick 1 of 3, a shop's reroll sign"). A cleared room's reward no longer pops up: each present player's offer lies as a small chest in their colours in the room, and their A at it opens the pick; an absent player's still waits (rule 4). Rewards offer 3 choices. Each shop has a reroll sign: A at it rolls a new shelf for 3, 5, 8, ... coins. Every pickup kind has its own generated sound, heard only from this machine's rooms. RT enters a bag in the inventory.
+Five asks of the owner (docs/milestones/connected-biomes.md, "Reward items, pick 1 of 3, a shop's reroll sign"). A cleared room's reward no longer pops up: each present player's offer lies as a small chest in their colours in the room, and their A at it opens the pick; an absent player's still waits (rule 4), and a chest left unopened is lost with its biome. Rewards offer 3 choices. Each shop has a reroll sign: A at it rolls a new shelf for 3, 5, 8, ... coins. Every pickup kind has its own generated sound, heard only from this machine's rooms. RT enters a bag in the inventory.
 
 ## 2026-11-19: A room reroll may change the kind, and lays only that room
 

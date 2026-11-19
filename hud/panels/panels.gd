@@ -93,7 +93,7 @@ extends CanvasLayer
 ##   connected biomes CB10): a seat's offer not yet picked, "pick 1 of 3". It never opens by itself
 ##   (the owner, 2026-11-19): a present seat's reward lies as an item in the cleared room, and A at
 ##   it (the item hints' `reward_of`) opens that offer; a seat with an offer lying nowhere (rolled
-##   while away, or its world left) opens its oldest such on `accept` with no menu open and nothing
+##   while away) opens its oldest such on `accept` with no menu open and nothing
 ##   else for A (no lit stone, no item in reach, no altar). A refused pick opens it again on that
 ##   offer once the seat may open a menu (`RewardMenu.wants_open`). Its pick is the command
 ##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
@@ -492,7 +492,7 @@ func poll() -> void:
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
 				elif start_now and _rewards[player].waiting_away() > 0 and _in_room and not _panels[player].is_downed():
-					# An offer lying nowhere (rolled while away, or its world left): A anywhere opens it.
+					# An offer lying nowhere (rolled while away): A anywhere opens it.
 					_open_reward(player)
 			if reroll_now and _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and events != null and _item_hints.reroll_of(player):
 				_item_hints.reroll_asked(player)

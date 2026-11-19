@@ -63,7 +63,9 @@ var _lamps: Array[PackedInt32Array] = []
 var _drawn_held: PackedByteArray = PackedByteArray()
 ## Each door's lamps' wizard as drawn now (their hat ramp, 0-3; -1 none known: the spark's shades).
 var _lamp_ramps: Array[PackedInt32Array] = []
-## The standing wizards Feel handed this frame, in seat order: their hat ramps and where they stand.
+## The standing wizards Feel handed this frame, in seat order: how many, their hat ramps and where
+## they stand (the first `_seen` of each; sized once, nothing allocated a frame).
+var _seen: int = 0
 var _standing_ramps: PackedInt32Array = PackedInt32Array()
 var _standing_at: PackedVector2Array = PackedVector2Array()
 ## Each hat ramp's lamp shades (out, then the ramp's shadow, base, light).
@@ -76,6 +78,8 @@ var _clock: float = 0.0
 func _ready() -> void:
 	top_level = true
 	z_index = Z
+	_standing_ramps.resize(ActorsScript.SEATS)
+	_standing_at.resize(ActorsScript.SEATS)
 	for ramp in ActorsScript.SEATS:
 		var shades: PackedColorArray = Palette.shades_of(StringName("player_%d" % (ramp + 1)))
 		_ramp_lamps.append(PackedColorArray([Palette.OUTLINE, shades[0], shades[1], shades[2]]))
@@ -84,8 +88,7 @@ func _ready() -> void:
 ## The standing wizards now, from `table` (each seat's own body, not down; Feel's, once a frame):
 ## whose lamp is whose.
 func see(table: ActorsScript) -> void:
-	_standing_ramps.resize(0)
-	_standing_at.resize(0)
+	_seen = 0
 	if table == null:
 		return
 	for seat in ActorsScript.SEATS:
@@ -95,8 +98,9 @@ func see(table: ActorsScript) -> void:
 			continue
 		if body is Actor and ((body as Actor).is_downed() or (body as Actor).is_dying()):
 			continue
-		_standing_ramps.append(clampi(table.ramp_of(id), 0, ActorsScript.SEATS - 1))
-		_standing_at.append(body.global_position)
+		_standing_ramps[_seen] = clampi(table.ramp_of(id), 0, ActorsScript.SEATS - 1)
+		_standing_at[_seen] = body.global_position
+		_seen += 1
 
 
 func bind(events: EventsScript) -> void:
@@ -267,7 +271,7 @@ func _lamp_wanted(door: int, lamp: int) -> int:
 
 ## The hat ramp lamp `lamp` of door `door` wants: its standing wizard's (-1: none handed).
 func _ramp_wanted(door: int, lamp: int) -> int:
-	if lamp >= _standing_ramps.size() or lamp >= _lamp_count(door):
+	if lamp >= _seen or lamp >= _lamp_count(door):
 		return -1
 	return _standing_ramps[lamp]
 
@@ -276,14 +280,14 @@ func _ramp_wanted(door: int, lamp: int) -> int:
 ## (with none handed: the first `gathered` lamps).
 func _is_gathered(door: int, lamp: int) -> bool:
 	var gathered: int = _gathered[door]
-	if lamp >= _standing_at.size():
+	if lamp >= _seen:
 		return lamp < gathered
 	if gathered <= 0:
 		return false
 	var area: Rect2 = _areas[door]
 	var mine: float = _gap_to(area, _standing_at[lamp])
 	var nearer: int = 0
-	for other in _standing_at.size():
+	for other in _seen:
 		if other == lamp:
 			continue
 		var gap: float = _gap_to(area, _standing_at[other])

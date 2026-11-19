@@ -193,6 +193,41 @@ func test_coins_go_to_the_pickers_wallet_only() -> void:
 	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [5, 0], "spending and rewards are one's own")
 
 
+## Seat `seat`'s own offer numbered `number` of the one choice `kind` `count`, waiting.
+func _offer(seat: int, number: int, kind: StringName, count: int, id: StringName = &"") -> void:
+	var offer := RewardOffer.new()
+	offer.number = number
+	offer.seat = seat
+	offer.add(kind, id, count)
+	_rewards._offers.append(offer)
+
+
+func test_healing_and_more_health_go_through_combat() -> void:
+	var body := _wizard(0)
+	_world.hurt(body, 50)
+	check_equal(body.health.health, 50.0, "hurt")
+	var heals: Array = []
+	_world.bus.heal_dealt.connect(func(by: int, _target: Node, amount: float, _at: Vector2) -> void: heals.append([by, amount]))
+	_offer(0, 60, RewardEntry.HEAL, 30)
+	_pick(0, 60, 0)
+	check_equal(body.health.health, 80.0, "healed 30")
+	check_equal(heals, [[EventsScript.NO_PLAYER, 30.0]], "told as a heal by nobody")
+	_offer(0, 61, RewardEntry.MAX_HEALTH, 10)
+	_pick(0, 61, 0)
+	check_equal([body.health.max_health, body.health.health], [110.0, 90.0], "10 more most health, and as much health")
+	check_equal(_taken.size(), 2, "both taken")
+
+
+func test_a_heal_waits_while_the_wizard_is_down() -> void:
+	var body := _wizard(0)
+	_world.hurt(body, 100000)
+	check(body.is_down(), "down")
+	_offer(0, 62, RewardEntry.HEAL, 30)
+	_pick(0, 62, 0)
+	check(_taken.is_empty(), "not taken while down")
+	check_equal(_rewards.waiting_of(0).size(), 1, "it waits")
+
+
 func test_no_room_in_the_bag_keeps_it_unspent() -> void:
 	var body := _wizard(0)
 	body.inventory.set_capacity(CARDS, body.inventory.copies(CARDS))

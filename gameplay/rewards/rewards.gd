@@ -15,7 +15,10 @@ extends Node
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
 ##   is the seat's, gives the choice to the seat's own wizard (a card's copies into its card bag;
 ##   coins into its wallet) and goes (`reward_taken`). With no room in the bag it stays unspent.
-## - **What a reward may be** before relics exist (`RewardEntry.KINDS`): a card, or coins.
+## - **What a reward may be** before relics exist (`RewardEntry.KINDS`; the owner, 2026-11-19): a
+##   card, coins, a heal (not while down: it stays unspent) or a little more most health, the last
+##   two through Combat, which keeps an actor's health (`health_gift_requested`). A card upgrade
+##   waits for card levels.
 ## - **Run stats** (`RunStats`): the run's own changes come with `run_stats_ruled` (the Run area's,
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
 ##   wizard, `RelicBase`). Read by name: `stat_of`.
@@ -30,7 +33,7 @@ extends Node
 ##
 ## It knows nothing of the HUD, Flow or `net/`, and calls no other area: it hears events, reads the
 ## actor table and the bodies' public kit (gameplay/actor: an Inventory), and asks the projectile
-## manager's wall grid where a coin may lie.
+## manager's wall grid where a coin may lie. A gift of health it asks of Combat.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -329,6 +332,15 @@ func _give(seat: int, kind: StringName, id: StringName, count: int) -> bool:
 		RewardEntry.COINS:
 			_add_coins(seat, count)
 			return true
+		RewardEntry.HEAL, RewardEntry.MAX_HEALTH:
+			# Combat keeps an actor's health: the gift goes through it. A heal waits while down.
+			var wizard: Actor = _wizard_of(seat)
+			if wizard == null or events == null or (kind == RewardEntry.HEAL and wizard.is_down()):
+				return false
+			var heal: float = float(count) if kind == RewardEntry.HEAL else 0.0
+			var more: float = float(count) if kind == RewardEntry.MAX_HEALTH else 0.0
+			events.health_gift_requested.emit(actors.home_of_seat(seat), heal, more)
+			return true
 		RewardEntry.CARD:
 			var body: Actor = _wizard_of(seat)
 			if body == null or body.inventory == null:
@@ -429,6 +441,10 @@ func _choice_view(offer: RewardOffer, choice: int) -> Dictionary:
 	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": "", "icon": null}
 	if kind == RewardEntry.COINS:
 		view["name"] = "%d coin%s" % [count, "" if count == 1 else "s"]
+	elif kind == RewardEntry.HEAL:
+		view["name"] = "Heal %d" % count
+	elif kind == RewardEntry.MAX_HEALTH:
+		view["name"] = "+%d max health" % count
 	elif spells != null:
 		# A card's name and icon are Spells' to say (no script outside core/spells reads a card).
 		view["name"] = spells.component_name(id)

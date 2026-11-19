@@ -312,6 +312,11 @@ signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
 ## caller died crumbles. Heard by combat, which takes its health and tells its death as any other
 ## (`enemy_died` with NO_PLAYER for a foe of the wizards).
 signal crumble_requested(actor: int)
+## Sender: rewards (connected biomes CB10: a reward of healing or of more health). The actor `actor`
+## gains `more_most` most health (and as much health, unless it is down) and is then healed `heal`.
+## Heard by combat, which keeps an actor's health: it changes the body's Health and tells a heal as
+## any other (`heal_dealt`, by nobody).
+signal health_gift_requested(actor: int, heal: float, more_most: float)
 ## Sender: actor (a boss body's `BossPresence` look, boss plan OB16). The boss `actor` entered play:
 ## `boss_name` its name for people (`EnemyBase.shown_name`: its `display_name`, else its id in words), `lore` its one line, `marks`
 ## each phase's health share (`EnemyPhase.health_below`, largest first; none for a phase by time).

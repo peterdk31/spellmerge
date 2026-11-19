@@ -99,6 +99,17 @@ func heal(amount: float) -> bool:
 	return true
 
 
+## Raise `max_health` by `more` and the health by as much, unless it is at 0 (a reward of more
+## health, connected biomes CB10: Combat calls it). Nothing for `more` not above 0.
+func grow(more: float) -> void:
+	if not (more > 0.0) or not is_finite(more):
+		return
+	max_health += more
+	if health > 0.0:
+		health = minf(health + more, max_health)
+	changed.emit(health, max_health)
+
+
 ## Set the health to `amount` (a revive, a new run), at most `max_health`.
 func reset(amount: float) -> void:
 	health = clampf(amount, 0.0, max_health)

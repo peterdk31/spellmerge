@@ -183,6 +183,7 @@ const EVENTS: Dictionary = {
 	&"coin_changed": [["coin", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
 	&"wallet_changed": [["player", TYPE_INT], ["coins", TYPE_INT]],
 	&"run_stats_ruled": [["changes", TYPE_ARRAY]],
+	&"health_gift_requested": [["actor", TYPE_INT], ["heal", TYPE_FLOAT], ["more_most", TYPE_FLOAT]],
 	&"unlock_gained": [["unlock_id", TYPE_STRING_NAME]],
 	&"currency_changed": [["currency_id", TYPE_STRING_NAME], ["amount", TYPE_INT]],
 }

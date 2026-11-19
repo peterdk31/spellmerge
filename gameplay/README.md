@@ -87,6 +87,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
 | `wallet_changed` | `rewards` (a seat's coins) | `hud` (the corner panel) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
+| `health_gift_requested` | `rewards` (a reward of healing or more most health) | `combat` (it keeps an actor's health) |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
 | `hub_requested` | HUD | `flow`, `core/input` |

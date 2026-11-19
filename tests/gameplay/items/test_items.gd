@@ -399,3 +399,65 @@ func test_the_pickup_rule() -> void:
 	check_equal(PickupRule.nearest(rows, Vector2.ZERO), 1, "a tie goes to the lower number")
 	check_equal(PickupRule.nearest(rows, Vector2(100, 0)), -1, "none in reach")
 	check(not PickupRule.has_room(null, ItemStack.card(&"a")), "no inventory has no room")
+
+
+# --- Everything is droppable (the owner, 2026-11-19) -------------------------------------------
+
+const CURRENCY: StringName = &"currency"
+
+
+## A coin and a key are dropped one copy at a time from one wizard's currency bag (X, the command
+## `bag_drop_requested`), lie as items, and another wizard takes them with A into its own bag: the
+## coins are one's own then (no shared income: the third player gains nothing), and none is made.
+func test_coins_and_a_key_dropped_by_one_wizard_are_taken_by_another_and_none_is_made() -> void:
+	var giver := _wizard(0, Vector2(100, 100))
+	var taker := _wizard(1, Vector2(100, 200))
+	var third := _wizard(2, Vector2(300, 300))
+	check(giver.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3)), "three coins")
+	check(giver.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)), "a key")
+	_tick()
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, CoinBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, CoinBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, KeyBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_tick()
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID), 1, "one coin a drop: two gone, one kept")
+	check_equal(giver.inventory.count_of(CURRENCY, KeyBase.ID), 0, "the key gone")
+	var lying: Array[GroundItem] = _items.lying()
+	check_equal(lying.size(), 3, "two coins and a key lie there, each its own")
+	for item: GroundItem in lying:
+		check_equal(item.stack.count, 1, "one copy each")
+		check_equal(ItemKinds.bag_of(item.stack.kind), CURRENCY, "of the currency")
+	for item: GroundItem in lying.duplicate():
+		taker.position = item.at
+		_tick()
+		_ask(1, item.number)
+		_tick()
+	check(_items.lying().is_empty(), "all taken")
+	check_equal(taker.inventory.count_of(CURRENCY, CoinBase.ID), 2, "the taker's own two coins")
+	check_equal(taker.inventory.count_of(CURRENCY, KeyBase.ID), 1, "and the key")
+	check_equal(third.inventory.count_of(CURRENCY, CoinBase.ID), 0, "a dropped coin goes to its taker alone")
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID) + taker.inventory.count_of(CURRENCY, CoinBase.ID) + third.inventory.count_of(CURRENCY, CoinBase.ID), 3, "as many coins as there were")
+
+
+## The drops and takes are state: the same ticks from the same start come to the same hash, and a
+## snapshot with a dropped coin lying comes back the same.
+func test_a_dropped_coin_is_the_same_state_twice_and_through_a_snapshot() -> void:
+	var giver := _wizard(0, Vector2(100, 100))
+	check(giver.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 2)), "two coins")
+	_tick()
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, CoinBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_tick()
+	var areas: Dictionary = {&"Items": _items}
+	var before: int = SimHash.of(_items)
+	var snapshot: Snapshot = Snapshot.take(areas, root)
+	check_equal(snapshot.problems, PackedStringArray(), "nothing it cannot save")
+	var coin: GroundItem = _items.lying().back()
+	giver.position = coin.at
+	_tick()
+	_ask(0, coin.number)
+	_tick()
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID), 2, "taken back")
+	check(SimHash.of(_items) != before, "the ground changed")
+	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored")
+	check_equal(SimHash.of(_items), before, "the coin lies there again")
+	check_equal([_items.lying().back().stack.kind, _items.lying().back().stack.id], [ItemKinds.COIN, CoinBase.ID], "the coin")

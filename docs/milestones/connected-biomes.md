@@ -425,7 +425,7 @@ Two changes the owner decided on 2026-11-19.
 
 ### Open questions for the owner
 
-1. **Keys are never dropped** (like coins): a wizard cannot hand a key to another. Should a key be droppable from the inventory (X), so a player can give one to a teammate?
+1. *Answered by the owner, 2026-11-19: "Everything is droppable" ("Everything is droppable", below).* ~~Keys are never dropped (like coins): should a key be droppable from the inventory (X)?~~
 2. **A downed wizard's keys** stay in its bag; a key taken by a possessed foe stays in the foe's bag when the possession ends (and is lost when it dies). Should a foe drop the keys it carries as it dies, as it drops its coins by chance?
 
 ## Follow-ups done, second part (2026-11-19)
@@ -437,6 +437,14 @@ Three more the owner decided on 2026-11-19 (the fight rooms' faint tint, 0.08, s
 - **Downed bots crawl toward their teammates** (CB3's crawl; tests/bots/bot.gd): a downed bot crawls toward the nearest standing teammate (seat order between two as near), round the walls (`AISight.detour`), leaning aside (never back) from each enemy ahead within 64 px so it does not crawl into one, and stops within 14 px of that teammate; with nobody standing it lies still. Its frames are its seat's walk only, read from the world as a player reads the screen, so it is deterministic. The game's AI is unchanged: an enemy that drives a wizard is never downed as one.
 - **Every room's own mist** (the owner, 2026-11-19): a biome's later rooms that name a mist draw it too, each its own `Mist` (the spectacle's `room_mists`) at its place and mirroring, as the start room's since the first follow-ups; made and freed with the first room's by spell light and "Fog", easing with it, gone with a new world. A walkway draws none. A mist off screen draws nothing; each costs its mask as it is made (as a biome is laid, and again for every room when spell light or "Fog" comes back on) and its parting a frame (only the cells not closed).
 - **Tests:** `tests/gameplay/flow/test_special_rooms.gd` (two treasure rooms, 1 or 2 keys by the run's chance, either over seeds, any key opening either door and spent; the key's room picked by the run's chance among the open rooms, either over seeds, never the treasure room; the boss's room never one, so the old test keeps its key in the start room), `tests/gameplay/feel/test_mist.gd` (a later room's own mist where it stands, mirrored, none for a bridge, freed and made again with spell light, gone with a new world), `tests/gameplay/feel/test_room_tints.gd` (the two bands past the nave's edge, then none, in its hue), `tests/bots/test_bot.gd` (toward the standing teammate, aside from an enemy ahead, stopping beside it, still with nobody standing, and nearer in play), `test_biome_generator.gd` (a treasure room in at least 18 of 24 crypt maps).
+
+## Everything is droppable (2026-11-19)
+
+The owner, 2026-11-19: "Everything is droppable."
+
+- **Coins and keys drop** from the inventory as any item (`ItemKinds.RULES`: both DROP): X in the currency bag lays **one copy** of the coin or the key pointed at (as a potion; a stack is never dropped whole), through the Items area (`item_drop_requested`), as a ground item another body takes with A into its own currency bag (`PickupRule`). A key so dropped opens a treasure door for whoever holds it, as any key.
+- **No coin is made by a drop:** a coin a player drops is taken by the one body that takes it (an Items ground item, not a Rewards floor coin: no shared income). The coins a foe dies with keep the shared rule (each laid as a Rewards coin, every player gaining one when one is taken), and a boss's go to everyone, but only the coins the foe came carrying and held all along (`Inventory.carried_kept`: the carried count, lowered whenever it held fewer, never raised by what it takes later). A possessed foe that took a player's dropped coin dies with it unshared, so the coin goes with the body, as its keys do (as built). *Open question for the owner:* whether such a coin should rather drop as an item where it fell.
+- **Tests:** `tests/gameplay/items/test_items.gd` (a key and coins dropped by one wizard and taken by another, one copy a drop, none made; a dropped coin lying through a snapshot), `tests/gameplay/rewards/test_rewards.gd` (a possessed foe's taken coin never shared on its death, a boss's only its own, the count held all along hashed and snapshotted), `tests/gameplay/player/test_player_potions.gd` and `tests/core/test_item_kinds.gd` (one coin a drop; every kind droppable), `tests/hud/test_inventory_menu.gd` (X drops one coin and one key from the currency bag).
 
 ## Answered by the owner (2026-11-18)
 

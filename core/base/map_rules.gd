@@ -11,11 +11,21 @@ extends Resource
 ## next row holds), never crossing another's links, so every room can be reached from the first and
 ## leads on to the last row. A row no line of the table can fill from
 ## the content (only lines that are not `required`) is left out, so the map is that much shorter.
+##
+## **A biome's map** (connected biomes CB5, docs/milestones/connected-biomes.md, decisions 1, 4 and 5;
+## `BiomeGenerator`, gameplay/run) reads the same table by depth (`KindRule`'s class doc) and its own
+## numbers: how many rooms (`rooms_min` to `rooms_max`, the start room and the bridges not counted),
+## the start room's kind (`start_kind`), how many fights lie on the way to the boss at least
+## (`fights_on_way`), the depth the run's scaling per depth reaches its end at (`scale_depth`) and
+## the shapes it rolls (`styles`). `biome_problems` says whether one can be made from the content and
+## the templates' shapes there are. The row map (above) stays the run's until CB8 switches.
 
 ## The deepest a map may be and the widest a row (the editor's ranges; a rule change, run
 ## generation RG6, may not pass them either).
 const MOST_DEPTH: int = 32
 const MOST_WIDTH: int = 8
+## The most rooms a biome's map may hold (the editor's range; a rule change may not pass it either).
+const MOST_ROOMS: int = 32
 
 ## The biome its rooms and enemies are of (`RoomBase.biome`, `EnemyBase.biomes`).
 @export var biome: StringName = &""
@@ -37,6 +47,22 @@ const MOST_WIDTH: int = 8
 ## quiet, each a share of the room's scaled budget. Null: a room's whole list spawns in at once.
 @export var spawning: SpawnRules = null
 
+@export_group("Biome map")
+## How many rooms a biome's map holds, at least and at most, not counting the start room and the
+## bridges (decision 1: 8 to 12).
+@export_range(1, 32) var rooms_min: int = 8
+@export_range(1, 32) var rooms_max: int = 12
+## The kind of the biome's start room (`RoomKind` id: a small safe slab, filled with nothing).
+@export var start_kind: StringName = &"start"
+## How many fights (rooms of a kind filled with enemies) lie on every way from the start room to the
+## boss, at least (decision 4).
+@export_range(0, 32) var fights_on_way: int = 4
+## The depth (bridges from the start room) at which the run's scaling per depth reaches its end
+## (`RunDefinition.biome_room_scale`); a deeper room keeps the end.
+@export_range(1, 32) var scale_depth: int = 8
+## The shapes a biome's map may take, each rolled by its weight (decision 5).
+@export var styles: Array[MapStyle] = []
+
 
 ## A copy of its own, its kind rules too (`KindRule.copied`), so changing it changes nothing else
 ## (run generation RG6: the rules a run plays, `RunDefinition.copied`).
@@ -47,6 +73,10 @@ func copied() -> MapRules:
 		kinds_made.append(rule.copied() if rule != null else null)
 	made.kinds = kinds_made
 	made.spawning = spawning.duplicate(false) as SpawnRules if spawning != null else null
+	var styles_made: Array[MapStyle] = []
+	for style: MapStyle in styles:
+		styles_made.append(style.duplicate(false) as MapStyle if style != null else null)
+	made.styles = styles_made
 	return made
 
 
@@ -259,3 +289,173 @@ static func _place(at: int, table: Array, taken: Dictionary, seen: Dictionary) -
 				holders[k] = at
 				return true
 	return false
+
+
+# --- A biome's map (connected biomes CB5) ----------------------------------------------------
+
+## What keeps a biome's map from being made by these rules from `content` and `shapes` (template id to
+## its unmirrored `PieceShape`, `Registry.piece_shapes`), one line each; empty when nothing the rules
+## and the content say does (the templates' shapes can still leave a seed no room: the generator
+## tries again, and names the last try's reason when none fits). Its numbers out of range, its
+## styles' (`MapStyle.problems`), a bad line of the table; no start room template with a socket; not
+## one line standing deepest (the boss: `KindRule.stands_deepest`, least and max_per_run 1); no line
+## without a limit to fill the rooms past the fixed and chance ones; more fixed rooms than
+## `rooms_max`; fewer fixed fights off the dead ends than `fights_on_way`; a needed line no template
+## of the biome with a socket hosts, or with fewer templates than its `least` (a template stands once
+## a biome) or no enemy or boss to fill it; no fight template with two sockets (a room on the way has
+## a way in and a way on); no walkway of the biome with two sockets; and fewer templates than
+## `rooms_min`.
+func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArray:
+	var found: PackedStringArray = _biome_range_problems()
+	if not found.is_empty():
+		return found
+	var known: Array[StringName] = content.kind_ids()
+	var named: Dictionary = {}
+	for rule: KindRule in kinds:
+		if rule == null:
+			found.append("%s: an empty kind rule." % biome)
+			continue
+		for line: String in rule.problems(known):
+			found.append("%s: %s" % [biome, line])
+		if named.has(rule.kind):
+			found.append("%s: kind '%s' has two lines: a biome's map reads one line a kind." % [biome, rule.kind])
+		named[rule.kind] = true
+	for style: MapStyle in styles:
+		if style == null:
+			found.append("%s: an empty map style." % biome)
+		else:
+			found.append_array(style.problems(biome))
+	if not found.is_empty():
+		return found
+	var start: RoomKind = content.kind(start_kind)
+	if start == null:
+		found.append("%s: the start room's kind '%s' is no room kind." % [biome, start_kind])
+	elif biome_templates(content, shapes, start_kind, 1).is_empty():
+		found.append("%s: no %s room with a socket hosts the start room's kind '%s'." % [biome, biome, start_kind])
+	var lines: Array[KindRule] = biome_lines(content, shapes)
+	var ends: int = 0
+	var unlimited: int = 0
+	var fixed: int = 0
+	var fixed_fights: int = 0
+	var spine_templates: Dictionary = {}
+	var used: Dictionary = {}
+	for rule: KindRule in lines:
+		var hosts: Array[RoomBase] = biome_templates(content, shapes, rule.kind, 1)
+		for room: RoomBase in hosts:
+			used[room.id] = true
+		if rule.stands_deepest():
+			ends += 1
+			if rule.least != 1 or rule.max_per_run != 1:
+				found.append("%s: kind '%s' stands deepest (the way's end): its least and max_per_run are 1." % [biome, rule.kind])
+			continue
+		fixed += rule.least
+		if rule.max_per_run == 0:
+			unlimited += 1
+		var of_kind: RoomKind = content.kind(rule.kind)
+		var fights: bool = of_kind.fill == RoomKind.FILL_ENEMIES
+		if fights and not rule.dead_end:
+			fixed_fights += rule.least
+			for room: RoomBase in biome_templates(content, shapes, rule.kind, 2):
+				spine_templates[room.id] = true
+		if hosts.size() < rule.least:
+			found.append("%s: kind '%s' has %d rooms in every biome, but %d %s rooms with a socket host it (a template stands once a biome)." % [biome, rule.kind, rule.least, hosts.size(), biome])
+	for rule: KindRule in kinds:
+		if rule != null and rule.required and not lines.has(rule):
+			found.append("%s: kind '%s' is required, but %s." % [biome, rule.kind, _biome_cannot_fill(content, shapes, rule)])
+	if ends != 1:
+		found.append("%s: %d kinds stand deepest (first_row and last_row -1); a biome's map has one at its way's end (the boss) the content fills." % [biome, ends])
+	if unlimited == 0:
+		found.append("%s: no kind without a max_per_run the content fills: nothing fills the rooms past the fixed and chance ones." % biome)
+	if fixed + 1 > rooms_max:
+		found.append("%s: %d fixed rooms (each kind's least, the boss's too), more than rooms_max %d." % [biome, fixed + 1, rooms_max])
+	if fixed_fights < fights_on_way:
+		found.append("%s: %d fights fixed (the least of kinds filled with enemies, not dead ends), fewer than the %d on the way to the boss (fights_on_way)." % [biome, fixed_fights, fights_on_way])
+	if spine_templates.size() < fights_on_way:
+		found.append("%s: %d %s rooms hosting a fight have two sockets, fewer than the %d fights on the way to the boss (a room on the way has a way in and a way on, and a template stands once a biome)." % [biome, spine_templates.size(), biome, fights_on_way])
+	if biome_walkways(content, shapes).is_empty():
+		found.append("%s: no %s walkway (RoomBase.walkway) with two sockets: nothing bridges its rooms." % [biome, biome])
+	if used.size() < rooms_min:
+		found.append("%s: %d %s rooms with a socket host its kinds, fewer than rooms_min %d (a template stands once a biome)." % [biome, used.size(), biome, rooms_min])
+	return found
+
+
+func _biome_range_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	if biome == &"":
+		found.append("Map rules name no biome.")
+	if rooms_min < 1 or rooms_min > rooms_max or rooms_max > MOST_ROOMS:
+		found.append("%s: rooms %d to %d; at least 1, the least first, %d at most." % [biome, rooms_min, rooms_max, MOST_ROOMS])
+	if fights_on_way < 0 or fights_on_way >= rooms_max:
+		found.append("%s: fights_on_way %d; 0 to fewer than rooms_max %d (the boss is a room too)." % [biome, fights_on_way, rooms_max])
+	if scale_depth < 1 or scale_depth > MOST_ROOMS:
+		found.append("%s: scale_depth %d; 1 to %d." % [biome, scale_depth, MOST_ROOMS])
+	if styles.is_empty():
+		found.append("%s: no map styles: a biome's map rolls one." % biome)
+	if kinds.is_empty():
+		found.append("%s: no kind rules: no room could stand in the map." % biome)
+	if room_budget < 1:
+		found.append("%s: room_budget %d; at least 1." % [biome, room_budget])
+	if spawning != null:
+		for line: String in spawning.problems():
+			found.append("%s: spawning: %s" % [biome, line])
+	return found
+
+
+## The lines of the table a biome's map places, in the table's order: those the content fills (a
+## template of the biome with a socket hosts the kind, and its enemy or boss pool is not empty) and
+## that may hold a room (a least, a chance or no limit); a line the content cannot fill is left out
+## (one `required` is a problem: `biome_problems`).
+func biome_lines(content: RunContent, shapes: Dictionary) -> Array[KindRule]:
+	var found: Array[KindRule] = []
+	for rule: KindRule in kinds:
+		if rule == null or content.kind(rule.kind) == null:
+			continue
+		if rule.least == 0 and rule.chance <= 0.0 and rule.max_per_run > 0 and not rule.stands_deepest():
+			continue
+		if _biome_cannot_fill(content, shapes, rule) == "":
+			found.append(rule)
+	return found
+
+
+## Why `rule`'s rooms cannot stand in a biome's map from `content` and `shapes` (empty when they can).
+func _biome_cannot_fill(content: RunContent, shapes: Dictionary, rule: KindRule) -> String:
+	var of_kind: RoomKind = content.kind(rule.kind)
+	if of_kind == null:
+		return "no room kind '%s'" % rule.kind
+	if biome_templates(content, shapes, rule.kind, 1).is_empty():
+		return "no %s room with a socket hosts '%s'" % [biome, rule.kind]
+	var from: int = maxi(rule.first_row, 0)
+	match of_kind.fill:
+		RoomKind.FILL_ENEMIES:
+			if content.enemy_pool(biome, from).is_empty():
+				return "no enemy fights in %s by depth %d" % [biome, from]
+		RoomKind.FILL_BOSS:
+			# The boss stands deepest, at the way's end: a way is fights_on_way + 1 rooms at least.
+			if content.boss_pool(biome, fights_on_way + 1).is_empty():
+				return "no boss fights in %s by depth %d (the shallowest the way's end may be)" % [biome, fights_on_way + 1]
+	return ""
+
+
+## The room templates (not walkways) of the biome that host `kind_id` and have `sockets` sockets at
+## least, by their shapes in `shapes`, in id order.
+func biome_templates(content: RunContent, shapes: Dictionary, kind_id: StringName, sockets: int) -> Array[RoomBase]:
+	var found: Array[RoomBase] = []
+	for room: RoomBase in content.rooms:
+		if room.biome != biome or room.walkway or not room.hosts(kind_id):
+			continue
+		var shape: PieceShape = shapes.get(room.id) as PieceShape
+		if shape != null and shape.sockets() >= sockets:
+			found.append(room)
+	return found
+
+
+## The walkways of the biome with two sockets (its bridges), by their shapes in `shapes`, in id order.
+func biome_walkways(content: RunContent, shapes: Dictionary) -> Array[RoomBase]:
+	var found: Array[RoomBase] = []
+	for room: RoomBase in content.rooms:
+		if room.biome != biome or not room.walkway:
+			continue
+		var shape: PieceShape = shapes.get(room.id) as PieceShape
+		if shape != null and shape.sockets() == 2:
+			found.append(room)
+	return found

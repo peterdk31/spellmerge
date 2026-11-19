@@ -6,7 +6,7 @@ extends RefCounted
 ## of placed thing is a branch here and nothing in Flow. It keeps them standing (a slot a
 ## placement, null once its body went, forgotten in the tick it goes) and answers by kind and role.
 ##
-## A room's zone named for a prop role (run generation RG7: the hub's `start_lectern`) is a place for
+## A room's zone named for a prop role is a place for
 ## the registry's prop of that role (`stand`): the first by id stands with its feet at the zone's
 ## middle, after the placements. So such a prop is found by folder, never named by the
 ## room's scene: deleting its folder leaves the zone empty and the room whole.

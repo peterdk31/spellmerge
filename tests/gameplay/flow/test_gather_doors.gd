@@ -268,10 +268,10 @@ func test_the_bosss_room_cleared_opens_the_portal_home_and_it_ends_the_run() -> 
 	# One in it: nothing; both: the run is won, back to the hub.
 	_wizard(0).position = area.get_center()
 	_ticks(1)
-	check_equal(flow.mode, FlowScript.MODE_BIOME, "one of two in the portal: the run goes on")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "one of two in the portal: the run goes on")
 	_wizard(1).position = area.get_center() + Vector2(4.0, 0.0)
 	_ticks(1)
-	check(flow.mode != FlowScript.MODE_BIOME, "every standing wizard in the portal: the biome's run ends")
+	check(flow.mode != FlowScript.MODE_RUN, "every standing wizard in the portal: the biome's run ends")
 	frames.call("begin_step", DT)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "and the party is back in the hub")
 	check_equal(_last_told(-1).size(), 7, "the view is told every door is forgotten")
@@ -282,7 +282,7 @@ func test_everyone_down_in_a_biome_ends_the_run_back_in_the_hub() -> void:
 	_ticks(1)
 	_down(_wizard(0))
 	_ticks(roundi(FlowScript.RESTART_DELAY / DT) + 2)
-	check(flow.mode != FlowScript.MODE_BIOME, "everyone down: the biome's run is lost")
+	check(flow.mode != FlowScript.MODE_RUN, "everyone down: the biome's run is lost")
 	frames.call("begin_step", DT)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub (decision 14)")
 

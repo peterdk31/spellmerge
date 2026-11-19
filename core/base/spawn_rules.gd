@@ -7,7 +7,7 @@ extends Resource
 ##
 ## The shares are of the room's **scaled** budget (`RunScaling.scaled_budget`), so a bigger party or a
 ## deeper room gets bigger groups in the same proportion as its bigger room. The run works the costs
-## out (`group_cost`, `refill_cost`) and hands Flow plain numbers (`run_room_paced`); nothing of this
+## out (`group_cost`, `refill_cost`) and hands Flow plain numbers (`run_room_filled`); nothing of this
 ## Resource sits in a run's state.
 
 ## The cost of one group, as a share of the room's scaled budget: a group takes enemies from the

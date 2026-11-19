@@ -3,61 +3,28 @@ extends "res://tests/support/suite.gd"
 ## (RG6)"), as data: a rule change (`RunRuleChange`) names a save flag and one number of the run
 ## definition it changes; the definition a run plays (`RunDefinition.changed_by`) is a copy of its
 ## own with the changes the run's unlocks hold applied in order, never the registry's; and a change
-## that names nothing, or leaves rules that make no map, is named by the validator. On made-up
-## content.
-const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
+## that names nothing, or leaves rules that make no map, is named by the validator. On the made-up
+## cellar biome (tests/support/made_up_biome.gd; connected biomes CB8: the row map's depth and width
+## targets went with it).
+const MadeUpBiome := preload("res://tests/support/made_up_biome.gd")
 
-const BIOME: StringName = &"cellar"
+const BIOME: StringName = MadeUpBiome.BIOME
 
-
-func _kind(id: StringName, fill: StringName) -> RoomKind:
-	var kind := RoomKind.new()
-	kind.id = id
-	kind.fill = fill
-	return kind
+## The made-up content and shapes (made once: they are read, never changed).
+var _biome: MadeUpBiome = MadeUpBiome.new()
 
 
-func _room(id: StringName, kinds: Array[StringName]) -> RoomBase:
-	var room := MadeUpRoom.new()
-	room.id = id
-	room.biome = BIOME
-	room.kinds = kinds
-	return room
-
-
-func _enemy(id: StringName, boss: bool = false) -> EnemyBase:
-	var enemy := EnemyBase.new()
-	enemy.id = id
-	enemy.biomes = [BIOME] as Array[StringName]
-	enemy.boss = boss
-	return enemy
-
-
-## A cellar with a fight room and a boss room, a rat and a boss.
-func _content() -> RunContent:
-	var kinds: Array[Resource] = [_kind(&"fight", RoomKind.FILL_ENEMIES), _kind(&"boss", RoomKind.FILL_BOSS)]
-	var rooms: Array[Resource] = [_room(&"hall", [&"fight"] as Array[StringName]), _room(&"throne", [&"boss"] as Array[StringName])]
-	var enemies: Array[Resource] = [_enemy(&"rat"), _enemy(&"king", true)]
-	return RunContent.gather(kinds, rooms, enemies)
-
-
-## Fights then a boss, 3 to 5 rows deep, scaled by depth.
+## The made-up cellar's run: its first kind line the fights, scaled by depth (1 to 2) and players.
 func _run() -> RunDefinition:
-	var rules := MapRules.new()
-	rules.biome = BIOME
-	rules.depth_min = 3
-	rules.depth_max = 5
-	var boss := KindRule.make(&"boss", -1, -1)
-	boss.max_per_row = 1
-	boss.max_per_run = 1
-	rules.kinds = [KindRule.make(&"fight", 0, -2), boss] as Array[KindRule]
-	rules.styles = [MapStyle.make(&"long", 0.75)] as Array[MapStyle]
-	var run := RunDefinition.new()
-	run.id = &"cellar_run"
-	run.biomes = [rules] as Array[MapRules]
-	run.scaling = RunScaling.new()
-	run.scaling.per_depth = ScaleCurve.make(1.0, 2.0)
-	return run
+	return MadeUpBiome.run()
+
+
+func _problems(run: RunDefinition) -> PackedStringArray:
+	return run.biome_problems(_biome.content, _biome.shapes)
+
+
+func _generate(run: RunDefinition, seed_value: int) -> BiomeMap:
+	return BiomeGenerator.generate(run, _biome.content, _biome.shapes, Sim.seeded(seed_value))
 
 
 func _unlocks(flags: Array[StringName]) -> RunUnlocks:
@@ -73,32 +40,32 @@ func _names(problems: PackedStringArray, part: String) -> bool:
 
 func test_with_no_flag_held_the_run_plays_its_own_definition() -> void:
 	var run: RunDefinition = _run()
-	run.changes = [RunRuleChange.make(&"deeper", RunRuleChange.Target.DEPTH_MAX, 6.0)] as Array[RunRuleChange]
+	run.changes = [RunRuleChange.make(&"bigger", RunRuleChange.Target.ROOMS_MAX, 11.0)] as Array[RunRuleChange]
 	check(run.changed_by(RunUnlocks.new()) == run, "no unlocks: the definition itself, no copy")
 	check(run.changed_by(_unlocks([&"other"] as Array[StringName])) == run, "a flag no change names: itself")
 	check(run.changed_by(null) == run, "no unlocks at all: itself")
-	check_equal(run.flags(), [&"deeper"] as Array[StringName], "the flags its changes name")
+	check_equal(run.flags(), [&"bigger"] as Array[StringName], "the flags its changes name")
 
 
 func test_a_held_flag_changes_a_copy_and_never_the_definition() -> void:
 	var run: RunDefinition = _run()
 	run.changes = [
-		RunRuleChange.make(&"deeper", RunRuleChange.Target.DEPTH_MAX, 6.0),
-		RunRuleChange.make(&"deeper", RunRuleChange.Target.KIND_WEIGHT, 3.0, RunRuleChange.How.TIMES, BIOME, &"fight"),
+		RunRuleChange.make(&"bigger", RunRuleChange.Target.ROOMS_MAX, 11.0),
+		RunRuleChange.make(&"bigger", RunRuleChange.Target.KIND_WEIGHT, 3.0, RunRuleChange.How.TIMES, BIOME, &"fight"),
 		RunRuleChange.make(&"harder", RunRuleChange.Target.SCALE_DEPTH_END, 0.5, RunRuleChange.How.ADD),
 	] as Array[RunRuleChange]
 	var before: int = SimHash.of(run.biomes[0])
-	var played: RunDefinition = run.changed_by(_unlocks([&"deeper"] as Array[StringName]))
+	var played: RunDefinition = run.changed_by(_unlocks([&"bigger"] as Array[StringName]))
 	check(played != run, "a copy")
 	check_equal(played.id, run.id, "of the same run")
-	check_equal(played.biomes[0].depth_max, 6, "its depth set")
+	check_equal(played.biomes[0].rooms_max, 11, "its room count set")
 	check(is_equal_approx(played.biomes[0].kinds[0].weight, 3.0), "the fight line's weight times 3")
 	check(is_equal_approx(played.scaling.per_depth.end, 2.0), "a flag not held changes nothing")
-	check_equal(run.biomes[0].depth_max, 5, "the definition's depth is its own")
+	check_equal(run.biomes[0].rooms_max, 12, "the definition's room count is its own")
 	check(is_equal_approx(run.biomes[0].kinds[0].weight, 1.0), "and its kind rule")
 	check_equal(SimHash.of(run.biomes[0]), before, "nothing of the definition changed")
 	check(played.biomes[0] != run.biomes[0] and played.biomes[0].kinds[0] != run.biomes[0].kinds[0], "every rule copied")
-	var both: RunDefinition = run.changed_by(_unlocks([&"harder", &"deeper"] as Array[StringName]))
+	var both: RunDefinition = run.changed_by(_unlocks([&"harder", &"bigger"] as Array[StringName]))
 	check(is_equal_approx(both.scaling.per_depth.end, 2.5), "the scaling's end raised by 0.5")
 	check(is_equal_approx(run.scaling.per_depth.end, 2.0), "the definition's curve its own")
 	check(played.scaling != run.scaling and played.scaling.per_depth != run.scaling.per_depth, "the scaling copied")
@@ -107,22 +74,17 @@ func test_a_held_flag_changes_a_copy_and_never_the_definition() -> void:
 func test_changes_apply_in_their_order() -> void:
 	var run: RunDefinition = _run()
 	run.changes = [
-		RunRuleChange.make(&"a", RunRuleChange.Target.WIDTH_MAX, 1.0, RunRuleChange.How.ADD),
-		RunRuleChange.make(&"b", RunRuleChange.Target.WIDTH_MAX, 2.0, RunRuleChange.How.TIMES),
+		RunRuleChange.make(&"a", RunRuleChange.Target.ROOMS_MIN, 1.0, RunRuleChange.How.ADD),
+		RunRuleChange.make(&"b", RunRuleChange.Target.ROOMS_MIN, 2.0, RunRuleChange.How.TIMES),
 	] as Array[RunRuleChange]
 	var played: RunDefinition = run.changed_by(_unlocks([&"b", &"a"] as Array[StringName]))
-	check_equal(played.biomes[0].width_max, 8, "(3 + 1) x 2: the definition's order, not the unlocks'")
+	check_equal(played.biomes[0].rooms_min, 18, "(8 + 1) x 2: the definition's order, not the unlocks'")
 
 
 func test_every_target_changes_its_number() -> void:
 	var cases: Array = [
 		[RunRuleChange.Target.KIND_WEIGHT, &"fight", func(d: RunDefinition) -> float: return d.biomes[0].kinds[0].weight],
-		[RunRuleChange.Target.KIND_MAX_PER_ROW, &"fight", func(d: RunDefinition) -> float: return float(d.biomes[0].kinds[0].max_per_row)],
 		[RunRuleChange.Target.KIND_MAX_PER_RUN, &"fight", func(d: RunDefinition) -> float: return float(d.biomes[0].kinds[0].max_per_run)],
-		[RunRuleChange.Target.DEPTH_MIN, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].depth_min)],
-		[RunRuleChange.Target.DEPTH_MAX, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].depth_max)],
-		[RunRuleChange.Target.WIDTH_MIN, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].width_min)],
-		[RunRuleChange.Target.WIDTH_MAX, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].width_max)],
 		[RunRuleChange.Target.SCALE_DEPTH_START, &"", func(d: RunDefinition) -> float: return d.scaling.per_depth.start],
 		[RunRuleChange.Target.SCALE_DEPTH_END, &"", func(d: RunDefinition) -> float: return d.scaling.per_depth.end],
 		[RunRuleChange.Target.SCALE_PLAYER_START, &"", func(d: RunDefinition) -> float: return d.scaling.per_player.start],
@@ -144,8 +106,8 @@ func test_every_target_changes_its_number() -> void:
 		var played: RunDefinition = run.changed_by(_unlocks([&"unlocked"] as Array[StringName]))
 		check(is_equal_approx(getter.call(played) as float, 4.0), "%s set to 4" % RunRuleChange.Target.find_key(case[0]))
 	var run: RunDefinition = _run()
-	run.changes = [RunRuleChange.make(&"round", RunRuleChange.Target.DEPTH_MAX, 1.4, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
-	check_equal(run.changed_by(_unlocks([&"round"] as Array[StringName])).biomes[0].depth_max, 7, "a whole number's result is rounded (5 x 1.4)")
+	run.changes = [RunRuleChange.make(&"round", RunRuleChange.Target.ROOMS_MAX, 0.75, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
+	check_equal(run.changed_by(_unlocks([&"round"] as Array[StringName])).biomes[0].rooms_max, 9, "a whole number's result is rounded (12 x 0.75)")
 
 
 func test_a_scaling_change_on_a_run_without_scaling_starts_from_one() -> void:
@@ -157,62 +119,60 @@ func test_a_scaling_change_on_a_run_without_scaling_starts_from_one() -> void:
 	check(is_equal_approx(played.scaling.per_player.end, 1.5) and is_equal_approx(played.scaling.per_player.start, 1.0), "from 1")
 	check(played.scaling.per_depth == null, "no other curve")
 	check(run.scaling == null, "the definition still has none")
-	check_equal(run.problems(_content()), PackedStringArray(), "sound")
+	check_equal(_problems(run), PackedStringArray(), "sound")
 
 
 func test_the_generator_makes_the_map_of_the_changed_rules() -> void:
 	var run: RunDefinition = _run()
 	run.changes = [
-		RunRuleChange.make(&"long", RunRuleChange.Target.DEPTH_MIN, 5.0),
-		RunRuleChange.make(&"long", RunRuleChange.Target.WIDTH_MIN, 2.0),
+		RunRuleChange.make(&"big", RunRuleChange.Target.ROOMS_MIN, 11.0),
+		RunRuleChange.make(&"big", RunRuleChange.Target.ROOMS_MAX, 11.0),
 	] as Array[RunRuleChange]
-	check_equal(run.problems(_content()), PackedStringArray(), "the changes are sound")
-	var held: RunDefinition = run.changed_by(_unlocks([&"long"] as Array[StringName]))
-	for seed in 40:
-		var plain: RunMap = RunGenerator.generate(run, _content(), Sim.seeded(seed))
-		var changed: RunMap = RunGenerator.generate(held, _content(), Sim.seeded(seed))
-		check(plain.is_made() and changed.is_made(), "seed %d: both made" % seed)
-		check_equal(changed.rows(), 5, "seed %d: as deep as the change says" % seed)
-		for row in range(1, changed.rows() - 1):
-			check(changed.row(row).size() >= 2, "seed %d: row %d as wide" % [seed, row])
-		check_equal(SimHash.of(changed), SimHash.of(RunGenerator.generate(run.changed_by(_unlocks([&"long"] as Array[StringName])), _content(), Sim.seeded(seed))), "seed %d: the same unlocks, the same map" % seed)
+	check_equal(_problems(run), PackedStringArray(), "the changes are sound")
+	var held: RunDefinition = run.changed_by(_unlocks([&"big"] as Array[StringName]))
+	for seed_value in 12:
+		var plain: BiomeMap = _generate(run, seed_value)
+		var changed: BiomeMap = _generate(held, seed_value)
+		check(plain.is_made() and changed.is_made(), "seed %d: both made" % seed_value)
+		check_equal(changed.rooms(), 12, "seed %d: as many rooms as the change says, and the start room" % seed_value)
+		check_equal(SimHash.of(changed), SimHash.of(_generate(run.changed_by(_unlocks([&"big"] as Array[StringName])), seed_value)), "seed %d: the same unlocks, the same map" % seed_value)
 
 
 func test_a_change_that_names_nothing_is_named() -> void:
 	var cases: Dictionary = {
-		"names no save flag": RunRuleChange.make(&"", RunRuleChange.Target.DEPTH_MAX, 5.0),
-		"not a plain id": RunRuleChange.make(&"a flag", RunRuleChange.Target.DEPTH_MAX, 5.0),
-		"is not a number": RunRuleChange.make(&"f", RunRuleChange.Target.DEPTH_MAX, NAN),
-		"no biome 'attic'": RunRuleChange.make(&"f", RunRuleChange.Target.DEPTH_MAX, 5.0, RunRuleChange.How.SET, &"attic"),
+		"names no save flag": RunRuleChange.make(&"", RunRuleChange.Target.ROOMS_MAX, 10.0),
+		"not a plain id": RunRuleChange.make(&"a flag", RunRuleChange.Target.ROOMS_MAX, 10.0),
+		"is not a number": RunRuleChange.make(&"f", RunRuleChange.Target.ROOMS_MAX, NAN),
+		"no biome 'attic'": RunRuleChange.make(&"f", RunRuleChange.Target.ROOMS_MAX, 10.0, RunRuleChange.How.SET, &"attic"),
 		"names no kind": RunRuleChange.make(&"f", RunRuleChange.Target.KIND_WEIGHT, 2.0),
-		"no kind rule of 'shop'": RunRuleChange.make(&"f", RunRuleChange.Target.KIND_WEIGHT, 2.0, RunRuleChange.How.SET, &"", &"shop"),
-		"changes the map, so it names no kind": RunRuleChange.make(&"f", RunRuleChange.Target.DEPTH_MAX, 5.0, RunRuleChange.How.SET, &"", &"fight"),
+		"no kind rule of 'feast'": RunRuleChange.make(&"f", RunRuleChange.Target.KIND_WEIGHT, 2.0, RunRuleChange.How.SET, &"", &"feast"),
+		"changes the map, so it names no kind": RunRuleChange.make(&"f", RunRuleChange.Target.ROOMS_MAX, 10.0, RunRuleChange.How.SET, &"", &"fight"),
 		"changes the run's scaling": RunRuleChange.make(&"f", RunRuleChange.Target.SCALE_DEPTH_END, 2.0, RunRuleChange.How.SET, BIOME),
 	}
 	for part: String in cases:
 		var run: RunDefinition = _run()
 		run.changes = [cases[part]] as Array[RunRuleChange]
-		var problems: PackedStringArray = run.problems(_content())
+		var problems: PackedStringArray = _problems(run)
 		check(_names(problems, part), "'%s' is named: %s" % [part, problems])
 	var run: RunDefinition = _run()
 	run.changes = [null] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "an empty rule change"), "an empty entry is named")
+	check(_names(_problems(run), "an empty rule change"), "an empty entry is named")
 
 
 func test_rules_a_flag_leaves_that_make_no_map_are_named() -> void:
 	var run: RunDefinition = _run()
-	run.changes = [RunRuleChange.make(&"broken", RunRuleChange.Target.DEPTH_MIN, 9.0)] as Array[RunRuleChange]
-	var problems: PackedStringArray = run.problems(_content())
-	check(_names(problems, "With broken unlocked") and _names(problems, "depth 9 to 5"), "a flag alone: %s" % problems)
-	# Each alone is sound; together the widths cross.
+	run.changes = [RunRuleChange.make(&"broken", RunRuleChange.Target.ROOMS_MIN, 20.0)] as Array[RunRuleChange]
+	var problems: PackedStringArray = _problems(run)
+	check(_names(problems, "With broken unlocked") and _names(problems, "rooms 20 to 12"), "a flag alone: %s" % problems)
+	# Each alone is sound; together the counts cross.
 	run.changes = [
-		RunRuleChange.make(&"wide", RunRuleChange.Target.WIDTH_MIN, 2.0),
-		RunRuleChange.make(&"narrow", RunRuleChange.Target.WIDTH_MAX, 1.0),
+		RunRuleChange.make(&"many", RunRuleChange.Target.ROOMS_MIN, 11.0),
+		RunRuleChange.make(&"few", RunRuleChange.Target.ROOMS_MAX, 9.0),
 	] as Array[RunRuleChange]
-	problems = run.problems(_content())
-	check(_names(problems, "With wide, narrow unlocked") or _names(problems, "With narrow, wide unlocked"), "every flag at once: %s" % problems)
-	check(not _names(problems, "With wide unlocked:") and not _names(problems, "With narrow unlocked:"), "and not each alone")
-	check_equal(run.biomes[0].width_min, 1, "checking changed nothing of the definition")
+	problems = _problems(run)
+	check(_names(problems, "With many, few unlocked") or _names(problems, "With few, many unlocked"), "every flag at once: %s" % problems)
+	check(not _names(problems, "With many unlocked:") and not _names(problems, "With few unlocked:"), "and not each alone")
+	check_equal(run.biomes[0].rooms_min, 8, "checking changed nothing of the definition")
 
 
 func test_a_save_names_the_flags_it_holds_among_those_asked() -> void:
@@ -231,39 +191,36 @@ func test_a_save_names_the_flags_it_holds_among_those_asked() -> void:
 ## never applies a held change twice (an ADD valid once, not twice, made no map).
 func test_a_held_change_is_applied_once_through_the_generator() -> void:
 	var run: RunDefinition = _run()
-	run.biomes[0].depth_min = 4
 	run.changes = [
-		RunRuleChange.make(&"short", RunRuleChange.Target.DEPTH_MIN, -1.0, RunRuleChange.How.ADD),
-		RunRuleChange.make(&"short", RunRuleChange.Target.DEPTH_MAX, -2.0, RunRuleChange.How.ADD),
+		RunRuleChange.make(&"small", RunRuleChange.Target.ROOMS_MIN, -1.0, RunRuleChange.How.ADD),
+		RunRuleChange.make(&"small", RunRuleChange.Target.ROOMS_MAX, -3.0, RunRuleChange.How.ADD),
 	] as Array[RunRuleChange]
-	check_equal(run.problems(_content()), PackedStringArray(), "sound: 3 to 3 rows with it")
-	var played: RunDefinition = run.changed_by(_unlocks([&"short"] as Array[StringName]))
+	check_equal(_problems(run), PackedStringArray(), "sound: 7 to 9 rooms with it")
+	var played: RunDefinition = run.changed_by(_unlocks([&"small"] as Array[StringName]))
 	check(played.changes.is_empty(), "the played copy has no changes left")
 	check_equal(run.changes.size(), 2, "the definition keeps its own")
-	check_equal(played.problems(_content()), PackedStringArray(), "the played rules are sound as they are")
-	for seed in 10:
-		var map: RunMap = RunGenerator.generate(played, _content(), Sim.seeded(seed))
-		check(map.is_made() and map.rows() == 3, "seed %d: made, 3 rows deep: %s" % [seed, map.problems])
+	check_equal(_problems(played), PackedStringArray(), "the played rules are sound as they are")
+	for seed_value in 8:
+		var map: BiomeMap = _generate(played, seed_value)
+		check(map.is_made() and map.rooms() >= 8 and map.rooms() <= 10, "seed %d: made, 7 to 9 rooms and the start room: %s" % [seed_value, map.not_made])
 	var scaled: RunDefinition = _run()
 	scaled.changes = [RunRuleChange.make(&"x", RunRuleChange.Target.SCALE_DEPTH_END, 2.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
 	var once: RunDefinition = scaled.changed_by(_unlocks([&"x"] as Array[StringName]))
-	RunGenerator.generate(once, _content(), Sim.seeded(1))
+	_generate(once, 1)
 	check(is_equal_approx(once.scaling.per_depth.end, 4.0), "a TIMES change once: 2 x 2")
 
 
 func test_a_change_past_the_rules_most_is_named() -> void:
 	var run: RunDefinition = _run()
-	run.changes = [RunRuleChange.make(&"huge", RunRuleChange.Target.DEPTH_MAX, 30.0, RunRuleChange.How.ADD)] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "35; 32 at most"), "a depth past the most")
-	run.changes = [RunRuleChange.make(&"wide", RunRuleChange.Target.WIDTH_MAX, 3.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "width up to 9"), "a width past the most")
+	run.changes = [RunRuleChange.make(&"huge", RunRuleChange.Target.ROOMS_MAX, 30.0, RunRuleChange.How.ADD)] as Array[RunRuleChange]
+	check(_names(_problems(run), "32 at most"), "a room count past the most")
 	run.changes = [RunRuleChange.make(&"steep", RunRuleChange.Target.SCALE_DEPTH_END, 1000.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "scaling per depth: end 2000"), "a scaling factor past the most")
+	check(_names(_problems(run), "scaling per depth: end 2000"), "a scaling factor past the most")
 	run.changes = [RunRuleChange.make(&"heavy", RunRuleChange.Target.KIND_WEIGHT, 500.0, RunRuleChange.How.SET, &"", &"fight")] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "its weight is 500"), "a weight past the most")
-	run.changes = [RunRuleChange.make(&"crowd", RunRuleChange.Target.KIND_MAX_PER_ROW, 40.0, RunRuleChange.How.SET, &"", &"fight")] as Array[RunRuleChange]
-	check(_names(run.problems(_content()), "limits 40 a row"), "a limit past the most")
+	check(_names(_problems(run), "its weight is 500"), "a weight past the most")
+	run.changes = [RunRuleChange.make(&"crowd", RunRuleChange.Target.KIND_MAX_PER_RUN, 80.0, RunRuleChange.How.SET, &"", &"fight")] as Array[RunRuleChange]
+	check(_names(_problems(run), "a limit of 80 a run"), "a limit past the most")
 	run.changes = []
 	for i in RunUnlocks.MAX_FLAGS + 1:
-		run.changes.append(RunRuleChange.make(StringName("f%d" % i), RunRuleChange.Target.WIDTH_MAX, 3.0))
-	check(_names(run.problems(_content()), "more than the %d a run's start carries" % RunUnlocks.MAX_FLAGS), "more flags than a run's start carries")
+		run.changes.append(RunRuleChange.make(StringName("f%d" % i), RunRuleChange.Target.ROOMS_MAX, 11.0))
+	check(_names(_problems(run), "more than the %d a run's start carries" % RunUnlocks.MAX_FLAGS), "more flags than a run's start carries")

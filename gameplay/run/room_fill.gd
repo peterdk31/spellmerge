@@ -1,7 +1,7 @@
 class_name RoomFill
 extends RefCounted
-## What fills a map's fight room (run generation RG2 and enemy spawning EA4; shared by `RunGenerator`
-## and `BiomeGenerator`): its enemies bought from a pool by a budget, and how they come in.
+## What fills a map's fight room (run generation RG2 and enemy spawning EA4; `BiomeGenerator` and the
+## run area): its enemies bought from a pool by a budget, and how they come in.
 
 
 ## Enemies of `pool` by chance (`dice`'s step `step`) until `budget` is spent: one of the whole pool

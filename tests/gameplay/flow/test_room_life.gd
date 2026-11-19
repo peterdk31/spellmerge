@@ -130,7 +130,7 @@ func _beat(room: int) -> void:
 
 func test_the_start_room_is_entered_and_every_piece_built_and_placed() -> void:
 	var map: BiomeMap = _start(1, [IMP], [IMP])
-	check_equal(flow.mode, FlowScript.MODE_BIOME, "a biome's run")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a biome's run")
 	check_equal(built, [0, 1, 2, 3, 4] as Array[int], "every room and then every bridge is built, in order")
 	check_equal(entered, [0] as Array[int], "the start room is entered as the biome starts")
 	check_equal(cleared, [0] as Array[int], "and, with no fight, cleared")

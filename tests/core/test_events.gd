@@ -55,7 +55,6 @@ const EVENTS: Dictionary = {
 	&"pad_wait_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
 	# Items on the ground (items I6).
 	&"item_take_requested": [["player", TYPE_INT], ["item", TYPE_INT]],
-	&"start_depth_picked": [["player", TYPE_INT], ["depth", TYPE_INT]],
 	&"boss_intro_next_requested": [["player", TYPE_INT], ["page", TYPE_INT]],
 	&"room_items_placed": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT], ["items", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"item_drop_requested": [["actor", TYPE_INT], ["stack", TYPE_OBJECT]],
@@ -152,12 +151,10 @@ const EVENTS: Dictionary = {
 	# Run and rooms.
 	&"run_started": [["player_count", TYPE_INT]],
 	&"run_ended": [["victory", TYPE_BOOL]],
-	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT], ["start_depth", TYPE_INT]],
+	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT]],
+	&"run_room_filled": [["room", TYPE_INT], ["enemies", TYPE_ARRAY], ["scale", TYPE_FLOAT], ["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
+	&"run_biome_chosen": [["map", TYPE_OBJECT]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
-	&"run_room_paced": [["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
-	&"run_room_chosen": [["room_id", TYPE_STRING_NAME], ["enemies", TYPE_ARRAY], ["ways", TYPE_ARRAY]],
-	&"run_way_taken": [["way", TYPE_INT]],
-	&"run_map_changed": [["rows", TYPE_PACKED_INT32_ARRAY], ["kinds", TYPE_ARRAY], ["links", TYPE_ARRAY], ["at", TYPE_INT]],
 	&"room_left": [["room", TYPE_INT]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"room_built": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT], ["layout_root", TYPE_OBJECT]],
@@ -169,10 +166,7 @@ const EVENTS: Dictionary = {
 	&"loading_finished": [],
 	&"start_stone_changed": [["standing", TYPE_INT], ["wizards", TYPE_INT], ["lit", TYPE_BOOL]],
 	&"altar_changed": [["seats", TYPE_INT]],
-	&"lectern_changed": [["seats", TYPE_INT]],
-	&"start_depth_changed": [["depth", TYPE_INT], ["depths", TYPE_INT]],
 	&"altar_placed": [["standing", TYPE_BOOL], ["at", TYPE_VECTOR2]],
-	&"room_exits_shown": [["at", TYPE_PACKED_VECTOR2_ARRAY], ["kinds", TYPE_ARRAY]],
 	&"gather_door_shown": [["door", TYPE_INT], ["rule", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["gathered", TYPE_INT], ["standing", TYPE_INT], ["held", TYPE_BOOL], ["open", TYPE_BOOL]],
 	&"hub_changed": [["in_hub", TYPE_BOOL]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
@@ -186,7 +180,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"gather_door_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"room_left", &"gather_door_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

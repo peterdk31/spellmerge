@@ -23,7 +23,7 @@ const NEAR: float = 64.0
 ## The ids not yet called, in the run's order, and what each costs (`EnemyBase.cost`).
 var waiting: Array[StringName] = []
 var costs: PackedInt32Array = PackedInt32Array()
-## The run's numbers for the room (`run_room_paced`): a group's cost (0: the whole list at once), the
+## The run's numbers for the room (`run_room_filled`): a group's cost (0: the whole list at once), the
 ## cost standing at or below which the next group comes, the seconds between two bodies of a group.
 var group: int = 0
 var refill_at: int = 0

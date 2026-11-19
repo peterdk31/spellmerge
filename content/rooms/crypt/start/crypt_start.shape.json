@@ -1,0 +1,19 @@
+{
+	"about": "The crypt's start room (docs/milestones/connected-biomes.md, CB8): the small safe slab the hub's stone brings the party to, a floating slab of the crypt's flagstones in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), a socket on each side for the bridges out. No fight stands here. tools/ground_shape.py draws crypt_start_ground.tscn and its art from this.",
+	"size": [384, 320],
+	"seed": 31,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [8, 12],
+		"rough": [46, 17, 6],
+		"seed": 9,
+		"pins": [[0, 128, 40, 192], [344, 128, 384, 192], [160, 0, 224, 40], [160, 280, 224, 320]],
+		"bays": [[64, 280, 18], [320, 40, 18]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "Decor"]}
+	}
+}

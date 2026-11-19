@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The nave's data (content/rooms/crypt/arena_02, crypt rework CR4, docs/milestones/crypt-rework.md):
-## a floating room drawn from its shape, its two colonnades `crypt_pillar` props and its exits gates;
+## a floating room drawn from its shape, its two colonnades `crypt_pillar` props and its two sockets;
 ## its landmark the sarcophagus in the middle of the nave (a low wall in its own `Walls`, drawn by a
 ## sprite of its box's size) ringed by candles; a shaft of light at one end; the floor of its south-west
 ## aisle fallen in, a pit in the edge style `crypt_pit`, clear of every spawn and placement.

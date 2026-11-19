@@ -1,6 +1,6 @@
 class_name MapDice
 extends RefCounted
-## A map generator's rolls in one attempt (run generation RG2, `RunGenerator`; connected biomes CB5,
+## A map generator's rolls in one attempt (run generation RG2; connected biomes CB5,
 ## `BiomeGenerator`): `sim.chance(purpose, key, counter)`, the key the attempt's and a step's
 ## (`attempt * steps + step`), the counter that step's own count, so one step's rolls never shift
 ## another's and every attempt rolls afresh.

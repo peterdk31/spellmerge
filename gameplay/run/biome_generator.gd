@@ -67,6 +67,8 @@ static func generate(definition: RunDefinition, content: RunContent, shapes: Dic
 		return map
 	var rules: MapRules = definition.biomes[0]
 	map.biome = rules.biome
+	if rules.start_only():
+		return _start_alone(definition, rules, content, shapes, sim, players)
 	var why: String = ""
 	for attempt in ATTEMPTS:
 		var dice := MapDice.new(sim, PURPOSE, attempt, Step.size())
@@ -225,6 +227,18 @@ static func _template(content: RunContent, id: StringName) -> RoomBase:
 		if room.id == id:
 			return room
 	return null
+
+
+## The map of the start room alone (`MapRules.start_only`: a test's pinned room): the first template
+## of the biome hosting the start room's kind, unmirrored at (0, 0), filled as its kind fills.
+static func _start_alone(definition: RunDefinition, rules: MapRules, content: RunContent, shapes: Dictionary, sim: Sim, players: int) -> BiomeMap:
+	var map := BiomeMap.new()
+	map.biome = rules.biome
+	var host: RoomBase = rules.biome_templates(content, shapes, rules.start_kind, 0)[0]
+	map.add_room(host.id, Vector2.ZERO, 0, rules.start_kind)
+	map.work_out_depths()
+	_fill(map, definition, rules, content, players, MapDice.new(sim, PURPOSE, 0, Step.size()))
+	return map
 
 
 ## Step 6: each room its scale (its depth, the run's players) and its enemies, as its kind fills.

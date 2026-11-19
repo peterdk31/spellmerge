@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The crossing's data (content/rooms/crypt/arena_04, crypt rework CR6, docs/milestones/crypt-rework.md):
-## a floating room drawn from its shape, its ring of four pillars `crypt_pillar` props and its exits
-## gates; its landmark the ring round the middle, where the floor fell in: a round pit inside the ring
+## a floating room drawn from its shape, its ring of four pillars `crypt_pillar` props and its two
+## sockets; its landmark the ring round the middle, where the floor fell in: a round pit inside the ring
 ## in the edge style `crypt_pit`, small enough to dash over, ringed by floor and clear of every spawn and
 ## pillar, its two cracks running out between the pillars; the shaft falling into the pit; four
 ## sarcophagi (each a low wall of the room's own `Walls`, drawn by a sprite of its box's size) with lit

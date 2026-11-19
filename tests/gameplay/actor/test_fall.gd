@@ -311,17 +311,3 @@ func test_an_enemy_with_no_hurt_shape_dies_of_a_fall_as_a_foe() -> void:
 	_ask(enemy, &"teleport", Vector2(66.0, 0.0), 0.0)
 	_run(FALL_TICKS + 1)
 	check_equal(_died.size(), 1, "its death told")
-
-
-## A wizard falling is not out of the party (hub rework HR-H2): an exit waits for it to come back,
-## so nobody skips a fall's cost by leaving the room as it falls.
-func test_an_exit_waits_for_a_falling_wizard() -> void:
-	var standing: Actor = _wizard(Vector2(500.0, 100.0))
-	var falling: Actor = _wizard(START, 1)
-	_run(1)
-	_ask(falling, &"teleport", Vector2(66.0, 0.0), 0.0)
-	_run(1)
-	check(falling.is_falling(), "it falls")
-	var area := Rect2(480.0, 80.0, 40.0, 40.0)
-	check(not ExitRules._everyone_in([standing, falling] as Array[Node2D], area), "the party is not all in the exit while one falls")
-	check(ExitRules._everyone_in([standing] as Array[Node2D], area), "the one standing alone is")

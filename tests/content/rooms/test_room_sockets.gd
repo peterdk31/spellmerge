@@ -47,7 +47,11 @@ func test_a_walkway_has_two_sockets_on_its_ends_and_hosts_no_room_kind() -> void
 		check_equal(shape.sockets(), 2, "%s has a socket at each end" % room.id)
 		check(room.kinds.is_empty(), "%s hosts no room kind: it is no room of a run's map" % room.id)
 		check(shape.cut_rect(0) == Rect2(), "%s is not cut where it is joined" % room.id)
-		check_equal(shape.mouth_rect(0).size, Vector2(PieceShape.MOUTH_DEPTH, RoomSocket.MOUTH), "its mouth is a cell deep and a mouth wide")
+		# A west-east walkway's mouth is a cell wide and a mouth tall; a north-south one's (connected
+		# biomes CB11) the other way round.
+		var across: bool = shape.socket_facing[0] == RoomSocket.Facing.WEST or shape.socket_facing[0] == RoomSocket.Facing.EAST
+		var mouth := Vector2(PieceShape.MOUTH_DEPTH, RoomSocket.MOUTH) if across else Vector2(RoomSocket.MOUTH, PieceShape.MOUTH_DEPTH)
+		check_equal(shape.mouth_rect(0).size, mouth, "%s's mouth is a cell deep and a mouth wide" % room.id)
 	check(found >= 1, "the crypt's bridge is a walkway")
 
 

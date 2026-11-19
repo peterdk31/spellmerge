@@ -1,0 +1,72 @@
+{
+	"about": "The crypt's Proving hall (docs/milestones/connected-biomes.md, CB11): The challenge room behind a gather door: a wide floating slab where the party fights a fight of elites together, for a bigger reward. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), sockets on its east and north and south and west sides for the bridges. tools/ground_shape.py draws crypt_challenge_ground.tscn and its art from this.",
+	"size": [
+		640,
+		448
+	],
+	"seed": 67,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			8,
+			12
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 24,
+		"pins": [
+			[
+				0,
+				192,
+				40,
+				256
+			],
+			[
+				600,
+				192,
+				640,
+				256
+			],
+			[
+				288,
+				0,
+				352,
+				40
+			],
+			[
+				288,
+				408,
+				352,
+				448
+			]
+		],
+		"bays": [
+			[
+				64,
+				408,
+				18
+			],
+			[
+				576,
+				40,
+				18
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"Decor",
+				"Zones"
+			]
+		}
+	}
+}

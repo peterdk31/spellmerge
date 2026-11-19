@@ -235,7 +235,15 @@ func _hangs_below(under: PackedByteArray, solid: PackedByteArray, w: int, h: int
 				up -= 1
 			if up < 0 or solid[up * w + x] == 0:
 				return false
-	return drawn > 0
+	if drawn > 0:
+		return true
+	# No rock face: only right when the floor has no south edge inside the frame (a north-south
+	# walkway runs to the template's edge at both ends, connected biomes CB11).
+	for x in w:
+		for y in h - 1:
+			if solid[y * w + x] != 0 and solid[(y + 1) * w + x] == 0:
+				return false
+	return true
 
 
 ## `data` (`stride` bytes a pixel) mirrored as `mirror` says.

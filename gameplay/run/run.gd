@@ -5,7 +5,7 @@ extends Node
 ## biome map once from the run's definition (`RUN_FOLDER`, content/runs), the content there is
 ## (`Registry.run_content`), its templates' shapes (`Registry.run_shapes`) and the run's chance
 ## (`BiomeGenerator.generate`), and answers with each room's fight (`run_room_filled`: its enemies,
-## its scale, run generation RG5, and the pace they come in at, enemy spawning EA4, worked out from
+## its scale, run generation RG5, its elites, connected biomes CB11, and the pace they come in at, enemy spawning EA4, worked out from
 ## its biome's `MapRules.spawning` at its scaled budget), then the map itself (`run_biome_chosen`),
 ## which Flow lays and plays. Areas never call each other: Flow knows the run by these events only,
 ## and this area knows nothing of a world, a body or a scene.
@@ -113,6 +113,6 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 		var enemies: Array[StringName] = made.enemies_of(room)
 		var scale: float = made.room_scales[room]
 		var pace: Array = RoomFill.pace(rules.spawning, RunScaling.scaled_budget(rules.room_budget, scale)) if not enemies.is_empty() else [0, 0, 0.0]
-		events.run_room_filled.emit(room, enemies, scale, pace[0], pace[1], pace[2])
+		events.run_room_filled.emit(room, enemies, scale, pace[0], pace[1], pace[2], made.elites_of(room))
 	# A copy: what hears it never holds the run's own map.
 	events.run_biome_chosen.emit(made.copy())

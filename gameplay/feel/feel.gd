@@ -134,6 +134,7 @@ const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const CoinsScript := preload("res://gameplay/feel/coins.gd")
+const SpecialRoomLooksScript := preload("res://gameplay/feel/special_room_looks.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
@@ -538,6 +539,9 @@ var _party_map: PartyMapViewScript = null
 var _ground_items: GroundItemsScript = null
 ## The coins on the floor (`coins.gd`, connected biomes CB10).
 var _coins: CoinsScript = null
+## The shops' shelves, the fountains' pools and the keys on the floor (`special_room_looks.gd`,
+## connected biomes CB11).
+var _special_rooms: SpecialRoomLooksScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
 var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -901,6 +905,10 @@ func _ready() -> void:
 	_coins.name = "Coins"
 	add_child(_coins)
 	_coins.bind(events)
+	_special_rooms = SpecialRoomLooksScript.new()
+	_special_rooms.name = "SpecialRoomLooks"
+	add_child(_special_rooms)
+	_special_rooms.bind(events)
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -2452,6 +2460,11 @@ func ground_items() -> GroundItemsScript:
 ## The coins on the floor's look (for tests).
 func coins() -> CoinsScript:
 	return _coins
+
+
+## The special rooms' look: shelves, pools and keys (connected biomes CB11; for tests).
+func special_rooms() -> SpecialRoomLooksScript:
+	return _special_rooms
 
 
 ## The gather doors' look (connected biomes CB7).

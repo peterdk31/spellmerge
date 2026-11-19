@@ -6,14 +6,21 @@ extends RefCounted
 ## into two sealed fights at once, every room laid, sleeping and waking on the way. `play` records
 ## each tick's hashes (and a snapshot after one); `resume` starts the same biome, restores the snapshot
 ## and plays on from the next tick, as a player joining the run would.
+## Connected biomes CB11 (`special`): the rooms west and east are a shop and a fountain (the crypt's
+## own, with the start room between them); seat 0, its wallet full, walks west over the shop's shelf
+## and buys, seat 1, hurt, walks east into the fountain and draws on it.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
+const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 
 const DT: float = 1.0 / 60.0
 ## The run's seed (a biome's run takes no replay's: the same in every play).
 const RUN_SEED: int = 0x5eed_b10e
+## CB11: the coins each wallet starts with, and the shelf's items (the shop's three zones).
+const FUNDS: int = 60
+const SHELF: int = 3
 ## The fights: the antechamber's and the court's.
 const WEST: Array[StringName] = [&"ember_imp", &"ember_imp"]
 const EAST: Array[StringName] = [&"spitter", &"ember_imp"]
@@ -26,6 +33,10 @@ var gate: bool = false
 var gate_opened: bool = false
 ## The tick the gate opened at (-1: it did not).
 var gate_opened_at: int = -1
+## CB11: the shop and the fountain (`special`), and whether a shelf item was bought and the pool drawn on.
+var special: bool = false
+var bought: bool = false
+var drawn: bool = false
 var problems: PackedStringArray = PackedStringArray()
 
 var _root: Window
@@ -51,9 +62,10 @@ class Walker:
 		tick += 1
 
 
-func _init(root: Window, at_the_gate: bool = false) -> void:
+func _init(root: Window, at_the_gate: bool = false, shop_and_fountain: bool = false) -> void:
 	_root = root
 	gate = at_the_gate
+	special = shop_and_fountain
 	_flow = root.get_node("Flow") as FlowScript
 	_tick = root.get_node("Tick") as TickScript
 	_frames = root.get_node("Frames")
@@ -82,6 +94,11 @@ func play(ticks: int, snapshot_at: int, into: Desync) -> Snapshot:
 		if _flow.gates.is_open(2) and _flow.life.has(2, RoomLife.SEALED) and not gate_opened:
 			gate_opened = true
 			gate_opened_at = i
+		if special:
+			var rewards: Object = _root.get_node("Rewards")
+			bought = bought or (rewards.call(&"shelf") as Array).size() < SHELF and int(rewards.call(&"wallet_of", 0)) < FUNDS
+			var left: float = float(rewards.call(&"pool_left", 2))
+			drawn = drawn or (left >= 0.0 and left < RewardsScript.POOL_HEALTH)
 		if i == snapshot_at:
 			snapshot = Snapshot.take(_tick.state_areas(), _root)
 	_stop()
@@ -118,11 +135,21 @@ func _start() -> BiomeMap:
 	if gate:
 		map.room_kinds[2] = &"boss"
 	var fights: Array[RoomFight] = [RoomFight.new(), RoomFight.of(WEST), RoomFight.of(EAST, 2, 0, 0.25)]
+	if special:
+		map = BiomeMaps.split(_root.get_node("Registry"), [0, 0, 0] as Array[int], [&"crypt_shop", &"crypt_start", &"crypt_fountain"] as Array[StringName])
+		map.room_kinds[1] = &"shop"
+		map.room_kinds[2] = &"fountain"
+		fights = [RoomFight.new(), RoomFight.new(), RoomFight.new()] as Array[RoomFight]
 	_flow.world_parent = _root
 	if not _flow.start_biome(0, map, fights):
 		problems.append("the biome did not start")
 		return null
 	_tick.sim.run_seed = RUN_SEED
+	if special:
+		var events: Object = _root.get_node("Events")
+		events.emit_signal(&"run_stats_ruled", [StatChange.make(&"start_coins", float(FUNDS))] as Array[StatChange])
+		var hurt: Actor = _flow.get_wizard(1) as Actor
+		hurt.health.take(60.0)
 	return map
 
 

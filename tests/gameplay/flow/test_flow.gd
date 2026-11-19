@@ -572,7 +572,7 @@ func _play_a_room_of(named: Array) -> void:
 	var enemies: Array[StringName] = []
 	enemies.assign(named)
 	var answer := func(_run_id: StringName, _players: int) -> void:
-		events.emit_signal("run_room_filled", 0, enemies, 1.0, 0, 0, 0.0)
+		events.emit_signal("run_room_filled", 0, enemies, 1.0, 0, 0, 0.0, [] as Array[StringName])
 	_listen("run_begun", answer)
 	_playing(1)
 

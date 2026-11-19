@@ -46,6 +46,18 @@ const MOST_ROOMS: int = 32
 ## The shapes a biome's map may take, each rolled by its weight (decision 5).
 @export var styles: Array[MapStyle] = []
 
+@export_group("Elites")
+## Elites (connected biomes CB11, decision 24): an enemy with more health, one extra card in its staff
+## and an outline. From this depth on (bridges from the start room; -1: never) a fight room is an
+## elite room by `elite_chance`, and then the first of its enemies is an elite; a challenge room's
+## (`RoomKind.FILL_ELITES`) are all elites.
+@export_range(-1, 32) var elite_depth: int = -1
+## The chance of a fight room at `elite_depth` or deeper being an elite room (decision 24: about 1 in 4).
+@export_range(0.0, 1.0, 0.01) var elite_chance: float = 0.25
+## The biome's list of elite cards (spell card ids): each elite gets one of them by chance, put into
+## its first staff past its own cards. Needed when a room may hold elites.
+@export var elite_cards: Array[StringName] = []
+
 
 ## A copy of its own, its kind rules too (`KindRule.copied`), so changing it changes nothing else
 ## (run generation RG6: the rules a run plays, `RunDefinition.copied`).
@@ -60,6 +72,7 @@ func copied() -> MapRules:
 	for style: MapStyle in styles:
 		styles_made.append(style.duplicate(false) as MapStyle if style != null else null)
 	made.styles = styles_made
+	made.elite_cards = elite_cards.duplicate()
 	return made
 
 
@@ -118,6 +131,7 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 	var fixed_fights: int = 0
 	var spine_templates: Dictionary = {}
 	var used: Dictionary = {}
+	var has_elites: bool = false
 	for rule: KindRule in lines:
 		var hosts: Array[RoomBase] = biome_templates(content, shapes, rule.kind, 1)
 		for room: RoomBase in hosts:
@@ -132,6 +146,8 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 			unlimited += 1
 		var of_kind: RoomKind = content.kind(rule.kind)
 		var fights: bool = of_kind.fill == RoomKind.FILL_ENEMIES
+		if of_kind.fill == RoomKind.FILL_ELITES or (fights and elite_depth >= 0 and elite_chance > 0.0):
+			has_elites = true
 		if fights and not rule.dead_end:
 			fixed_fights += rule.least
 			for room: RoomBase in biome_templates(content, shapes, rule.kind, 2):
@@ -153,6 +169,8 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 		found.append("%s: %d %s rooms hosting a fight have two sockets, fewer than the %d fights on the way to the boss (a room on the way has a way in and a way on, and a template stands once a biome)." % [biome, spine_templates.size(), biome, fights_on_way])
 	if biome_walkways(content, shapes).is_empty():
 		found.append("%s: no %s walkway (RoomBase.walkway) with two sockets: nothing bridges its rooms." % [biome, biome])
+	if has_elites and elite_cards.is_empty():
+		found.append("%s: its rooms may hold elites (a challenge room, or elite_chance from elite_depth on), but elite_cards is empty: an elite gets one of them." % biome)
 	if used.size() < rooms_min:
 		found.append("%s: %d %s rooms with a socket host its kinds, fewer than rooms_min %d (a template stands once a biome)." % [biome, used.size(), biome, rooms_min])
 	return found
@@ -167,7 +185,7 @@ func _start_only_problems(content: RunContent, shapes: Dictionary) -> PackedStri
 		found.append("%s: the start room's kind '%s' is no room kind." % [biome, start_kind])
 	elif biome_templates(content, shapes, start_kind, 0).is_empty():
 		found.append("%s: no %s room hosts the start room's kind '%s'." % [biome, biome, start_kind])
-	elif start.fill == RoomKind.FILL_ENEMIES and content.enemy_pool(biome, 0).is_empty():
+	elif start.fills_with_enemies() and content.enemy_pool(biome, 0).is_empty():
 		found.append("%s: no enemy fights in %s to fill the start room." % [biome, biome])
 	elif start.fill == RoomKind.FILL_BOSS and content.boss_pool(biome, 0).is_empty():
 		found.append("%s: no boss fights in %s to fill the start room." % [biome, biome])
@@ -191,6 +209,8 @@ func _biome_range_problems() -> PackedStringArray:
 		found.append("%s: no map styles: a biome's map rolls one." % biome)
 	if kinds.is_empty() and not start_only():
 		found.append("%s: no kind rules: no room could stand in the map." % biome)
+	if not (elite_chance >= 0.0 and elite_chance <= 1.0):
+		found.append("%s: elite_chance %s; 0 to 1." % [biome, elite_chance])
 	if room_budget < 1:
 		found.append("%s: room_budget %d; at least 1." % [biome, room_budget])
 	if spawning != null:
@@ -224,7 +244,7 @@ func _biome_cannot_fill(content: RunContent, shapes: Dictionary, rule: KindRule)
 		return "no %s room with a socket hosts '%s'" % [biome, rule.kind]
 	var from: int = maxi(rule.first_row, 0)
 	match of_kind.fill:
-		RoomKind.FILL_ENEMIES:
+		RoomKind.FILL_ENEMIES, RoomKind.FILL_ELITES:
 			if content.enemy_pool(biome, from).is_empty():
 				return "no enemy fights in %s by depth %d" % [biome, from]
 		RoomKind.FILL_BOSS:

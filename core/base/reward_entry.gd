@@ -28,6 +28,9 @@ const KINDS: Array[StringName] = [CARD, COINS, HEAL, MAX_HEALTH]
 ## For a card line with no id: the most complex card it may give (`SpellComponent.complexity`);
 ## 0 for any.
 @export_range(0, 10) var max_complexity: int = 0
+## What it costs on a shop's shelf (connected biomes CB11, decision 19), in coins, before the buyer's
+## `price_scale` run stat; read only by a shelf's table (`RoomKind.shelf`).
+@export_range(1, 999) var price: int = 10
 
 
 ## A line of `of_kind` (`of_id`, `of_count` of it) at `of_weight`.
@@ -50,6 +53,8 @@ func problems(what: String) -> PackedStringArray:
 		found.append("%s: a line weighs %s; it must weigh more than 0." % [what, weight])
 	if count < 1:
 		found.append("%s: a line gives %d; it must give at least 1." % [what, count])
+	if price < 1:
+		found.append("%s: a line costs %d; at least 1." % [what, price])
 	if kind != CARD and id != &"":
 		found.append("%s: a %s line names the id '%s'; only a card has one." % [what, kind, id])
 	return found

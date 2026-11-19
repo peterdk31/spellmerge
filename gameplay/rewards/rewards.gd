@@ -1,17 +1,19 @@
 extends Node
-## The Rewards area (autoload `Rewards`; connected biomes CB10, docs/milestones/connected-biomes.md,
-## decisions 16 to 18 and 26): each player's rewards, their wallets and the coins on the floor.
-## State like any area's, the same on every machine, saved and restored with everything else.
+## The Rewards area (autoload `Rewards`; connected biomes CB10 and CB11, docs/milestones/connected-
+## biomes.md, decisions 16 to 20 and 26): each player's rewards, their wallets, the coins on the floor,
+## the shops' shelves and the fountains' pools. State like any area's, the same on every machine,
+## saved and restored with everything else.
 ##
-## - **A roll per player** (DESIGN rule 3): as a room whose fight was fought is cleared
-##   (`room_cleared`, rolled at the area's next step, so the death that cleared it has been heard; a
-##   room cleared with no foe dying in it, the start room, rolls nothing), every seat with a
-##   wizard gets an offer of its own (`RewardOffer`), its choices rolled from the reward table
-##   `CLEAR_TABLE` (content/rewards, `RewardRoll`), as many as that player's `reward_choices`
-##   (`RunStats`: "pick 1 of 2", decision 17), said by `reward_rolled`. A seat whose wizard was in
-##   the room (`here`) has its menu opened by the HUD; one who was not there finds it waiting, an
-##   unspent icon on its corner panel (rule 4). Nobody waits: each player picks when they like,
-##   oldest first, and an offer stays until it is picked (`rewards_waiting_changed`), all run long.
+## - **A roll per player** (DESIGN rule 3): as a room whose kind rewards a clear is cleared
+##   (`room_rewards_due`, Flow's, with the kind's table: a fight's `clear`, the boss's `boss`, a
+##   reward room's `reward`, ...; rolled at the area's next step), however its foes left it (the
+##   owner, 2026-11-19: a possessed foe killed elsewhere too), every seat with a wizard gets an offer
+##   of its own (`RewardOffer`), its choices rolled from that table (content/rewards, `RewardRoll`),
+##   as many as that player's `reward_choices` (`RunStats`: "pick 1 of 2", decision 17), said by
+##   `reward_rolled`. A seat whose wizard was in the room (`here`) has its menu opened by the HUD;
+##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). Nobody
+##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
+##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
 ##   is the seat's, gives the choice to the seat's own wizard (a card's copies into its card bag;
 ##   coins into its wallet) and goes (`reward_taken`). With no room in the bag it stays unspent.
@@ -19,6 +21,17 @@ extends Node
 ##   card, coins, a heal (not while down: it stays unspent) or a little more most health, the last
 ##   two through Combat, which keeps an actor's health (`health_gift_requested`). A card upgrade
 ##   waits for card levels.
+## - **A shop** (CB11, decision 19): as a shop room opens (`special_room_opened`, its shelf table and
+##   its spots), its shelf is rolled once (purpose SHOP_PURPOSE, keyed by its room): one item a spot,
+##   each a different line's, at its line's `price`. The first standing wizard (seat order) whose own
+##   feet come within SHELF_REACH of an item, with its price (times that player's `price_scale`) in
+##   their own wallet and room for it, buys it: it is theirs (as a reward's choice is given) and gone
+##   from the shelf for everyone. The shelf keeps what is left all run (`shelf_changed`).
+## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
+##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
+##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry
+##   (`fountain_changed`). The pool counts what was asked of Combat (`health_gift_requested`), which
+##   heals it as asked.
 ## - **Run stats** (`RunStats`): the run's own changes come with `run_stats_ruled` (the Run area's,
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
 ##   wizard, `RelicBase`). Read by name: `stat_of`.
@@ -26,15 +39,16 @@ extends Node
 ##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none; a boss's go to every wallet at once,
 ##   decision 25), each one coin anyone may take: the first wizard (seat order)
 ##   whose feet come within `COIN_REACH` takes it, and every player's wallet gains one. Each wallet
-##   starts a run with its player's `start_coins`, and spending is one's own (`spend`, for CB11's
-##   shop). The coins on the floor are the world's: a new world (`room_entered` FIRST_ROOM) and a
+##   starts a run with its player's `start_coins`, and spending is one's own (a shop's buy, `spend`).
+##   The coins, shelves and pools are the world's: a new world (`room_entered` FIRST_ROOM) and a
 ##   run's start clear them; a cleared room's coins stay where they lie.
-## - **Said:** `coin_changed` as a coin is laid and goes, `wallet_changed` as a wallet changes.
-##   After a snapshot is restored it says everything again (`rebuild_derived`).
+## - **Said:** `coin_changed` as a coin is laid and goes, `wallet_changed` as a wallet changes,
+##   `shelf_changed` and `fountain_changed` as a shelf and a pool change. After a snapshot is
+##   restored it says everything again (`rebuild_derived`).
 ##
 ## It knows nothing of the HUD, Flow or `net/`, and calls no other area: it hears events, reads the
-## actor table and the bodies' public kit (gameplay/actor: an Inventory), and asks the projectile
-## manager's wall grid where a coin may lie. A gift of health it asks of Combat.
+## actor table and the bodies' public kit (gameplay/actor: an Inventory, its Health), and asks the
+## projectile manager's wall grid where a coin may lie. A gift of health it asks of Combat.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -46,8 +60,17 @@ const SEATS: int = 4
 ## The registry folders of the reward tables (content/rewards) and of the relics (content/relics).
 const TABLES: StringName = &"rewards"
 const RELICS: StringName = &"relics"
-## The table a room's clear rolls from (CB11 gives each kind of room its own).
+## The table a fight's clear rolls from (each kind names its own, `RoomKind.rewards`; CB11).
 const CLEAR_TABLE: StringName = &"clear"
+## A shop's shelf (CB11): the chance's purposes it is rolled under (keyed by its room), and how near a
+## wizard's feet must come to an item to buy it, in pixels.
+const SHOP_PURPOSE: StringName = &"shop"
+const SHOP_CARD_PURPOSE: StringName = &"shop_card"
+const SHELF_REACH: float = 12.0
+## A fountain (CB11): the healing its pool holds (times the highest `fountain_pool`), and how fast a
+## wizard in it draws on it, health a second.
+const POOL_HEALTH: float = 120.0
+const DRAW_RATE: float = 40.0
 ## The card bag and the relics bag of an Inventory (`ItemKinds.BAGS`).
 const CARD_BAG: StringName = &"cards"
 const RELIC_BAG: StringName = &"relics"
@@ -63,7 +86,7 @@ const COIN_SPREAD: Array[Vector2] = [
 const COIN_RADIUS: float = 2.0
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
@@ -81,11 +104,25 @@ var _run_changes: Array[StatChange] = []
 var _offers: Array[RewardOffer] = []
 ## The number the next offer gets.
 var _next_offer: int = 0
-## The rooms cleared since the last step, to roll for at the next (`room_cleared`'s numbers).
-var _cleared: PackedInt32Array = PackedInt32Array()
-## The places a foe died in since their clear was rolled for (`Actor.room`; NO_PLACE in a world
-## with none, a row run's room).
-var _fought: PackedInt32Array = PackedInt32Array()
+## The rooms due a roll since the last step (`room_rewards_due`), and the table each rolls from.
+var _due_rooms: PackedInt32Array = PackedInt32Array()
+var _due_tables: Array[StringName] = []
+## The shops' shelves: each item's number, room, place, what it is (a choice: kind, id, count) and
+## price (before a buyer's `price_scale`), by the same index, in the order stocked.
+var _item_numbers: PackedInt32Array = PackedInt32Array()
+var _item_rooms: PackedInt32Array = PackedInt32Array()
+var _item_at: PackedVector2Array = PackedVector2Array()
+var _item_kinds: Array[StringName] = []
+var _item_ids: Array[StringName] = []
+var _item_counts: PackedInt32Array = PackedInt32Array()
+var _item_prices: PackedInt32Array = PackedInt32Array()
+## The number the next shelf item gets.
+var _next_item: int = 0
+## The fountains: each one's room, pool, healing left and most, by the same index.
+var _pool_rooms: PackedInt32Array = PackedInt32Array()
+var _pool_areas: Array[Rect2] = []
+var _pool_left: PackedFloat32Array = PackedFloat32Array()
+var _pool_most: PackedFloat32Array = PackedFloat32Array()
 ## By seat: the rolls it has had this run (its counter of the run's chance, `RewardRoll`).
 var _rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By seat: the coins in its wallet.
@@ -100,6 +137,8 @@ var _next_coin: int = 0
 ## The coin numbers this machine's looks were last told lie there (`coin_changed`): a restore tells
 ## them gone for those it no longer holds. Not state: what was said here.
 var _said_coins: Dictionary = {}
+## The shelf items this machine's looks were last told lie there (`shelf_changed`), as `_said_coins`.
+var _said_items: Dictionary = {}
 
 
 func _ready() -> void:
@@ -118,7 +157,8 @@ func _ready() -> void:
 	if events == null:
 		push_warning("Rewards: the Events autoload is missing, so nobody is rewarded.")
 		return
-	events.room_cleared.connect(_on_room_cleared)
+	events.room_rewards_due.connect(_on_room_rewards_due)
+	events.special_room_opened.connect(_on_special_room_opened)
 	events.room_entered.connect(_on_room_entered)
 	events.enemy_died.connect(_on_enemy_died)
 	events.run_stats_ruled.connect(_on_run_stats_ruled)
@@ -126,9 +166,11 @@ func _ready() -> void:
 	events.listen(&"reward_pick_requested", _on_reward_pick_requested)
 
 
-## A run's start: every offer, coin and wallet goes (each said), and the area is a fresh one's.
+## A run's start: every offer, coin, shelf, pool and wallet goes (each said), and the area is a fresh
+## one's.
 func begin_run() -> void:
 	_clear_coins()
+	_clear_rooms()
 	SimFresh.renew(self)
 	for seat in SEATS:
 		_say_waiting(seat)
@@ -137,15 +179,17 @@ func begin_run() -> void:
 
 ## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
 ## its starting coins (once a run); each coin a wizard's feet reach is taken (seats in order, the
-## first takes it).
-func step(_delta: float) -> void:
+## first takes it); each shelf item a wizard can buy is bought; each fountain is drawn on.
+func step(delta: float) -> void:
 	if actors == null:
 		return
-	if not _cleared.is_empty():
-		var rooms: PackedInt32Array = _cleared.duplicate()
-		_cleared.clear()
-		for room: int in rooms:
-			_roll_clear(room)
+	if not _due_rooms.is_empty():
+		var rooms: PackedInt32Array = _due_rooms.duplicate()
+		var tables: Array[StringName] = _due_tables.duplicate()
+		_due_rooms.clear()
+		_due_tables.clear()
+		for at in rooms.size():
+			_roll_clear(rooms[at], tables[at])
 	for seat in SEATS:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
@@ -163,6 +207,8 @@ func step(_delta: float) -> void:
 					_add_coins(seat, 1)
 		else:
 			at += 1
+	_buy_from_shelves()
+	_draw_on_pools(delta)
 
 
 # --- Asked ------------------------------------------------------------------------------
@@ -187,6 +233,28 @@ func spend(seat: int, amount: int) -> bool:
 		return false
 	_add_coins(seat, -amount)
 	return true
+
+
+## The shelf items lying in shops: each one's view (`number`, `room`, `at`, `price` as the run's own
+## `price_scale` makes it, and `choice`, a choice's view), in the order stocked.
+func shelf() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for at in _item_numbers.size():
+		out.append({"number": _item_numbers[at], "room": _item_rooms[at], "at": _item_at[at], "price": _shown_price(at), "choice": _item_view(at)})
+	return out
+
+
+## What seat `seat` pays for shelf item `item` (by number): its price times the player's
+## `price_scale`, 1 at least; -1 for no such item.
+func price_for(seat: int, item: int) -> int:
+	var at: int = _item_numbers.find(item)
+	return _price_of(at, stat_of(seat, &"price_scale")) if at >= 0 else -1
+
+
+## The healing left in room `room`'s fountain (-1: no fountain there).
+func pool_left(room: int) -> float:
+	var at: int = _pool_rooms.find(room)
+	return _pool_left[at] if at >= 0 else -1.0
 
 
 ## Seat `seat`'s offers not yet picked, oldest first (copies of their views).
@@ -227,6 +295,15 @@ func rebuild_derived() -> void:
 			events.coin_changed.emit(number, Vector2.ZERO, false)
 	for at in _coin_numbers.size():
 		_say_coin(_coin_numbers[at], _coin_at[at], true)
+	for number: int in _said_items.keys():
+		if not _item_numbers.has(number):
+			_said_items.erase(number)
+			events.shelf_changed.emit(number, Vector2.ZERO, {}, 0, false)
+	for at in _item_numbers.size():
+		_say_item(at, true)
+	events.fountain_changed.emit(-1, Rect2(), 0.0, 0.0)
+	for at in _pool_rooms.size():
+		_say_pool(at)
 	for seat in SEATS:
 		_say_wallet(seat)
 		_say_waiting(seat)
@@ -234,23 +311,20 @@ func rebuild_derived() -> void:
 
 # --- Heard ------------------------------------------------------------------------------
 
-## The room `room` was cleared: rolled for at the next step.
-func _on_room_cleared(_room_id: StringName, room: int) -> void:
-	if not _cleared.has(room):
-		_cleared.append(room)
+## The room `room` was cleared and its kind rewards it from `table`: rolled for at the next step.
+func _on_room_rewards_due(room: int, table: StringName) -> void:
+	if not _due_rooms.has(room):
+		_due_rooms.append(room)
+		_due_tables.append(table)
 
 
-## Room `room`'s clear: when a foe died in it (or in a world with no places), every seat with a
-## wizard rolls its own offer.
-func _roll_clear(room: int) -> void:
-	var fought: bool = _fought.has(room) or _fought.has(RoomGrid.NO_PLACE)
-	_erase(_fought, room)
-	_erase(_fought, RoomGrid.NO_PLACE)
-	if not fought or actors == null:
+## Room `room`'s clear: every seat with a wizard rolls its own offer from the table `table_id`.
+func _roll_clear(room: int, table_id: StringName) -> void:
+	if actors == null:
 		return
-	var table: RewardTable = registry.get_resource(TABLES, CLEAR_TABLE) as RewardTable if registry != null else null
+	var table: RewardTable = registry.get_resource(TABLES, table_id) as RewardTable if registry != null else null
 	if table == null:
-		push_warning("Rewards: no reward table '%s' (content/rewards), so a clear rewards nobody." % CLEAR_TABLE)
+		push_warning("Rewards: no reward table '%s' (content/rewards), so a clear rewards nobody." % table_id)
 		return
 	var cards: Array[StringName] = []
 	var complexities := PackedInt32Array()
@@ -302,21 +376,35 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	_say_waiting(player)
 
 
-## A new world (FIRST_ROOM entered): the coins of the one before are gone with it, and its fights.
+## A new world (FIRST_ROOM entered): the coins, shelves and pools of the one before are gone with it.
 func _on_room_entered(_room_id: StringName, room: int) -> void:
 	if room == EventsScript.FIRST_ROOM:
 		_clear_coins()
-		_fought.clear()
+		_clear_rooms()
 
 
-## A foe died at `position`: its room was fought in, and its coins land there (`EnemyBase.coins`,
-## spread round it).
+## A special room opened (Flow's, CB11): a shop's shelf is stocked from `table` at `spots`, a
+## fountain's pool filled at `area`. Once a room.
+func _on_special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array) -> void:
+	if fill == RoomKind.FILL_SHOP and not _item_rooms.has(room):
+		_stock_shelf(room, table, spots)
+	elif fill == RoomKind.FILL_FOUNTAIN and not _pool_rooms.has(room):
+		var most: float = 0.0
+		for seat in SEATS:
+			if _wizard_of(seat) != null:
+				most = maxf(most, stat_of(seat, &"fountain_pool"))
+		_pool_rooms.append(room)
+		_pool_areas.append(area)
+		_pool_left.append(POOL_HEALTH * most)
+		_pool_most.append(POOL_HEALTH * most)
+		_say_pool(_pool_rooms.size() - 1)
+
+
+## A foe died at `position`: its coins land there (`EnemyBase.coins`, spread round it).
 func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) -> void:
 	var body := enemy as Actor
 	if body == null:
 		return
-	if not _fought.has(body.room):
-		_fought.append(body.room)
 	if body.data == null or body.is_add:
 		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill wallets.
 		return
@@ -429,11 +517,110 @@ func _clear_coins() -> void:
 		_say_coin(numbers[i], at[i], false)
 
 
-## `list` without `value` (once: it holds each once).
-static func _erase(list: PackedInt32Array, value: int) -> void:
-	var at: int = list.find(value)
-	if at >= 0:
-		list.remove_at(at)
+## Room `room`'s shelf stocked from the table `table_id`: one item a spot of `spots`, rolled once.
+func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) -> void:
+	var table: RewardTable = registry.get_resource(TABLES, table_id) as RewardTable if registry != null else null
+	if table == null:
+		push_warning("Rewards: no shelf table '%s' (content/rewards), so the shop stands empty." % table_id)
+		return
+	var cards: Array[StringName] = []
+	var complexities := PackedInt32Array()
+	_cards_of(cards, complexities)
+	var stock := RewardOffer.new()
+	var lines: Array[RewardEntry] = []
+	RewardRoll.fill(stock, table, spots.size(), _sim(), room, 0, cards, complexities, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
+	for at in stock.size():
+		_item_numbers.append(_next_item)
+		_next_item += 1
+		_item_rooms.append(room)
+		_item_at.append(spots[at])
+		_item_kinds.append(stock.kinds[at])
+		_item_ids.append(stock.ids[at])
+		_item_counts.append(stock.counts[at])
+		_item_prices.append(lines[at].price)
+		_say_item(_item_numbers.size() - 1, true)
+
+
+## Each shelf item the first standing wizard (seat order) at it can pay for and take is bought: given
+## to them, paid from their own wallet, and gone from the shelf.
+func _buy_from_shelves() -> void:
+	var at: int = 0
+	while at < _item_numbers.size():
+		var bought: bool = false
+		for seat in SEATS:
+			var body: Actor = _wizard_of(seat)
+			if body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
+				continue
+			var price: int = _price_of(at, stat_of(seat, &"price_scale"))
+			if _wallets[seat] < price or not _give(seat, _item_kinds[at], _item_ids[at], _item_counts[at]):
+				continue
+			_add_coins(seat, -price)
+			_say_item(at, false)
+			_item_numbers.remove_at(at)
+			_item_rooms.remove_at(at)
+			_item_at.remove_at(at)
+			_item_kinds.remove_at(at)
+			_item_ids.remove_at(at)
+			_item_counts.remove_at(at)
+			_item_prices.remove_at(at)
+			bought = true
+			break
+		if not bought:
+			at += 1
+
+
+## Each fountain `delta` seconds on: every hurt standing wizard whose own feet are in its pool draws
+## on it (seats in order), until whole or the pool is dry.
+func _draw_on_pools(delta: float) -> void:
+	for at in _pool_rooms.size():
+		if _pool_left[at] <= 0.0:
+			continue
+		var drawn: bool = false
+		for seat in SEATS:
+			var body: Actor = _wizard_of(seat)
+			if body == null or body.is_down() or body.health == null or not _pool_areas[at].has_point(body.position):
+				continue
+			var missing: float = body.health.max_health - body.health.health
+			var amount: float = minf(minf(DRAW_RATE * delta, missing), _pool_left[at])
+			if amount <= 0.0:
+				continue
+			_pool_left[at] -= amount
+			drawn = true
+			events.health_gift_requested.emit(actors.home_of_seat(seat), amount, 0.0)
+			if _pool_left[at] <= 0.0:
+				_pool_left[at] = 0.0
+				break
+		if drawn:
+			_say_pool(at)
+
+
+## Shelf item `at`'s price for a player whose `price_scale` is `scale`: 1 at least.
+func _price_of(at: int, scale: float) -> int:
+	return maxi(roundi(float(_item_prices[at]) * scale), 1)
+
+
+## Shelf item `at`'s price as shown: the run's own `price_scale` (a buyer's relics may change theirs).
+func _shown_price(at: int) -> int:
+	return _price_of(at, RunStats.value_of(&"price_scale", _run_changes))
+
+
+## Every shelf and pool gone (each said gone).
+func _clear_rooms() -> void:
+	for at in _item_numbers.size():
+		_say_item(at, false)
+	_item_numbers.clear()
+	_item_rooms.clear()
+	_item_at.clear()
+	_item_kinds.clear()
+	_item_ids.clear()
+	_item_counts.clear()
+	_item_prices.clear()
+	if not _pool_rooms.is_empty() and events != null:
+		events.fountain_changed.emit(-1, Rect2(), 0.0, 0.0)
+	_pool_rooms.clear()
+	_pool_areas.clear()
+	_pool_left.clear()
+	_pool_most.clear()
 
 
 func _sim() -> Sim:
@@ -450,9 +637,16 @@ func _offer_view(offer: RewardOffer) -> Dictionary:
 
 ## The plain view of choice `choice` of `offer`: its kind, id, count, name and icon.
 func _choice_view(offer: RewardOffer, choice: int) -> Dictionary:
-	var kind: StringName = offer.kinds[choice]
-	var id: StringName = offer.ids[choice]
-	var count: int = offer.counts[choice]
+	return _view_of(offer.kinds[choice], offer.ids[choice], offer.counts[choice])
+
+
+## The plain view of shelf item `at` (as a choice's).
+func _item_view(at: int) -> Dictionary:
+	return _view_of(_item_kinds[at], _item_ids[at], _item_counts[at])
+
+
+## The plain view of a choice of `kind` `id`, `count` of it: its kind, id, count, name and icon.
+func _view_of(kind: StringName, id: StringName, count: int) -> Dictionary:
 	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": "", "icon": null}
 	if kind == RewardEntry.COINS:
 		view["name"] = "%d coin%s" % [count, "" if count == 1 else "s"]
@@ -479,6 +673,21 @@ func _say_waiting(seat: int) -> void:
 func _say_wallet(seat: int) -> void:
 	if events != null:
 		events.wallet_changed.emit(seat, _wallets[seat])
+
+
+func _say_item(at: int, lying: bool) -> void:
+	var number: int = _item_numbers[at]
+	if lying:
+		_said_items[number] = true
+	else:
+		_said_items.erase(number)
+	if events != null:
+		events.shelf_changed.emit(number, _item_at[at], _item_view(at) if lying else {}, _shown_price(at), lying)
+
+
+func _say_pool(at: int) -> void:
+	if events != null:
+		events.fountain_changed.emit(_pool_rooms[at], _pool_areas[at], _pool_left[at], _pool_most[at])
 
 
 func _say_coin(number: int, at: Vector2, lying: bool) -> void:

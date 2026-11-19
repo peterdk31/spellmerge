@@ -23,6 +23,10 @@ const NEAR: float = 64.0
 ## The ids not yet called, in the run's order, and what each costs (`EnemyBase.cost`).
 var waiting: Array[StringName] = []
 var costs: PackedInt32Array = PackedInt32Array()
+## Each waiting id's elite card (connected biomes CB11; empty: no elite), and the card of the id
+## `next` gave last.
+var cards: Array[StringName] = []
+var card: StringName = &""
 ## The run's numbers for the room (`run_room_filled`): a group's cost (0: the whole list at once), the
 ## cost standing at or below which the next group comes, the seconds between two bodies of a group.
 var group: int = 0
@@ -39,11 +43,14 @@ var order: PackedInt32Array = PackedInt32Array()
 
 
 ## The room's list `ids` (each costing `cost_of[i]`) comes in at the run's pace (`group`, `refill_at`,
-## `stagger`): the first group starts now (its first body is the next `next` returns).
-func begin(ids: Array[StringName], cost_of: PackedInt32Array, group_cost: int, refill_cost: int, seconds_apart: float) -> void:
+## `stagger`): the first group starts now (its first body is the next `next` returns). `elite_cards`:
+## each id's elite card by the same index (short or empty: none past its end).
+func begin(ids: Array[StringName], cost_of: PackedInt32Array, group_cost: int, refill_cost: int, seconds_apart: float, elite_cards: Array[StringName] = []) -> void:
 	clear()
 	waiting = ids.duplicate()
 	costs = cost_of.duplicate()
+	for at in ids.size():
+		cards.append(elite_cards[at] if at < elite_cards.size() else &"")
 	group = maxi(group_cost, 0)
 	refill_at = maxi(refill_cost, 0)
 	stagger = seconds_apart if is_finite(seconds_apart) and seconds_apart > 0.0 else 0.0
@@ -52,7 +59,7 @@ func begin(ids: Array[StringName], cost_of: PackedInt32Array, group_cost: int, r
 
 ## The id to stand now, `delta` seconds on, with `standing_cost` of the room's enemies standing or
 ## spawning (Flow's count); &"" for none this time. Call it again with `delta` 0 until it gives &"":
-## a group with no stagger stands all at once.
+## a group with no stagger stands all at once. Its elite card is `card` then.
 func next(delta: float, standing_cost: int) -> StringName:
 	if waiting.is_empty():
 		group_left = 0
@@ -67,6 +74,7 @@ func next(delta: float, standing_cost: int) -> StringName:
 	stagger_left = stagger
 	group_left -= 1
 	costs.remove_at(0)
+	card = cards.pop_front() if not cards.is_empty() else &""
 	return waiting.pop_front()
 
 
@@ -75,6 +83,7 @@ func take_all() -> Array[StringName]:
 	var taken: Array[StringName] = waiting.duplicate()
 	waiting.clear()
 	costs.clear()
+	cards.clear()
 	group_left = 0
 	return taken
 
@@ -93,6 +102,8 @@ func left() -> int:
 func clear() -> void:
 	waiting.clear()
 	costs.clear()
+	cards.clear()
+	card = &""
 	group = 0
 	refill_at = 0
 	stagger = 0.0

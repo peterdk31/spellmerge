@@ -60,6 +60,9 @@ signal staff_built(at: int)
 @export var staffs: Array[StaffBase] = []
 ## The card ids built into each staff when the actor is ready (a list per staff).
 @export var start_cards: Array = []
+## Slots its first staff has past its own (connected biomes CB11, decision 24: an elite's extra card,
+## the first of its first staff's start cards; `hold_staffs`). 0 for every other body.
+var extra_slots: int = 0
 ## The buttons that hold no staff (a bit each, 1 << button): an empty hand (items I2). Set before
 ## the actor is ready (`PlayerController.seat_wizard`). An actor with an `Inventory` (items I3) is
 ## made with its staffs here, which the inventory then owns: it changes a hand's cards with
@@ -380,7 +383,7 @@ func cards_of(at: int) -> Array[StringName]:
 
 ## How many slots staff `at` has (0 for an empty hand).
 func slot_count(at: int = 0) -> int:
-	return staff_of(at).slots if holds(at) else 0
+	return staff_of(at).slots + (extra_slots if at == 0 else 0) if holds(at) else 0
 
 
 ## The staff of button `at`: its own in `staffs`, else `staff`, else a plain one of 4 slots.
@@ -424,7 +427,7 @@ func last_carrier_card(at: int) -> StringName:
 
 ## Hold the staffs of `entries` (an enemy's or a prop's data: `StaffCards`, at most 4) from the start,
 ## one per button, their cards built when the actor enters play. Before the actor is ready.
-func hold_staffs(entries: Array[StaffCards]) -> void:
+func hold_staffs(entries: Array[StaffCards], extra_card: StringName = &"") -> void:
 	var held: Array[StaffBase] = []
 	var cards: Array = []
 	for entry: StaffCards in entries.slice(0, MAX_STAFFS):
@@ -432,6 +435,14 @@ func hold_staffs(entries: Array[StaffCards]) -> void:
 		cards.append(entry.cards.duplicate() if entry != null else [])
 	if held.is_empty():
 		return
+	extra_slots = 0
+	if extra_card != &"" and held[0] != null:
+		# An elite's card (connected biomes CB11): one slot more on its first staff, the card in front of
+		# its own (a modifier reads the cards after it).
+		var first: Array = [extra_card]
+		first.append_array((cards[0] as Array).slice(0, held[0].slots))
+		cards[0] = first
+		extra_slots = 1
 	staff_count = held.size()
 	staffs = held
 	staff = held[0]
@@ -518,6 +529,8 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
+	# An elite's slot more was its own first staff's (connected biomes CB11): new staffs have none.
+	extra_slots = 0
 	empty_hands = 0
 	for at in MAX_STAFFS:
 		_mana[at] = max_mana_of(at)
@@ -598,18 +611,18 @@ func _install(at: int) -> void:
 	if actor.spells == null or number < 0:
 		_has_build[at] = 0
 		return
-	var compiled: CompiledStaff = _compiled(_cards[at], staff_of(at))
+	var compiled: CompiledStaff = _compiled(_cards[at], staff_of(at), slot_count(at))
 	_has_build[at] = 1 if actor.spells.install_staff(number, at, compiled) != 0 else 0
 
 
-func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
-	var key: String = _key(cards, base)
+func _compiled(cards: Array[StringName], base: StaffBase, slots: int) -> CompiledStaff:
+	var key: String = _key(cards, base, slots)
 	var found: CompiledStaff = _cache.get(key) as CompiledStaff
 	if found != null:
 		return found
 	if _cache.size() >= CACHE_SIZE:
 		_cache.clear()
-	found = actor.spells.compile_staff(cards, base, _spell_scale())
+	found = actor.spells.compile_staff(cards, base, _spell_scale(), slots)
 	_cache[key] = found
 	return found
 
@@ -617,7 +630,9 @@ func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 ## The compiled staff of `cards` on `base` for a trial: the staffs' own cache's when it is there (a
 ## build held), else the trials' (made there, never in the staffs' own).
 func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
-	var key: String = _key(cards, base)
+	# The first staff of an elite reads its slot more (connected biomes CB11).
+	var slots: int = base.slots + (extra_slots if base == staff_of(0) else 0)
+	var key: String = _key(cards, base, slots)
 	var found: CompiledStaff = _cache.get(key) as CompiledStaff
 	if found == null:
 		found = _trials.get(key) as CompiledStaff
@@ -625,14 +640,15 @@ func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 		return found
 	if _trials.size() >= CACHE_SIZE:
 		_trials.clear()
-	found = actor.spells.compile_staff(cards, base, _spell_scale())
+	found = actor.spells.compile_staff(cards, base, _spell_scale(), slots)
 	_trials[key] = found
 	return found
 
 
-## The caches' key of `cards` on `base` at the body's spell scale: "spells id|staff id|scale|cards".
-func _key(cards: Array[StringName], base: StaffBase) -> String:
-	return "%d|%d|%s|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), _spell_scale(), ",".join(PackedStringArray(cards))]
+## The caches' key of `cards` on `base` with `slots` slots (-1: the staff's own) at the body's spell
+## scale: "spells id|staff id|slots|scale|cards".
+func _key(cards: Array[StringName], base: StaffBase, slots: int = -1) -> String:
+	return "%d|%d|%d|%s|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), slots if slots >= 0 else base.slots, _spell_scale(), ",".join(PackedStringArray(cards))]
 
 
 ## The size its spells are built at (boss plan OB7): its body's `Stats.spell_scale`, 1 without.

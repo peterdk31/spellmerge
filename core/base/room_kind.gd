@@ -4,19 +4,32 @@ extends Resource
 ## model"): what a room of that kind is for the game, how it is filled and what ends it. One file
 ## per kind, `content/room_kinds/<id>.tres`, found by the registry under `room_kinds`; a room template
 ## says which kinds it can host (`RoomBase.kinds`) and a run's map rules where each kind may stand
-## (`KindRule`). Today: `fight`, `boss` and `start` (a biome's start room). A new kind (a reward room) is a new file, and a new way of
-## filling is engine work (one more of `FILLS`, and the behaviour it names), never a change to the
-## generator.
+## (`KindRule`). Today: `fight`, `boss`, `start` (a biome's start room) and connected biomes CB11's
+## special rooms (`reward`, `shop`, `fountain`, `treasure`, `secret`, `challenge`). A new kind is a
+## new file, and a new way of filling or of entering is engine work (one more of `FILLS` or `DOORS`,
+## and the behaviour it names), never a change to the generator.
 
 ## How a room of the kind is filled: an enemy budget spent on the biome's enemy pool (`RunContent.enemy_pool`).
 const FILL_ENEMIES: StringName = &"enemies"
 ## How a room of the kind is filled: one boss of the biome's boss pool (`RunContent.boss_pool`).
 const FILL_BOSS: StringName = &"boss"
 ## How a room of the kind is filled: with nothing, a safe room (a biome's start room, connected
-## biomes CB5; the special rooms' fills come with CB11).
+## biomes CB5; a reward room, a treasure room and a secret room, CB11, whose clear on entering rolls
+## each player's reward from the kind's `rewards`).
 const FILL_NONE: StringName = &"none"
+## How a room of the kind is filled: as `FILL_ENEMIES`, every enemy an elite (a challenge room,
+## connected biomes CB11, decision 23: more health, one extra card from the biome's
+## `MapRules.elite_cards`, an outline).
+const FILL_ELITES: StringName = &"elites"
+## How a room of the kind is filled: a shop's shelf (decision 19), one of each item rolled from the
+## kind's `shelf` table, each bought by the first wizard who steps onto it with its price in their
+## own wallet (the Rewards area's).
+const FILL_SHOP: StringName = &"shop"
+## How a room of the kind is filled: a fountain (decision 20), a shared pool of healing that every
+## hurt wizard standing in it draws on until it runs dry (the Rewards area's).
+const FILL_FOUNTAIN: StringName = &"fountain"
 ## Every way of filling the game knows.
-const FILLS: Array[StringName] = [FILL_ENEMIES, FILL_BOSS, FILL_NONE]
+const FILLS: Array[StringName] = [FILL_ENEMIES, FILL_BOSS, FILL_NONE, FILL_ELITES, FILL_SHOP, FILL_FOUNTAIN]
 ## What ends a room of the kind: every enemy in it down.
 const END_ENEMIES_DOWN: StringName = &"enemies_down"
 ## Every way of ending the game knows.
@@ -30,10 +43,17 @@ const DOOR_GATHER: StringName = &"gather"
 ## By the gate (the boss's room, decision 25): a gather door that also stays shut while any sealed
 ## fight holds a wizard, downed or standing; when it opens everyone comes, downed or far away.
 const DOOR_GATE: StringName = &"gate"
+## By a key door (a treasure room, connected biomes CB11, decision 21): shut until a wizard holding
+## its key comes to it (the key is dropped on the way to it: in the room its bridge hangs off, as that
+## room is cleared); then it opens for everyone.
+const DOOR_KEY: StringName = &"key"
+## By cracked rock (a secret room, CB11, decision 22): shut until an element rolled for the room (its
+## crack's tint) touches the floor at the rock; then it breaks open for everyone.
+const DOOR_SECRET: StringName = &"secret"
 ## Not a kind's door: the name the view is told the portal home by (`gather_door_shown`, CB7).
 const DOOR_PORTAL_HOME: StringName = &"portal"
 ## Every way in the game knows.
-const DOORS: Array[StringName] = [DOOR_NONE, DOOR_GATHER, DOOR_GATE]
+const DOORS: Array[StringName] = [DOOR_NONE, DOOR_GATHER, DOOR_GATE, DOOR_KEY, DOOR_SECRET]
 ## The layout metadata a biome's laid room may carry its kind's id under (`room_built`'s layout;
 ## connected biomes CB12): what the view reads a room's kind by. Without it the view takes the first
 ## kind its template hosts (`RoomBase.kinds`).
@@ -53,6 +73,13 @@ const LAYOUT_META: StringName = &"room_kind"
 ## True when a room of the kind, cleared, opens the portal home (connected biomes CB7, decision 7):
 ## a gather door in it that ends the run, back to the hub, once every standing wizard is in it.
 @export var portal_home: bool = false
+## The reward table (`RewardTable` id, content/rewards) a room of the kind rolls each player's reward
+## from as it is cleared (connected biomes CB11; decision 16, rule 3): a fight's `clear`, the boss's
+## `boss`, a reward room's `reward`. Empty: its clear rewards nobody (the start room, a shop).
+@export var rewards: StringName = &""
+## A shop's shelf (`FILL_SHOP`): the reward table its items are rolled from, each line's `price` what
+## it costs. Read for no other fill.
+@export var shelf: StringName = &""
 
 @export_group("Look and sound")
 ## What a room of the kind brings to how it looks and sounds (connected biomes CB12, decision 30;
@@ -78,6 +105,11 @@ const SYMBOL_SIDE: int = 7
 const SYMBOL_NONE: int = 0
 const SYMBOL_BASE: int = 1
 const SYMBOL_LIT: int = 2
+
+
+## True when a room of the kind is filled with enemies, elites or not (a fight, a challenge room).
+func fills_with_enemies() -> bool:
+	return fill == FILL_ENEMIES or fill == FILL_ELITES
 
 
 ## Its name for people: `display_name`, else its id in words.
@@ -129,6 +161,8 @@ func problems() -> PackedStringArray:
 		found.append("%s: ends '%s' is none of %s." % [id, ends, ENDS])
 	if not DOORS.has(door):
 		found.append("%s: door '%s' is none of %s." % [id, door, DOORS])
+	if fill == FILL_SHOP and shelf == &"":
+		found.append("%s: a shop names no shelf table (shelf)." % id)
 	if light != &"" and (not Palette.has(light) or Palette.OWNED.has(light)):
 		found.append("%s: light '%s' is not a palette material the world may use." % [id, light])
 	if music != null:

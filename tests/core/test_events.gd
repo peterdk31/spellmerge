@@ -153,7 +153,7 @@ const EVENTS: Dictionary = {
 	&"run_started": [["player_count", TYPE_INT]],
 	&"run_ended": [["victory", TYPE_BOOL]],
 	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT]],
-	&"run_room_filled": [["room", TYPE_INT], ["enemies", TYPE_ARRAY], ["scale", TYPE_FLOAT], ["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
+	&"run_room_filled": [["room", TYPE_INT], ["enemies", TYPE_ARRAY], ["scale", TYPE_FLOAT], ["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT], ["elites", TYPE_ARRAY]],
 	&"run_biome_chosen": [["map", TYPE_OBJECT]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
 	&"room_left": [["room", TYPE_INT]],
@@ -162,6 +162,8 @@ const EVENTS: Dictionary = {
 	&"floor_touched": [["caster", TYPE_INT], ["element", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT]],
 	&"cover_changed": [["room", TYPE_INT], ["cells", TYPE_PACKED_INT32_ARRAY], ["states", TYPE_PACKED_INT32_ARRAY]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
+	&"room_rewards_due": [["room", TYPE_INT], ["table", TYPE_STRING_NAME]],
+	&"special_room_opened": [["room", TYPE_INT], ["fill", TYPE_STRING_NAME], ["table", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["spots", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"rooms_seen": [["seen", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
@@ -172,6 +174,7 @@ const EVENTS: Dictionary = {
 	&"gather_door_shown": [["door", TYPE_INT], ["rule", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["gathered", TYPE_INT], ["standing", TYPE_INT], ["held", TYPE_BOOL], ["open", TYPE_BOOL]],
 	&"key_door_shown": [["door", TYPE_INT], ["area", TYPE_RECT2], ["open", TYPE_BOOL]],
 	&"secret_rock_shown": [["rock", TYPE_INT], ["area", TYPE_RECT2], ["element", TYPE_STRING_NAME], ["broken", TYPE_BOOL]],
+	&"key_shown": [["key", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
 	&"hub_changed": [["in_hub", TYPE_BOOL]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
@@ -181,6 +184,8 @@ const EVENTS: Dictionary = {
 	&"reward_refused": [["player", TYPE_INT], ["offer", TYPE_INT]],
 	&"rewards_waiting_changed": [["player", TYPE_INT], ["offers", TYPE_ARRAY]],
 	&"coin_changed": [["coin", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
+	&"shelf_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["choice", TYPE_DICTIONARY], ["price", TYPE_INT], ["lying", TYPE_BOOL]],
+	&"fountain_changed": [["room", TYPE_INT], ["area", TYPE_RECT2], ["left", TYPE_FLOAT], ["most", TYPE_FLOAT]],
 	&"wallet_changed": [["player", TYPE_INT], ["coins", TYPE_INT]],
 	&"run_stats_ruled": [["changes", TYPE_ARRAY]],
 	&"health_gift_requested": [["actor", TYPE_INT], ["heal", TYPE_FLOAT], ["more_most", TYPE_FLOAT]],
@@ -190,7 +195,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

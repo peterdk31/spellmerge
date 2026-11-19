@@ -806,9 +806,10 @@ func card_works(card_id: StringName, carrier: StringName) -> bool:
 ## makes until its cycle ends (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
 ## card is listed in `wasted`. `spell_scale` is the casting body's (boss plan OB7, its `Stats`):
-## × every spell's size (`Carrier.scale_size`), 1 as the cards say.
-func compile_staff(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0) -> CompiledStaff:
-	return StaffCompiler.new(_component).compile(cards, staff, spell_scale)
+## × every spell's size (`Carrier.scale_size`), 1 as the cards say. `slots`: the slots it reads (-1:
+## the staff's own; an elite's first staff has one more, connected biomes CB11).
+func compile_staff(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0, slots: int = -1) -> CompiledStaff:
+	return StaffCompiler.new(_component).compile(cards, staff, spell_scale, slots)
 
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`

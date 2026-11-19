@@ -271,7 +271,7 @@ func test_the_bosss_room_cleared_opens_the_portal_home_and_it_ends_the_run() -> 
 	check_equal(flow.mode, FlowScript.MODE_RUN, "one of two in the portal: the run goes on")
 	_wizard(1).position = area.get_center() + Vector2(4.0, 0.0)
 	_ticks(1)
-	check(flow.mode != FlowScript.MODE_RUN, "every standing wizard in the portal: the biome's run ends")
+	check(flow.state == FlowScript.State.IDLE and flow.world == null, "every standing wizard in the portal: the biome's run ends")
 	frames.call("begin_step", DT)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "and the party is back in the hub")
 	check_equal(_last_told(-1).size(), 7, "the view is told every door is forgotten")
@@ -282,7 +282,7 @@ func test_everyone_down_in_a_biome_ends_the_run_back_in_the_hub() -> void:
 	_ticks(1)
 	_down(_wizard(0))
 	_ticks(roundi(FlowScript.RESTART_DELAY / DT) + 2)
-	check(flow.mode != FlowScript.MODE_RUN, "everyone down: the biome's run is lost")
+	check(flow.mode == FlowScript.MODE_HUB or (flow.state == FlowScript.State.IDLE and flow.world == null), "everyone down: the biome's run is lost")
 	frames.call("begin_step", DT)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub (decision 14)")
 
@@ -348,7 +348,7 @@ func test_a_room_with_two_doors_counts_each_door_on_its_own() -> void:
 	var lip_way: Vector2 = Vector2.LEFT if lip.get_center().x < world.room_rect(0).get_center().x else Vector2.RIGHT
 	a.position = lip.get_center() + lip_way * 10.0
 	a.room = _grid().place_at(a.position)
-	check_equal(a.room, 0, "the lip outside door 0's mouth is the nave's place")
+	check_equal(a.room, map.rooms() + doors.door_bridges[0], "the lip outside door 0's mouth is its bridge's place (connected biomes CB8: a room is entered only by its mouth)")
 	b.room = map.rooms() + doors.door_bridges[1]
 	b.position = world.bridge_rect(doors.door_bridges[1]).get_center()
 	var party: Array[Node2D] = [a, b]

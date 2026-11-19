@@ -778,8 +778,11 @@ func _ask_wait(player: int, on: bool) -> void:
 		events.pad_wait_requested.emit(player, 1 if on else 0)
 
 
-## A room was entered: a run's start lets every stop go, so each seat still waiting asks again.
-func _on_room_entered(_room_id: StringName, _room: int) -> void:
+## A new world was entered (FIRST_ROOM: a run's start lets every stop go), so each seat still
+## waiting asks again; a biome's later room entered changes no stop, so nobody asks twice.
+func _on_room_entered(_room_id: StringName, room: int) -> void:
+	if room != EventsScript.FIRST_ROOM:
+		return
 	for player in MAX_PLAYERS:
 		if _waiting[player]:
 			_ask_wait(player, true)

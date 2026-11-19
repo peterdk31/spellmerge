@@ -471,3 +471,27 @@ func test_corner_walkways_bridge_rooms_too() -> void:
 			if String(map.bridge_templates[bridge]).begins_with("plank_corner"):
 				corners[map.bridge_mirrors[bridge]] = true
 	check_equal(corners.size(), 4, "corners placed turning every way: %s" % [corners.keys()])
+
+
+## The start room alone (`MapRules.start_only`, rooms 0 to 0: a test's pinned room,
+## tests/support/pinned_run.gd; connected biomes CB8): one room, the first template hosting the start
+## room's kind, unmirrored at the origin, filled as its kind fills; the same for every seed.
+func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
+	var rules := MapRules.new()
+	rules.biome = MadeUpBiome.BIOME
+	rules.rooms_min = 0
+	rules.rooms_max = 0
+	rules.start_kind = &"fight"
+	var definition := RunDefinition.new()
+	definition.id = &"cellar_alone"
+	definition.biomes = [rules] as Array[MapRules]
+	check_equal(definition.biome_problems(_biome.content, _biome.shapes), PackedStringArray(), "sound")
+	var first: BiomeMap = BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(1))
+	check(first.is_made() and first.rooms() == 1 and first.bridges() == 0, "one room, no bridge")
+	if not first.is_made():
+		return
+	check_equal(first.room_templates[0], rules.biome_templates(_biome.content, _biome.shapes, &"fight", 0)[0].id, "the first template hosting its kind")
+	check(first.room_places[0] == Vector2.ZERO and first.room_mirrors[0] == 0, "unmirrored at the origin")
+	check(not first.enemies_of(0).is_empty(), "filled with its fight")
+	check_equal(first.problems(_biome.shapes), PackedStringArray(), "a sound map")
+	check_equal(BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(2)).room_templates, first.room_templates, "the same room for any seed")

@@ -540,8 +540,9 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places, registry)
 	if mode == MODE_RUN:
+		# A later room's placed enemies stand as it is entered (`_enter_biome_room`), not before.
 		for other in range(1, life.rooms()):
-			contents.stand_more(new_world, biome.room_places(other), registry)
+			contents.stand_more(new_world, biome.room_places(other), registry, false)
 	for problem in contents.problems:
 		push_warning("Flow: the room's bodies: %s" % problem)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
@@ -1517,7 +1518,7 @@ func _lay_biome(into: Node2D) -> bool:
 	_begin_gates(biome.map)
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
-		_add_camera_over(into, projectiles.bounds())
+		_add_camera_over(into, biome.area())
 	return true
 
 
@@ -1631,6 +1632,10 @@ func _take_portal_home() -> void:
 ## is cleared at once.
 func _enter_biome_room(room: int) -> void:
 	life.set_flag(room, RoomLife.ENTERED, true)
+	if room != EventsScript.FIRST_ROOM and world != null:
+		# Its placed enemies (a dummy, a stand-in) stand now, as the party first comes (connected
+		# biomes CB8); the start room's stood with the world.
+		contents.stand_enemies(world, biome.room_places(room))
 	if events != null:
 		events.room_entered.emit(biome.map.room_templates[room], room)
 	var fight: RoomFight = life.fights[room]
@@ -1767,7 +1772,7 @@ func _rebuild_biome() -> void:
 	if biome.map != null:
 		_places = biome.room_places(EventsScript.FIRST_ROOM)
 		if projectiles != null:
-			_add_camera_over(world, projectiles.bounds())
+			_add_camera_over(world, biome.area())
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 		life.tell_awake(projectiles.grid())

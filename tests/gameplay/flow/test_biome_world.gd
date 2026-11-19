@@ -70,6 +70,7 @@ func test_the_biome_is_laid_at_its_places_under_one_grid() -> void:
 	check(_biome.room_layout(1).find_children("*", "RoomSocket", true, false).is_empty(), "its sockets taken out")
 	check_equal(_biome.room_layout(1).get_meta(PieceShape.GROUND_MIRROR_META), Vector2i.ZERO, "it says it is not mirrored, for the ground's drawing")
 	check_equal(PieceShape.GROUND_MIRROR_META, GroundShapeScript.MIRROR_META, "the meta the ground's drawing reads (CB4)")
+	check_equal(_biome.room_layout(1).get_meta(RoomKind.LAYOUT_META, &""), _biome.map.room_kinds[1], "it says its kind, for the view (CB12)")
 	var bounds: Rect2 = _world.projectiles.bounds()
 	check(bounds.encloses(_biome.room_rect(2)) and bounds.encloses(_biome.room_rect(0)), "the grid covers the whole biome")
 	var grid: RoomGrid = _world.projectiles.grid()

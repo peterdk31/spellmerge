@@ -24,6 +24,11 @@ extends RefCounted
 ## from FIRST_ROOM) and a room's kind from the layout's `RoomKind.LAYOUT_META`, else the first kind its
 ## template hosts; a reward room's type (`RewardType`, the owner's ask of 2026-11-19) from the layout's
 ## `RewardType.LAYOUT_META` (none: any), for the mouths' signs and the held map.
+##
+## **A piece laid again** (a room reroll, `BiomeWorld.relay_room`: `room_built` of a number already
+## told in the same world) is relearnt alone and counted (`relaid`, `version_of`): the views that read
+## the places once a world read that piece again alone (`changed_since`), so no other room's look
+## starts over.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -60,6 +65,9 @@ var _followed: int = NONE
 ## How many worlds were laid (`room_built` of FIRST_ROOM): the looks that read the grid lay theirs
 ## again when it changes.
 var _world: int = 0
+## How many pieces were laid again in this world, and by piece how many times (see the top).
+var _relaid: int = 0
+var _versions: PackedInt32Array = PackedInt32Array()
 
 
 func bind(events: EventsScript) -> void:
@@ -77,13 +85,21 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_followed = NONE
 		_touch_places = -1
 		_world += 1
+		_versions.resize(0)
 	if number < 0:
 		return
+	if number != EventsScript.FIRST_ROOM and number < _templates.size() and _templates[number] != &"":
+		# A piece laid again alone (a room reroll's): counted, and the touch lists worked out again.
+		_relaid += 1
+		_versions[number] += 1
+		_touch_places = -1
 	while _templates.size() <= number:
 		_templates.append(&"")
 		_walkway.append(0)
 		_kinds.append(null)
 		_types.append(null)
+	while _versions.size() <= number:
+		_versions.append(0)
 	_templates[number] = room_id
 	var room: RoomBase = _room(room_id)
 	_walkway[number] = 1 if room != null and room.walkway else 0
@@ -165,6 +181,30 @@ func _work_out_touches(grid: RoomGrid, places: int) -> void:
 ## The number of the world laid last (it changes with each new one: a biome, a row run's room).
 func world() -> int:
 	return _world
+
+
+## How many pieces were laid again alone in all (it changes with each: see the top).
+func relaid() -> int:
+	return _relaid
+
+
+## How many times piece `place` was laid again alone in this world (0: as the world was laid).
+func version_of(place: int) -> int:
+	return _versions[place] if place >= 0 and place < _versions.size() else 0
+
+
+## Each piece's `version_of` now, for `changed_since`.
+func versions() -> PackedInt32Array:
+	return _versions.duplicate()
+
+
+## The pieces of `places` laid again alone since `seen` (an earlier `versions`) was taken.
+func changed_since(seen: PackedInt32Array, places: int) -> PackedInt32Array:
+	var found := PackedInt32Array()
+	for place in places:
+		if version_of(place) != (seen[place] if place < seen.size() else 0):
+			found.append(place)
+	return found
 
 
 ## True when a sound at world point `at` is heard (see the top).

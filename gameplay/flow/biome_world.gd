@@ -116,6 +116,39 @@ func rebuild_derived() -> void:
 		_lay_now(true)
 
 
+## Room `room` laid again alone, `map` (the world's from now on) differing from the map laid only in
+## that room (a room reroll's, `BiomeGenerator.reroll_room`: its template, mirroring, place, kind and
+## fill; its bridges where they were, the biome's bounds the same): its layout replaced by its new one
+## (told `built` under its own number, so only its looks are made again), what is where in it read
+## again, and the grid's layers laid again over the cells it covered or covers now, as a whole lay
+## leaves them (`_lay_cells`), its place's rectangle the new one. Nothing else is touched: the other
+## pieces' nodes, the solid shots' stones and the footprints stay; the seals and shut mouths are
+## Flow's to tell again. False (nothing done) when there is no laid map to change so.
+func relay_room(room: int) -> bool:
+	if map == null or _laid == null or room <= 0 or room >= map.rooms() or room >= _layouts.size() or map.rooms() != _laid.rooms() or map.bridges() != _laid.bridges():
+		return false
+	shapes_of(map)
+	var old_shape: PieceShape = _laid.room_shape(room, _shapes)
+	var old: Rect2 = old_shape.rect_at(_laid.room_places[room]) if old_shape != null else Rect2()
+	var layout: Node = _layouts[room]
+	if layout != null and is_instance_valid(layout):
+		if layout.get_parent() != null:
+			layout.get_parent().remove_child(layout)
+		layout.free()
+	_layouts[room] = _place(ROOM_NODE % room, map.room_templates[room], map.room_places[room], map.room_mirrors[room], room, room)
+	if projectiles != null:
+		var grid: RoomGrid = projectiles.grid()
+		var region: Rect2 = old.merge(room_rect(room)) if old.has_area() else room_rect(room)
+		for bridge in map.bridges():
+			for end in 2:
+				if map.end_room(bridge, end) == room:
+					region = region.merge(mouth_rect(bridge, end))
+		_lay_cells(grid, grid.cells_round(region))
+		grid.set_place_rect(room, room_rect(room))
+	_laid = map.copy()
+	return true
+
+
 ## The layout node of room `room` (null when none is laid).
 func room_layout(room: int) -> Node:
 	return _layouts[room] if map != null and room >= 0 and room < map.rooms() and room < _layouts.size() else null
@@ -227,7 +260,11 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	if number < map.rooms():
 		var shape: PieceShape = _shapes.get(template) as PieceShape
 		var read: RoomPlaces = RoomPlaces.read(layout) if layout != null else RoomPlaces.new()
-		_room_places.append(read.placed_in(place, mirror, shape.size if shape != null else read.size))
+		var placed: RoomPlaces = read.placed_in(place, mirror, shape.size if shape != null else read.size)
+		if number < _room_places.size():
+			_room_places[number] = placed
+		else:
+			_room_places.append(placed)
 	if layout == null:
 		return null
 	layout.name = named
@@ -265,24 +302,7 @@ func _lay_grid(restored: bool) -> void:
 		grid.size_to(projectiles.bounds())
 	else:
 		projectiles.set_bounds(bounds())
-	var pieces: Array[Rect2] = []
-	for room in map.rooms():
-		var shape: PieceShape = map.room_shape(room, _shapes)
-		_lay_piece(grid, shape, map.room_places[room])
-		pieces.append(room_rect(room))
-	for bridge in map.bridges():
-		pieces.append(bridge_rect(bridge))
-	grid.wall_outside(pieces)
-	for bridge in map.bridges():
-		for end in 2:
-			var room: int = map.end_room(bridge, end)
-			var shape: PieceShape = map.room_shape(room, _shapes)
-			grid.cut(_moved(shape.cut_rect(map.end_socket(bridge, end)), map.room_places[room]))
-	for bridge in map.bridges():
-		_lay_piece(grid, map.bridge_shape(bridge, _shapes), map.bridge_places[bridge])
-	for bridge in map.bridges():
-		for end in 2:
-			grid.add_mouth(mouth_rect(bridge, end))
+	_lay_cells(grid, Rect2())
 	# Every piece a place, rooms first (connected biomes CB3); the seals are Flow's to set again.
 	var biggest: float = 0.0
 	for room in map.rooms():
@@ -297,11 +317,44 @@ func _lay_grid(restored: bool) -> void:
 		projectiles.relay_solids()
 
 
-func _lay_piece(grid: RoomGrid, shape: PieceShape, place: Vector2) -> void:
+## The grid's walls, holes and mouths laid from the map, in order: every room's walls and holes, the
+## dark between the pieces a wall, each joined room socket cut open, the bridges' walls and holes,
+## their mouths. With `within` (whole cells, not empty) only its cells, opened first (`RoomGrid.cut`:
+## the solid shots' stones and the footprints kept), then laid as the whole grid lays them.
+func _lay_cells(grid: RoomGrid, within: Rect2) -> void:
+	if within.has_area():
+		grid.cut(within)
+	var pieces: Array[Rect2] = []
+	for room in map.rooms():
+		_lay_piece(grid, map.room_shape(room, _shapes), map.room_places[room], within)
+		pieces.append(room_rect(room))
+	for bridge in map.bridges():
+		pieces.append(bridge_rect(bridge))
+	grid.wall_outside(pieces, within)
+	for bridge in map.bridges():
+		for end in 2:
+			var room: int = map.end_room(bridge, end)
+			var shape: PieceShape = map.room_shape(room, _shapes)
+			grid.cut(_clipped(_moved(shape.cut_rect(map.end_socket(bridge, end)), map.room_places[room]), within))
+	for bridge in map.bridges():
+		_lay_piece(grid, map.bridge_shape(bridge, _shapes), map.bridge_places[bridge], within)
+	for bridge in map.bridges():
+		for end in 2:
+			grid.add_mouth(_clipped(mouth_rect(bridge, end), within))
+
+
+func _lay_piece(grid: RoomGrid, shape: PieceShape, place: Vector2, within: Rect2 = Rect2()) -> void:
 	for rect: Rect2 in shape.walls:
-		grid.add_wall(_moved(rect, place))
+		grid.add_wall(_clipped(_moved(rect, place), within))
 	for rect: Rect2 in shape.holes:
-		grid.add_hole(_moved(rect, place))
+		grid.add_hole(_clipped(_moved(rect, place), within))
+
+
+## `rect` within `within` (all of it when `within` is empty; an empty rectangle when they miss).
+static func _clipped(rect: Rect2, within: Rect2) -> Rect2:
+	if not within.has_area():
+		return rect
+	return rect.intersection(within)
 
 
 static func _moved(rect: Rect2, by: Vector2) -> Rect2:

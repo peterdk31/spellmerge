@@ -406,20 +406,42 @@ func cut(rect: Rect2) -> void:
 
 ## Make every cell of the grid whose middle lies in none of `pieces` (world rectangles) a room wall
 ## (connected biomes CB2: the dark between a biome's rooms and bridges, where nothing stands or flies).
-func wall_outside(pieces: Array[Rect2]) -> void:
+## With `within` (not empty), only the cells whose middle lies in it (a room laid again alone).
+func wall_outside(pieces: Array[Rect2], within: Rect2 = Rect2()) -> void:
+	var cx0: int = 0
+	var cy0: int = 0
+	var cx1: int = _wall_w
+	var cy1: int = _wall_h
+	if within.has_area():
+		var low_w: Vector2 = (within.position - _bounds.position) / WALL_CELL
+		var high_w: Vector2 = (within.end - _bounds.position) / WALL_CELL
+		cx0 = maxi(ceili(low_w.x - 0.5), 0)
+		cy0 = maxi(ceili(low_w.y - 0.5), 0)
+		cx1 = mini(ceili(high_w.x - 0.5), _wall_w)
+		cy1 = mini(ceili(high_w.y - 0.5), _wall_h)
+	var w: int = maxi(cx1 - cx0, 0)
+	var h: int = maxi(cy1 - cy0, 0)
 	var inside := PackedByteArray()
-	inside.resize(_wall_w * _wall_h)
+	inside.resize(w * h)
 	for piece: Rect2 in pieces:
 		# The cells whose middle lies in it: from ceil(low - 0.5) to ceil(high - 0.5), not with it.
 		var low: Vector2 = (piece.position - _bounds.position) / WALL_CELL
 		var high: Vector2 = (piece.end - _bounds.position) / WALL_CELL
-		for cy in range(maxi(ceili(low.y - 0.5), 0), mini(ceili(high.y - 0.5), _wall_h)):
-			for cx in range(maxi(ceili(low.x - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w)):
-				inside[cy * _wall_w + cx] = 1
-	for cell in inside.size():
-		if inside[cell] == 0:
-			_wall_cells[cell] |= ROOM_CELL
-			_has_walls = true
+		for cy in range(maxi(ceili(low.y - 0.5), cy0), mini(ceili(high.y - 0.5), cy1)):
+			for cx in range(maxi(ceili(low.x - 0.5), cx0), mini(ceili(high.x - 0.5), cx1)):
+				inside[(cy - cy0) * w + (cx - cx0)] = 1
+	for cy in h:
+		for cx in w:
+			if inside[cy * w + cx] == 0:
+				_wall_cells[(cy + cy0) * _wall_w + cx + cx0] |= ROOM_CELL
+				_has_walls = true
+
+
+## `rect` grown out to the wall cells it touches (whole cells of the grid, for a part laid again).
+func cells_round(rect: Rect2) -> Rect2:
+	var low: Vector2 = ((rect.position - _bounds.position) / WALL_CELL).floor()
+	var high: Vector2 = ((rect.end - _bounds.position) / WALL_CELL).ceil()
+	return Rect2(_bounds.position + low * WALL_CELL, (high - low) * WALL_CELL)
 
 
 ## The room's walls as an image (FORMAT_L8), one pixel a WALL_CELL square from the corner of
@@ -452,7 +474,26 @@ func add_place(rect: Rect2, over: bool = false) -> int:
 		_place_cells.fill(0)
 		_place_mixed.resize(_place_w * _place_h)
 		_place_mixed.fill(0)
-	if over:
+	_mark_place(number)
+	return number
+
+
+## Place `place`'s rectangle is `rect` from now on (a room laid again alone: a room reroll's); its
+## seal, its sleep and the others' kept, the lookup of every place worked out again, as if each had
+## been added so.
+func set_place_rect(place: int, rect: Rect2) -> void:
+	if place < 0 or place >= _place_rects.size():
+		return
+	_place_rects[place] = rect
+	_place_cells.fill(0)
+	_place_mixed.fill(0)
+	for number in _place_rects.size():
+		_mark_place(number)
+
+
+func _mark_place(number: int) -> void:
+	var rect: Rect2 = _place_rects[number]
+	if _place_over[number] != 0:
 		var ox0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
 		var oy0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
 		var ox1: int = mini(ceili((rect.end.x - _bounds.position.x) / PLACE_CELL), _place_w)
@@ -470,7 +511,6 @@ func add_place(rect: Rect2, over: bool = false) -> int:
 				var middle: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * PLACE_CELL
 				if rect.has_point(middle) and _place_cells[y * _place_w + x] == 0:
 					_place_cells[y * _place_w + x] = number + 1
-	return number
 
 
 ## Every place gone (a row run's room has none): `place_at` is NO_PLACE everywhere.

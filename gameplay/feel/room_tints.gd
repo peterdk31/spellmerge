@@ -57,6 +57,10 @@ var _seen: PackedByteArray = PackedByteArray()
 var _as_stands: bool = false
 var _laid_places: int = -1
 var _laid_world: int = -1
+## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a
+## room reroll's) is read again alone, every other tint playing on as it was.
+var _laid_versions: PackedInt32Array = PackedInt32Array()
+var _laid_relaid: int = -1
 var _clock: float = 0.0
 ## The light written to last (its instance id; 0: none) and whether the rows changed since.
 var _light_id: int = 0
@@ -87,6 +91,15 @@ func step(delta: float, grid: RoomGrid, light: SpellLightScript) -> void:
 	var world: int = pieces.world() if pieces != null else 0
 	if places != _laid_places or world != _laid_world:
 		_lay(grid, places, world)
+	elif pieces != null and pieces.relaid() != _laid_relaid:
+		var stages: Dictionary = {}
+		for i in _places.size():
+			stages[_places[i]] = _stage[i]
+		var changed: PackedInt32Array = pieces.changed_since(_laid_versions, places)
+		_lay(grid, places, world)
+		for i in _places.size():
+			if stages.has(_places[i]) and not changed.has(_places[i]):
+				_stage[i] = stages[_places[i]]
 	if _as_stands:
 		_as_stands = false
 		for i in _places.size():
@@ -177,6 +190,8 @@ func _wanted(i: int) -> int:
 func _lay(grid: RoomGrid, places: int, world: int) -> void:
 	_laid_places = places
 	_laid_world = world
+	_laid_relaid = pieces.relaid() if pieces != null else 0
+	_laid_versions = pieces.versions() if pieces != null else PackedInt32Array()
 	_places.resize(0)
 	_rects.resize(0)
 	_hues.resize(0)

@@ -2,15 +2,17 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-<<<<<<< HEAD
+## 2026-11-19: The reward menu's cards
+
+The owner asked for a new reward picker (2026-11-19): an offer's choices now show as cards in a row, picked with left and right and A as before (hud/menus/reward). Each card has the reward's icon (a card's own; coins, a heal and more health have a small glyph of their kind), its name and what it does: a card's builder line, or the reward kind's own line (`RewardEntry.DESCRIPTIONS`, so a new kind brings its text; the Rewards area's choice view now carries `description`). The row is laid out by `reward_layout.gd` in the room the menu has (the seat's quarter of the view while several play, the whole view for one): cards 60 to 96 px wide, side by side; four fit a quarter, and past what fits the row scrolls with an arrow each side, keeping the focused card in view. Words wrap and are never clipped. Smooth: the menu unrolls and rolls up over 4 frames, the focused card stands up 3 px a pixel a frame, the gold rim slides from card to card over 4 frames and a scrolled row slides. The pick is the same command (`reward_pick_requested`), nothing in the simulation changed. Tests: `tests/hud/test_reward_menu.gd` (1 to 5 choices at full screen and in a quarter, selection, each kind's description, the frames); screenshots `shot_reward_cards.gd` (2 and 3 choices, and four players at once).
+
 ## 2026-11-19: Connected biomes CB13: templates
 
 The thirteenth step of the connected biomes plan (docs/milestones/connected-biomes.md, "CB13 done"): the crypt has walkways of both kinds, straight ones every 32 px from 96 to 384 px each way and seven corner (L-shaped) walkways, all on the causeway, with a north-south causeway (`causeway_ns`) whose courses run across the walkway, drawn again from each shape, never turned; a shape's outline may now be a polygon (`points`), in the tool and both of the game's drawings alike. Eight new fight rooms (arena_05 to arena_12, a folder each, each with its landmark and three or four sockets) make twelve fights. Found on the way: the loop style closed almost no loop because the old fight rooms have only two sockets; and a corner's arms must reach past half a room; over 60 loop maps, 0 closed a loop before, 34 now.
-=======
+
 ## 2026-11-19: Connected biomes CB12b: each kind's light and air
 
 A step the owner added to the connected biomes plan (docs/milestones/connected-biomes.md, "CB12b done"; "also tint the room"), view only. A room kind's light now also tints its room: a new `RoomKind.light_tint` says how far the room's dark and every light in it lean toward the kind's light, drawn by the spell light's apply pass by each room's world rectangle (`gameplay/feel/room_tints.gd`, `SpellLight.set_room_tints`), so two rooms in one view and two views of a split screen are each tinted by their own room, bridges never. A tint comes in over 3 frames at 12 fps as the room is entered, and is drawn as it stands after a restore. Each kind may name its own air motes (`RoomKind.air_motes`), given off over its own rooms alone within half the room air's share of the motes' ring (`gameplay/feel/kind_air.gd`). The crypt's nine kinds got their light and air: the boss's and the challenge's fire, the fountain's water, the secret room's void, the spark's gold for the rest, a faint one for fights. Tests: `test_room_tints.gd`; screenshots `shot_room_tints.gd` (one a kind, and two kinds side by side).
->>>>>>> origin/main
 
 ## 2026-11-19: Connected biomes CB11: special rooms
 

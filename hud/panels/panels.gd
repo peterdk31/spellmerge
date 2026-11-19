@@ -392,6 +392,8 @@ func _process(delta: float) -> void:
 		# The entrance waits while the game is paused.
 		_boss_banner.step(delta)
 	step_staffs()
+	for reward in _rewards:
+		reward.step()
 
 
 ## Put every player's item hint over its item as the camera shows it now (none outside a room,
@@ -499,16 +501,22 @@ func _has_menu(player: int) -> bool:
 
 
 
-## Open seat `player`'s reward menu, in the middle of their quarter of the view, so four open at once
-## never cover each other.
+## Open seat `player`'s reward menu, its cards laid out in their quarter of the view while several
+## play, so four open at once never cover each other (a quarter is inside the seat's own cell of a
+## split screen, CB6), or in the whole view for one player.
 func _open_reward(player: int) -> void:
 	var reward: RewardMenuScript = _rewards[player]
-	if not reward.open_menu():
-		return
-	reward.reset_size()
+	reward.room = reward_room(player)
+	reward.open_menu()
+
+
+## The room seat `player`'s reward menu lays its cards out in (view pixels).
+func reward_room(player: int) -> Rect2:
 	var view: Vector2 = (get_node("Root") as Control).size
-	var quarter: Vector2 = Vector2(0.25 + 0.5 * (player % 2), 0.75 if player >= 2 else 0.25) * view
-	reward.position = (quarter - reward.size * 0.5).round()
+	if _joined.count(true) <= 1:
+		return Rect2(Vector2.ZERO, view)
+	var quarter: Vector2 = (view * 0.5).floor()
+	return Rect2(Vector2(float(player % 2), 1.0 if player >= 2 else 0.0) * quarter, quarter)
 
 
 ## The reward menu of seat `player` (for tests and screenshots).

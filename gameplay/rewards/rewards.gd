@@ -645,9 +645,11 @@ func _item_view(at: int) -> Dictionary:
 	return _view_of(_item_kinds[at], _item_ids[at], _item_counts[at])
 
 
-## The plain view of a choice of `kind` `id`, `count` of it: its kind, id, count, name and icon.
+## The plain view of a choice of `kind` `id`, `count` of it: its kind, id, count, name, icon and
+## description (what it does, for the reward menu's card: a card's own builder line, Spells', or
+## the kind's line, `RewardEntry.describe`).
 func _view_of(kind: StringName, id: StringName, count: int) -> Dictionary:
-	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": "", "icon": null}
+	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": "", "icon": null, "description": RewardEntry.describe(kind, count)}
 	if kind == RewardEntry.COINS:
 		view["name"] = "%d coin%s" % [count, "" if count == 1 else "s"]
 	elif kind == RewardEntry.HEAL:
@@ -658,6 +660,7 @@ func _view_of(kind: StringName, id: StringName, count: int) -> Dictionary:
 		# A card's name and icon are Spells' to say (no script outside core/spells reads a card).
 		view["name"] = spells.component_name(id)
 		view["icon"] = spells.component_icon(id)
+		view["description"] = spells.component_description(id)
 	if String(view["name"]) == "":
 		view["name"] = String(id)
 	if kind == RewardEntry.CARD and count > 1:

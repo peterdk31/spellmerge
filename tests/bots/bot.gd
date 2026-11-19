@@ -30,6 +30,10 @@ extends FrameSource
 ## toward the landing where no walk is open), then steps in, and its fight seals it in; in a fight the brain plays as
 ## above, and a revive goes first (its brain's `revive` behaviour running: it stays by the one downed,
 ## cleared room or not). It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
+## Rewards: a fighter answers a "pick 1 of N" offer waiting for its seat (gameplay/rewards, as the
+## reward menu shows it) with the same command a player's A sends (`reward_pick_requested`, in its own
+## frame), its first choice, the next one if that was refused (a full bag), so it never stands
+## waiting in a reward room; nothing for an offer every choice of which was refused.
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
@@ -97,6 +101,12 @@ var _route_map: BiomeMap = null
 ## The open actors, read for a crawl (sized once).
 var _ids: PackedInt32Array = PackedInt32Array()
 
+## The offers waiting for its seat, as the Rewards area last told them (`rewards_waiting_changed`, as
+## the reward menu hears them), the offer it last asked for and the choice it asked.
+var _waiting: Array[Dictionary] = []
+var _asked_offer: int = -1
+var _asked_choice: int = -1
+
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
 ## How many `staff_change_requested` events the bot has sent.
@@ -116,6 +126,7 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	if int(_input.call("add_virtual_device", player)) == int(_input.get("NO_DEVICE")):
 		return false
 	_frames = _input.get_tree().root.get_node_or_null("Frames")
+	use_events(_input.get_tree().root.get_node_or_null("Events"))
 	if _frames != null:
 		_frames.call("set_source", player, self)
 	return true
@@ -200,6 +211,35 @@ func fill_frame(frame: InputFrame, delta: float) -> void:
 	frame.held_bits = _wanted.held_bits
 	frame.pressed_bits = _wanted.pressed_bits
 	_wanted.pressed_bits = 0
+	if mode == Mode.FIGHTER:
+		pick_reward(frame)
+
+
+## Hear the offers waiting from `events` (the `Events` autoload, as `join` does; a test's bus).
+func use_events(events: Node) -> void:
+	if events != null and not events.is_connected(&"rewards_waiting_changed", _on_rewards_waiting_changed):
+		events.connect(&"rewards_waiting_changed", _on_rewards_waiting_changed)
+
+
+func _on_rewards_waiting_changed(seat: int, offers: Array[Dictionary]) -> void:
+	if seat == player:
+		_waiting = offers.duplicate()
+
+
+## A pick of the oldest offer waiting for its seat into `frame` (`reward_pick_requested`, as the
+## reward menu's A): its first choice, or, the same offer still waiting after that ask (a refusal),
+## the next. Nothing with none waiting, or every choice of it asked.
+func pick_reward(frame: InputFrame) -> void:
+	if _waiting.is_empty():
+		return
+	var offer: Dictionary = _waiting[0]
+	var number: int = int(offer["offer"])
+	var choice: int = _asked_choice + 1 if number == _asked_offer else 0
+	if choice >= (offer["choices"] as Array).size():
+		return
+	if frame.add_command(&"reward_pick_requested", [number, choice]):
+		_asked_offer = number
+		_asked_choice = choice
 
 
 ## One step: the brain thinks for the wizard and the bot wants what it wants (`send`). An idler

@@ -16,12 +16,24 @@ extends SceneTree
 ##   ... the suite's TEST TIME, TEST OK or TEST FAILED lines, and whatever it printed ...
 ##   SUITE END: res://tests/a/test_x.gd PASS 1234 ms
 ## A user argument `--shard=K/N` goes to every suite (tests/support/suite.gd, "shards").
+##
+## **Its own user://:** the runner gives every process a data folder of its own (`XDG_DATA_HOME`),
+## and what a file saved is cleared before the next (`_clear_user_data`). Godot takes only an
+## absolute `XDG_DATA_HOME` (as the XDG rules say): a relative one is passed over for
+## `~/.local/share`, so every process at once shares one user:// and one process's clearing deletes
+## another's files mid-test (a save written, then gone: test_intro's "the save remembers it", and
+## test_net_play's replays, failing only among the others; found 2026-11-19). A host whose user://
+## is not under its `XDG_DATA_HOME` (`user_dir_shared`) says so once and clears nothing, so it never
+## deletes what another process is using.
 
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const SuiteScript := preload("res://tests/support/suite.gd")
 
 const START: String = "SUITE START: "
 const END: String = "SUITE END: "
+
+## True when this process's user:// is shared with others (see the class doc): nothing is cleared.
+var _shared: bool = false
 
 
 func _initialize() -> void:
@@ -36,6 +48,9 @@ func _initialize() -> void:
 		quit(2)
 		return
 	var autoloads: Array[String] = _autoload_names()
+	_shared = user_dir_shared(OS.get_environment("XDG_DATA_HOME"), OS.get_user_data_dir())
+	if _shared:
+		print("WARNING: run.gd: user:// (%s) is not under XDG_DATA_HOME (%s, which Godot takes only when absolute): it is shared with every other process, so nothing in it is cleared between files." % [OS.get_user_data_dir(), OS.get_environment("XDG_DATA_HOME")])
 	var failed: int = 0
 	for at in files.size():
 		if at > 0:
@@ -84,10 +99,21 @@ func _fresh_game(autoloads: Array[String]) -> void:
 			child.free()
 	Engine.time_scale = 1.0
 	InputMap.load_from_project_settings()
-	_clear_user_data("user://")
+	if not _shared:
+		_clear_user_data("user://")
 	FreshGame.restart(root)
 	# As at a start: the autoloads' deferred calls run before the first test.
 	await process_frame
+
+
+## True when the data folder `xdg_data_home` (the environment's `XDG_DATA_HOME`; empty: none asked)
+## was asked for and the user dir `user_dir` (`OS.get_user_data_dir()`) is not in it: Godot passed it
+## over (a relative path), and user:// is the one every process shares.
+static func user_dir_shared(xdg_data_home: String, user_dir: String) -> bool:
+	if xdg_data_home == "":
+		return false
+	var home: String = xdg_data_home.simplify_path()
+	return not (user_dir.simplify_path() + "/").begins_with(home.trim_suffix("/") + "/")
 
 
 ## Every file and folder under `folder` of user:// (what an earlier file saved: settings, replays),

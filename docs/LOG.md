@@ -2,15 +2,17 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-<<<<<<< HEAD
+## 2026-11-19: Connected biomes follow-ups: the shop's A, the mist's place, secret sense
+
+Three follow-ups to the connected biomes plan the owner decided on 2026-11-19 (docs/milestones/connected-biomes.md, "Follow-ups done"). **The shop buys with A:** the Rewards area tells each seat the shelf item nearest its standing wizard's feet (`shelf_near_changed`), the HUD shows the item hint over it ("Buy Heal 30 (6)"), and A sends the new command `shelf_buy_requested` (`InputFrame.VERSION` 8, the replay `FORMAT` 14), so the first seat to ask in a tick takes it, from its own wallet; a refused buy (too few coins, no room, a heal while whole) shakes the hint (`shelf_refused`). Walking over an item buys nothing now, so the shelf sells heals (a new line, 30 health for 6 coins). A ground item in reach still comes first, then the shop's item, then the altar and a waiting reward: what the wizard stands at decides what A does. **The mist lies at its room's place:** the rect, its mask and its parting begin where the room's layout stands, the mask of the walls and holes as mirrored there (`PieceShape.laid_walls`), as #851 did for the art. **`secret_sense` shows secret rooms on the Y map:** Rewards tells each seat's run stats by name (`run_stats_told`), and the map view draws, on that player's map only, each secret room within `secret_sense` pixels of a room the party entered, worked out each frame from the party's map, so it saves nothing and is the same on every machine. Also: docs/LOG.md's leftover merge markers from CB13's merge are gone. Tests: `test_rewards.gd`, `test_shop_hint.gd`, `test_mist.gd`, `test_party_map_view.gd`, `test_events.gd`, `test_panels.gd`; `test_content_determinism.gd`'s shop now buys with A.
+
 ## 2026-11-19: Connected biomes CB13: templates
 
 The thirteenth step of the connected biomes plan (docs/milestones/connected-biomes.md, "CB13 done"): the crypt has walkways of both kinds, straight ones every 32 px from 96 to 384 px each way and seven corner (L-shaped) walkways, all on the causeway, with a north-south causeway (`causeway_ns`) whose courses run across the walkway, drawn again from each shape, never turned; a shape's outline may now be a polygon (`points`), in the tool and both of the game's drawings alike. Eight new fight rooms (arena_05 to arena_12, a folder each, each with its landmark and three or four sockets) make twelve fights. Found on the way: the loop style closed almost no loop because the old fight rooms have only two sockets; and a corner's arms must reach past half a room; over 60 loop maps, 0 closed a loop before, 34 now.
-=======
+
 ## 2026-11-19: Connected biomes CB12b: each kind's light and air
 
 A step the owner added to the connected biomes plan (docs/milestones/connected-biomes.md, "CB12b done"; "also tint the room"), view only. A room kind's light now also tints its room: a new `RoomKind.light_tint` says how far the room's dark and every light in it lean toward the kind's light, drawn by the spell light's apply pass by each room's world rectangle (`gameplay/feel/room_tints.gd`, `SpellLight.set_room_tints`), so two rooms in one view and two views of a split screen are each tinted by their own room, bridges never. A tint comes in over 3 frames at 12 fps as the room is entered, and is drawn as it stands after a restore. Each kind may name its own air motes (`RoomKind.air_motes`), given off over its own rooms alone within half the room air's share of the motes' ring (`gameplay/feel/kind_air.gd`). The crypt's nine kinds got their light and air: the boss's and the challenge's fire, the fountain's water, the secret room's void, the spark's gold for the rest, a faint one for fights. Tests: `test_room_tints.gd`; screenshots `shot_room_tints.gd` (one a kind, and two kinds side by side).
->>>>>>> origin/main
 
 ## 2026-11-19: Connected biomes CB11: special rooms
 

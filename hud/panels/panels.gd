@@ -99,7 +99,10 @@ extends CanvasLayer
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
 ##   Enter, never Space, which casts) with no menu open and no lit stone takes it
-##   (`item_take_requested`); the altar's A comes after.
+##   (`item_take_requested`). With no ground item in reach, a shop's item where the wizard stands
+##   (`shelf_near_changed`) is shown the same way, "Buy" and its price, and `take` buys it
+##   (`shelf_buy_requested`; connected biomes CB11's follow-up): what the wizard stands at decides
+##   what A does. The altar's A and a waiting reward's come after.
 ## - The cheat code (`hud/widgets/cheat_code.gd`, node CheatCode, made here; owner, 2026-11-19):
 ##   the word `CheatCode.CODE` typed on the keyboard, or `CheatCode.PAD_CODE` on a gamepad, sends `all_cards_requested` (every card, in
 ##   the hub).
@@ -453,6 +456,9 @@ func poll() -> void:
 						events.run_requested.emit(player)
 				elif take_now and _item_hints.item_of(player) >= 0:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
+				elif take_now and _item_hints.shelf_of(player) >= 0:
+					# A shop's item where the wizard stands: A buys it (connected biomes CB11's follow-up).
+					events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
 				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():

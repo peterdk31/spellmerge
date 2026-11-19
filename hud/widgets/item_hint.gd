@@ -17,8 +17,9 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 
-## What A is called on the hint.
+## What A is called on the hint: a ground item's, and a shop item's (`BUY`, with its price).
 const VERB: String = "Take"
+const BUY: String = "Buy"
 ## The button that takes it (A; F or Enter on the keyboard, never Space, which casts).
 const ACTION: StringName = &"take"
 const FONT_SIZE: int = 8
@@ -72,8 +73,9 @@ func bind(input: InputManagerScript, spells: SpellsScript) -> void:
 	_glyph.bind(input)
 
 
-## Show `view` (the item `item`) for `player`; item -1 or an empty view hides it.
-func show_item(player: int, item: int, view: Dictionary) -> void:
+## Show `view` (the item `item`) for `player`; item -1 or an empty view hides it. `verb` is what A
+## does (VERB, or BUY for a shop's item, whose view's `price` follows its name).
+func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) -> void:
 	_player = player
 	_item = item if not view.is_empty() else -1
 	_view = view if _item >= 0 else {}
@@ -83,7 +85,9 @@ func show_item(player: int, item: int, view: Dictionary) -> void:
 		return
 	if _glyph != null:
 		_glyph.show_action(player, ACTION)
-	_title = "%s %s" % [VERB, String(view.get("name", ""))]
+	_title = "%s %s" % [verb, String(view.get("name", ""))]
+	if view.has("price"):
+		_title += " (%d)" % int(view["price"])
 	_line = tooltip_line(view)
 	_icons.clear()
 	for id: Variant in view.get("cards", []):

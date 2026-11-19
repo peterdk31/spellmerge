@@ -11,7 +11,12 @@ extends CanvasLayer
 ## MAP_CELL world pixels a map pixel, read once from the grid as the biome is laid); each bridge with a
 ## seen room at an end; each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
 ## drawn bridge leads to (their mouth tells it already, `mouth_symbols.gd`); and every wizard, a dot in
-## its hat colour.
+## its hat colour. **A player's own sense** (the run stat `secret_sense`, told for each seat by
+## `run_stats_told`; the owner's answer of 2026-11-19): on that player's map only, each secret
+## room (a kind whose door is `RoomKind.DOOR_SECRET`) not otherwise drawn whose rectangle lies within
+## `secret_sense` pixels of a room the party entered is drawn too, in the stone's shadow as a room only
+## shown. It is worked out each frame from the party's map, the pieces and the seat's stat, so it is
+## the same on every machine and needs nothing of its own saved: per player, and view only.
 ##
 ## **Where:** a frame round the map, centred on the anchor of the player's view (where its wizards are
 ## drawn), as large as fits inside that view's cell EDGE screen pixels in (a convex cell: a rectangle
@@ -74,6 +79,16 @@ var _symbol_shades: Array[PackedColorArray] = []
 var _area: Rect2 = Rect2()
 ## The party's map as told last (`rooms_seen`).
 var _seen: PackedByteArray = PackedByteArray()
+## By place: a secret room (1). By seat: its `secret_sense` (pixels; `run_stats_told`).
+var _secret: PackedByteArray = PackedByteArray()
+var _sense: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+## By seat and place (seat * places + place): a secret room sensed by that seat drawn (0 none, 1 the
+## stone's shadow).
+var _sense_shade: PackedInt32Array = PackedInt32Array()
+## By seat and place: sensed now (1), worked out again only when the party's map, a seat's stat or
+## the biome changes (`_sensed_stale`).
+var _sensed: PackedByteArray = PackedByteArray()
+var _sensed_stale: bool = true
 ## By seat: held now, the opening's stage, its frame (screen pixels) and scale, and where the map's
 ## corner sits in its frame (screen pixels).
 var _held: PackedByteArray = PackedByteArray([0, 0, 0, 0])
@@ -125,10 +140,21 @@ func _init() -> void:
 func bind(events: Node) -> void:
 	if events != null:
 		events.rooms_seen.connect(_on_rooms_seen)
+		events.run_stats_told.connect(_on_run_stats_told)
 
 
 func _on_rooms_seen(seen: PackedByteArray, _again: bool) -> void:
 	_seen = seen
+	_sensed_stale = true
+	if not _any_open():
+		_settle()
+
+
+func _on_run_stats_told(player: int, stats: Dictionary) -> void:
+	if player < 0 or player >= _sense.size():
+		return
+	_sense[player] = float(stats.get(&"secret_sense", 0.0))
+	_sensed_stale = true
 	if not _any_open():
 		_settle()
 
@@ -163,6 +189,33 @@ func shade_of(place: int) -> int:
 
 func symbol_rows_of(place: int) -> int:
 	return _symbol_rows[place] if place >= 0 and place < _symbol_rows.size() else 0
+
+
+## Room `place` as sensed on seat `seat`'s map now (0 not drawn, 1 the stone's shadow; for tests).
+func sense_shade_of(seat: int, place: int) -> int:
+	var at: int = seat * _rects.size() + place
+	return _sense_shade[at] if seat >= 0 and place >= 0 and place < _rects.size() and at < _sense_shade.size() else 0
+
+
+## True when seat `seat`'s own map draws secret room `place`, which the party's map does not, by the
+## seat's `secret_sense`: it lies within that many pixels (rectangle to rectangle) of a room entered.
+func senses(seat: int, place: int) -> bool:
+	if seat < 0 or seat >= _sense.size() or _sense[seat] <= 0.0 or place < 0 or place >= _rects.size():
+		return false
+	if _secret[place] == 0 or draws(place):
+		return false
+	var reach: float = _sense[seat]
+	for room in _rects.size():
+		if _room[room] != 0 and _level(room) >= ENTERED and gap_between(_rects[place], _rects[room]) <= reach:
+			return true
+	return false
+
+
+## The distance between rectangles `a` and `b` (0 when they touch or overlap).
+static func gap_between(a: Rect2, b: Rect2) -> float:
+	var x: float = maxf(0.0, maxf(a.position.x - b.end.x, b.position.x - a.end.x))
+	var y: float = maxf(0.0, maxf(a.position.y - b.end.y, b.position.y - a.end.y))
+	return Vector2(x, y).length()
 
 
 ## How many places the map knows.
@@ -224,6 +277,9 @@ func is_moving() -> bool:
 		for place in _shade.size():
 			if _shade[place] != _shade_wanted(place) or _symbol_rows[place] != _rows_wanted(place):
 				return true
+		for at in _sense_shade.size():
+			if _sense_shade[at] != _sense_wanted(at):
+				return true
 	return false
 
 
@@ -236,6 +292,19 @@ func advance() -> void:
 	for place in _shade.size():
 		_shade[place] += signi(_shade_wanted(place) - _shade[place])
 		_symbol_rows[place] += signi(_rows_wanted(place) - _symbol_rows[place])
+	for at in _sense_shade.size():
+		_sense_shade[at] += signi(_sense_wanted(at) - _sense_shade[at])
+
+
+## The sensed shade wanted at `at` (seat * places + place).
+func _sense_wanted(at: int) -> int:
+	if _sensed_stale:
+		_sensed_stale = false
+		var places: int = _rects.size()
+		_sensed.resize(places * ActorsScript.SEATS)
+		for each in _sensed.size():
+			_sensed[each] = 1 if senses(each / places, each % places) else 0
+	return _sensed[at] if at < _sensed.size() else 0
 
 
 func _stage_wanted(seat: int) -> int:
@@ -266,6 +335,8 @@ func _settle() -> void:
 	for place in _shade.size():
 		_shade[place] = _shade_wanted(place)
 		_symbol_rows[place] = _rows_wanted(place)
+	for at in _sense_shade.size():
+		_sense_shade[at] = _sense_wanted(at)
 
 
 ## Seat `seat` holds the map's button, and no menu of its holds its input (its builder's Y is its own).
@@ -371,10 +442,15 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 	canvas.draw_rect(Rect2(shift + Vector2.ONE, size - Vector2(2, 2)), Palette.OUTLINE)
 	var scale: int = _scale[seat]
 	var origin: Vector2 = _origin[seat] + shift
-	for place in _rects.size():
-		if _shade[place] <= 0:
+	var places: int = _rects.size()
+	for place in places:
+		var shade: int = _shade[place]
+		if shade <= 0 and _sense_shade[seat * places + place] > 0:
+			# A secret room this player senses (`secret_sense`): on their map only.
+			shade = 1
+		if shade <= 0:
 			continue
-		var colour: Color = _stone[_shade[place] - 1]
+		var colour: Color = _stone[shade - 1]
 		var at: Vector2 = origin + ((_rects[place].position - _area.position) / MAP_CELL).floor() * scale
 		var texture: ImageTexture = _floors[place]
 		if texture != null:
@@ -403,6 +479,10 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_symbols.clear()
 	_symbol_shades.clear()
 	_room.resize(places)
+	_secret.resize(places)
+	_sense_shade.resize(places * ActorsScript.SEATS)
+	_sense_shade.fill(0)
+	_sensed_stale = true
 	_shade.resize(places)
 	_symbol_rows.resize(places)
 	_ends.resize(places * 2)
@@ -415,6 +495,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
 		_floors.append(floor_of(grid, place))
 		var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
+		_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
 		_symbols.append(kind.symbol_pixels() if kind != null else PackedByteArray())
 		_symbol_shades.append(KindSymbolScript.shades_of(kind))
 	for place in places:

@@ -128,6 +128,13 @@ signal run_requested(player: int)
 ## it if it still lies in reach and its bag has room; no room says `item_refused`, an item gone
 ## meanwhile (taken by a seat before it in that tick) or out of reach by then says nothing.
 signal item_take_requested(player: int, item: int)
+## Sender: hud. `player` pressed A (`take`, as `item_take_requested`) with no menu open while shop
+## item `item` lay in reach of their own wizard (`shelf_near_changed`; a ground item in reach comes
+## first, the altar and a waiting reward after): buy it (connected biomes CB11, the owner's answer of
+## 2026-11-19). A command: heard by rewards at the next tick's start, which sells it to the first seat
+## (seat order) that still stands at it, can pay and has room; a refused buy says `shelf_refused`, an
+## item gone meanwhile or out of reach by then says nothing.
+signal shelf_buy_requested(player: int, item: int)
 ## Sender: hud. `player` pressed A on page `page` of the boss's intro, written out on their screen
 ## (docs/milestones/boss-intro.md, rule 2): the next page for everyone, or past the last the fight.
 ## Any seat on any machine moves it on (decision 1). A command: heard by flow at the next tick's
@@ -626,6 +633,14 @@ signal coin_changed(coin: int, at: Vector2, lying: bool)
 ## change theirs), or is gone (bought, or the world went). After a snapshot is restored, said again
 ## for every item (and gone for those no longer there). For the view only. Heard by feel.
 signal shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, lying: bool)
+## Sender: rewards. The shop item in reach of seat `player`'s own standing wizard now is `item`,
+## lying at `at`, `view` what it is (`shelf_changed`'s choice, with its `price` for this player), or
+## none (-1, an empty view). Sent when it changes, at a run's start (-1) and after a snapshot is
+## restored. Heard by hud (the hint; A buys it, `shelf_buy_requested`).
+signal shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
+## Sender: rewards. `player` asked to buy shop item `item` and could not: too few coins in their own
+## wallet, no room for it, or a heal while whole. Nothing changed. Heard by hud (the hint's red shake).
+signal shelf_refused(player: int, item: int)
 ## Sender: rewards (connected biomes CB11, decision 20). The fountain of room `room`, its pool at
 ## `area` (world pixels), holds `left` of its `most` healing: as it is filled, as a hurt wizard draws
 ## on it, and after a snapshot is restored; room -1 (the rest empty): every fountain forgotten (the
@@ -635,6 +650,11 @@ signal fountain_changed(room: int, area: Rect2, left: float, most: float)
 ## starting coins come, as anyone takes a coin from the floor (every wallet gains it), as a reward
 ## gives coins and as the player spends. Heard by hud (the corner panel).
 signal wallet_changed(player: int, coins: int)
+## Sender: rewards (connected biomes CB11's follow-up). Seat `player`'s run stats now (`stats`: every
+## `RunStats` row by name, its value for this player: the base, the run's changes, its relics): at a
+## run's start, as the run's changes come (`run_stats_ruled`), as the seat's wizard comes, and after a
+## snapshot is restored. For the view only (a player's own map: `secret_sense`). Heard by feel.
+signal run_stats_told(player: int, stats: Dictionary)
 ## Sender: progression. `unlock_id` was unlocked.
 signal unlock_gained(unlock_id: StringName)
 ## Sender: progression. The balance of `currency_id` is now `amount`.

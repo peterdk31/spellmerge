@@ -32,8 +32,9 @@ extends RefCounted
 ## and `sandbox_spawn_requested` gone with the sandbox, crypt rework CR-S, docs/DECISIONS.md
 ## 2026-11-16, the kinds after them renumbered; 6: `reward_pick_requested` names its offer,
 ## connected biomes CB10; 7: `start_depth_picked` gone with the lectern,
-## connected biomes CB8, the kind after it renumbered).
-const VERSION: int = 7
+## connected biomes CB8, the kind after it renumbered; 8: `shelf_buy_requested` added, a shop's
+## buy by A, connected biomes CB11's follow-up).
+const VERSION: int = 8
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -74,6 +75,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"staff_hand_requested", &"bag_drop_requested",
 	&"boss_intro_next_requested",
 	&"all_cards_requested",
+	&"shelf_buy_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -87,6 +89,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"iii", "ssii",
 	"i",
 	"",
+	"i",
 ]
 
 var seat: int = 0

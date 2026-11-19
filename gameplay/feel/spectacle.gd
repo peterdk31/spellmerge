@@ -187,6 +187,7 @@ var _mist_data: RoomMist = null
 var _room_size: Vector2 = Vector2.ZERO
 var _room_walls: Array[Rect2] = []
 var _room_holes: Array[Rect2] = []
+var _room_at: Vector2 = Vector2.ZERO
 var _feet: PackedVector2Array = PackedVector2Array()
 var _feet_count: int = 0
 ## The pool's material the stirs were last handed to, and their `version` then.
@@ -1106,7 +1107,7 @@ func _fit_mist(at_once: bool) -> void:
 		mist = MistScript.new(MARK_Z)
 		mist.set_share(_mist_share)
 		add_child(mist)
-		mist.lay(_room_size, _room_walls, _room_holes)
+		mist.lay(_room_size, _room_walls, _room_holes, _room_at)
 		mist.use(_mist_data)
 		_keep_mist_last()
 	if mist != null:
@@ -1212,22 +1213,25 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# The mist's room (atmosphere F), read only when the room names a mist.
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null and room.mist != null:
-		# Its walls and holes in the world's pixels, as the grid has them (the mist itself still lies
-		# from the world's origin over the template's size, not yet at a biome room's place).
+		# Its walls and holes in the world's pixels, as the grid has them, mirrored as the room is
+		# placed, and the mist laid over the room where it stands (its node's place: a biome's start
+		# room may stand away from the world's origin).
 		var places: RoomPlaces = RoomPlaces.read(layout_root)
-		lay_mist(places.size, walls, PieceShape.laid_holes(layout_root))
+		var piece := layout_root as Node2D
+		lay_mist(places.size, walls, PieceShape.laid_holes(layout_root), piece.position if piece != null else Vector2.ZERO)
 	else:
 		lay_mist(Vector2.ZERO, [] as Array[Rect2], [] as Array[Rect2])
 
 
-## The room the mist lies in (atmosphere F): its size (px, from the origin), walls and holes (world
-## px); a zero size: none (`room_built` calls this; tests too).
-func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> void:
+## The room the mist lies in (atmosphere F): its size (px), walls and holes (world px) and its place
+## (world px); a zero size: none (`room_built` calls this; tests too).
+func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], at: Vector2 = Vector2.ZERO) -> void:
 	_room_size = size
 	_room_walls = walls
 	_room_holes = holes
+	_room_at = at
 	if mist != null:
-		mist.lay(size, walls, holes)
+		mist.lay(size, walls, holes, at)
 
 
 ## The mist is the last of the children at the marks' z, so it lies over the marks and the shadows.

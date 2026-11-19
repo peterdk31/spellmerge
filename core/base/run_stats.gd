@@ -17,7 +17,8 @@ extends RefCounted
 ## - `start_coins`: the coins in a player's wallet at a run's start (decision 18).
 ## - `price_scale`: what a shop's prices are multiplied by (CB11's shop).
 ## - `map_reveal`: how many rooms past the seen ones the map shows (CB9's map).
-## - `secret_sense`: how far a secret room's crack is sensed, in pixels (CB11).
+## - `secret_sense`: how far from a room the party entered a secret room shows on this player's own
+##   map, in pixels (rectangle to rectangle; CB9's map, the owner's answer of 2026-11-19).
 ## - `fountain_pool`: what a fountain's pool is multiplied by (CB11).
 const ROWS: Dictionary = {
 	&"reward_choices": {"base": 2.0, "low": 1.0, "high": 4.0, "whole": true},
@@ -71,6 +72,14 @@ static func value_of(stat: StringName, run_changes: Array[StatChange] = [], reli
 		value = float(row["base"])
 	value = clampf(value, float(row["low"]), float(row["high"]))
 	return roundf(value) if bool(row["whole"]) else value
+
+
+## Every row's value for one player (`value_of`), by name.
+static func all_of(run_changes: Array[StatChange] = [], relics: Array[Resource] = []) -> Dictionary:
+	var out: Dictionary = {}
+	for stat: StringName in names():
+		out[stat] = value_of(stat, run_changes, relics)
+	return out
 
 
 ## `stat` for one player as a whole number (`value_of`, rounded).

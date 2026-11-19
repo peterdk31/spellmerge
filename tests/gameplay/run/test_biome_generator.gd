@@ -328,7 +328,16 @@ func test_the_crypt_is_made() -> void:
 	check_equal(crypt.biome_problems(content, shapes), PackedStringArray(), "the validator names the crypt makeable")
 	var rules: MapRules = crypt.biomes[0]
 	check(rules.fights_on_way == 4 and rules.styles.size() == 4, "the crypt's fights on the way and styles are decisions 4's and 5's")
+	# Connected biomes CB11: decision 1's fixed kinds are back, and its counts as far as the
+	# templates allow (8 to 12 rooms, a scale depth of 8).
+	check(rules.rooms_min == 8 and rules.rooms_max == 12 and rules.scale_depth == 8, "decision 1's 8 to 12 rooms and a scale depth of 8")
+	var least: Dictionary = {}
+	for rule: KindRule in rules.kinds:
+		least[rule.kind] = rule.least
+	check(least.get(&"reward", 0) == 1 and least.get(&"shop", 0) == 1 and least.get(&"secret", 0) == 1 and least.get(&"fight", 0) == 4 and least.get(&"boss", 0) == 1, "decision 1's fixed kinds: a reward room, a shop, a secret room, 4 fights and the boss: %s" % [least])
 	var styles: Dictionary = {}
+	var chance_kinds: Dictionary = {}
+	var elites: int = 0
 	for seed_value in 24:
 		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
 		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
@@ -338,8 +347,25 @@ func test_the_crypt_is_made() -> void:
 		check_equal(map.room_kinds[0], &"start", "seed %d: the start room first" % seed_value)
 		check(map.room_kinds.has(&"boss"), "seed %d: the boss stands" % seed_value)
 		check(map.rooms() >= rules.rooms_min + 1 and map.rooms() <= rules.rooms_max + 1, "seed %d: %d rooms and the start room" % [seed_value, map.rooms() - 1])
+		for kind: StringName in [&"reward", &"shop", &"secret"]:
+			check(map.room_kinds.has(kind), "seed %d: a %s room (a fixed kind)" % [seed_value, kind])
+		check(map.room_kinds.count(&"fight") >= 4, "seed %d: four fights at least" % seed_value)
+		for kind: StringName in [&"fountain", &"treasure", &"challenge"]:
+			if map.room_kinds.has(kind):
+				chance_kinds[kind] = true
+		if map.room_kinds.count(&"secret") == 2:
+			chance_kinds[&"second secret"] = true
+		for room in map.rooms():
+			for card: StringName in map.elites_of(room):
+				if card != &"":
+					check(rules.elite_cards.has(card), "seed %d: an elite's card is of the biome's list" % seed_value)
+					elites += 1
+			if map.room_kinds[room] == &"challenge":
+				check(not map.enemies_of(room).is_empty() and not map.elites_of(room).has(&""), "seed %d: a challenge room's enemies are all elites" % seed_value)
 		styles[map.style] = true
 	check(styles.size() > 1, "more than one style rolled: %s" % [styles.keys()])
+	check(chance_kinds.size() == 4, "every chance kind stands now and then (a fountain, a treasure room, a challenge room, a second secret): %s" % [chance_kinds.keys()])
+	check(elites > 0, "fight rooms past the elites' depth hold elites now and then")
 
 
 ## A map generated from the crypt's own rooms (the antechamber as the start, the nave a fight, the

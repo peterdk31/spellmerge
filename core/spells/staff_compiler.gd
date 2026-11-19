@@ -53,13 +53,14 @@ func _init(lookup: Callable) -> void:
 
 ## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`, for a body of `spell_scale`
 ## (its stats': every spell's size times it, `Carrier.scale_size`; 1 as the cards say). Cards past
-## `staff.slots` are ignored; an unknown id is wasted.
-func compile(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0) -> CompiledStaff:
+## `staff.slots` (or `slots`, when 0 or more: an elite's staff has one more) are ignored; an unknown id
+## is wasted.
+func compile(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0, slots: int = -1) -> CompiledStaff:
 	_spell_scale = spell_scale if spell_scale > 0.0 else 1.0
 	_out = CompiledStaff.new()
 	_out.staff = staff
 	_out.cards = cards.duplicate()
-	_count = mini(cards.size(), staff.slots if staff != null else cards.size())
+	_count = mini(cards.size(), slots if slots >= 0 else (staff.slots if staff != null else cards.size()))
 	_cards.clear()
 	_useful.clear()
 	var unknown: Dictionary = {}

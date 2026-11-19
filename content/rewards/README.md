@@ -5,12 +5,18 @@ A reward table is what a reward offers its choices from (connected biomes CB10, 
 ## Contract
 
 - A line's `kind` is one of `RewardEntry.KINDS`: `card` (`count` copies of the card `id`, or with no id any card of `content/spells` of at most `max_complexity`, 0 for any) `coins` (`count` coins into the player's own wallet), `heal` (`count` health) or `max_health` (`count` more most health, and as much health). A card upgrade waits for card levels; relics join with M3's relic work: a new kind is a row of `KINDS` and its code in the Rewards area.
-- `weight` is how likely the line is against the table's others (above 0).
+- `weight` is how likely the line is against the table's others (above 0). `price` (connected biomes CB11): what the line costs on a shop's shelf, in coins, before the buyer's `price_scale` run stat (read only by a shelf's table).
 - `RewardTable.problems()` must be empty, and every card a line names must be a card (`tests/content/rewards/test_reward_tables.gd`).
 
 | Table | What rolls from it |
 | --- | --- |
-| `clear` | a room's clear (every fight and the boss); CB11 gives each kind of room its own |
+| `clear` | a fight room's clear (a room kind names its table: `RoomKind.rewards`, connected biomes CB11) |
+| `boss` | the boss's room's clear: better cards, more health |
+| `reward` | a reward room, as the party steps in |
+| `treasure` | a treasure room (behind its key door) |
+| `secret` | a secret room (behind its cracked rock) |
+| `challenge` | a challenge room's clear: the bigger reward of an elite fight |
+| `shelf` | a shop's shelf (`RoomKind.shelf`): one item a spot, never one twice, each at its line's `price` |
 
 ## Allowed files
 

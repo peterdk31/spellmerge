@@ -163,6 +163,10 @@ const PLAYER_SLOTS: int = 4
 const ROOM_FOLDER: StringName = &"rooms"
 ## The room kinds' registry folder (a biome's rooms' kinds: their doors, connected biomes CB7).
 const ROOM_KIND_FOLDER: StringName = &"room_kinds"
+## The registry folder of the spell cards (the elements a secret rock may open to, connected biomes
+## CB11), and the chance's purpose its element is rolled by.
+const SPELLS_FOLDER: StringName = &"spells"
+const SECRET_PURPOSE: StringName = &"secret_element"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
@@ -292,6 +296,8 @@ var life: RoomLife = RoomLife.new()
 ## A biome's gather doors: its gated rooms' doors (a challenge room's, the boss's gate) and the portal
 ## home (connected biomes CB7, `GatherDoors`).
 var gates: GatherDoors = GatherDoors.new()
+## A biome's key doors, secret rocks and keys (connected biomes CB11, `LockDoors`).
+var locks: LockDoors = LockDoors.new()
 var _biome_start: BiomeMap = null
 var _biome_fights: Array[RoomFight] = []
 var _biome_given: bool = false
@@ -343,6 +349,7 @@ func _ready() -> void:
 		frames.set_party_source(_party_now)
 	boss_intro.events = events
 	gates.events = events
+	locks.events = events
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -361,6 +368,7 @@ func _ready() -> void:
 	events.run_room_filled.connect(_on_run_room_filled)
 	events.run_biome_chosen.connect(_on_run_biome_chosen)
 	events.adds_requested.connect(_on_adds_requested)
+	events.floor_touched.connect(_on_floor_touched)
 
 
 ## Advance the intro and the run's end (restart) timer by `delta` seconds; the prop yard; in the hub,
@@ -637,12 +645,12 @@ func _begin_run_of_rooms(players: int) -> RoomBase:
 
 ## The run area's fight of room `room` (`run_room_filled`), kept as a `RoomFight`. Heard only while
 ## Flow asks (`_begin_run_of_rooms`).
-func _on_run_room_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float) -> void:
+func _on_run_room_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float, elites: Array[StringName]) -> void:
 	if not _asking or room < 0:
 		return
 	while _chosen_fights.size() <= room:
 		_chosen_fights.append(null)
-	_chosen_fights[room] = RoomFight.of(enemies, group, refill_at, stagger, scale)
+	_chosen_fights[room] = RoomFight.of(enemies, group, refill_at, stagger, scale, elites)
 
 
 ## The run area's biome map (`run_biome_chosen`; a `BiomeMap`), a copy kept. Heard only while Flow
@@ -1206,11 +1214,12 @@ func stand_all_now() -> void:
 		if not life.has(room, RoomLife.STARTED) or life.has(room, RoomLife.CLEARED):
 			continue
 		var queue: RoomSpawning = life.fights[room].queue
+		var cards: Array[StringName] = queue.cards.duplicate()
 		var ids: Array[StringName] = queue.take_all()
 		if not ids.is_empty():
 			_scale_for(room)
-		for id: StringName in ids:
-			_stand_queued(id, biome.room_places(room), queue, room)
+		for at in ids.size():
+			_stand_queued(ids[at], biome.room_places(room), queue, room, cards[at] if at < cards.size() else &"")
 		_check_biome_room(room)
 
 
@@ -1218,7 +1227,8 @@ func stand_all_now() -> void:
 ## farthest from every standing wizard first, none over a hole nor within `RoomSpawning.NEAR` of a
 ## wizard), stacked where one is used again and moved to the nearest clear ground. An id with no
 ## enemy, or a room with no spawns, stands nothing: it is dropped (it was taken off the queue).
-func _stand_queued(id: StringName, places: RoomPlaces, queue: RoomSpawning, room: int) -> void:
+## `elite_card`: an elite's card (connected biomes CB11; empty: no elite).
+func _stand_queued(id: StringName, places: RoomPlaces, queue: RoomSpawning, room: int, elite_card: StringName = &"") -> void:
 	var data: EnemyBase = _enemy_data_of(id)
 	var spawns: PackedVector2Array = places.enemy_spawns
 	if data == null or data.scene == null or spawns.is_empty():
@@ -1233,7 +1243,7 @@ func _stand_queued(id: StringName, places: RoomPlaces, queue: RoomSpawning, room
 		# A body stacked beside its spawn may reach a wall or a hole's edge: the nearest clear ground
 		# (the spot itself when it is clear; hub rework HR-H2).
 		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), radius))
-	_stand_enemy(world, data, at, true)
+	_stand_enemy(world, data, at, true, elite_card)
 
 
 ## What the room's enemies standing or spawning cost together (`EnemyBase.cost`): how busy the room is
@@ -1282,11 +1292,14 @@ func _enemy_data_of(enemy_id: StringName) -> EnemyBase:
 ## room, run generation RG5), both before its data is applied. With `spawn_in` it spawns in (enemy
 ## spawning EA3: `Actor.spawn`, set before it enters the tree, so its hurt shape is never registered
 ## while it spawns in), in the style `spawn_style_for` picks. Null when no body could be made.
-func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool = false) -> Actor:
+func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool = false, elite_card: StringName = &"") -> Actor:
 	var enemy := RoomContents.make_body(data) as Actor
 	if enemy == null:
 		return null
 	enemy.position = at
+	# An elite (connected biomes CB11, decision 24): its card and its look are the body's, its health
+	# Difficulty's (it hears `enemy_standing`).
+	enemy.elite_card = elite_card
 	enemy.players = _players_in_play()
 	if spawn_in:
 		var style: SpawnStyle = spawn_style_for(data)
@@ -1444,6 +1457,7 @@ func _clear_run() -> void:
 	biome.clear()
 	life.clear()
 	gates.clear()
+	locks.clear()
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
@@ -1521,6 +1535,7 @@ func _lay_biome(into: Node2D) -> bool:
 	_places = biome.room_places(EventsScript.FIRST_ROOM)
 	life.begin(biome.map.rooms(), biome.places(), _biome_fights)
 	_begin_gates(biome.map)
+	_begin_locks(biome.map)
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 		_add_camera_over(into, biome.area())
@@ -1544,6 +1559,61 @@ func _begin_gates(map: BiomeMap) -> void:
 		homes[room] = 1 if kind != null and kind.portal_home else 0
 	gates.begin(map, rules, homes)
 	gates.lay(biome, projectiles.grid() if projectiles != null else null)
+
+
+## The biome's key doors and secret rocks begin from its rooms' kinds (`RoomKind.DOOR_KEY`,
+## `DOOR_SECRET`; connected biomes CB11), each secret room's element rolled by the run's chance from
+## the elements there are (purpose `SECRET_PURPOSE`, keyed by the room), laid into the grid shut and
+## told to the view.
+func _begin_locks(map: BiomeMap) -> void:
+	var rules := PackedByteArray()
+	var elements: Array[StringName] = []
+	rules.resize(map.rooms())
+	var choices: Array[StringName] = _element_ids()
+	var game: Sim = Sim.found(self)
+	for room in map.rooms():
+		var kind: RoomKind = _kind_of(room)
+		rules[room] = LockDoors.RULE_NONE
+		var element: StringName = &""
+		if kind != null and kind.door == RoomKind.DOOR_KEY:
+			rules[room] = LockDoors.RULE_KEY
+		elif kind != null and kind.door == RoomKind.DOOR_SECRET:
+			rules[room] = LockDoors.RULE_SECRET
+			if not choices.is_empty() and game != null:
+				element = choices[game.chance_int(SECRET_PURPOSE, room, 0, choices.size())]
+		elements.append(element)
+	locks.begin(map, rules, elements)
+	locks.lay(biome, projectiles.grid() if projectiles != null else null)
+	locks.tell_all()
+
+
+## The ids of every element card the registry has (`ElementBase`), in id order: what a secret rock
+## may open to.
+func _element_ids() -> Array[StringName]:
+	var found: Array[StringName] = []
+	if registry == null:
+		return found
+	for resource: Resource in registry.get_all(SPELLS_FOLDER):
+		var element := resource as ElementBase
+		if element != null and element.id != &"":
+			found.append(element.id)
+	found.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	return found
+
+
+## The kind of the biome's room `room` (`RoomKind`, from the registry), or null.
+func _kind_of(room: int) -> RoomKind:
+	if registry == null or biome.map == null or room < 0 or room >= biome.map.rooms() or biome.map.room_kinds[room] == &"":
+		return null
+	return registry.get_resource(ROOM_KIND_FOLDER, biome.map.room_kinds[room]) as RoomKind
+
+
+## An element touched the floor (`floor_touched`, connected biomes CB11): a secret rock of that
+## element near it breaks open.
+func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
+	if mode != MODE_RUN or state != State.RUNNING or locks.doors() == 0 or world == null:
+		return
+	locks.touched(element, world.to_local(at), radius, projectiles.grid() if projectiles != null else null)
 
 
 ## A piece of the biome was laid (`BiomeWorld.built`): `room_built` for it.
@@ -1581,7 +1651,7 @@ func _step_biome(delta: float) -> bool:
 		actor.find_room()
 		# A wizard standing (a downed one crawling in starts nothing).
 		# A gated room is entered only once it opened (its lip outside the shut door is its place).
-		if not actor.is_down() and actor.room >= 0 and actor.room < life.rooms() and not life.has(actor.room, RoomLife.ENTERED) and gates.is_open(actor.room):
+		if not actor.is_down() and actor.room >= 0 and actor.room < life.rooms() and not life.has(actor.room, RoomLife.ENTERED) and gates.is_open(actor.room) and locks.is_open(actor.room):
 			_enter_biome_room(actor.room)
 	for room in life.rooms():
 		if life.has(room, RoomLife.STARTED) and not life.has(room, RoomLife.CLEARED):
@@ -1591,6 +1661,7 @@ func _step_biome(delta: float) -> bool:
 	var gated: int = gates.count_doors(_wizards, life)
 	if gated != GatherDoors.NONE:
 		_open_gate(gated)
+	locks.step(_wizards, life, projectiles.grid() if projectiles != null else null)
 	if gates.count_portal(_wizards):
 		_take_portal_home()
 		return true
@@ -1646,6 +1717,7 @@ func _enter_biome_room(room: int) -> void:
 			push_warning("Flow: the room's bodies: %s" % problem)
 	if events != null:
 		events.room_entered.emit(biome.map.room_templates[room], room)
+	_open_special_room(room)
 	var fight: RoomFight = life.fights[room]
 	if not fight.has_enemies():
 		_clear_biome_room(room)
@@ -1658,9 +1730,11 @@ func _enter_biome_room(room: int) -> void:
 	var places: RoomPlaces = biome.room_places(room)
 	var queued: Array[StringName] = []
 	var queued_costs := PackedInt32Array()
+	var queued_cards: Array[StringName] = []
 	var bosses: int = 0
 	var stood: Array[Node] = []
-	for id: StringName in fight.enemies:
+	for at in fight.enemies.size():
+		var id: StringName = fight.enemies[at]
 		var data: EnemyBase = _enemy_data_of(id)
 		if data == null or data.scene == null or places.enemy_spawns.is_empty():
 			push_warning("Flow: the biome's room %d cannot stand '%s', so it is dropped." % [room, id])
@@ -1674,7 +1748,8 @@ func _enter_biome_room(room: int) -> void:
 		else:
 			queued.append(id)
 			queued_costs.append(data.cost)
-	fight.queue.begin(queued, queued_costs, fight.group, fight.refill_at, fight.stagger)
+			queued_cards.append(fight.elite_of(at))
+	fight.queue.begin(queued, queued_costs, fight.group, fight.refill_at, fight.stagger, queued_cards)
 	_call_room_spawning(room, 0.0)
 	if events != null:
 		for wizard: Node2D in _wizards:
@@ -1708,7 +1783,7 @@ func _call_room_spawning(room: int, delta: float) -> void:
 	if id != &"":
 		_scale_for(room)
 	while id != &"":
-		_stand_queued(id, places, queue, room)
+		_stand_queued(id, places, queue, room, queue.card)
 		id = queue.next(0.0, _standing_cost(room))
 
 
@@ -1739,10 +1814,46 @@ func _clear_biome_room(room: int) -> void:
 	life.set_flag(room, RoomLife.SEALED, false)
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
+	var kind: RoomKind = _kind_of(room)
 	if events != null:
 		events.room_cleared.emit(biome.map.room_templates[room], room)
+		if kind != null and kind.rewards != &"":
+			# Each player's reward (connected biomes CB11): however its foes left it.
+			events.room_rewards_due.emit(room, kind.rewards)
+	_drop_keys(room)
 	if gates.opens_home(room):
 		_open_portal_home(room)
+
+
+## Room `room` of a special fill (a shop, a fountain; connected biomes CB11) is entered for the first
+## time: the Rewards area is told where its shelf or its pool is (`special_room_opened`).
+func _open_special_room(room: int) -> void:
+	var kind: RoomKind = _kind_of(room)
+	if kind == null or events == null or (kind.fill != RoomKind.FILL_SHOP and kind.fill != RoomKind.FILL_FOUNTAIN):
+		return
+	var places: RoomPlaces = biome.room_places(room)
+	var middle: Vector2 = biome.room_rect(room).get_center()
+	var spots := PackedVector2Array()
+	var pool := Rect2()
+	if kind.fill == RoomKind.FILL_SHOP:
+		spots = SpecialPlaces.shelf(places, middle)
+	else:
+		pool = SpecialPlaces.pool(places, middle)
+	events.special_room_opened.emit(room, kind.fill, kind.shelf, pool, spots)
+
+
+## Room `room` was cleared: each key that drops in it lies at its zone `key`, else its middle, on the
+## nearest clear ground (connected biomes CB11).
+func _drop_keys(room: int) -> void:
+	var drops: bool = false
+	for key in locks.key_drops.size():
+		drops = drops or locks.key_drops[key] == room
+	if not drops:
+		return
+	var at: Vector2 = SpecialPlaces.key_spot(biome.room_places(room), biome.room_rect(room).get_center())
+	if projectiles != null and world != null:
+		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), PORTAL_GROUND * 0.5))
+	locks.drop_keys(room, at)
 
 
 ## Room `room`, cleared, opens the portal home on its floor (connected biomes CB7): at its zone
@@ -1785,4 +1896,6 @@ func _rebuild_biome() -> void:
 		life.tell_seals(projectiles.grid())
 		life.tell_awake(projectiles.grid())
 		gates.lay(biome, projectiles.grid())
+		locks.lay(biome, projectiles.grid())
 	gates.tell_all(_wizards, life)
+	locks.tell_all()

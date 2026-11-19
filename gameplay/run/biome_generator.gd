@@ -24,7 +24,14 @@ extends RefCounted
 ##    bridge's ends meet, each kept only where the rules still hold (the boss still deepest, fights
 ##    enough on every way to it, every kind at a depth it takes).
 ## 6. **The fill:** each room's scale (`RunDefinition.biome_room_scale`: its depth, the run's
-##    players) and a fight's enemies bought by its scaled budget, the boss's one boss (`RoomFill`).
+##    players) and a fight's enemies bought by its scaled budget, the boss's one boss (`RoomFill`);
+##    its elites (connected biomes CB11, decision 24): a fight room from `MapRules.elite_depth` on is
+##    an elite room by `elite_chance` (its first enemy an elite), a challenge room's
+##    (`RoomKind.FILL_ELITES`) every enemy, each elite one card of `elite_cards` by chance.
+##
+## A line with no limit (the fights) fills the rooms past the fixed and chance ones only while a
+## template is left to host it (a template stands once a biome), so the count rolled is the most
+## the content allows (CB11: four fight templates in the crypt until CB13 brings more).
 ##
 ## **Placing a room** (decisions 2 and 6): over a free socket of the room it hangs off, a bridge
 ## (a walkway of the biome, straight or a corner, any mirroring whose end faces the socket), and at the bridge's far end
@@ -207,7 +214,7 @@ static func _fills_at(rules: MapRules, content: RunContent, rule: KindRule, dept
 	if rule.stands_deepest() != (depth == end_depth) or not rule.takes_row(depth, end_depth + 1):
 		return false
 	match content.kind(rule.kind).fill:
-		RoomKind.FILL_ENEMIES:
+		RoomKind.FILL_ENEMIES, RoomKind.FILL_ELITES:
 			return not content.enemy_pool(rules.biome, depth).is_empty()
 		RoomKind.FILL_BOSS:
 			return not content.boss_pool(rules.biome, depth).is_empty()
@@ -247,13 +254,23 @@ static func _fill(map: BiomeMap, definition: RunDefinition, rules: MapRules, con
 		var depth: int = map.depths[room]
 		var scale: float = definition.biome_room_scale(rules, depth, players)
 		var enemies: Array[StringName] = []
-		match content.kind(map.room_kinds[room]).fill:
-			RoomKind.FILL_ENEMIES:
+		var elites: int = 0
+		var fill: StringName = content.kind(map.room_kinds[room]).fill
+		match fill:
+			RoomKind.FILL_ENEMIES, RoomKind.FILL_ELITES:
 				enemies = RoomFill.spend(content.enemy_pool(rules.biome, depth), RunScaling.scaled_budget(rules.room_budget, scale), dice, Step.FILL)
+				if fill == RoomKind.FILL_ELITES:
+					elites = enemies.size()
+				elif rules.elite_depth >= 0 and depth >= rules.elite_depth and dice.roll(Step.FILL) < rules.elite_chance:
+					elites = 1
 			RoomKind.FILL_BOSS:
 				var bosses: Array[EnemyBase] = content.boss_pool(rules.biome, depth)
 				enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
-		map.fill_room(room, scale, enemies)
+		var cards: Array[StringName] = []
+		if elites > 0 and not rules.elite_cards.is_empty():
+			for at in enemies.size():
+				cards.append(rules.elite_cards[dice.below(Step.FILL, rules.elite_cards.size())] if at < elites else &"")
+		map.fill_room(room, scale, enemies, cards)
 
 
 ## One attempt's map as it grows (steps 1 to 5): a generator's scratch, never state.
@@ -392,12 +409,22 @@ class Growth:
 					pool.append(rule)
 		var fillers: Array[KindRule] = []
 		var weights := PackedFloat32Array()
+		# A filler takes no more rooms than templates host it (a template stands once a biome).
+		var room_left := PackedInt32Array()
 		for rule: KindRule in lines:
-			if rule != end_line and rule.max_per_run == 0:
+			var left: int = rules.biome_templates(content, shapes, rule.kind, 1).size() - pool.count(rule)
+			if rule != end_line and rule.max_per_run == 0 and left > 0:
 				fillers.append(rule)
 				weights.append(rule.weight)
+				room_left.append(left)
 		while pool.size() + 1 < count and not fillers.is_empty():
-			pool.append(fillers[dice.pick(Step.KINDS, weights)])
+			var at: int = dice.pick(Step.KINDS, weights)
+			pool.append(fillers[at])
+			room_left[at] -= 1
+			if room_left[at] <= 0:
+				fillers.remove_at(at)
+				weights.remove_at(at)
+				room_left.remove_at(at)
 		return pool
 
 	# --- Step 3: the way -----------------------------------------------------------------------

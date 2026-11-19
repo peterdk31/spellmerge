@@ -37,7 +37,7 @@ func _init() -> void:
 		_first.append(&"")
 
 
-func compile_staff(cards: Array[StringName], staff: StaffBase, _spell_scale: float = 1.0) -> CompiledStaff:
+func compile_staff(cards: Array[StringName], staff: StaffBase, _spell_scale: float = 1.0, _slots: int = -1) -> CompiledStaff:
 	var out := CompiledStaff.new()
 	out.staff = staff
 	out.cards = cards.duplicate()

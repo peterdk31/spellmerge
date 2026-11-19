@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "path": "art/grounds/crypt_bridge_v192/crypt_bridge_v192_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt's north-south bridge's floor (192 px, connected biomes CB11), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v192.shape.json: a 64 px band of the causeway's narrow dressed stones (content/grounds/causeway) running north to south across the dark, its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/crypt_bridge_v192/crypt_bridge_v192_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt's north-south bridge's underside (192 px, connected biomes CB11), drawn by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v192.shape.json: the rock of the walkway hanging into the dark under its south end, in the crypt edge's shades (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/crypt_bridge_v192/crypt_bridge_v192_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crypt's north-south bridge's edge glow (192 px, connected biomes CB11), drawn at half size by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v192.shape.json: the crypt edge's faint glow along the walkway's sides, added over what lies below it."
+    }
+  ]
+}

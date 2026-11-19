@@ -20,8 +20,10 @@ const TRIES_A_ROLL: int = TRIES * MOST
 
 ## Fill `offer` with up to `count` choices from `table` for seat `seat`'s roll number `roll`,
 ## `cards` being the card ids a line of any card may give, each with its complexity
-## (`complexities`, by the same index), in id order.
-static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, seat: int, roll: int, cards: Array[StringName], complexities: PackedInt32Array) -> void:
+## (`complexities`, by the same index), in id order. `purpose` and `card_purpose`: the chance's (a
+## shop's shelf rolls under its own, keyed by its room in place of a seat; connected biomes CB11).
+## Each choice's line is in `lines`, when given, by the same index (a shelf's prices).
+static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, seat: int, roll: int, cards: Array[StringName], complexities: PackedInt32Array, purpose: StringName = PURPOSE, card_purpose: StringName = CARD_PURPOSE, lines: Array[RewardEntry] = []) -> void:
 	if table == null or sim == null:
 		return
 	var total: float = table.total_weight()
@@ -31,7 +33,7 @@ static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, s
 	for choice in mini(count, MOST):
 		for attempt in TRIES:
 			var counter: int = roll * TRIES_A_ROLL + choice * TRIES + attempt
-			var entry: RewardEntry = _line(table, total, sim.chance(PURPOSE, seat, counter))
+			var entry: RewardEntry = _line(table, total, sim.chance(purpose, seat, counter))
 			if entry == null:
 				continue
 			var id: StringName = entry.id
@@ -42,9 +44,10 @@ static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, s
 						allowed.append(cards[at])
 				if allowed.is_empty():
 					continue
-				id = allowed[sim.chance_int(CARD_PURPOSE, seat, counter, allowed.size())]
+				id = allowed[sim.chance_int(card_purpose, seat, counter, allowed.size())]
 			if not offer.offers(entry.kind, id, entry.count):
 				offer.add(entry.kind, id, entry.count)
+				lines.append(entry)
 				break
 
 

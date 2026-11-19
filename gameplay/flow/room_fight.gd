@@ -13,13 +13,18 @@ var group: int = 0
 var refill_at: int = 0
 var stagger: float = 0.0
 var scale: float = 0.0
+## Each enemy's elite card by the same index as `enemies` (connected biomes CB11; empty: no elite,
+## a short list: none past its end).
+var elites: Array[StringName] = []
 var queue: RoomSpawning = RoomSpawning.new()
 
 
-## A fight of `ids` (one a body), at the pace given and scaled by `room_scale` (0: unscaled).
-static func of(ids: Array[StringName], group_cost: int = 0, refill_cost: int = 0, seconds_apart: float = 0.0, room_scale: float = 0.0) -> RoomFight:
+## A fight of `ids` (one a body), at the pace given and scaled by `room_scale` (0: unscaled), the
+## elites' cards `elite_cards` by the same index.
+static func of(ids: Array[StringName], group_cost: int = 0, refill_cost: int = 0, seconds_apart: float = 0.0, room_scale: float = 0.0, elite_cards: Array[StringName] = []) -> RoomFight:
 	var fight := RoomFight.new()
 	fight.enemies = ids.duplicate()
+	fight.elites = elite_cards.duplicate()
 	fight.group = group_cost
 	fight.refill_at = refill_cost
 	fight.stagger = seconds_apart
@@ -34,4 +39,9 @@ func has_enemies() -> bool:
 
 ## A copy as it was given (its queue not begun), for a run started again.
 func fresh() -> RoomFight:
-	return of(enemies, group, refill_at, stagger, scale)
+	return of(enemies, group, refill_at, stagger, scale, elites)
+
+
+## The elite card of the fight's enemy `at` (empty: no elite).
+func elite_of(at: int) -> StringName:
+	return elites[at] if at >= 0 and at < elites.size() else &""

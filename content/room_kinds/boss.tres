@@ -8,6 +8,7 @@ id = &"boss"
 display_name = "Boss"
 fill = &"boss"
 ends = &"enemies_down"
+rewards = &"boss"
 door = &"gate"
 portal_home = true
 light = &"fire"

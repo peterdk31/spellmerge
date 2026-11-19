@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RunDefinition" load_steps=19 format=3]
+[gd_resource type="Resource" script_class="RunDefinition" load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://core/base/run_definition.gd" id="1_run"]
 [ext_resource type="Script" path="res://core/base/map_rules.gd" id="2_rules"]
@@ -22,6 +22,58 @@ first_row = -1
 last_row = -1
 max_per_run = 1
 least = 1
+dead_end = true
+
+[sub_resource type="Resource" id="reward"]
+script = ExtResource("3_kind")
+kind = &"reward"
+first_row = 1
+last_row = -2
+max_per_run = 1
+least = 1
+
+[sub_resource type="Resource" id="shop"]
+script = ExtResource("3_kind")
+kind = &"shop"
+first_row = 1
+last_row = -2
+max_per_run = 1
+least = 1
+
+[sub_resource type="Resource" id="secret"]
+script = ExtResource("3_kind")
+kind = &"secret"
+first_row = 1
+last_row = -2
+max_per_run = 2
+least = 1
+chance = 0.5
+dead_end = true
+
+[sub_resource type="Resource" id="fountain"]
+script = ExtResource("3_kind")
+kind = &"fountain"
+first_row = 1
+last_row = -2
+max_per_run = 1
+chance = 0.5
+
+[sub_resource type="Resource" id="treasure"]
+script = ExtResource("3_kind")
+kind = &"treasure"
+first_row = 2
+last_row = -2
+max_per_run = 1
+chance = 0.5
+dead_end = true
+
+[sub_resource type="Resource" id="challenge"]
+script = ExtResource("3_kind")
+kind = &"challenge"
+first_row = 2
+last_row = -2
+max_per_run = 1
+chance = 0.4
 dead_end = true
 
 [sub_resource type="Resource" id="spawning"]
@@ -62,12 +114,15 @@ script = ExtResource("2_rules")
 biome = &"crypt"
 room_budget = 16
 spawning = SubResource("spawning")
-kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
-rooms_min = 5
-rooms_max = 5
+kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss"), SubResource("reward"), SubResource("shop"), SubResource("secret"), SubResource("fountain"), SubResource("treasure"), SubResource("challenge")])
+rooms_min = 8
+rooms_max = 12
 start_kind = &"start"
 fights_on_way = 4
-scale_depth = 5
+scale_depth = 8
+elite_depth = 3
+elite_chance = 0.25
+elite_cards = Array[StringName]([&"faster", &"bigger", &"pierce", &"homing"])
 styles = Array[ExtResource("7_style")]([SubResource("style_long"), SubResource("style_branching"), SubResource("style_loop"), SubResource("style_hub")])
 
 [sub_resource type="Resource" id="per_depth"]

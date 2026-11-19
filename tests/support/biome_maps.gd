@@ -19,9 +19,10 @@ static func walk_through(registry: Object) -> BiomeMap:
 
 ## CB3's split map: the nave the start room (room 0), the antechamber west of it (room 1) and the
 ## ossuary court east of it (room 2), each joined to the nave by a bridge, so a party can split to two
-## fights at once. `mirrors`: the antechamber's, the nave's and the court's mirrorings.
-static func split(registry: Object, mirrors: Array[int] = [0, 0, 0]) -> BiomeMap:
-	var row: BiomeMap = _row(registry, [FIRST, MIDDLE, LAST] as Array[StringName], mirrors)
+## fights at once. `mirrors`: the antechamber's, the nave's and the court's mirrorings. `templates`:
+## other rooms in their places, west, middle (the start room) and east (connected biomes CB11).
+static func split(registry: Object, mirrors: Array[int] = [0, 0, 0], templates: Array[StringName] = [FIRST, MIDDLE, LAST]) -> BiomeMap:
+	var row: BiomeMap = _row(registry, templates, mirrors)
 	var map := BiomeMap.new()
 	map.biome = row.biome
 	# The row's room 1 (the nave) first, then its rooms 0 and 2.

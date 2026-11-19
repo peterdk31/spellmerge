@@ -44,7 +44,7 @@ func after_each() -> void:
 	tick.begin_run()
 
 
-func _on_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float) -> void:
+func _on_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float, _elites: Array[StringName]) -> void:
 	answers.append([&"filled", room, enemies.duplicate(), scale, group, refill_at, stagger])
 
 

@@ -93,13 +93,11 @@ func _foe_dies(at: Vector2, room: int = RoomGrid.NO_PLACE) -> void:
 	foe.free()
 
 
-## Room `room` fought (a foe with no coins died in it) and cleared, then a step rolls for it.
-func _clear(room: int, place: int = RoomGrid.NO_PLACE) -> void:
-	var foe := Actor.new()
-	foe.room = place
-	_world.bus.enemy_died.emit(0, foe, Vector2.ZERO, -1)
-	foe.free()
+## Room `room` cleared, its kind rewarding it from `table` (Flow's `room_rewards_due`), then a step
+## rolls for it.
+func _clear(room: int, table: StringName = &"clear") -> void:
 	_world.bus.room_cleared.emit(&"test_room", room)
+	_world.bus.room_rewards_due.emit(room, table)
 	_rewards.step(Fixture.STEP)
 
 
@@ -122,19 +120,33 @@ func test_a_clear_rolls_each_players_own_offer_of_two() -> void:
 	check(_rewards.waiting_of(2).is_empty(), "a seat with no wizard rolls nothing")
 
 
-func test_a_clear_with_no_fight_rolls_nothing() -> void:
+func test_only_a_clear_its_kind_rewards_rolls_and_from_its_own_table() -> void:
 	_wizard(0)
 	_world.bus.room_cleared.emit(&"start_room", 0)
+	_rewards.step(Fixture.STEP)
+	check(_rolled.is_empty(), "a clear whose kind names no table (the start room, a shop) rewards nobody")
+	# Connected biomes CB11 (the owner, 2026-11-19): however its foes left it (one killed elsewhere,
+	# none dying in it at all), a fight's clear rolls.
+	_foe_dies(Vector2(500, 500), 2)
+	_world.bus.room_rewards_due.emit(1, &"clear")
 	check(_rolled.is_empty(), "not before the area's step")
 	_rewards.step(Fixture.STEP)
-	check(_rolled.is_empty(), "the start room, cleared with no foe dying in it, rewards nobody")
-	_foe_dies(Vector2(500, 500), 2)
-	_world.bus.room_cleared.emit(&"start_room", 1)
+	check_equal(_rolled.size(), 1, "a fight's clear rolls whoever its foes died by and wherever")
+	# Each kind rolls from its own table: the treasure's never offers what only the clear's has.
+	var treasure := registry_table(&"treasure")
+	_world.bus.room_rewards_due.emit(4, &"treasure")
 	_rewards.step(Fixture.STEP)
-	check(_rolled.is_empty(), "nor a room whose foes died elsewhere")
-	_world.bus.room_cleared.emit(&"fight", 2)
-	_rewards.step(Fixture.STEP)
-	check_equal(_rolled.size(), 1, "the room fought in does")
+	check_equal(_rolled.size(), 2, "a treasure room's clear rolls too")
+	for choice: Dictionary in _rolled[1][2]:
+		var listed: bool = false
+		for entry: RewardEntry in treasure.entries:
+			listed = listed or (entry.kind == choice["kind"] and entry.count == choice["count"])
+		check(listed, "each choice is a line of the treasure's own table: %s" % [choice])
+
+
+## The reward table `id` of the registry.
+func registry_table(id: StringName) -> RewardTable:
+	return _world.registry.get_resource(&"rewards", id) as RewardTable
 
 
 func test_a_player_who_was_not_there_finds_it_waiting() -> void:
@@ -142,7 +154,7 @@ func test_a_player_who_was_not_there_finds_it_waiting() -> void:
 	away.room = 3
 	var there := _wizard(1)
 	there.room = 1
-	_clear(1, 1)
+	_clear(1)
 	check_equal([_rolled[0][0], _rolled[0][3]], [0, false], "the player elsewhere still gets an offer, not there (rule 4)")
 	check_equal([_rolled[1][0], _rolled[1][3]], [1, true], "the one in the room is there")
 	check_equal(_rewards.waiting_of(0)[0]["here"], false, "its waiting offer says so")
@@ -354,8 +366,10 @@ func test_a_new_world_clears_the_coins_and_a_run_start_everything() -> void:
 	_rewards.lay_coin(Vector2(80, 0))
 	_world.bus.room_entered.emit(&"later", 3)
 	check_equal(_rewards.coins_lying().size(), 1, "a biome's later room keeps the floor")
+	_world.bus.special_room_opened.emit(5, RoomKind.FILL_SHOP, &"shelf", Rect2(), PackedVector2Array([Vector2(300, 0)]))
 	_world.bus.room_entered.emit(&"next_world", EventsScript.FIRST_ROOM)
 	check(_rewards.coins_lying().is_empty(), "a new world has none")
+	check(_rewards.shelf().is_empty(), "nor a shelf")
 	_clear(0)
 	_rewards.lay_coin(Vector2(80, 0))
 	_rewards.begin_run()
@@ -378,3 +392,106 @@ func test_a_restore_says_it_all_again() -> void:
 	check(_coins.has([kept, true]), "every coin lying is said")
 	check(_wallets.has([0, 0]), "every wallet is said")
 	check(waiting.has([0, 1]), "every seat's waiting offers are said")
+
+
+# --- Connected biomes CB11: shops and fountains --------------------------------------------------
+
+## A shop opened in room `room` with its shelf at `spots` (Flow's `special_room_opened`).
+func _open_shop(room: int, spots: PackedVector2Array) -> void:
+	_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
+
+
+## Seat `seat`'s wallet given `coins` (a run's starting coins).
+func _fund(coins: int) -> void:
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_coins", float(coins))] as Array[StatChange])
+	_tick()
+
+
+func test_a_shops_shelf_is_one_of_each_and_the_first_buyer_takes_it() -> void:
+	var shelf: Array = []
+	_world.bus.shelf_changed.connect(func(item: int, _at: Vector2, choice: Dictionary, price: int, lying: bool) -> void: shelf.append([item, choice.get("kind", &""), price, lying]))
+	var one := _wizard(0, Vector2(-200, 0))
+	var two := _wizard(1, Vector2(-200, 60))
+	_fund(30)
+	_open_shop(3, PackedVector2Array([Vector2(0, 0), Vector2(48, 0), Vector2(96, 0)]))
+	var items: Array[Dictionary] = _rewards.shelf()
+	check_equal(items.size(), 3, "an item a spot")
+	var seen: Dictionary = {}
+	for item: Dictionary in items:
+		var choice: Dictionary = item["choice"]
+		seen["%s|%s|%s" % [choice["kind"], choice["id"], choice["count"]]] = true
+		check(int(item["price"]) > 0, "each has a price")
+	check_equal(seen.size(), 3, "one of each: no item twice")
+	check_equal(shelf.size(), 3, "each told to the view")
+	_open_shop(3, PackedVector2Array([Vector2(0, 0)]))
+	check_equal(_rewards.shelf().size(), 3, "a shop is stocked once: it keeps its shelf")
+	# Both step onto the first item at once: the first seat buys it, and only it pays.
+	var price: int = int(items[0]["price"])
+	one.position = items[0]["at"]
+	two.position = items[0]["at"]
+	_tick()
+	check_equal(_rewards.shelf().size(), 2, "bought: gone from the shelf for everyone")
+	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [30 - price, 30], "the buyer pays from their own wallet")
+	check(shelf.back()[3] == false and shelf.back()[0] == items[0]["number"], "the view is told it went")
+
+
+func test_a_wizard_who_cannot_pay_buys_nothing_and_prices_follow_the_players_scale() -> void:
+	var one := _wizard(0, Vector2(-200, 0))
+	_fund(1)
+	_open_shop(4, PackedVector2Array([Vector2(0, 0)]))
+	var item: Dictionary = _rewards.shelf()[0]
+	one.position = item["at"]
+	_tick()
+	check_equal(_rewards.shelf().size(), 1, "too few coins: it stays")
+	check_equal(_rewards.wallet_of(0), 1, "nothing spent")
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"price_scale", 0.5, StatChange.How.TIMES)] as Array[StatChange])
+	check_equal(_rewards.price_for(0, item["number"]), maxi(roundi(float(item["price"]) * 0.5), 1), "a player's price is the price times their price_scale")
+
+
+func test_a_fountain_is_a_shared_pool_every_hurt_wizard_draws_on() -> void:
+	var one := _wizard(0, Vector2(-200, 0))
+	var two := _wizard(1, Vector2(-200, 60))
+	var told: Array = []
+	_world.bus.fountain_changed.connect(func(room: int, _area: Rect2, left: float, most: float) -> void: told.append([room, left, most]))
+	_world.bus.special_room_opened.emit(6, RoomKind.FILL_FOUNTAIN, &"", Rect2(0, 0, 64, 48), PackedVector2Array())
+	var most: float = _rewards.pool_left(6)
+	check_equal(most, RewardsScript.POOL_HEALTH, "its pool holds the healing of one fountain (fountain_pool 1)")
+	_world.hurt(one, 90)
+	_world.hurt(two, 90)
+	_tick()
+	check_equal(_rewards.pool_left(6), most, "nobody in it: untouched")
+	one.position = Vector2(20, 20)
+	two.position = Vector2(40, 20)
+	for i in 30:
+		_tick()
+	check(one.health.health > 10.0 and two.health.health > 10.0, "both draw on it: %s and %s" % [one.health.health, two.health.health])
+	check(is_equal_approx(_rewards.pool_left(6), most - (one.health.health - 10.0) - (two.health.health - 10.0)), "what they drew is gone from the shared pool")
+	for i in 300:
+		_tick()
+	check_equal(_rewards.pool_left(6), 0.0, "drawn dry")
+	check(is_equal_approx(one.health.health + two.health.health, 20.0 + most), "no more than the pool healed in all")
+	check(not told.is_empty() and told.back()[1] == 0.0, "the view is told it ran dry")
+	# A wizard at full health draws nothing from another fountain.
+	one.position = Vector2(-200, 0)
+	two.position = Vector2(-200, 60)
+	_world.bus.special_room_opened.emit(7, RoomKind.FILL_FOUNTAIN, &"", Rect2(0, 100, 64, 48), PackedVector2Array())
+	var whole := _wizard(2, Vector2(20, 120))
+	for i in 10:
+		_tick()
+	check_equal(_rewards.pool_left(7), most, "a wizard at full health draws nothing")
+	check(whole.health.health == whole.health.max_health, "and is whole")
+
+
+func test_a_restore_says_the_shelves_and_pools_again() -> void:
+	_wizard(0, Vector2(-200, 0))
+	_open_shop(3, PackedVector2Array([Vector2(0, 0), Vector2(48, 0)]))
+	_world.bus.special_room_opened.emit(6, RoomKind.FILL_FOUNTAIN, &"", Rect2(0, 0, 64, 48), PackedVector2Array())
+	var items: Array = []
+	var pools: Array = []
+	_world.bus.shelf_changed.connect(func(item: int, _at: Vector2, _choice: Dictionary, _price: int, lying: bool) -> void: items.append([item, lying]))
+	_world.bus.fountain_changed.connect(func(room: int, _area: Rect2, _left: float, _most: float) -> void: pools.append(room))
+	_rewards._said_items[99] = true
+	_rewards.rebuild_derived()
+	check(items.has([99, false]), "an item this machine drew that lies there no more is said gone")
+	check(items.has([0, true]) and items.has([1, true]), "every item lying is said")
+	check_equal(pools, [-1, 6], "every pool forgotten, then each said")

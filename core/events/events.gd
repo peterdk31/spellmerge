@@ -416,8 +416,10 @@ signal run_begun(run_id: StringName, players: int)
 ## `group` cost (0: the whole list at once), the next when the cost still standing or spawning in the
 ## room drops to `refill_at` or below, the bodies of a group `stagger` seconds apart (enemy spawning
 ## EA4: plain costs, the run works them out from its biome's `SpawnRules` shares at the room's scaled
-## budget). Sent for every room before `run_biome_chosen`. Heard by flow (the room's `RoomFight`).
-signal run_room_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float)
+## budget). `elites` (connected biomes CB11, decision 24), by the same index as `enemies`: the card
+## an elite enemy gets in its staff, empty for one that is no elite (an empty list: none is). Sent for
+## every room before `run_biome_chosen`. Heard by flow (the room's `RoomFight`).
+signal run_room_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float, elites: Array[StringName])
 ## Sender: run, in answer to `run_begun`, after every room's `run_room_filled` (connected biomes
 ## CB8). The run's biome map, `map`: a `BiomeMap` (gameplay/run; typed here as what it extends, since
 ## core names no area's class), a copy of the run's own. Heard by flow, which keeps a copy as its
@@ -489,6 +491,18 @@ signal loading_progressed(done: int, total: int)
 signal loading_finished()
 ## Sender: flow. The room `room_id` (the world's room `room`) was cleared: every enemy the run stood in it is down (boss OB2a: no waves). In a biome each fight room's own (connected biomes CB3), sent once; the boss's room cleared opens the portal home (CB7).
 signal room_cleared(room_id: StringName, room: int)
+## Sender: flow (connected biomes CB11). The biome's room `room` was cleared and its kind rewards a
+## clear: each player rolls a reward from the table `table` (`RoomKind.rewards`, content/rewards),
+## however its foes left it (the owner, 2026-11-19: a possessed foe killed elsewhere too). Sent right
+## after `room_cleared`, once a room. Heard by rewards.
+signal room_rewards_due(room: int, table: StringName)
+## Sender: flow (connected biomes CB11, decisions 19 and 20). The biome's room `room` of a special
+## fill (`RoomKind.FILL_SHOP`, `FILL_FOUNTAIN`) was entered for the first time: `table` the shop's
+## shelf table (`RoomKind.shelf`; empty for a fountain), `area` the fountain's pool in world pixels
+## (its template's zone `fountain`, else round the room's middle), `spots` where a shop's items lie
+## (its zones `shelf`, in order, else spots round its middle). Sent once a room, never by a restore.
+## Heard by rewards, which stocks the shelf and fills the pool.
+signal special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
@@ -511,18 +525,23 @@ signal altar_placed(standing: bool, at: Vector2)
 ## `open` true: what is told next is drawn as it stands, not played in).
 ## For the view only. Heard by feel (the door's bars, its lamps, the portal).
 signal gather_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool)
-## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: key door
+## Sender: flow (connected biomes CB11; CB12 made its look). In a biome: key door
 ## `door` (by number), its `area` in world pixels (its mouth), `open` once a key opened it. Sent as
 ## it changes; door -1 (the rest empty): every key door forgotten (the biome left; a restore, with
 ## `open` true: what is told next is drawn as it stands, not played in). For the view only. Heard by
 ## feel (its padlock turning and falling, its bars sinking: `lock_looks.gd`).
 signal key_door_shown(door: int, area: Rect2, open: bool)
-## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: secret rock
+## Sender: flow (connected biomes CB11; CB12 made its look). In a biome: secret rock
 ## `rock` (by number), its `area` in world pixels (the cracked rock), the `element` that breaks it (a
 ## card id, &"fire"; its crack's tint), `broken` once it broke. Sent as it changes; rock -1 (the rest
 ## empty): every secret rock forgotten (as `key_door_shown`'s -1). For the view only. Heard by feel
 ## (its crack's tint, brightening as its element touches near it, and its breaking in stages).
 signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bool)
+## Sender: flow (connected biomes CB11, decision 21). In a biome: key `key` (by number, one a key
+## door) lies on the floor at `at` (`lying`), or does no more (taken: the party holds it; the biome
+## left). After a snapshot is restored, said again for every key (key -1 first: every key
+## forgotten). For the view only. Heard by feel (`special_room_looks.gd`).
+signal key_shown(key: int, at: Vector2, lying: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent for every room as a world is made, at the run's start.
@@ -591,6 +610,17 @@ signal rewards_waiting_changed(player: int, offers: Array[Dictionary])
 ## (`lying`), or is gone from there (taken, or the world went). After a snapshot is restored, said
 ## again for every coin (and gone for those no longer lying). Heard by feel (the coins' look).
 signal coin_changed(coin: int, at: Vector2, lying: bool)
+## Sender: rewards (connected biomes CB11, decision 19). Shop item `item` (numbered once a run) lies on
+## its shelf at `at` (`lying`), `choice` what it is (a reward choice's view: `kind`, `id`, `count`,
+## `name`, `icon`) and `price` its price in coins (the run's own `price_scale`; a buyer's relics may
+## change theirs), or is gone (bought, or the world went). After a snapshot is restored, said again
+## for every item (and gone for those no longer there). For the view only. Heard by feel.
+signal shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, lying: bool)
+## Sender: rewards (connected biomes CB11, decision 20). The fountain of room `room`, its pool at
+## `area` (world pixels), holds `left` of its `most` healing: as it is filled, as a hurt wizard draws
+## on it, and after a snapshot is restored; room -1 (the rest empty): every fountain forgotten (the
+## world went; a restore, before each is said again). For the view only. Heard by feel.
+signal fountain_changed(room: int, area: Rect2, left: float, most: float)
 ## Sender: rewards. Seat `player`'s wallet holds `coins` now: at a run's start, as a player's
 ## starting coins come, as anyone takes a coin from the floor (every wallet gains it), as a reward
 ## gives coins and as the player spends. Heard by hud (the corner panel).

@@ -77,6 +77,16 @@ func test_a_party_through_the_gate_plays_the_same_twice_and_through_a_snapshot()
 	check(fight.gate_opened_at > 8, "after the snapshot (at tick %d)" % fight.gate_opened_at)
 
 
+## Connected biomes CB11: a shop bought from and a fountain drawn on (the crypt's own, west and east of
+## the start room, tests/support/biome_fight.gd) play the same twice and through a snapshot taken
+## before either happened: the shelf, the wallets, the pool and the healing.
+func test_a_shop_bought_from_and_a_fountain_drawn_on_play_the_same_twice_and_through_a_snapshot() -> void:
+	var fight := BiomeFight.new(root, false, true)
+	_check_biome(fight, 4)
+	check(fight.bought, "a shelf item was bought")
+	check(fight.drawn, "the fountain was drawn on")
+
+
 ## `fight` played twice the same and through a snapshot taken after tick `at`.
 func _check_biome(fight: BiomeFight, at: int) -> void:
 	var first := Desync.new()

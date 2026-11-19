@@ -177,6 +177,11 @@ var data: EnemyBase = null
 ## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Its other
 ## numbers are its `stats` (boss plan OB7), which a room's scale may change later as a relic does.
 var stat_scale: float = 1.0
+## An elite's card (connected biomes CB11, decision 24; empty: no elite): set by Flow before the
+## actor is added. Its first staff holds it in a slot more, in front of its own cards
+## (`Caster.hold_staffs`), it is drawn with an outline (`EliteLook`), and Difficulty gives it more
+## health (`Difficulty.ELITE_HEALTH`, through `stat_scale`).
+var elite_card: StringName = &""
 ## The wizards in play its health is counted for (boss plan OB13, `EnemyBase.health_per_player`): set
 ## by Flow before the actor is added, and changed while it stands by `count_players`.
 var players: int = 1
@@ -1046,6 +1051,12 @@ func _apply_data() -> void:
 		phases.name = "Phases"
 		add_child(phases)
 		_components.append(phases)
+	if is_elite() and _elite_look() == null:
+		# An elite's outline (connected biomes CB11): a look, added as a boss's presence is.
+		var outline := EliteLook.new()
+		outline.name = "EliteLook"
+		add_child(outline)
+		_looks.append(outline)
 	if data.boss and _boss_presence() == null:
 		# A boss tells the HUD it is in play (boss plan OB16): a look, added as its Phases are.
 		var presence := BossPresence.new()
@@ -1058,7 +1069,20 @@ func _apply_data() -> void:
 		_components.erase(caster)
 		caster = null
 		return
-	caster.hold_staffs(data.staffs)
+	caster.hold_staffs(data.staffs, elite_card)
+
+
+## True for an elite (connected biomes CB11: it has an `elite_card`).
+func is_elite() -> bool:
+	return elite_card != &""
+
+
+## The elite's outline (`EliteLook`), or null.
+func _elite_look() -> EliteLook:
+	for look in _looks:
+		if look is EliteLook:
+			return look as EliteLook
+	return null
 
 
 ## The look that tells the HUD a boss is in play (`BossPresence`, boss plan OB16), or null.

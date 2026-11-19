@@ -4,19 +4,26 @@ A kind of room is what a room of a run's map is for the game (run generation, do
 
 ## Contract
 
-- `fill`: how a room of the kind is filled, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached), `boss` (one of the biome's bosses) or `none` (nothing: a safe room).
+- `fill`: how a room of the kind is filled, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached; from the biome's `MapRules.elite_depth` on, by its `elite_chance`, its first enemy an elite), `elites` (the same, every enemy an elite: a challenge room, connected biomes CB11), `boss` (one of the biome's bosses), `shop` (a shop's shelf, one of each item rolled from the kind's `shelf` table, each bought by the first wizard who steps onto it with its price in their own wallet), `fountain` (a pool of healing shared by every hurt wizard standing in it) or `none` (nothing: a safe room).
 - `ends`: what ends it, one of `RoomKind.ENDS`: `enemies_down`.
-- `door` (connected biomes CB7): how a room of the kind is entered in a biome, one of `RoomKind.DOORS`: none (free), `gather` (a gather door: shut until every standing wizard is on its bridge, then the standing ones come in together; a challenge room, CB11) or `gate` (the boss's: a gather door that also waits while any sealed fight holds a wizard, and then brings everyone, downed or far away).
+- `door` (connected biomes CB7): how a room of the kind is entered in a biome, one of `RoomKind.DOORS`: none (free), `gather` (a gather door: shut until every standing wizard is on its bridge, then the standing ones come in together; a challenge room, CB11), `gate` (the boss's: a gather door that also waits while any sealed fight holds a wizard, and then brings everyone, downed or far away), `key` (a key door, CB11: its key is dropped in the room its bridge hangs off as that room is cleared; a wizard holding it at the door opens it for all) or `secret` (cracked rock, CB11: it breaks open when the element rolled for the room touches the floor at it).
+- `rewards` (CB11): the reward table (content/rewards) each player rolls a reward from as a room of the kind is cleared, however its foes left it; empty: its clear rewards nobody. `shelf`: a shop's table of items (each line's `price`).
 - `portal_home` (CB7): true when a room of the kind, cleared, opens the portal home on its floor (at its template's zone `portal`, else its middle): every standing wizard in it ends the run, won, back in the hub.
 - **Its look and sound** (connected biomes CB12, decision 30; the inspector's "Look and sound" group, each optional, drawn and heard only): `air`, an `Ambience` (its bed and accents, heard in place of the room's own while the music follows a room of the kind: the room this machine's wizards are in, the most intense of them); `music`, a `MusicTrack` played then in place of the room's (a living boss's music still comes first); `light`, the palette material (docs/STYLE.md, never a player's or Blight) the mouths into a room of the kind shimmer in and its seals' runes glow in (empty: the spark's). The boss's light is the fire's.
-- A new kind (a reward room, a healing room) is a new file and a line in a run's kind table; a new way of filling or ending is engine work (one more of `FILLS` or `ENDS` and the behaviour it names), never a change to the generator.
+- A new kind is a new file and a line in a run's kind table; a new way of filling, entering or ending is engine work (one more of `FILLS`, `DOORS` or `ENDS` and the behaviour it names), never a change to the generator.
 - `RoomKind.problems()` must be empty (`tests/content/runs/test_runs.gd`, through `Registry.validate_runs()`).
 
 | Kind | Fill | What it is |
 | --- | --- | --- |
-| `fight` | `enemies` | a fight: its enemies stand as it starts, and it is cleared when they are down |
-| `boss` | `boss` | the boss's room: in a biome its gate (`door = gate`) and, cleared, the portal home |
+| `fight` | `enemies` | a fight: its enemies stand as it starts, and it is cleared when they are down; rewards from `clear` |
+| `boss` | `boss` | the boss's room: in a biome its gate (`door = gate`) and, cleared, the portal home; rewards from `boss` |
 | `start` | `none` | a biome's start room (connected biomes CB5, `MapRules.start_kind`): a small safe slab where the party arrives; hosted by `crypt_start` (CB8), cleared as it is entered |
+| `reward` | `none` | a reward room (CB11): each wizard's reward from `reward` as the party steps in; `crypt_reward` |
+| `shop` | `shop` | the shop (CB11, decision 19): its shelf from `shelf`, one of each, first buyer takes it; `crypt_shop` |
+| `fountain` | `fountain` | a fountain (CB11, decision 20): a shared pool of healing; `crypt_fountain` |
+| `treasure` | `none` | a treasure room behind a key door (CB11, decision 21): rewards from `treasure`; `crypt_treasure` |
+| `secret` | `none` | a secret room behind cracked rock that one element breaks (CB11, decision 22): rewards from `secret`; `crypt_secret_a`, `crypt_secret_b` |
+| `challenge` | `elites` | a challenge room behind a gather door (CB11, decision 23): an elite fight, rewards from `challenge`; `crypt_challenge` |
 
 ## Allowed files
 

@@ -6,7 +6,9 @@ shader_type canvas_item;
 // that keeps only the pixels nearer its own anchor than any other view's (its Voronoi cell: the
 // same cut as `VoronoiCells.fill`, so the cells cover the screen, a pixel in exactly one, ties to
 // the lower view) and draws the divider along each bisector, `divider_k` whole pixels across
-// (half on each side), in the void's dark. A pixel is either the view's or the divider's: no blur.
+// (counted along the line's steeper axis; the lower view's side takes the odd one), in the
+// void's dark. A pixel is either the view's or the divider's: no blur. `SplitScreen.divider_pixels`
+// is this rule on the CPU, for the tests.
 
 // The screen's size (pixels), this view's anchor and up to three others' (screen pixels), how
 // many others there are, which of them come before this view (a bit each: ties go to them), and
@@ -38,12 +40,20 @@ void fragment() {
 		if (length_of < 0.0001) {
 			continue;
 		}
-		float side = dot(p - (own + a) * 0.5, normal / length_of);
+		vec2 unit = normal / length_of;
+		float side = dot(p - (own + a) * 0.5, unit);
 		bool before = ((before_mask >> k) & 1) != 0;
 		if (side > 0.0 || (side == 0.0 && before)) {
 			discard;
 		}
-		if (-side < width * 0.5) {
+		// Whole pixels from the line along its steeper axis (pixel middles are one apart there, so
+		// the first pixel on this side is within 1, the second within 2, ...): this side draws its
+		// share of the divider, the lower view the odd pixel, so the line is always `width` across.
+		float steps = -side / max(abs(unit.x), abs(unit.y));
+		float share = before ? floor(width * 0.5) : ceil(width * 0.5);
+		// This side's pixels lie at `steps` d, d + 1, ...: from 0 on the side owning ties, past 0 on
+		// the other.
+		if (before ? steps <= share : steps < share) {
 			line = true;
 		}
 	}

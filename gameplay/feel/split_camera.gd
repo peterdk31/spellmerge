@@ -42,12 +42,17 @@ const MERGE_ROOM: float = 1.1
 ## this far apart.
 const JOIN_REACH: float = 160.0
 const LEAVE_REACH: float = 224.0
-## The farthest group is drawn this far from the screen's edge (screen pixels).
+## The farthest group is drawn this far from the screen's edge (screen pixels), and two groups at
+## least this far apart.
 const SITE_MARGIN: float = 96.0
+const SITE_GAP: float = 96.0
 ## The divider's full width (whole screen pixels; it grows or shrinks one a drawn frame).
 const DIVIDER_WIDTH: int = 3
 ## Two pictures are the same when they are this close (screen pixels): a merging view goes.
 const SETTLED: float = 0.05
+## How far a view's anchor moves a drawn frame at most while it is not on its own place (screen
+## pixels): a new view's from the one it split from, a merging view's onto the one it merges into.
+const ANCHOR_STEP: float = 4.0
 ## A merging view's divider shrinks once its picture is this close to the one it merges into.
 const SHRINK_FROM: float = 1.0
 ## A new view eases in over this many real seconds (its pull rising from none), so it sets off from
@@ -79,6 +84,19 @@ var _kin: PackedInt32Array = PackedInt32Array()
 var _age: PackedFloat32Array = PackedFloat32Array()
 ## By view (as laid out in `views`): its slot.
 var _slot_of: PackedInt32Array = PackedInt32Array()
+## By slot: the seats it held before this frame's groups were matched (where a new view starts).
+var _held_before: PackedInt32Array = PackedInt32Array()
+## By slot: where its anchor is drawn (screen pixels), which moves to its own place (a live view's
+## group, as drawn) or, once their pictures are one, onto the anchor of the view it merges into, by
+## at most ANCHOR_STEP a frame,
+## so a cell is never cut at once from a picture not its own; true once it is on its own place,
+## from then on following it. A new view's starts on the anchor of the view it split from.
+var _shown: PackedVector2Array = PackedVector2Array()
+var _anchored: PackedByteArray = PackedByteArray()
+## By slot: made this frame (drawn first as the picture it split from).
+var _born: PackedByteArray = PackedByteArray()
+## By slot: how far a merging view's picture is from its target's (screen pixels).
+var _merge_gap: PackedFloat32Array = PackedFloat32Array()
 ## By seat: its box's middle and its box (each seat's own body and the actor it drives).
 var _point: PackedVector2Array = PackedVector2Array()
 var _box: Array[Rect2] = []
@@ -105,6 +123,11 @@ func _init() -> void:
 	_kin.fill(-1)
 	_age.resize(VIEWS_MOST)
 	_slot_of.resize(VIEWS_MOST)
+	_held_before.resize(VIEWS_MOST)
+	_shown.resize(VIEWS_MOST)
+	_anchored.resize(VIEWS_MOST)
+	_born.resize(VIEWS_MOST)
+	_merge_gap.resize(VIEWS_MOST)
 	_point.resize(ActorsScript.SEATS)
 	_box.resize(ActorsScript.SEATS)
 	_group_of.resize(ActorsScript.SEATS)
@@ -121,6 +144,9 @@ func reset() -> void:
 		_members[slot] = 0
 		_stage[slot] = 0
 		_kin[slot] = -1
+		_shown[slot] = Vector2.INF
+		_anchored[slot] = 0
+		_born[slot] = 0
 	split = false
 	views.count = 0
 
@@ -156,9 +182,9 @@ func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, scree
 	if camera == null or not is_instance_valid(camera) or table == null or screen.x <= 0.0 or screen.y <= 0.0:
 		reset()
 		return
+	# Only this machine's seats split it (decision 27); with none of them in the world (a machine
+	# waiting for its seat) there is one picture, which then holds everyone (the party camera).
 	_find(table, seats)
-	if _present == 0 and seats != 0:
-		_find(table, 0)
 	var limits := Rect2(Vector2(camera.limit_left, camera.limit_top), Vector2(camera.limit_right - camera.limit_left, camera.limit_bottom - camera.limit_top))
 	var root_zoom: float = camera.zoom.x
 	var root_centre: Vector2 = _clamp(camera.position, root_zoom, limits, screen)
@@ -299,12 +325,34 @@ func _lay_sites(screen: Vector2) -> void:
 	for seat in ActorsScript.SEATS:
 		if _group_seats[seat] != 0:
 			_group_site[seat] = screen * 0.5 + (_group_middle[seat] - mid) * scale
+	# Two groups' places at least SITE_GAP apart, pushed along the line between them in the world
+	# (so the divider between them keeps its way): a far third wizard squeezes the party onto the
+	# screen, and two places almost on one point would swing their line round at the least step.
+	var inner := Rect2(Vector2.ONE * (SITE_MARGIN * 0.5), screen - Vector2.ONE * SITE_MARGIN)
+	for pass_count in 4:
+		for a in ActorsScript.SEATS:
+			if _group_seats[a] == 0:
+				continue
+			for b in range(a + 1, ActorsScript.SEATS):
+				if _group_seats[b] == 0:
+					continue
+				var apart: float = _group_site[a].distance_to(_group_site[b])
+				if apart >= SITE_GAP:
+					continue
+				var way: Vector2 = (_group_middle[b] - _group_middle[a]).normalized()
+				if way == Vector2.ZERO:
+					way = Vector2.RIGHT
+				var push: Vector2 = way * ((SITE_GAP - apart) * 0.5)
+				_group_site[a] = (_group_site[a] - push).clamp(inner.position, inner.end)
+				_group_site[b] = (_group_site[b] + push).clamp(inner.position, inner.end)
 
 
 ## Give each group a slot: the one holding most of its seats (a live one before a merging one),
 ## else a new one, starting as the picture its seats were in (the world camera's with none). A
 ## live slot no group took merges into the one that holds its first seat now.
 func _match(root_centre: Vector2, root_zoom: float) -> void:
+	for slot in VIEWS_MOST:
+		_held_before[slot] = _members[slot] if _state[slot] != FREE else 0
 	var taken: int = 0
 	for seat in ActorsScript.SEATS:
 		_group_slot[seat] = -1
@@ -326,6 +374,10 @@ func _match(root_centre: Vector2, root_zoom: float) -> void:
 			continue
 		taken |= 1 << best
 		_group_slot[seat] = best
+		if _members[best] != held or _state[best] != LIVE:
+			# Its group changed (a seat joined or left, or it came back from merging): its anchor
+			# walks to the group's new middle rather than jumping there.
+			_anchored[best] = 0
 		_state[best] = LIVE
 		_members[best] = held
 	for slot in VIEWS_MOST:
@@ -353,14 +405,17 @@ func _open_slot(held: int, root_centre: Vector2, root_zoom: float) -> int:
 	var from: int = -1
 	var most: int = 0
 	for slot in VIEWS_MOST:
-		if slot != free and _state[slot] != FREE and _bits(_members[slot] & held) > most:
-			most = _bits(_members[slot] & held)
+		if slot != free and _bits(_held_before[slot] & held) > most:
+			most = _bits(_held_before[slot] & held)
 			from = slot
 	_centre[free] = _centre[from] if from >= 0 else root_centre
 	_zoom[free] = _zoom[from] if from >= 0 else root_zoom
 	_stage[free] = 0
 	_kin[free] = from
 	_age[free] = 0.0
+	_born[free] = 1
+	_anchored[free] = 0
+	_shown[free] = _shown[from] if from >= 0 else Vector2.INF
 	_members[free] = held
 	_state[free] = LIVE
 	return free
@@ -374,8 +429,9 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 	for slot in VIEWS_MOST:
 		if _state[slot] != LIVE:
 			continue
-		if _stage[slot] == 0:
+		if _born[slot] != 0:
 			# Born this frame: drawn first as the picture it splits from, eased from the next.
+			_born[slot] = 0
 			_stage[slot] = 1
 			continue
 		_age[slot] += maxf(delta, 0.0)
@@ -401,9 +457,14 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		_zoom[slot] = lerpf(_zoom[slot], to_zoom, weight)
 		_centre[slot] = _clamp(_centre[slot].lerp(to_centre, weight), _zoom[slot], limits, screen)
 		var gap: float = _picture_gap(_centre[slot], _zoom[slot], to_centre, to_zoom, screen)
+		_merge_gap[slot] = gap
 		if gap < SHRINK_FROM:
 			_stage[slot] = maxi(_stage[slot] - 1, 0)
-		if _stage[slot] == 0 and gap < SETTLED:
+		var on_target: bool = into < 0 or _shown[slot].distance_to(_shown[into]) <= VoronoiCellsScript.MIN_GAP * 2.0
+		if _stage[slot] == 0 and gap < SETTLED and on_target:
+			if into >= 0:
+				# Its seats are its target's alone now: that view's anchor walks to them.
+				_anchored[into] = 0
 			_state[slot] = FREE
 			_members[slot] = 0
 			_kin[slot] = -1
@@ -429,7 +490,14 @@ func _merge_target(slot: int) -> int:
 		for other in VIEWS_MOST:
 			if other != slot and _state[other] == LIVE and _members[other] & (1 << seat) != 0:
 				return other
-	return -1
+	# Its seats are gone: the live view nearest its picture.
+	var nearest: int = -1
+	var gap: float = INF
+	for other in VIEWS_MOST:
+		if other != slot and _state[other] == LIVE and _centre[other].distance_to(_centre[slot]) < gap:
+			gap = _centre[other].distance_to(_centre[slot])
+			nearest = other
+	return nearest
 
 
 ## How far merging slot `slot`'s picture is from its target's (screen pixels; 0 for a slot not merging).
@@ -456,15 +524,51 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 		var zoom: float = _zoom[slot]
 		var transform := Transform2D(0.0, Vector2(zoom, zoom), 0.0, screen * 0.5 - (_centre[slot] + offset) * zoom)
 		var held: int = _members[slot]
-		var at: Vector2 = screen * 0.5
-		if held != 0:
-			at = screen * 0.5 + (_middle_of(held) - _centre[slot]) * zoom
-		views.set_view(count, held, transform, at)
+		var own: Vector2 = screen * 0.5
+		# A live view's anchor leaves out the seats a view merging into it still holds: it moves to
+		# its whole group's middle once that view is gone, never across it.
+		var placed: int = held & ~_merging_into(slot) if _state[slot] == LIVE else held
+		if placed == 0:
+			placed = held
+		if placed != 0:
+			own = screen * 0.5 + (_middle_of(placed) - _centre[slot]) * zoom
+		views.set_view(count, held, transform, _anchor_of(slot, own))
 		_slot_of[count] = slot
 		count += 1
 	views.count = count
 	_apart(count)
 	_cells.fill(views)
+
+
+## The seats held by the views merging into live slot `slot`.
+func _merging_into(slot: int) -> int:
+	var held: int = 0
+	for other in VIEWS_MOST:
+		if other != slot and _state[other] == MERGING and _merge_target(other) == slot:
+			held |= _members[other]
+	return held
+
+
+## Where slot `slot`'s anchor is drawn this frame, its own place being `own`: on it once it got
+## there; else moved toward it (a live view) or onto its target's anchor (a merging one) by at most
+## ANCHOR_STEP.
+func _anchor_of(slot: int, own: Vector2) -> Vector2:
+	var aim: Vector2 = own
+	if _state[slot] == MERGING:
+		var into: int = _merge_target(slot)
+		_anchored[slot] = 0
+		# Onto its target's anchor only once the two pictures are one: the line between them may
+		# then swing anyhow (the same picture either side), and its lines to the others move on.
+		if into >= 0 and _shown[into].is_finite() and _merge_gap[slot] < SHRINK_FROM:
+			aim = _shown[into]
+	elif _anchored[slot] != 0 or not _shown[slot].is_finite():
+		_shown[slot] = own
+		_anchored[slot] = 1
+		return own
+	_shown[slot] = _shown[slot].move_toward(aim, ANCHOR_STEP)
+	if _state[slot] == LIVE and _shown[slot].distance_to(own) < 0.5:
+		_anchored[slot] = 1
+	return _shown[slot]
 
 
 ## Anchors closer than MIN_GAP to an earlier one moved off it, each toward its own side.

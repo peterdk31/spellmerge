@@ -985,9 +985,10 @@ func step(real_delta: float) -> void:
 	if _spawn_look != null:
 		_spawn_look.step(_actor_table(), real_delta)
 	var picture: Rect2 = _picture()
+	var focus: Vector2 = _focus(picture)
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	_cover.step(_clock, _actor_table(), focus, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
 	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
 	_spectacle.step(_clock, _actor_table())
@@ -1000,7 +1001,7 @@ func step(real_delta: float) -> void:
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
-		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
+		_ambience.step(real_delta, focus)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -1188,6 +1189,16 @@ func _picture() -> Rect2:
 	if split_screen != null and split_screen.is_drawing():
 		return split_screen.camera.views.world_box()
 	return party_camera.visible_rect()
+
+
+## Where this machine looks from (the cover's nearest bodies, the room's ambience): the picture's
+## middle; while split, the middle of the first view's (the box round the views may be the void
+## between them). INF with no picture.
+func _focus(picture: Rect2) -> Vector2:
+	if split_screen != null and split_screen.is_drawing():
+		var views: ScreenViewsScript = split_screen.camera.views
+		return views.to_screen[0].affine_inverse() * (views.screen * 0.5)
+	return picture.get_center() if picture.has_area() else Vector2.INF
 
 
 ## This machine's views now: the split screen's, or the party camera's one picture as one view.
@@ -3374,6 +3385,9 @@ func _on_player_downed(player: int) -> void:
 func _in_picture(at: Vector2) -> bool:
 	if at == Vector2.INF:
 		return true
+	# While split: in a view's cell, or within SHAKE_REACH of it (not the void between views).
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views.view_showing(at, SHAKE_REACH) >= 0
 	var picture: Rect2 = _picture()
 	return not picture.has_area() or picture.grow(SHAKE_REACH).has_point(at)
 

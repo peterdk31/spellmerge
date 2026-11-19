@@ -413,6 +413,14 @@ func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE) -> void
 		_extra.append(buffer)
 	for k in _extra.size():
 		_extra[k].render_target_update_mode = SubViewport.UPDATE_ALWAYS if k + 1 < _views.size() else SubViewport.UPDATE_DISABLED
+	# Each buffer is drawn before the view that reads it (Godot draws a viewport's children first):
+	# made after the views, it would be read a frame late, slipping behind them as they move.
+	for k in VIEWS_MOST:
+		var buffer: SubViewport = viewport if k == 0 else (_extra[k - 1] if k - 1 < _extra.size() else null)
+		if buffer == null:
+			break
+		var reader: Viewport = _views[k] if k < _views.size() and is_instance_valid(_views[k]) else buffer.get_parent().get_viewport()
+		RenderingServer.viewport_set_parent_viewport(buffer.get_viewport_rid(), reader.get_viewport_rid())
 	_bind(apply.material as ShaderMaterial)
 	for key: StringName in _readers:
 		_bind(_readers[key] as ShaderMaterial)

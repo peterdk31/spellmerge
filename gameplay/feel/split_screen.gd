@@ -80,6 +80,29 @@ func _exit_tree() -> void:
 	_stop()
 
 
+## What `split_cell.gdshader` draws at the pixel whose middle is `p` (screen pixels) for a view
+## anchored at `own`, the others at `others` with dividers `widths` (whole pixels) and `before` (a
+## bit each: those coming before it): -1 not its pixel, 0 its picture, 1 the divider. The shader's
+## rule on the CPU, line for line, for the tests.
+static func cell_pixel(p: Vector2, own: Vector2, others: PackedVector2Array, widths: PackedFloat32Array, before: int) -> int:
+	var line: bool = false
+	for k in others.size():
+		var normal: Vector2 = others[k] - own
+		var length: float = normal.length()
+		if length < 0.0001:
+			continue
+		var unit: Vector2 = normal / length
+		var side: float = (p - (own + others[k]) * 0.5).dot(unit)
+		var first: bool = (before >> k) & 1 != 0
+		if side > 0.0 or (side == 0.0 and first):
+			return -1
+		var steps: float = -side / maxf(absf(unit.x), absf(unit.y))
+		var share: float = floorf(widths[k] * 0.5) if first else ceilf(widths[k] * 0.5)
+		if steps <= share if first else steps < share:
+			line = true
+	return 1 if line else 0
+
+
 ## The views drawn now, in the order of `camera.views` (empty with one picture). Read only.
 func views() -> Array[Viewport]:
 	return _shown

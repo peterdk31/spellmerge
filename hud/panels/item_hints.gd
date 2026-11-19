@@ -56,7 +56,8 @@ func clear() -> void:
 
 ## A frame: `menus` holds, by player, whether they have a menu open; `to_screen` turns room pixels
 ## into this layer's (the camera now). While the screen is split (`views`, connected biomes CB6)
-## each player's hint is put where that player's own view shows the item instead (`layer` turns the
+## each player's hint is put where that player's own view shows the item instead (another
+## machine's player's, where any view shows it) (`layer` turns the
 ## screen's pixels into this layer's), and hides while the item is outside that view's cell. Real
 ## time for the shakes.
 func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: ScreenViews = null, layer: Transform2D = Transform2D.IDENTITY) -> void:
@@ -68,7 +69,10 @@ func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: Scree
 			continue
 		var place: Vector2 = to_screen * _at[player]
 		if split:
+			# The player's own view; a player of another machine's, the view that shows the item.
 			var view: int = views.view_of_seat(player)
+			if view < 0:
+				view = views.view_showing(_at[player])
 			var on_screen: Vector2 = views.to_screen[view] * _at[player] if view >= 0 else Vector2.INF
 			hint.visible = view >= 0 and views.cell_holds(view, on_screen, 0.0)
 			if not hint.visible:

@@ -583,7 +583,7 @@ func _build_seat(seat: int, frame: InputFrame, delta: float) -> void:
 			frame.captured = true
 	elif input != null and input.is_joined(seat):
 		var hand: Vector2 = _pivot(seat)
-		_local[seat].fill(frame, input, seat, delta, hand, _mouse_world() if hand != Vector2.INF else Vector2.INF)
+		_local[seat].fill(frame, input, seat, delta, hand, _mouse_world(seat) if hand != Vector2.INF else Vector2.INF)
 	var pending: Array = _pending[seat]
 	if pending.is_empty():
 		return
@@ -601,18 +601,22 @@ func _pivot(seat: int) -> Vector2:
 	return _pivots[seat].call() as Vector2
 
 
-## The mouse in the world: the viewport's mouse through its canvas transform (the world's camera).
-func _mouse_world() -> Vector2:
+## The mouse in the world for seat `seat`: the viewport's mouse through its canvas transform (the
+## world's camera); while the screen is split, through the seat's own view (so its aim stays its
+## picture's, wherever the cursor crosses a divider), or the view under the mouse for a seat in none.
+func _mouse_world(seat: int = -1) -> Vector2:
 	if mouse_world_override != Vector2.INF:
 		return mouse_world_override
 	if not is_inside_tree():
 		return Vector2.INF
 	var viewport: Viewport = get_viewport()
 	var mouse: Vector2 = viewport.get_mouse_position()
-	# While the screen is split (connected biomes CB6): through the view the mouse is over.
+	# While the screen is split (connected biomes CB6): through the seat's own view.
 	var views: ScreenViews = ScreenViews.on(viewport)
 	if views != null and views.is_split():
-		var view: int = views.view_at(mouse)
+		var view: int = views.view_of_seat(seat) if seat >= 0 else -1
+		if view < 0:
+			view = views.view_at(mouse)
 		if view >= 0:
 			return views.to_screen[view].affine_inverse() * mouse
 	return viewport.get_canvas_transform().affine_inverse() * mouse

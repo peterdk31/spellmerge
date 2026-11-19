@@ -72,8 +72,6 @@ func step(table: ActorsScript, seats_here: int, views: ScreenViewsScript, clock:
 	count = 0
 	_clock = clock
 	if table != null and seats_here != 0 and views != null and views.count > 0:
-		var low := Vector2.ONE * INSET
-		var high: Vector2 = views.screen - Vector2.ONE * INSET
 		for seat in ActorsScript.SEATS:
 			if seats_here & (1 << seat) != 0:
 				continue
@@ -87,23 +85,34 @@ func step(table: ActorsScript, seats_here: int, views: ScreenViewsScript, clock:
 			var view: int = _nearest_view(views, world)
 			var from: Vector2 = views.anchor[view]
 			var to: Vector2 = views.to_screen[view] * world - from
-			var reach: float = INF
-			if to.x > 0.0:
-				reach = minf(reach, (high.x - from.x) / to.x)
-			elif to.x < 0.0:
-				reach = minf(reach, (low.x - from.x) / to.x)
-			if to.y > 0.0:
-				reach = minf(reach, (high.y - from.y) / to.y)
-			elif to.y < 0.0:
-				reach = minf(reach, (low.y - from.y) / to.y)
+			var reach: float = _reach_in_cell(views, view, from, to)
 			_seat[count] = seat
-			_at[count] = from + to * clampf(reach, 0.0, 1.0)
+			_at[count] = from + to * reach
 			_way[count] = to.normalized()
 			_colour[count] = ProjectileManagerScript.ramp_color(table.ramp_of(id))
 			_down[count] = 1 if body is Actor and (body as Actor).is_downed() else 0
 			count += 1
 	if count > 0 or before > 0:
 		queue_redraw()
+
+
+## How far along `to` from `from` (0 to 1) a point stays INSET inside view `view`'s cell (so the
+## marker sits at that view's own edge, the screen's or a divider, never in another view's cell).
+static func _reach_in_cell(views: ScreenViewsScript, view: int, from: Vector2, to: Vector2) -> float:
+	var reach: float = 1.0
+	var n: int = views.corners(view)
+	for i in n:
+		var a: Vector2 = views.corner(view, i)
+		var edge: Vector2 = views.corner(view, (i + 1) % n) - a
+		var length: float = edge.length()
+		if length <= 0.0:
+			continue
+		# Inside is where the cross is positive (the cells run clockwise on screen).
+		var inside: float = edge.cross(from - a) / length
+		var outward: float = edge.cross(to) / length
+		if outward < 0.0:
+			reach = minf(reach, (inside - INSET) / -outward)
+	return clampf(reach, 0.0, 1.0)
 
 
 ## The view of `views` whose wizards stand nearest `world` (its anchor taken back into the world).

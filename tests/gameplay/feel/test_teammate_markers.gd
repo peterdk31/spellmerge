@@ -138,3 +138,18 @@ func test_a_teammate_in_another_view_needs_no_marker_and_one_in_none_gets_one() 
 	if _markers.count == 1:
 		check_equal(_markers.position_of(0), Vector2(480.0, 360.0 - MarkersScript.INSET), "at the bottom edge, below the right view's wizard")
 		check_equal(_markers.way_of(0), Vector2.DOWN, "pointing down, its way")
+
+
+## A teammate between two views: its marker sits at the edge of the view nearest it, inside that
+## view's own cell (not in the other view's).
+func test_a_marker_sits_in_the_nearest_views_own_cell() -> void:
+	_wizard(Vector2(0.0, 0.0), 0)
+	_wizard(Vector2(5000.0, 0.0), 1)
+	_wizard(Vector2(1000.0, 0.0), 2)
+	var views: ScreenViewsScript = _two(Vector2(0.0, 0.0), Vector2(5000.0, 0.0))
+	_markers.step(_table, 0b0011, views, 0.0)
+	check_equal(_markers.count, 1, "seat 2 is in no view")
+	if _markers.count == 1:
+		check(views.cell_holds(0, _markers.position_of(0), 0.0), "in the left view's cell, the view nearest it (%s)" % _markers.position_of(0))
+		check(is_equal_approx(_markers.position_of(0).x, 320.0 - MarkersScript.INSET), "at the divider, INSET inside (%s)" % _markers.position_of(0))
+		check_equal(_markers.way_of(0), Vector2.RIGHT, "pointing its way")

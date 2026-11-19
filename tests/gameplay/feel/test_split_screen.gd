@@ -146,3 +146,23 @@ func test_each_players_item_hint_follows_its_own_view() -> void:
 	hints.step(0.0, menus, Transform2D.IDENTITY, views)
 	check(hints.hint_of(1).visible, "player 1's item is in their own view: its hint shows")
 	check(not hints.hint_of(0).visible, "player 0's view does not show that item: no hint")
+
+
+## The divider is exactly as many whole pixels across as its width, wherever the line falls
+## (split_cell.gdshader, mirrored by `SplitScreen.cell_pixel`).
+func test_the_divider_is_its_width_in_whole_pixels_wherever_the_line_is() -> void:
+	for middle: float in [320.0, 320.5, 320.25]:
+		for width in range(0, 4):
+			# Two views, anchors either side of a vertical line at x = `middle`, and a slanted pair.
+			for slant: float in [0.0, 0.4]:
+				var a := Vector2(middle - 100.0, 180.0 - 100.0 * slant)
+				var b := Vector2(middle + 100.0, 180.0 + 100.0 * slant)
+				var row: int = 0
+				for x in range(200, 440):
+					var p := Vector2(float(x) + 0.5, 180.5)
+					var from_a: int = SplitScreenScript.cell_pixel(p, a, PackedVector2Array([b]), PackedFloat32Array([float(width)]), 0)
+					var from_b: int = SplitScreenScript.cell_pixel(p, b, PackedVector2Array([a]), PackedFloat32Array([float(width)]), 1)
+					check((from_a >= 0) != (from_b >= 0), "the pixel at %s is one view's" % p)
+					if from_a == 1 or from_b == 1:
+						row += 1
+				check_equal(row, width, "a line at %.2f (slant %.1f) is %d pixels across" % [middle, slant, width])

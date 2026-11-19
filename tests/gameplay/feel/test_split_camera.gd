@@ -296,3 +296,104 @@ func _free_bodies() -> void:
 		if is_instance_valid(body):
 			body.free()
 	_bodies.clear()
+
+
+## A copy of the views as laid out now.
+func _snapshot() -> ScreenViewsScript:
+	var copy := ScreenViewsScript.new()
+	var views: ScreenViewsScript = _split.views
+	copy.screen = views.screen
+	copy.count = views.count
+	for view in views.count:
+		copy.set_view(view, views.seats[view], views.to_screen[view], views.anchor[view])
+		for at in views.corners(view):
+			copy.set_corner(view, at, views.corner(view, at))
+		copy.set_corners(view, views.corners(view))
+	return copy
+
+
+## The world point drawn at screen point `p` (the world camera's with no view).
+func _world_at(views: ScreenViewsScript, p: Vector2) -> Vector2:
+	if views.count == 0:
+		return _root_transform().affine_inverse() * p
+	var view: int = views.view_at(p)
+	return views.to_screen[maxi(view, 0)].affine_inverse() * p
+
+
+## No part of the screen shows a far other part of the world from one frame to the next: a pixel in
+## the same view as before shows what it showed moved at most `most` screen pixels (the views' own
+## easing); a pixel that changed view lies within LINE_MOVE of its new cell's edge (a divider moving
+## on, a few pixels a frame, never a region of the screen changing picture at once).
+const LINE_MOVE: float = 6.0
+
+
+func _check_no_jump(before: ScreenViewsScript, before_root: Transform2D, after: ScreenViewsScript, most: float, what: String) -> bool:
+	for y in range(3, int(SCREEN.y), 12):
+		for x in range(3, int(SCREEN.x), 12):
+			var p := Vector2(x, y) + Vector2(0.5, 0.5)
+			var was_view: int = before.view_at(p) if before.count > 0 else -1
+			var now_view: int = after.view_at(p) if after.count > 0 else -1
+			var was_seats: int = before.seats[was_view] if was_view >= 0 else -1
+			var now_seats: int = after.seats[now_view] if now_view >= 0 else -1
+			var was: Vector2 = before.to_screen[was_view].affine_inverse() * p if was_view >= 0 else before_root.affine_inverse() * p
+			var now: Vector2 = _world_at(after, p)
+			var zoom: float = after.to_screen[now_view].x.x if now_view >= 0 else _root_transform().x.x
+			var moved: float = was.distance_to(now) * zoom
+			if moved <= most:
+				continue
+			if now_view >= 0 and was_view >= 0 and was_seats != now_seats and not after.cell_holds(now_view, p, -LINE_MOVE):
+				continue
+			check(false, "%s: the screen point %s jumped %.1f px (view %d to %d)" % [what, p, moved, was_view, now_view])
+			return false
+	return true
+
+
+func test_a_wizard_leaving_a_shared_view_splits_off_it_without_a_jump() -> void:
+	_wizard(0, _rooms[1])
+	var walker: Node2D = _wizard(1, _rooms[1] + Vector2(40.0, 0.0))
+	_wizard(2, _rooms[9])
+	_frames(150)
+	check_equal(_split.views.count, 2, "the pair shares a view, the third its own")
+	var shared: int = _split.views.view_of_seat(0)
+	var frames: int = 0
+	while _split.views.count == 2 and frames < 600:
+		var before: ScreenViewsScript = _snapshot()
+		var before_root: Transform2D = _root_transform()
+		walker.global_position += Vector2(0.0, 5.0)
+		_frame()
+		frames += 1
+		if _split.views.count == 3:
+			var left: Transform2D = before.to_screen[shared]
+			var new_view: int = _split.views.view_of_seat(1)
+			check(_gap(_split.views.to_screen[new_view], left) < 0.01, "the new view starts as the view its wizard left (%.3f px off)" % _gap(_split.views.to_screen[new_view], left))
+			_check_no_jump(before, before_root, _snapshot(), 40.0, "the split-off frame")
+	check_equal(_split.views.count, 3, "walked off: a view of its own")
+	for i in 60:
+		var before: ScreenViewsScript = _snapshot()
+		var before_root: Transform2D = _root_transform()
+		walker.global_position += Vector2(0.0, 5.0)
+		_frame()
+		if not _check_no_jump(before, before_root, _snapshot(), 40.0, "easing apart"):
+			break
+
+
+func test_three_views_where_one_merges_into_another_without_a_jump() -> void:
+	_wizard(0, _rooms[0])
+	var walker: Node2D = _wizard(1, _rooms[5])
+	_wizard(2, _rooms[11])
+	_frames(150)
+	check_equal(_split.views.count, 3, "three views")
+	var frames: int = 0
+	var target: Vector2 = _rooms[0] + Vector2(40.0, 0.0)
+	while frames < 3000 and (_split.views.count > 2 or walker.global_position.distance_to(target) > 1.0):
+		var before: ScreenViewsScript = _snapshot()
+		var before_root: Transform2D = _root_transform()
+		walker.global_position += (target - walker.global_position).limit_length(8.0)
+		_frame()
+		frames += 1
+		# A frame where the walker's view goes, or the cells shift: what each pixel shows moves no
+		# more than the views' easing does.
+		if not _check_no_jump(before, before_root, _snapshot(), 40.0, "merging (frame %d)" % frames):
+			break
+	check_equal(_split.views.count, 2, "merged: two views")
+	check_equal(_split.views.view_of_seat(0), _split.views.view_of_seat(1), "seats 0 and 1 share one")

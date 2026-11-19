@@ -549,13 +549,17 @@ func downed_mate() -> Actor:
 	return best
 
 
-## Behaviours ask: whether an actor of another team that can be aimed at now stands within
-## `radius` of `point` (`Projectiles.nearest_target`, as the target is found).
+## Behaviours ask: whether an actor of another team stands within `radius` of `point` (a body's
+## middle; `Projectiles.nearest_target`, as the target is found). One still spawning in counts (it
+## is a foe a moment later), one dying does not.
 func foe_within(point: Vector2, radius: float) -> bool:
 	if actor.projectiles == null:
 		return false
 	var found: Node2D = actor.projectiles.nearest_target(point, radius, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
-	return found != null and can_target(found)
+	if found == null or not is_instance_valid(found):
+		return false
+	var other: Actor = found as Actor
+	return other == null or not other.is_dying()
 
 
 ## Behaviours ask: the health of `body` now, a share of its most (1 without Health).

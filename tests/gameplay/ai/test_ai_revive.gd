@@ -35,20 +35,21 @@ func after_each() -> void:
 
 
 ## `steps` steps of the brain driving the bot with `profile`: it thinks, its body walks by the
-## intent. Returns how many steps it stood within Coop's revive range of the one downed, counted
-## from the first.
+## intent. Returns the longest run of steps in a row it stood within Coop's revive range of the one
+## downed (Coop drains a revive that is left, so only a run in a row brings it back).
 func _drive(profile: AIProfile, steps: int) -> int:
 	_brain.setup(_world.players[0], profile, 4111)
-	var near: int = 0
+	var run: int = 0
+	var longest: int = 0
 	var bot: Actor = _world.players[0]
 	for i in steps:
 		_world.projectiles.step(Fixture.STEP)
 		_intent.begin_step()
 		_brain.think(Fixture.STEP, _intent)
 		bot.position += _intent.move.limit_length(1.0) * WALK * Fixture.STEP
-		if bot.position.distance_to(MATE_AT) <= CoopScript.REVIVE_RANGE:
-			near += 1
-	return near
+		run = run + 1 if bot.position.distance_to(MATE_AT) <= CoopScript.REVIVE_RANGE else 0
+		longest = maxi(longest, run)
+	return longest
 
 
 ## How many steps of `steps` the brain chose to revive.
@@ -105,6 +106,47 @@ func test_a_profile_that_does_not_revive_never_goes() -> void:
 func test_enemies_never_revive() -> void:
 	check_equal(AIProfile.fallback().revives, 0.0, "the fallback profile's revives")
 	check_equal(Fixture.exact().revives, 0.0, "the AI tests' enemy profile's revives")
+	var enemies: Array[Resource] = _world.registry.call("get_all", &"enemies")
+	check(not enemies.is_empty(), "the registry lists the enemies")
+	for data: Resource in enemies:
+		var enemy: EnemyBase = data as EnemyBase
+		if enemy == null:
+			continue
+		check_equal(enemy.profile_or_fallback().revives, 0.0, "%s's profile revives" % enemy.id)
+		for phase: EnemyPhase in enemy.phases:
+			if phase != null and phase.profile != null:
+				check_equal(phase.profile.revives, 0.0, "a phase of %s revives" % enemy.id)
+
+
+## A sense of a bolt that reaches 200 px and deals `damage`, winding up `wind_up`.
+func _bolt(damage: float, wind_up: float) -> CastSense:
+	var sense := CastSense.new()
+	sense.empty = false
+	sense.reach = 200.0
+	sense.damage = damage
+	sense.wind_up = wind_up
+	return sense
+
+
+func test_while_reviving_it_fires_only_what_keeps_it_there() -> void:
+	# The brain presses on toward its target through a wind-up or a channel (`press_on`), which
+	# would walk it out of the revive's range: those are left, as is a cast that moves it.
+	var imp: Actor = _world.imp(Vector2(100.0, 250.0))
+	_brain.setup(_world.players[0], BOT_PROFILE, 4111)
+	_brain.target = imp
+	_brain.distance = 150.0
+	_brain.line_clear = true
+	_brain.staff_count = 3
+	var held: CastSense = _bolt(40.0, 0.0)
+	held.repeats_held = true
+	_brain.senses = [_bolt(30.0, 0.5), held, _bolt(10.0, 0.0), null]
+	_brain.ready = PackedByteArray([1, 1, 1, 0])
+	_brain.holding = PackedByteArray([0, 0, 0, 0])
+	check_equal(ReviveScript.fire_pick(_brain), 2, "the plain bolt, not the wind-up nor the held one")
+	_brain.senses[2].moves_caster = true
+	check_equal(ReviveScript.fire_pick(_brain), -1, "nothing: the last moves its caster")
+	_brain.senses[0].wind_up = 0.0
+	check_equal(ReviveScript.fire_pick(_brain), 0, "the bolt with no wind-up")
 
 
 func test_two_runs_go_the_same() -> void:

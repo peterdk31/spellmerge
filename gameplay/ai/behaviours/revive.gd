@@ -5,7 +5,9 @@ extends AIBehaviour
 ## walks into a crowd to revive), its own health not under LOW, and no shot about to hit it (an
 ## urgent dodge goes first). With the fight over (no target) it wants it most; with a fight on,
 ## more than a ready attack, and it fires the best ready staff that hurts the target from where it
-## walks or stands (`AIBrain.can_fire`, never one that moves its caster, which would carry it off).
+## walks or stands (`AIBrain.can_fire`), never one that would carry it off: one that moves its
+## caster, winds up or is held (the brain presses on toward its target through a wind-up and a
+## channel, `AIProfile.press_on`).
 ## A wall between walks round it (`AISight.detour`). Only with `AIProfile.revives` above 0 (the test
 ## bots'); an enemy never looks. It reads no coop rule: NEAR is its own, well inside the revive's
 ## range (tests/gameplay/ai/test_ai_revive.gd checks it against Coop's).
@@ -39,7 +41,7 @@ func want(brain: AIBrain) -> float:
 	if brain.threat_time >= 0.0 and brain.threat_time < AIBrain.URGENT_TIME:
 		return 0.0
 	var mate: Actor = brain.downed_mate()
-	if mate == null or brain.foe_within(mate.global_position, SAFE):
+	if mate == null or brain.foe_within(mate.global_position + mate.body_offset, SAFE):
 		return 0.0
 	brain.memo[index] = float(mate.id)
 	return brain.profile.revives * (CLEAR if brain.target == null else FIGHTING)
@@ -62,17 +64,19 @@ func act(brain: AIBrain) -> void:
 	else:
 		brain.plan_move = AIBrain.Move.POINT
 		brain.plan_point = to
-	brain.plan_staff = _fire_pick(brain)
+	brain.plan_staff = fire_pick(brain)
 
 
 ## The ready staff that hurts the target from here and deals most, never one that moves its
-## caster; -1 for none.
-func _fire_pick(brain: AIBrain) -> int:
+## caster, winds up or is held (any would walk it off); -1 for none.
+static func fire_pick(brain: AIBrain) -> int:
 	var best: int = -1
 	var most: float = -1.0
 	for at in brain.staff_count:
 		var sense: CastSense = brain.senses[at]
-		if brain.ready[at] == 0 or not brain.can_fire(sense, at, BLAST_MARGIN) or sense.moves_caster:
+		if brain.ready[at] == 0 or not brain.can_fire(sense, at, BLAST_MARGIN):
+			continue
+		if sense.moves_caster or sense.wind_up > 0.0 or sense.repeats_held:
 			continue
 		if sense.damage > most:
 			most = sense.damage

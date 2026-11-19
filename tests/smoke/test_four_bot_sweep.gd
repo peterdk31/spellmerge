@@ -7,6 +7,7 @@ const SweepScript := preload("res://tests/smoke/four_bot_sweep.gd")
 
 func test_a_range_plays_every_seed_in_it() -> void:
 	check_equal(SweepScript.seeds_of(PackedStringArray(["--seeds=3-6"])), PackedInt64Array([3, 4, 5, 6]), "--seeds=3-6")
+	check_equal(SweepScript.seeds_of(PackedStringArray(["--seeds=6-3"])), PackedInt64Array([3, 4, 5, 6]), "--seeds=6-3")
 
 
 func test_a_list_plays_its_seeds() -> void:

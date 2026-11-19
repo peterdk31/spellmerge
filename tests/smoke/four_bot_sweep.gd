@@ -7,7 +7,7 @@ extends SceneTree
 ##
 ##   godot --headless --fixed-fps 60 --path . --script res://tests/smoke/four_bot_sweep.gd -- --seeds=1-40
 ##
-## `--seeds=A-B` plays replay seeds A to B (both in; DEFAULT_FIRST to DEFAULT_LAST without it), and
+## `--seeds=A-B` plays replay seeds A to B (both in, either way round; DEFAULT_FIRST to DEFAULT_LAST without it), and
 ## `--seeds=3,11,17` those seeds. A lost seed is played again alone with the smoke test's own
 ## argument (`four_bot_smoke.gd -- --replay-seed=N`), which prints why. The lines it prints:
 ##   SWEEP seed 7: won (run seed 123...)
@@ -55,7 +55,9 @@ static func seeds_of(args: PackedStringArray) -> PackedInt64Array:
 		var value: String = arg.trim_prefix(SEEDS_ARGUMENT)
 		var ends: PackedStringArray = value.split("-")
 		if ends.size() == 2 and ends[0].is_valid_int() and ends[1].is_valid_int():
-			for seed_value in range(maxi(ends[0].to_int(), 1), ends[1].to_int() + 1):
+			var low: int = mini(ends[0].to_int(), ends[1].to_int())
+			var high: int = maxi(ends[0].to_int(), ends[1].to_int())
+			for seed_value in range(maxi(low, 1), high + 1):
 				out.append(seed_value)
 		else:
 			for part in value.split(","):

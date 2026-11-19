@@ -254,7 +254,8 @@ func _glow_wanted(rock: int) -> int:
 ## The shades (shadow, base, light) of the palette material nearest the element `element`'s tint
 ## (by its base shade; the world's materials only), the spark's for none.
 func _tint_of(element: StringName) -> PackedColorArray:
-	var card: ElementBase = registry.call(&"get_resource", SPELLS_FOLDER, element) as ElementBase if registry != null and element != &"" else null
+	# Read once a rock, as the damage numbers read an element's colour (`ElementBase.tint`).
+	var card := registry.call(&"get_resource", SPELLS_FOLDER, element) as ElementBase if registry != null and element != &"" else null
 	if card == null:
 		return Palette.shades_of(&"spark")
 	return Palette.shades_of(nearest_material(card.tint))

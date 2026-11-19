@@ -523,6 +523,14 @@ signal altar_placed(standing: bool, at: Vector2)
 ## many). Sent as it changes; empty when none is lit (a room under way, the room left). For the view
 ## only. Heard by feel (the kind's name over each lit exit).
 signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
+## Sender: flow. In a biome (connected biomes CB7): gather door `door` (the doors of the biome's gated
+## rooms, by number, then the portal home after them), its `rule` (`RoomKind.DOOR_GATHER`,
+## `DOOR_GATE`, or `portal` for the portal home), its `area` in world pixels (a door's mouth, the
+## portal's floor), how many standing wizards are `gathered` at it of the `standing` there are,
+## `held` while a gate stays shut for a sealed fight that holds a wizard, and `open` once it opened.
+## Sent as it changes; door -1 (the rest empty): every door forgotten (the biome left, a restore).
+## For the view only. Heard by feel (the door's bars, its lamps, the portal).
+signal gather_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as

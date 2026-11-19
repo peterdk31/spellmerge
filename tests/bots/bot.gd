@@ -30,6 +30,12 @@ extends FrameSource
 ## toward the landing where no walk is open), then steps in, and its fight seals it in; in a fight the brain plays as
 ## above, and a revive goes first (its brain's `revive` behaviour running: it stays by the one downed,
 ## cleared room or not). It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
+## Rewards: a fighter answers a "pick 1 of N" offer waiting for its seat (gameplay/rewards, as the
+## reward menu shows it) with the same command a player's A sends (`reward_pick_requested` on the bus,
+## as the menu sends it), its first choice, the next one if that was refused (a full bag), so it never
+## stands waiting in a reward room. An offer every choice of which was refused is passed over for the
+## next one waiting (all asked again once the offers change); with nothing left to ask while a menu
+## holds its seat (the reward menu opens again on a refusal) it closes it with `back`, as a person would.
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
@@ -97,6 +103,15 @@ var _route_map: BiomeMap = null
 ## The open actors, read for a crawl (sized once).
 var _ids: PackedInt32Array = PackedInt32Array()
 
+## The offers waiting for its seat, as the Rewards area last told them (`rewards_waiting_changed`, as
+## the reward menu hears them), the offer it last asked for and the choice it asked, and the offers
+## it gave up on (every choice refused) since they last changed.
+var _waiting: Array[Dictionary] = []
+var _asked_offer: int = -1
+var _asked_choice: int = -1
+var _given_up: PackedInt32Array = PackedInt32Array()
+var _events: Node = null
+
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
 ## How many `staff_change_requested` events the bot has sent.
@@ -116,6 +131,7 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	if int(_input.call("add_virtual_device", player)) == int(_input.get("NO_DEVICE")):
 		return false
 	_frames = _input.get_tree().root.get_node_or_null("Frames")
+	use_events(_input.get_tree().root.get_node_or_null("Events"))
 	if _frames != null:
 		_frames.call("set_source", player, self)
 	return true
@@ -200,6 +216,55 @@ func fill_frame(frame: InputFrame, delta: float) -> void:
 	frame.held_bits = _wanted.held_bits
 	frame.pressed_bits = _wanted.pressed_bits
 	_wanted.pressed_bits = 0
+	if mode == Mode.FIGHTER:
+		pick_reward()
+
+
+## Hear the offers waiting from `events` (the `Events` autoload, as `join` does; a test's bus).
+func use_events(events: Node) -> void:
+	_events = events
+	if events != null and not events.is_connected(&"rewards_waiting_changed", _on_rewards_waiting_changed):
+		events.connect(&"rewards_waiting_changed", _on_rewards_waiting_changed)
+
+
+func _on_rewards_waiting_changed(seat: int, offers: Array[Dictionary]) -> void:
+	if seat != player:
+		return
+	if offers.size() != _waiting.size():
+		# Taken or a new one: whatever was given up may fit now (a bag freed).
+		_given_up.clear()
+	_waiting = offers.duplicate()
+
+
+## Forget what it asked (a new wizard: a new run numbers its offers afresh).
+func _forget_rewards() -> void:
+	_asked_offer = -1
+	_asked_choice = -1
+	_given_up.clear()
+
+
+## Ask for a pick of the oldest offer waiting for its seat that it has not given up on
+## (`reward_pick_requested` on the bus, as the reward menu's A: the frames service puts it in the
+## seat's frame): its first choice, or, the same offer still waiting after that ask (a refusal), the
+## next; past its last choice the offer is given up and the next one is asked. With nothing left to
+## ask while a menu holds its seat, a `back` closes it. Nothing with none waiting.
+func pick_reward() -> void:
+	if _events == null:
+		return
+	for offer: Dictionary in _waiting:
+		var number: int = int(offer["offer"])
+		if _given_up.has(number):
+			continue
+		var choice: int = _asked_choice + 1 if number == _asked_offer else 0
+		if choice >= (offer["choices"] as Array).size():
+			_given_up.append(number)
+			continue
+		_asked_offer = number
+		_asked_choice = choice
+		_events.emit_signal("reward_pick_requested", player, number, choice)
+		return
+	if not _waiting.is_empty() and _input != null and bool(_input.call("is_captured", player)):
+		tap_back()
 
 
 ## One step: the brain thinks for the wizard and the bot wants what it wants (`send`). An idler
@@ -220,6 +285,7 @@ func step(delta: float) -> void:
 		# A new wizard (a new run): a fresh brain for it.
 		intent.clear()
 		brain.setup(wizard, PROFILE, SEED + player)
+		_forget_rewards()
 	intent.begin_step()
 	brain.think(delta, intent)
 	# A revive under way (the brain's `revive` behaviour) goes first: it would walk off its teammate.

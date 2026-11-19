@@ -451,7 +451,7 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		var rise: float = clampf(_age[slot] / EASE_IN, 0.0, 1.0)
 		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
 		var group: int = _group_holding(slot)
-		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen) if group >= 0 else SPLIT_ZOOM, pull)
+		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM, pull)
 		var aim: Vector2 = _centre[slot]
 		if group >= 0:
 			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
@@ -486,8 +486,9 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 ## The zoom group `group`'s view frames its close foes at: SPLIT_ZOOM while they are drawn inside its
 ## cell with FOE_MARGIN to spare, else lower, down to the party camera's MIN_ZOOM. The cell is where
 ## the screen is nearer the group's place than any other group's, within the screen; the view zooms
-## about the group's middle drawn at its place.
-func zoom_for_foes(group: int, screen: Vector2) -> float:
+## about the group's middle drawn at its place. Never wider than `limits` (the world camera's; none:
+## no bound) allow: a picture past them would be pushed off its group's place.
+func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> float:
 	var zoom: float = SPLIT_ZOOM
 	if _foes == null or _foes.count == 0:
 		return zoom
@@ -499,29 +500,31 @@ func zoom_for_foes(group: int, screen: Vector2) -> float:
 		var way: Vector2 = _foes.at[i] - _group_middle[group]
 		if way.length_squared() < 1.0:
 			continue
-		var unit: Vector2 = way.normalized()
 		# The screen's four edges, then the line half way to each other group's place.
-		zoom = _fit_along(zoom, way, unit, Vector2.LEFT, site.x)
-		zoom = _fit_along(zoom, way, unit, Vector2.RIGHT, screen.x - site.x)
-		zoom = _fit_along(zoom, way, unit, Vector2.UP, site.y)
-		zoom = _fit_along(zoom, way, unit, Vector2.DOWN, screen.y - site.y)
+		zoom = _fit_along(zoom, way, Vector2.LEFT, site.x)
+		zoom = _fit_along(zoom, way, Vector2.RIGHT, screen.x - site.x)
+		zoom = _fit_along(zoom, way, Vector2.UP, site.y)
+		zoom = _fit_along(zoom, way, Vector2.DOWN, screen.y - site.y)
 		for other in ActorsScript.SEATS:
 			if other == group or _group_seats[other] == 0:
 				continue
 			var apart: Vector2 = _group_site[other] - site
 			if apart.length_squared() < 1.0:
 				continue
-			zoom = _fit_along(zoom, way, unit, apart.normalized(), apart.length() * 0.5)
-	return clampf(zoom, PartyCameraScript.MIN_ZOOM, SPLIT_ZOOM)
+			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
+	var widest: float = PartyCameraScript.MIN_ZOOM
+	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
+		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
+	return clampf(zoom, minf(widest, SPLIT_ZOOM), SPLIT_ZOOM)
 
 
-## `zoom`, lowered so a point `way` from the place (drawn `way` × zoom from it, FOE_MARGIN further
-## along `unit`) stays within `room` of it along `normal`.
-static func _fit_along(zoom: float, way: Vector2, unit: Vector2, normal: Vector2, room: float) -> float:
+## `zoom`, lowered so a point `way` from the place (drawn `way` × zoom from it) stays FOE_MARGIN
+## inside `room` of it along `normal`.
+static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) -> float:
 	var reach: float = way.dot(normal)
 	if reach <= 0.0:
 		return zoom
-	return minf(zoom, maxf(room - FOE_MARGIN * unit.dot(normal), 0.0) / reach)
+	return minf(zoom, maxf(room - FOE_MARGIN, 0.0) / reach)
 
 
 ## The group (lowest seat) live slot `slot` shows, or -1.

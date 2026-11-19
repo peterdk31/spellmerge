@@ -459,6 +459,12 @@ func test_a_view_zooms_out_for_its_close_foes_and_its_cell_still_holds_its_wizar
 		_party.step(FRAME)
 		_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
 	near = _split.views.view_of_seat(0)
-	check(near >= 0 and _split.views.to_screen[near].x.x >= PartyCameraScript.MIN_ZOOM - 0.001, "a far foe in a sealed fight: the view stops at the widest zoom (%f)" % (_split.views.to_screen[near].x.x if near >= 0 else -1.0))
+	var limits := Rect2(_camera.limit_left, _camera.limit_top, _camera.limit_right - _camera.limit_left, _camera.limit_bottom - _camera.limit_top)
+	var widest: float = maxf(PartyCameraScript.MIN_ZOOM, maxf(SCREEN.x / limits.size.x, SCREEN.y / limits.size.y))
+	check(near >= 0 and absf(_split.views.to_screen[near].x.x - widest) < 0.01, "a far foe in a sealed fight: the view stops at the widest zoom the limits allow, %f (%f)" % [widest, _split.views.to_screen[near].x.x if near >= 0 else -1.0])
 	check(_split.split, "a foe never merges or splits the views: still split")
 	_check_own_cells(_split.views, "with a far foe")
+	# Narrow limits (a biome one screen tall): the view zooms out no wider than they allow.
+	_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
+	var group: int = 0
+	check(is_equal_approx(_split.zoom_for_foes(group, SCREEN, Rect2(limits.position, Vector2(limits.size.x, SCREEN.y / 0.8))), 0.8), "limits 1/0.8 screens tall: no wider than 0.8")

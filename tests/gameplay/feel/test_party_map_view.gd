@@ -474,10 +474,15 @@ func test_a_rerolled_rooms_sign_sinks_out_and_its_new_one_rises() -> void:
 	check(symbols.is_turning(into_west), "the sign turns over")
 	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "no jump: the old sign still shows")
 	var rows: Array[int] = []
+	var strengths: Array[float] = []
 	while symbols.is_moving():
 		symbols.advance()
 		rows.append(symbols.rows_of(into_west))
+		var light: Marker2D = symbols.light_of(into_west)
+		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
 	check_equal(rows, [6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7] as Array[int], "it sinks out a row a frame and the new one rises")
+	for i in strengths.size():
+		check(is_equal_approx(strengths[i], MouthSymbolsScript.LIGHT_STRENGTH * rows[i] / RoomKind.SYMBOL_SIDE), "its light follows its rows, never a jump (%s)" % [strengths])
 	check(not symbols.is_turning(into_west), "turned")
 	check(symbols.light_of(into_west) != old_light and symbols.light_of(into_west).get_meta(LightSpot.TINT) == KindSymbolScript.shades_of(_hearing().kind_of(WEST))[1], "its light is the new kind's")
 	check(map != null, "the map")

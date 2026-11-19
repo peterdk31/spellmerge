@@ -18,7 +18,7 @@ extends Node2D
 ## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) is drawn as it stands; a room
 ## rerolled (`turn`, Feel's of `room_rerolled`; the owner, 2026-11-19) turns its signs over: a mouth
 ## into it showing its old kind's symbol sinks that out a row a frame at FPS, then its new kind's
-## rises in the same way, never a jump, its light changing while no sign shows. Whole pixels;
+## rises in the same way, never a jump, its light dimming out and brightening in with the rows. Whole pixels;
 ## nothing fades.
 ##
 ## A child of Feel, top level (world space), over the mouths' looks and under the bodies. Feel steps it
@@ -160,6 +160,7 @@ func is_moving() -> bool:
 ## One row of every change (a frame at FPS).
 func advance() -> void:
 	for mouth in _rows.size():
+		var was: int = _rows[mouth]
 		if _turning[mouth] != 0 and _rows[mouth] == 0:
 			# The old sign is out: the new one takes its place and rises from here.
 			_turning[mouth] = 0
@@ -167,8 +168,10 @@ func advance() -> void:
 			_shades[mouth] = _next_shades[mouth]
 			_glyph_pixels[mouth] = _next_glyphs[mouth]
 			_glyph_shades[mouth] = _next_glyph_shades[mouth]
-			_light(mouth)
 		_rows[mouth] += signi(_wanted(mouth) - _rows[mouth])
+		if _rows[mouth] != was:
+			# Its light dims and brightens with its rows (made again only while a sign moves).
+			_light(mouth)
 	queue_redraw()
 
 
@@ -294,18 +297,20 @@ func _read(grid: RoomGrid, found: int, world_now: int) -> void:
 	queue_redraw()
 
 
-## The light spot on mouth `mouth`'s sign made again in its kind's light (none when it tells
-## nothing). Made only as a world is read or a sign turns over, never in a plain frame.
+## The light spot on mouth `mouth`'s sign made again in its kind's light, as bright as the share of
+## its rows shown (none when it tells nothing or shows no row), so a sign turning over dims its
+## light out and the new one's in by its rows (Smooth). Made only as a world is read or a sign
+## moves, never in a still frame.
 func _light(mouth: int) -> void:
 	if _lights[mouth] != null:
 		_lights[mouth].queue_free()
 		_lights[mouth] = null
-	if _pixels[mouth].is_empty():
+	if _pixels[mouth].is_empty() or _rows[mouth] <= 0:
 		return
 	var light := Marker2D.new()
 	light.name = "SignLight%d" % mouth
 	light.position = _at[mouth] + Vector2.ONE * (RoomKind.SYMBOL_SIDE * SCALE * 0.5)
-	LightSpot.mark(light, LIGHT_REACH, LIGHT_STRENGTH, 0.0, _shades[mouth][1])
+	LightSpot.mark(light, LIGHT_REACH, LIGHT_STRENGTH * float(_rows[mouth]) / float(RoomKind.SYMBOL_SIDE), 0.0, _shades[mouth][1])
 	_lights[mouth] = light
 	add_child(light)
 

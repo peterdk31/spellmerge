@@ -16,8 +16,16 @@ const BoltCard := preload("res://content/spells/carriers/bolt/bolt.tres")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const WallClock := preload("res://tests/support/wall_clock.gd")
 
 ## Ticks played before the snapshot, and after it.
+## A restore across into a world that laid another biome (`test_a_twelve_room_biome_costs_the_snapshot_its_map`):
+## its runs (the fastest counts), what one usually costs in GDScript references (`WallClock`) on a
+## quiet machine (2026-11-20, a 4-core container), and the slack over that, so a 2x slowdown fails
+## on any machine, loaded or not.
+const ACROSS_RUNS: int = 3
+const ACROSS_USUAL: float = 6.0
+const ACROSS_SLACK: float = 1.5
 const BEFORE: int = 70
 const AFTER: int = 80
 ## Ticks a decoy fight plays after its snapshot: past several decoys' ends and new ones.
@@ -484,11 +492,23 @@ func test_a_twelve_room_biome_costs_the_snapshot_its_map() -> void:
 	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid as it was")
 	check_equal(into.get_child_count(), 23, "nothing laid again: twelve rooms and eleven bridges")
 	# Into a world that laid another biome (a joining machine's): the restored map is laid.
-	var other_into := own(Node2D.new()) as Node2D
-	var other: BiomeWorld = BiomeMaps.laid(registry, mgr, other_into, BiomeMaps.walk_through(registry))
-	started = Time.get_ticks_usec()
-	check_equal(snapshot.restore({"Projectiles": mgr, "Biome": other}), PackedStringArray(), "restored across without problems")
-	var across_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	# Timed on ACROSS_RUNS such worlds in turn with the GDScript reference, the fastest of each
+	# (tests/support/wall_clock.gd): the last is the one checked.
+	var others: Array[BiomeWorld] = []
+	var others_into: Array[Node2D] = []
+	for run in ACROSS_RUNS:
+		others_into.append(own(Node2D.new()) as Node2D)
+		others.append(BiomeMaps.laid(registry, mgr, others_into[run], BiomeMaps.walk_through(registry)))
+	var next: Array[int] = [0]
+	var restored: Array[PackedStringArray] = []
+	var timed: WallClock.Timed = WallClock.against(func() -> void:
+		restored.append(snapshot.restore({"Projectiles": mgr, "Biome": others[next[0]]}))
+		next[0] += 1, WallClock.gdscript_reference, ACROSS_RUNS)
+	for problems: PackedStringArray in restored:
+		check_equal(problems, PackedStringArray(), "restored across without problems")
+	var other: BiomeWorld = others[ACROSS_RUNS - 1]
+	var other_into: Node2D = others_into[ACROSS_RUNS - 1]
+	var across_ms: float = float(timed.work_usec) / 1000.0
 	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid laid again from the map, the stones in it, the same to the byte")
 	var again := StateWalk.new()
 	again.with_paths = false
@@ -496,6 +516,8 @@ func test_a_twelve_room_biome_costs_the_snapshot_its_map() -> void:
 	check_equal(other_into.get_child_count(), 23, "its pieces laid")
 	print("CB2 snapshot cost of a 12-room biome: adds %d bytes; taken in %.1f ms, restored in place in %.1f ms, across (laid again) in %.1f ms" % [held, take_ms, restore_ms, across_ms])
 	check(held < 8192, "the biome adds a few kilobytes to the snapshot: %d bytes" % held)
-	check(across_ms < 1000.0, "laid again in under a second: %.1f ms" % across_ms)
+	print("CB2 snapshot across: %.2f GDScript references (one %d us)" % [timed.multiple, timed.reference_usec])
+	check(timed.multiple <= ACROSS_USUAL * ACROSS_SLACK, "laid again in %.2f GDScript references, within %.1f (%.1f ms)" % [timed.multiple, ACROSS_USUAL * ACROSS_SLACK, across_ms])
 	biome.clear()
-	other.clear()
+	for world: BiomeWorld in others:
+		world.clear()

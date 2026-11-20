@@ -25,8 +25,8 @@ extends PanelContainer
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
 ## Beside the staff rows, the seat's four quick-use slots (`set_quick`; `hud/widgets/quick_cross.gd`, a
-## small d-pad cross with each bound item's icon and count, the owner's of 2026-11-20): it takes room
-## only while something is bound, growing and shrinking by whole steps (Smooth).
+## small d-pad cross with each bound item's icon and count, the owner's of 2026-11-20): it always
+## shows, its arms empty cells before anything is bound (the owner, 2026-11-20).
 ##
 ## While the player has a menu open the staff rows hide: the builder shows the staffs, and the
 ## radial builder's column takes the space under the panel.
@@ -35,6 +35,10 @@ const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
+## The staff rows' least width: all of a 96 px panel inside its 4 px margins, as before the quick-use
+## cross stood beside them always, so a short staff still shows whole and the panel grows by the
+## cross instead (inside a quarter pane of the Equal split).
+const STAFFS_WIDTH: float = 88.0
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
@@ -123,11 +127,13 @@ func _ready() -> void:
 	_staffs.reparent(_lower, false)
 	_staffs.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_staffs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_staffs.custom_minimum_size.x = STAFFS_WIDTH
+	# No staff told yet: no rows (and no width held for them) until one is.
+	_staffs.visible = false
 	_quick = QuickCrossScript.new()
 	_quick.name = "QuickCross"
 	_quick.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_lower.add_child(_quick)
-	_quick.shown_changed.connect(_refresh_rows)
 	_held_note = Label.new()
 	_held_note.name = "JoinHeld"
 	_held_note.visible = false
@@ -262,6 +268,11 @@ func set_quick(slot: int, icon: Texture2D, count: int, at_once: bool = false) ->
 	_quick.set_slot(slot, icon, count, at_once)
 
 
+## Quick-use slot `slot`'s item recharges for `left` more seconds of its `whole` cooldown (0: ready).
+func set_quick_recharge(slot: int, left: float, whole: float, at_once: bool = false) -> void:
+	_quick.set_recharge(slot, left, whole, at_once)
+
+
 ## The quick-use cross (for tests and screenshots).
 func quick_cross() -> QuickCrossScript:
 	return _quick
@@ -384,10 +395,9 @@ func _refresh_rows() -> void:
 	for staff in STAFF_COUNT:
 		_rows[staff].visible = _has_cards[staff] and not _menu_open
 	_staffs.visible = not _menu_open and _has_cards.has(true)
-	# The cross shows only while it takes room (it says so itself), so an empty one adds no gap;
-	# while a menu is open the whole row hides with the staff rows.
-	_lower.visible = _staffs.visible or (_quick.cross_stage() > 0 and not _menu_open)
-	_quick.modulate.a = 0.0 if _menu_open else 1.0
+	# The cross always shows, an empty one too; while a menu is open the whole row hides with the
+	# staff rows.
+	_lower.visible = not _menu_open
 
 
 func _refresh_status() -> void:

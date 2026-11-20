@@ -342,6 +342,11 @@ func hint_verbs() -> Array[String]:
 	return _hint_verbs.duplicate()
 
 
+## Whether each hint is live (lit) or dimmed, in the order of `hint_verbs` (for tests).
+func hint_live() -> Array[bool]:
+	return _hint_live.duplicate()
+
+
 ## The hint row's place, from its first glyph to the end of its last verb.
 func hints_rect() -> Rect2:
 	var width: float = 0.0

@@ -8,7 +8,8 @@ extends RefCounted
 ## - `stacks`: whether copies of one id share one stack (a count) or each is a stack of its own.
 ## - `content`: the registry folders its ids are found in (core/registry), and `type`: the class a
 ##   resource there must be to be one of it (`is_content`).
-## - `actions`: what can be done with one held (`can`).
+## - `actions`: what can be done with one held (`can`). Whether one is used is not a kind's: its
+##   content has a use (`usable`, `use_of`).
 ## - `premade`: the registry folders its premade items are found in (`premade_of`: the hub's rack,
 ##   a `StaffItem`; items I6), apart from its content.
 ## - `ids` (only for a kind that shares its bag with another, the currency's coins, keys and rerolls): the ids
@@ -16,6 +17,8 @@ extends RefCounted
 ##
 ##     var bag: StringName = ItemKinds.bag_of(ItemKinds.CARD)   # &"cards"
 ##     if ItemKinds.stacks(stack.kind): ...
+
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 const STAFF: StringName = &"staff"
 const CARD: StringName = &"card"
@@ -34,13 +37,12 @@ const BAGS: Array[StringName] = [&"staffs", &"cards", &"relics", &"potions", &"c
 const DROP: StringName = &"drop"
 const DROP_ONE: StringName = &"drop_one"
 const HAND: StringName = &"hand"
-const USE: StringName = &"use"
 
 ## One row a kind (see the class doc). A premade staff (`StaffItem`, `items`) is a staff of the
 ## `wizard` folder with its cards, so a stack's id is always its content's. A relic is a
 ## `RelicBase` (connected biomes CB10: its run stat changes, `RunStats`; no relic file exists yet).
-## A potion is a `PotionBase` (content/potions), drunk from the bag (USE: the player controller's
-## `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
+## A potion is a `PotionBase` (content/potions), drunk from the bag (its content has a use, not its
+## row: `usable`; the player controller's `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
 ## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one); a key is a
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
 ## room's door (the owner, 2026-11-19: "Keys are also just inventory items"); a reroll is a
@@ -53,7 +55,7 @@ const RULES: Dictionary = {
 	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"], "premade": [&"items"]},
 	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"], "premade": []},
 	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"RelicBase", "actions": [&"drop"], "premade": []},
-	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop", &"use"], "premade": []},
+	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop"], "premade": []},
 	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [&"drop"], "premade": [], "ids": [&"coin"]},
 	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [&"drop"], "premade": [], "ids": [&"key"]},
 	&"reroll": {"bag": &"currency", "stacks": true, "content": [&"rerolls"], "type": &"RerollBase", "actions": [&"drop"], "premade": [], "ids": [&"reward_reroll"]},
@@ -168,9 +170,36 @@ static func kind_of(resource: Resource) -> StringName:
 	return &""
 
 
-## True when one held of `kind` can be `action`ed (DROP, DROP_ONE, HAND, USE).
+## True when one held of `kind` can be `action`ed (DROP, DROP_ONE, HAND). Whether one is used is
+## whether its own content has a use, never its kind's (`usable`).
 static func can(kind: StringName, action: StringName) -> bool:
 	return (_row(kind).get("actions", []) as Array).has(action)
+
+
+## True when the item `id` of `bag` is usable: it has a use (`ItemContent.use_of`, an `ItemUse`; the
+## owner, 2026-11-20: usable exactly when it has a use). Only such an item is used from the bag or
+## bound to a d-pad arm. An item `registry` has no content of, one with no use (a coin, a passive
+## relic) or of a kind that has none (a staff, a card), is not.
+static func usable(bag: StringName, id: StringName, registry: RegistryScript) -> bool:
+	return use_of(bag, id, registry) != null
+
+
+## The use of the item `id` of `bag` (`ItemContent.use_of`), or null for none.
+static func use_of(bag: StringName, id: StringName, registry: RegistryScript) -> ItemUse:
+	var found := content(kind_in(bag, id), id, registry) as ItemContent
+	return found.use_of() if found != null else null
+
+
+## The content `kind` `id` is (the first of its row's folders that has it and is of its class), or
+## null.
+static func content(kind: StringName, id: StringName, registry: RegistryScript) -> Resource:
+	if registry == null or id == &"":
+		return null
+	for folder: StringName in content_of(kind):
+		var found: Resource = registry.get_resource(folder, id)
+		if found != null and is_content(kind, found):
+			return found
+	return null
 
 
 static func _row(kind: StringName) -> Dictionary:

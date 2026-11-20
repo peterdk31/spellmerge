@@ -1,7 +1,8 @@
 class_name Inventory
 extends ActorComponent
 ## The inventory (items I3, docs/milestones/items.md, "The model"): the things an actor holds, in
-## bags, and which of its staffs is on which hand. A component of the actor kit, never stepped; the
+## bags, and which of its staffs is on which hand. A component of the actor kit, stepped by its body only
+## while an item recharges (`step`, `recharge_left`: an active relic's cooldown); the
 ## wizard has one in its scene (`content/wizard/base/wizard.tscn`), and every other actor is given
 ## one by its actor (items I8: an enemy's or a prop's staffs on its hands, its bags empty). Hands are
 ## its Caster's: a body with no Caster has none (`free_hand`), so whatever it takes goes in a bag.
@@ -58,12 +59,14 @@ extends ActorComponent
 ##
 ## - **Quick-use slots** (the owner, 2026-11-20): one per d-pad arm (QUICK_SLOTS: 0 up, 1 right, 2
 ##   down, 3 left), each bound to a usable item by its bag and id or to nothing (`quick_bag`,
-##   `quick_id`). `bind_quick(slot, bag, id)` binds one it holds a copy of and can use
-##   (`ItemKinds.USE`; refused NO_ITEM, NO_USE): bound on another slot already, it moves; bound on
-##   this slot already, it is let go (as a hand's button takes its staff off). A binding names the
-##   item, not a copy: with none left it stays (the HUD greys it) and is full again as one is taken.
+##   `quick_id`, `quick_slot_of`). **Only an item with a use binds** (`ItemContent.use_of`,
+##   `ItemKinds.usable`; the owner, 2026-11-20): `bind_quick(slot, bag, id)` binds one it holds a copy
+##   of (refused NO_USE, NO_ITEM): bound on another slot already, it moves (with none left too);
+##   bound on this slot already, it is let go (as a hand's button takes its staff off). A binding
+##   names the item, not a copy: with none left it stays (the HUD greys it, on the panel and on the
+##   inventory's ring) and is full again as one is taken.
 ##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
-##   and a usable item taken (`add`) that no slot is bound to fills the first slot bound to nothing**
+##   and an item with a use taken (`add`) that no slot is bound to fills the first slot bound to nothing**
 ##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
@@ -72,6 +75,11 @@ extends ActorComponent
 
 ## Why a change was refused (NONE: it was made).
 enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP, NO_USE }
+
+const RegistryScript := preload("res://core/registry/registry.gd")
+
+## Not state: the content registry it reads an item's use from (a service), and a step's scratch.
+const DERIVED: Array[StringName] = [&"registry", &"_recharged"]
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -85,6 +93,8 @@ const HANDS: int = Caster.MAX_STAFFS
 const DEV_COPIES: int = 20
 ## The quick-use slots, one per d-pad arm (0 up, 1 right, 2 down, 3 left).
 const QUICK_SLOTS: int = 4
+## No quick-use slot (`quick_slot_of`).
+const NO_QUICK: int = -1
 
 ## The contents of bag `bag` changed (`stacks_in`, `count_of`, `copies`).
 signal bag_changed(bag: StringName)
@@ -94,6 +104,8 @@ signal staff_changed(number: int)
 signal hands_changed()
 ## What quick-use slot `slot` is bound to changed (`quick_bag`, `quick_id`).
 signal quick_changed(slot: int)
+## An item it holds began to recharge, or is ready again (`recharge_left`).
+signal recharge_changed(bag: StringName, id: StringName)
 
 ## By bag (each of `ItemKinds.BAGS`): its stacks, in the order they came.
 var _bags: Dictionary = {}
@@ -121,6 +133,17 @@ var _carried_kept: int = 0
 ## By quick-use slot: the bag and the id of the item bound to it (`&""`: none).
 var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
 var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
+## Items recharging after a use (the owner, 2026-11-20: an active relic recharges for its use's
+## cooldown): by `_recharge_key(bag, id)`, the seconds left, counted down by `step` with the tick's
+## delta. State: hashed and snapshotted.
+var _recharge: Dictionary = {}
+## By the same key: the whole cooldown it recharges for (to tell its steps).
+var _recharge_whole: Dictionary = {}
+## Scratch: the keys done recharging in a step.
+var _recharged: Array[StringName] = []
+## The content registry (`ItemKinds.usable` reads an item's tag from it): set by its body's controller
+## (`PlayerController`) or `take_loadout`; null: the registry autoload.
+var registry: RegistryScript = null
 
 
 func _init() -> void:
@@ -188,19 +211,21 @@ func loadout() -> PlayerLoadout:
 ## `registry` has of its id; one it has none of is left out; cards past its slots are cut, as
 ## `ItemStack.of_staff` cuts them), on the hands the loadout puts them on
 ## or else in the staff bag, every pool full. A bag it has not, and a hand past HANDS, hold nothing.
-func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
+func take_loadout(loadout: PlayerLoadout, in_registry: Node) -> void:
 	cards_given = true
 	_staffs_given = true
 	_hands.fill(null)
 	_next_number = HANDS
 	# What it carried from the start is gone with the bags (`carried_kept`: 0 from now on).
 	_carried_kept = 0
+	if registry == null:
+		registry = in_registry as RegistryScript
 	for bag: StringName in _bags:
 		_stacks(bag).clear()
 	for slot in QUICK_SLOTS:
 		var bag: StringName = loadout.quick_bag(slot)
 		var id: StringName = loadout.quick_id(slot)
-		var bound: bool = _bags.has(bag) and ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE)
+		var bound: bool = _bags.has(bag) and ItemKinds.usable(bag, id, _registry())
 		_quick_bags[slot] = bag if bound else &""
 		_quick_ids[slot] = id if bound else &""
 	for bag: StringName in loadout.bags():
@@ -219,7 +244,7 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 			stack.count = counts[at]
 			_put(stack)
 	for number: int in loadout.staff_numbers():
-		var base: StaffBase = staff_content(registry, loadout.staff_id(number))
+		var base: StaffBase = staff_content(in_registry, loadout.staff_id(number))
 		if base == null:
 			continue
 		var stack := ItemStack.of_staff(base, loadout.staff_cards(number))
@@ -261,12 +286,12 @@ func set_staff_mana(number: int, mana: float) -> void:
 		stack.mana = clampf(mana, 0.0, stack.staff.max_mana if stack.staff != null else mana)
 
 
-## The staff `registry` has of the id `id` in the staff kind's content folders, or null.
-static func staff_content(registry: Node, id: StringName) -> StaffBase:
-	if registry == null or id == &"":
+## The staff `content_registry` has of the id `id` in the staff kind's content folders, or null.
+static func staff_content(content_registry: Node, id: StringName) -> StaffBase:
+	if content_registry == null or id == &"":
 		return null
 	for folder: StringName in ItemKinds.content_of(ItemKinds.STAFF):
-		var found: Resource = registry.call(&"get_resource", folder, id) as Resource
+		var found: Resource = content_registry.call(&"get_resource", folder, id) as Resource
 		if ItemKinds.is_content(ItemKinds.STAFF, found):
 			return found as StaffBase
 	return null
@@ -296,14 +321,14 @@ func hand_cards() -> Array:
 # --- Bags -------------------------------------------------------------------------------
 
 ## The dev bag (the hub's, and a wizard's given none): DEV_COPIES of every card
-## `registry` finds in the card kind's content folders, card id to copies, in the registry's order.
-static func dev_cards(registry: Node) -> Dictionary:
+## `content_registry` finds in the card kind's content folders, card id to copies, in the registry's order.
+static func dev_cards(content_registry: Node) -> Dictionary:
 	var out: Dictionary = {}
-	if registry == null:
+	if content_registry == null:
 		return out
 	for folder: StringName in ItemKinds.content_of(ItemKinds.CARD):
-		for id: StringName in registry.call(&"get_ids", folder):
-			if ItemKinds.is_content(ItemKinds.CARD, registry.call(&"get_resource", folder, id) as Resource):
+		for id: StringName in content_registry.call(&"get_ids", folder):
+			if ItemKinds.is_content(ItemKinds.CARD, content_registry.call(&"get_resource", folder, id) as Resource):
 				out[id] = DEV_COPIES
 	return out
 
@@ -376,17 +401,16 @@ func add(stack: ItemStack) -> bool:
 	_say_bag(bag)
 	for number in numbered:
 		_say_staff(number)
-	_bind_if_free(bag, stack.id, stack.kind)
+	_bind_if_free(bag, stack.id)
 	return true
 
 
 ## A usable item just taken that no quick-use slot is bound to fills the first slot bound to nothing.
-func _bind_if_free(bag: StringName, id: StringName, kind: StringName) -> void:
-	if not ItemKinds.can(kind, ItemKinds.USE):
+func _bind_if_free(bag: StringName, id: StringName) -> void:
+	if not ItemKinds.usable(bag, id, _registry()):
 		return
-	for slot in QUICK_SLOTS:
-		if _quick_bags[slot] == bag and _quick_ids[slot] == id:
-			return
+	if quick_slot_of(bag, id) != NO_QUICK:
+		return
 	for slot in QUICK_SLOTS:
 		if _quick_ids[slot] == &"":
 			_set_quick(slot, bag, id)
@@ -475,29 +499,47 @@ func quick_bag(slot: int) -> StringName:
 	return _quick_bags[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
 
 
+## The quick-use slot `id` of `bag` is bound to, NO_QUICK for none.
+func quick_slot_of(bag: StringName, id: StringName) -> int:
+	for slot in QUICK_SLOTS:
+		if id != &"" and _quick_bags[slot] == bag and _quick_ids[slot] == id:
+			return slot
+	return NO_QUICK
+
+
 ## The id of the item quick-use slot `slot` is bound to (`&""`: none, or no such slot).
 func quick_id(slot: int) -> StringName:
 	return _quick_ids[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
 
 
 ## Bind quick-use slot `slot` to `id` of `bag`, as the class doc says (`&""` lets the slot go).
-## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item it holds none of (NO_ITEM)
-## and one that is never used (NO_USE).
+## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item with no use (NO_USE,
+## `ItemKinds.usable`) and one it holds none of (NO_ITEM), unless that one is bound on another slot
+## already: a binding with none left moves as any does (the owner, 2026-11-20: the inventory lists it
+## greyed, to let go or bind again).
 func bind_quick(slot: int, bag: StringName, id: StringName) -> Refusal:
 	if slot < 0 or slot >= QUICK_SLOTS:
 		return Refusal.NO_SLOT
 	if id == &"" or (_quick_bags[slot] == bag and _quick_ids[slot] == id):
 		_set_quick(slot, &"", &"")
 		return Refusal.NONE
-	if not ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE):
+	if not ItemKinds.usable(bag, id, _registry()):
 		return Refusal.NO_USE
-	if count_of(bag, id) < 1:
+	if count_of(bag, id) < 1 and quick_slot_of(bag, id) == NO_QUICK:
 		return Refusal.NO_ITEM
 	for other in QUICK_SLOTS:
 		if other != slot and _quick_bags[other] == bag and _quick_ids[other] == id:
 			_set_quick(other, &"", &"")
 	_set_quick(slot, bag, id)
 	return Refusal.NONE
+
+
+## The content registry `ItemKinds.usable` reads an item's tag from: `registry`, else the autoload
+## (null outside the tree with none set: then nothing is usable).
+func _registry() -> RegistryScript:
+	if registry == null and is_inside_tree():
+		registry = get_node_or_null(^"/root/Registry") as RegistryScript
+	return registry
 
 
 func _set_quick(slot: int, bag: StringName, id: StringName) -> void:
@@ -856,6 +898,79 @@ func _on_hand(stack: ItemStack, hand: int) -> void:
 ## changed since its start, so an untouched body's state hash sums it up with the body.
 func at_rest() -> bool:
 	return not _edited
+
+
+# --- Recharging -------------------------------------------------------------------------
+
+## How finely a recharge is told (`recharge_changed`): at each sixteenth of its cooldown, so the HUD
+## shows the simulation's own count (16 rows on the inventory's ring, 8 on the cross) and never keeps
+## a clock of its own.
+const RECHARGE_STEPS: int = 16
+
+
+## The seconds before `id` of `bag` can be used again (0: ready).
+func recharge_left(bag: StringName, id: StringName) -> float:
+	return float(_recharge.get(_recharge_key(bag, id), 0.0))
+
+
+## The whole cooldown `id` of `bag` recharges for (0: not recharging).
+func recharge_whole(bag: StringName, id: StringName) -> float:
+	return float(_recharge_whole.get(_recharge_key(bag, id), 0.0))
+
+
+## `id` of `bag` recharges for `seconds` (its use's cooldown; nothing for none). The recharge is the
+## holder's, by its bag and id: an item dropped and taken back still recharges, one taken by another body is ready for it; a loadout (a run's
+## start, a rejoin) starts ready.
+func start_recharge(bag: StringName, id: StringName, seconds: float) -> void:
+	if seconds <= 0.0:
+		return
+	var key: StringName = _recharge_key(bag, id)
+	_recharge[key] = seconds
+	_recharge_whole[key] = seconds
+	_edited = true
+	recharge_changed.emit(bag, id)
+
+
+## True while anything recharges (its body steps it then: `step`).
+func is_recharging() -> bool:
+	return not _recharge.is_empty()
+
+
+## Every item recharging: [bag, id] each, in the order they began.
+func recharging() -> Array:
+	var out: Array = []
+	for key: StringName in _recharge:
+		var parts: PackedStringArray = String(key).split("/", true, 1)
+		out.append([StringName(parts[0]), StringName(parts[1])])
+	return out
+
+
+## Count every recharge down by `delta` (its body's step, the tick's delta): told at each
+## RECHARGE_STEPS step it passes (`recharge_changed`), and once ready.
+func step(delta: float) -> void:
+	_recharged.clear()
+	for key: StringName in _recharge:
+		var whole: float = float(_recharge_whole[key])
+		var before: int = _recharge_step(float(_recharge[key]), whole)
+		var left: float = float(_recharge[key]) - delta
+		_recharge[key] = left
+		if left <= 0.0 or _recharge_step(left, whole) != before:
+			_recharged.append(key)
+	for key: StringName in _recharged:
+		if float(_recharge[key]) <= 0.0:
+			_recharge.erase(key)
+			_recharge_whole.erase(key)
+		var parts: PackedStringArray = String(key).split("/", true, 1)
+		recharge_changed.emit(StringName(parts[0]), StringName(parts[1]))
+
+
+static func _recharge_step(left: float, whole: float) -> int:
+	return ceili(float(RECHARGE_STEPS) * left / whole - 0.000001) if whole > 0.0 and left > 0.0 else 0
+
+
+## Bag names hold no "/" (`ItemKinds.BAGS`), so the key splits back at its first.
+static func _recharge_key(bag: StringName, id: StringName) -> StringName:
+	return StringName("%s/%s" % [bag, id])
 
 
 ## Say a change (`bag_changed`, `staff_changed`, `hands_changed`); after its start, it is no longer

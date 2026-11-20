@@ -332,3 +332,26 @@ func test_the_rack_is_one_row_on_open_floor() -> void:
 	check_equal(ids, RACK_ROW, "the premade builds lie in one row, in this order")
 	for i in range(1, row.size()):
 		check_equal(row[i] - row[i - 1], Vector2(RACK_STEP, 0.0), "%s lies %d px right of %s" % [ids[i], int(RACK_STEP), ids[i - 1]])
+
+
+## The rack's normal staffs (the owner, 2026-11-20, on #891: real, balanced builds beside the crazy
+## ones, so players and bots have real choices): one row RACK_STEP apart ending left of the Wild
+## star, each on a starter staff (a starter's mana and a cooldown, never the dev staff).
+const NORMAL_ROW: Array[StringName] = [&"twin_bolt", &"frost_seeker", &"firebolt", &"wild_star"]
+
+
+func test_the_normal_staffs_lie_in_a_row_by_the_wild_star() -> void:
+	var places: RoomPlaces = _room().places()
+	var row: Array[Vector2] = []
+	var ids: Array[StringName] = []
+	for i in places.placed.size():
+		var item := places.placed[i] as StaffItem
+		if item == null or not NORMAL_ROW.has(item.id):
+			continue
+		row.append(places.placed_at[i])
+		ids.append(item.id)
+		if item.id != &"wild_star":
+			check(item.staff.cooldown > 0.0 and item.staff.max_mana <= 100.0, "%s is a fair staff" % item.id)
+	check_equal(ids, NORMAL_ROW, "the normal staffs lie in one row, in this order, the Wild star last")
+	for i in range(1, row.size()):
+		check_equal(row[i] - row[i - 1], Vector2(RACK_STEP, 0.0), "%s lies %d px right of %s" % [ids[i], int(RACK_STEP), ids[i - 1]])

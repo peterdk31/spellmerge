@@ -4,14 +4,15 @@ extends "res://tests/support/suite.gd"
 ## run seed (`SimSeed.fresh`) and about one start in eleven played a fight the bots lose; the test
 ## failed by chance ("player 3 is down at the end") and passed again on a rerun. Now the runner
 ## records its run with the replay seed REPLAY_SEED, which deals the run's seed: the same seed, so
-## the same map and rolls, on every start. `--replay-seed=N` plays another.
+## the same map and rolls, on every start. `--replay-seed=N` plays another. Since 2026-11-20 the
+## runner records the hub, which takes the first seed dealt, and the run from the stone the second.
 
 const RunnerScript := preload("res://tests/smoke/four_bot_runner.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 
 
 ## A runner started on the root, as four_bot_smoke.gd starts it, and stopped again; returns the
-## run seed its run got (-1 with no Tick autoload).
+## seed its hub got (-1 with no Tick autoload).
 func _run_seed_of_a_start() -> int:
 	var tick: TickScript = root.get_node_or_null(^"Tick") as TickScript
 	check(tick != null, "the Tick autoload is missing")
@@ -23,15 +24,36 @@ func _run_seed_of_a_start() -> int:
 	return seed_now
 
 
-## The run seed a replay of seed `of` deals to the first run it starts.
-func _dealt(of: int) -> int:
+## The run seed a replay of seed `of` deals to the `nth` run it starts (1: the first).
+func _dealt(of: int, nth: int = 1) -> int:
 	var replay := Replay.new()
 	replay.run_seed = of
-	return ReplayTape.recording(replay).next_run_seed()
+	var tape: ReplayTape = ReplayTape.recording(replay)
+	var dealt: int = 0
+	for _i in nth:
+		dealt = tape.next_run_seed()
+	return dealt
 
 
-func test_a_start_plays_the_run_seed_the_replay_seed_deals() -> void:
-	check_equal(_run_seed_of_a_start(), _dealt(RunnerScript.REPLAY_SEED), "the run seed is not the one REPLAY_SEED deals")
+func test_a_start_plays_the_hub_seed_the_replay_seed_deals() -> void:
+	check_equal(_run_seed_of_a_start(), _dealt(RunnerScript.REPLAY_SEED), "the hub's seed is not the one REPLAY_SEED deals")
+
+
+## The run the bots fight (from the hub's stone) plays the replay's second seed: the review of
+## 2026-11-20 (a stone's run with a seed of its own would have passed the hub's check above).
+func test_the_run_from_the_stone_plays_the_replay_seeds_second() -> void:
+	var runner: Node = RunnerScript.new()
+	root.add_child(runner)
+	for _frame in 1200:
+		if bool(runner.call("in_run")):
+			break
+		await physics_frame
+	var started: bool = bool(runner.call("in_run"))
+	var got: int = int(runner.call("run_seed"))
+	runner.call("stop")
+	runner.free()
+	check(started, "the bots started the run from the hub's stone")
+	check_equal(got, _dealt(RunnerScript.REPLAY_SEED, 2), "the run's seed is not the second REPLAY_SEED deals")
 
 
 func test_two_starts_play_the_same_run_seed() -> void:

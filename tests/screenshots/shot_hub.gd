@@ -4,7 +4,8 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Shots: one player just arrived (the stone dark, the stone line counting); the same player by the
 ## island's south-west edge, its rim of embers rising off it; the same player by the rack's row of
-## premade builds, the Glacier Engine's hint up (content/items/staffs/); two players on the stone and two off
+## premade builds, the Glacier Engine's hint up (content/items/staffs/); by the row of normal staffs
+## ending at the Wild star, the Frost seeker's hint up; two players on the stone and two off
 ## it; all four on the lit stone ("A starts the run"), the stone's cue playing; the whole island from
 ## above (hub rework HR2).
 
@@ -36,6 +37,10 @@ func take() -> void:
 	_place(0, Vector2(480.0, 796.0))
 	await settle(8)
 	await shot("hub_builds")
+	# The rack's normal staffs (the owner, 2026-11-20, on #891), the Frost seeker's hint up.
+	_place(0, Vector2(480.0, 732.0))
+	await settle(8)
+	await shot("hub_normal_staffs")
 	_place(0, room_spawn())
 	for index in range(1, 4):
 		_input.call("add_virtual_device", index)

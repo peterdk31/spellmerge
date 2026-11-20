@@ -13,9 +13,10 @@ const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const DT: float = 1.0 / 60.0
-## The items on the hub's rack: the Wild star and the seven premade builds (content/items/staffs/;
-## the two showcase builds of crypt rework CR-S among them).
-const HUB_RACK: int = 8
+## The items on the hub's rack: the three normal staffs (the owner, 2026-11-20, on #891), the Wild
+## star and the seven premade builds (content/items/staffs/; the two showcase builds of crypt rework
+## CR-S among them).
+const HUB_RACK: int = 11
 
 var flow: FlowScript
 var input: Node

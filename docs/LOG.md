@@ -12,6 +12,26 @@ The owner's two follow-ups to #890 (docs/milestones/connected-biomes.md, "Motes 
 
 Measured (`biome_frames.gd` under xvfb on llvmpipe, 4 cores, this container; main then this branch, two runs each, the second runs quieter; the views' render time a frame, then the frame's average): seed 11 desktop Dynamic 364/65 → 378/66 ms (frame 662/227 → 530/237), desktop Equal 215/107 → 102/64 ms (frame 453/287 → 275/223), seed 11 web Dynamic 183/53 → 54/54 ms (frame 367/165 → 155/147), web Equal 89/52 → 54/80 ms (frame 231/169 → 160/183), seed 23 web Equal 88/60 → 63/51 ms (frame 220/152 → 180/161); the one picture's root 83/51 → 380/52 ms (frame 293/200 → 523/190). Feel's "camera and split" with four views 2.33 to 2.42 → 2.08 to 2.31 ms. Between runs of the same build the numbers move by up to a factor of four on llvmpipe, where a view's time is mostly filling pixels, so no gain or loss shows here beyond that noise; the owner's GPU and web runs are the measure. The two-view split, where no copy is made at all now, is not in the benchmark (it splits four ways). Tests `test_mote_regions.gd` (new), `test_split_screen.gd` (1 to 4 views, Dynamic and Equal), `test_room_tints.gd`, `test_view_boxes.gd`; screenshots `shot_mote_regions.gd`.
 
+## 2026-11-20: The bots start in the hub and take normal staffs from its rack
+
+The owner's decision after #886, and their answers on #891 (tests/bots/README.md, "The hub"; content/items/README.md). The hub's rack gets three normal premade staffs beside the crazy ones, each on a starter staff with its own test: the Firebolt (fire on a bolt), the Frost seeker (a homing frost bolt) and the Twin bolt (a bolt split in two). The smoke runner, the sweep and the playtest record the hub instead of Play. Each bot plays a hub errand (`tests/bots/bot_hub.gd`):
+- It draws its build from the hub's dice.
+- It takes its rack staff with A as a player does: the mender the Firebolt, P1 the Frost seeker, P3 the Twin bolt.
+- It sets its build and walks to its own corner of the teleporter stone.
+- P1 presses A once the stone is lit.
+
+The run from the stone takes the whole player along, and the runners check that each bot carried its build in. The mender holds its heal on RB, a dash on RT and the Firebolt on LB. A fighter holds a dash on RB, its drawn attack on RT and its rack staff on LB. The brain picks the staff by what each one casts next. Bots never take a dev staff or the Wild star. No game rule changed: the content added is the rack's three staffs.
+
+The replay seed now deals the hub's seed first and the run's second, so every replay seed's run is a new map. The comparison is therefore against a control on the same maps: the hub start with the old heal-and-attack mender and no rack staffs.
+
+| | Control | This change |
+|---|---|---|
+| Sweep 1-60, seeds lost | 1 (42) | 1 (16) |
+| Fights cleared on seed 11, 1 / 2 / 4 bots | 2/9, 2/9, 8/9 | 5/9, 8/9, 8/9 |
+| Downs by bot, summed | P1 6, P2 6, P3 3, P4 3 | P1 3, P2 10, P3 1, P4 2 |
+
+The mender's downs rise because the runs go further. On main (the Play start, other maps), the sweep lost 2 (10, 31). The pinned seed 11 still wins on its new map. Tests: `test_bot_hub.gd` (new), `test_bot_builds.gd` (the mender heals with RB, dashes from shots with RT and attacks with LB; bots take only normal rack staffs), `test_four_bot_seed.gd` (the stone's run plays the replay's second seed), `test_hub_data.gd` (the normal staffs' row), and the three staffs' own tests.
+
 ## 2026-11-20: More rooms show the done look
 
 The owner's decision after #884, as answered on #888 (docs/milestones/connected-biomes.md, "More rooms show the done look"). The calm done look of a cleared fight (the symbol dimmed to its shadow, the green check, the sign's light at half, over 7 frames) now also comes to every doorway sign into a fountain once it is drawn dry, and into a reward, treasure or secret room once everything in it is taken, and to their Y map symbols; never a shop. A secret room got a symbol (a question mark in the void's light), kept unmarked until its rock is broken. Which rule a room follows is read off its kind (`KindSymbol.done_by`); the "cleared" names that meant the look are "done" now. Flow tells the view the rooms opened (`rooms_opened`) and Rewards the rooms still holding a reward to take (`rooms_rewards_left`), both read from state they already kept; the fountains' `fountain_changed` already said their pools. A player who was away has its offer waiting anywhere, so it never holds a room back. View only. Tests in `test_party_map_view.gd`, `test_special_rooms.gd` and `test_events.gd`; screenshots `shot_done_signs.gd`.

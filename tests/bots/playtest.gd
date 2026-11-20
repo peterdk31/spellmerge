@@ -9,13 +9,17 @@ extends "res://tests/support/screenshot.gd"
 ## `stuck` (a standing bot out of a fight that moved under STUCK_MOVE pixels in STUCK_TICKS ticks),
 ## `long fight` (over LONG_FIGHT seconds); at the end `PLAYTEST RESULT`, the world's sounds started
 ## (`sounds`, and `doubled sound`: one id started twice at one place in one frame), `one body hit
-## twice in a frame by one caster's card`, and every error logged. The arguments are in tests/README.md
-## (`bots/`). The bots start with the builds drawn for them (tests/bots/bot_builds.gd: a fighter's
-## strong staff and a dash, and with two or more P2's mend staff), and `PLAYTEST heals` says what each
-## bot's heals gave to teammates and to foes; `--plain` plays the starter staffs instead and `--build`
-## the smoke test's old random staffs. With `--shots` (on a display) it saves screenshots as `playtest_<seed>_<players>_<what>`
-## at the first room of each kind, the first reward offer, the boss's intro, every stuck spot and long
-## fight, and with `--every=S` one every S game seconds.
+## twice in a frame by one caster's card`, and every error logged; `PLAYTEST downs` the downs by
+## bot. The arguments are in tests/README.md (`bots/`). The bots start in the hub (the owner,
+## 2026-11-20, after #886), as players do: each plays its hub errand (tests/bots/bot_hub.gd), drawing
+## its build from the hub's dice (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and
+## with two or more P2's mend, dash and the rack's Firebolt taken as its attack), and all walk onto
+## the teleporter stone, where P1 starts the run; `PLAYTEST heals` says what each bot's heals gave to
+## teammates and to foes. `--plain` plays the starter staffs instead and `--build` the smoke test's
+## old random staffs (set as the run starts); with either the bots only walk to the stone. With `--shots` (on a display) it saves screenshots as `playtest_<seed>_<players>_<what>`
+## in the hub as the rack's staff is taken and as the party stands on the lit stone, at the first
+## room of each kind, the first reward offer, the boss's intro, every stuck spot and long fight, and
+## with `--every=S` one every S game seconds.
 ##
 ## The bots page a boss's intro on as a player's A would (`boss_intro_next_requested`, seat 0), and
 ## `--sturdy` heals the standing wizards every half second: a playtest looks for rough edges on the way
@@ -30,6 +34,8 @@ const STUCK_TICKS: int = 600
 const STUCK_MOVE: float = 24.0
 const LONG_FIGHT: float = 90.0
 const DEFAULT_LIMIT: float = 1500.0
+## Game seconds the bots are given in the hub to start the run.
+const HUB_LIMIT: float = 60.0
 
 var _players: int = 4
 var _seed: int = 11
@@ -60,6 +66,10 @@ var _cleared: int = 0
 var _boss_cleared: bool = false
 var _fights: int = 0
 var _downs: int = 0
+## True once the run from the stone entered its start room, and the tick it did.
+var _run_started: bool = false
+var _run_tick: int = 0
+var _downs_by: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _shot_queue: Array[String] = []
 var _every: int = 0
 var _audio: Node
@@ -115,12 +125,14 @@ func take() -> void:
 		if not bot.join(index, BotScript.Mode.FIGHTER, input, _flow):
 			fail("bot %d could not join" % (index + 1))
 			return
+		# The hub's errand: a drawn build for the whole team (none with `--plain` or `--build`); P1 starts.
+		bot.plan_hub(0 if _plain or _build else _players, index == 0)
 		_bots.append(bot)
 		_last_at.append(Vector2.INF)
 		_last_tick.append(0)
 	_events.connect("room_entered", _on_room_entered)
 	_events.connect("room_cleared", _on_room_cleared)
-	_events.connect("player_downed", func(p: int) -> void: _downs += 1; _say("downed P%d" % (p + 1)))
+	_events.connect("player_downed", func(p: int) -> void: _downs += 1; _downs_by[clampi(p, 0, 3)] += 1; _say("downed P%d" % (p + 1)))
 	_events.connect("player_revived", func(p: int, r: int) -> void: _say("revived P%d by P%d" % [p + 1, r + 1]))
 	_events.connect("run_ended", func(victory: bool) -> void: _say("run ended, victory %s" % victory); _ended = 1 if victory else 0)
 	_events.connect("rewards_waiting_changed", _on_rewards)
@@ -131,10 +143,35 @@ func take() -> void:
 	if not _plain and not _build:
 		_bag_had = BuildsScript.stock(_flow)
 	var frames: Node = root.get_node("Frames")
-	frames.call("record", &"play_requested", 0, _seed)
+	frames.call("record", &"hub_requested", 0, _seed)
 	var tick: Node = root.get_node("Tick")
-	print("PLAYTEST start: %d players, replay seed %d, run seed %d, split %d" % [_players, _seed, int(tick.get("sim").get("run_seed")), _split])
-	while _ended < 0 and float(_ticks) / 60.0 < _limit:
+	print("PLAYTEST start in the hub: %d players, replay seed %d, split %d" % [_players, _seed, _split])
+	var rack_shot: bool = false
+	while not _run_started and float(_ticks) / 60.0 < HUB_LIMIT:
+		await process_frame
+		_ticks += 1
+		# In the hub: a shot as the rack's staff is taken and one as the party stands on the stone.
+		for bot in _bots:
+			var wizard := _flow.call("get_wizard", bot.player) as Actor
+			var rack: StaffItem = BuildsScript.rack_of(bot.build)
+			if not rack_shot and rack != null and BotScript.HubScript.holds_rack_staff(wizard, rack):
+				rack_shot = true
+				_say("P%d took the rack's %s" % [bot.player + 1, rack.id])
+				_queue_shot("hub_rack")
+		if bool(_flow.call("is_stone_lit")) and not _kinds_shot.has(&"hub_stone"):
+			_kinds_shot[&"hub_stone"] = true
+			_say("the party stands on the lit stone")
+			_queue_shot("hub_stone")
+		while not _shot_queue.is_empty():
+			var what: String = _shot_queue.pop_front()
+			save(await grab(), "playtest_%d_%d%s_%s" % [_seed, _players, "e" if _split == SplitScreenSetting.EQUAL else "", what])
+	if not _run_started:
+		_say("the run never started from the hub's stone")
+		_ended = 0
+	else:
+		_say("the run started from the hub's stone, run seed %d" % int(tick.get("sim").get("run_seed")))
+	# `--limit` counts the run's time, not the hub's.
+	while _ended < 0 and float(_ticks - _run_tick) / 60.0 < _limit:
 		await process_frame
 		_ticks += 1
 		if _flow.get("mode") != _flow.get("MODE_RUN"):
@@ -166,6 +203,10 @@ func take() -> void:
 	for id: StringName in _sound_counts:
 		counts.append("%s %d" % [id, _sound_counts[id]])
 	print("PLAYTEST sounds: " + ", ".join(counts))
+	var by: Array[String] = []
+	for seat in _bots.size():
+		by.append("P%d %d" % [seat + 1, _downs_by[seat]])
+	print("PLAYTEST downs: " + ", ".join(by))
 	for what: String in _hit_twice:
 		print("PLAYTEST one body hit twice in a frame by one caster's card: %s, %d times" % [what, _hit_twice[what]])
 	for id: StringName in _doubles:
@@ -198,7 +239,8 @@ func _queue_shot(what: String) -> void:
 
 
 func _on_room_entered(_room_id: StringName, room: int) -> void:
-	var map: BiomeMap = (_flow.get("biome") as BiomeWorld).map
+	var biome: BiomeWorld = _flow.get("biome") as BiomeWorld
+	var map: BiomeMap = biome.map if biome != null and _flow.get("mode") == _flow.get("MODE_RUN") else null
 	if map == null or room < 0 or room >= map.rooms():
 		return
 	var kind: StringName = map.room_kinds[room]
@@ -208,6 +250,9 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 		for r in map.rooms():
 			if life.fights[r].has_enemies():
 				_fights += 1
+	if room == 0 and not _run_started:
+		_run_started = true
+		_run_tick = _ticks
 	_say("entered room %d (%s, %s)" % [room, map.room_templates[room], kind])
 	if room == 0 and not _plain and not _built:
 		_built = true
@@ -216,8 +261,10 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 				_bots[index].build_random(2026 + index)
 				_say("P%d built %s" % [index + 1, _bots[index].built_cards])
 			else:
-				_bots[index].build_drawn(_bots.size())
-				_say("P%d built %s %s" % [index + 1, _bots[index].build["name"], _bots[index].build["staffs"]])
+				# Built in the hub: it carried its build in (or says it did not).
+				var bot: BotScript = _bots[index]
+				var carried: bool = bot.holds_build(_flow.call("get_wizard", index) as Actor)
+				_say("P%d carried %s %s%s" % [index + 1, bot.build.get("name", "none"), bot.build.get("staffs", []), "" if carried else " NOT on its staffs"])
 	_started_at[room] = _ticks
 	if not _kinds_shot.has(kind):
 		_kinds_shot[kind] = true
@@ -226,7 +273,7 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 
 func _on_room_cleared(_room_id: StringName, room: int) -> void:
 	var life: RoomLife = _flow.get("life") as RoomLife
-	if room < 0 or room >= life.fights.size() or not life.fights[room].has_enemies():
+	if _flow.get("mode") != _flow.get("MODE_RUN") or life == null or room < 0 or room >= life.fights.size() or not life.fights[room].has_enemies():
 		return
 	_cleared += 1
 	var map: BiomeMap = (_flow.get("biome") as BiomeWorld).map

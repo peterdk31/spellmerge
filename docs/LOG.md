@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-20: The recharge travels with the relic; a use is kept by default
+
+The owner's follow-up to #882 (docs/milestones/connected-biomes.md, "Quick-use", third round). An `ItemUse` is kept unless it says otherwise (the field's default, the one place; a potion's drink says consumed), and the item validator refuses a relic use that is consumed and a kept use with a cooldown of 0, naming the item and the fix. The cooldown left is now the item's own (`ItemStack.recharge_left`), not its holder's: the inventory steps the stacks it holds, the Items area those on the ground, so a dropped relic keeps recharging and is picked up mid-recharge, its new holder's HUD told; a run's start begins ready, and a rejoin keeps it (Flow's `LeftPlayers`). Tests: `tests/gameplay/items/test_relic_recharge.gd` (new), `test_rejoin.gd`, `test_item_kinds.gd`, `test_usable_items.gd`.
+
 ## 2026-11-20: Cleared doorway signs; a finer, quicker reveal of unseen rooms
 
 The owner's playtest polish on #883 (docs/milestones/connected-biomes.md, "Cleared doorway signs, a finer reveal"). Once a fight, challenge or boss room is cleared, every doorway sign into it and its symbol on the Y map step over seven frames to a calm cleared look: the symbol dimmed to its shadow and a green check drawn across it a pixel a frame, the sign's light dimming with it. Flow tells the view which rooms are cleared in a new event, `rooms_cleared`, read from the room life it already keeps (again after a restore, drawn as it stands). An unseen room now opens by 8 px blocks at 24 fps instead of 16 px at 12, so it opens in about 0.17 s and no longer reads as a grid of black lines mid-way. View only: the simulation keeps no new state. Tests in `test_party_map_view.gd`, `test_biome_sound_and_look.gd` and `test_events.gd`; screenshots `shot_cleared_signs.gd`.

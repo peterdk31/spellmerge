@@ -240,6 +240,43 @@ func test_a_body_casts_its_shadow_away_from_the_light() -> void:
 	check(shadows.cast[walker.id].length() < 0.01, "a light out of reach casts nothing")
 
 
+## The lights by square (the performance pass): a body sums only the lights whose reach comes into
+## its square, in the order they came, so every cast is the one from every light, to the bit; with
+## lights spread over a biome, bodies far apart and near the squares' edges, some carried.
+func test_the_lights_squares_cast_as_every_light_does() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261120
+	var lights: Array = []
+	for n in BodyShadowsScript.LIGHTS - 8:
+		lights.append([Vector2(rng.randf_range(-300.0, 3000.0), rng.randf_range(-200.0, 2000.0)), rng.randf_range(16.0, 220.0), rng.randf_range(0.2, 1.0)])
+	var walkers: Array[Actor] = []
+	for n in 48:
+		var at := Vector2(rng.randf_range(-300.0, 3000.0), rng.randf_range(-200.0, 2000.0))
+		if n % 3 == 0:
+			# Near a light, on a square's edge.
+			var light: Array = lights[n]
+			at = Vector2(floorf((light[0] as Vector2).x / BodyShadowsScript.LIGHT_CELL) * BodyShadowsScript.LIGHT_CELL, (light[0] as Vector2).y + 3.0)
+		walkers.append(_walker(at))
+	var rows: PackedFloat32Array = _rows(lights)
+	var owners := PackedInt32Array()
+	owners.resize(lights.size())
+	owners.fill(ActorsScript.NONE)
+	owners[3] = walkers[3].id
+	var shadows: BodyShadowsScript = _shadows()
+	shadows.begin_lights()
+	shadows.add_lights(rows, lights.size(), SpellLightScript.SPOT_ROW_STRENGTH, owners)
+	shadows.step(_world.table, _clock, Rect2(), null)
+	var lit: int = 0
+	for walker in walkers:
+		var squares: Vector2 = shadows.cast[walker.id]
+		shadows.set(&"_grid_w", -1)
+		var every: Vector2 = shadows.call(&"_cast_from", walker.global_position + Vector2(0.0, BodyShadowsScript.DROP), walker.id, null)
+		check(squares == every, "body %d: its cast %s is every light's %s" % [walker.id, squares, every])
+		if every != Vector2.ZERO:
+			lit += 1
+	check(lit >= 10, "many bodies are lit (%d)" % lit)
+
+
 func test_its_own_light_casts_no_shadow() -> void:
 	var walker: Actor = _walker(Vector2(100.0, 100.0))
 	var shadows: BodyShadowsScript = _shadows()

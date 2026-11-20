@@ -54,7 +54,8 @@ extends ActorController
 ##   uses one item of the shown body's bag that has a use (a potion, an active relic: its
 ##   `ItemContent.use_of`, found in the registry): the body is given what its use does through Combat
 ##   (`health_gift_requested`), one copy taken when the use is consumed, else it recharges for the
-##   use's cooldown (`Inventory.start_recharge`; `item_recharging` tells the HUD); refused for
+##   use's cooldown (`Inventory.start_recharge`: the relic's own stack recharges, so it goes with
+##   the relic; `item_recharging` tells the HUD, the new holder's too as one is taken mid-recharge); refused for
 ##   none held (NO_ITEM), a thing with no use (NO_USE, `ItemKinds.usable`), one still recharging (NO_CHARGE) and a use that only heals while the
 ##   body is whole (NO_NEED, `ItemUse.wasted_on`: never wasted).
 ## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the

@@ -371,9 +371,7 @@ func test_a_recharging_item_shows_a_shutter_stepping_by_whole_rows() -> void:
 func test_a_relic_used_in_play_shows_its_recharge_as_the_simulation_counts_it() -> void:
 	var relic := RelicBase.new()
 	relic.id = &"test_hud_idol"
-	relic.active_use = ItemUse.health(10.0, 0.0)
-	relic.active_use.consumed = false
-	relic.active_use.cooldown = 4.0
+	relic.active_use = ItemUse.kept(10.0, 0.0, 4.0)
 	check(_world.registry.add(&"relics", relic), "a test-only active relic")
 	# The HUD reads the content autoload (an item's use, its look), as in the game.
 	var content: Node = root.get_node("Registry")

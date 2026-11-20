@@ -653,6 +653,10 @@ func wall_radius() -> float:
 ## caller moves the body (`tick_step` does).
 func step(delta: float) -> void:
 	var full: float = delta
+	# What it holds recharges in the simulation's time whatever holds the body (a hit-stop, a spawn,
+	# a fall), as an item lying on the ground does (the recharge is the item's: ItemStack).
+	if inventory != null and inventory.is_recharging():
+		inventory.step(full)
 	# Each component is called only when it has something to do (performance pass, 2026-10-28):
 	# a step runs for every actor every frame, and a call costs more than the checks here.
 	if actors != null and (actors.held_count > 0 or actors.resting_count > 0) and id != ActorsScript.NONE:
@@ -693,8 +697,6 @@ func step(delta: float) -> void:
 			_land()
 			if _dying:
 				return
-	if inventory != null and inventory.is_recharging():
-		inventory.step(delta)
 	if phases != null:
 		phases.step(delta)
 	if possessed_by != null:

@@ -47,6 +47,9 @@ func take() -> void:
 			inventory.add(ItemStack.of_staff(crystal, [&"bolt", &"split", &"bolt", &"bolt", &"split", &"bolt"] as Array[StringName]))
 			var numbers: PackedInt32Array = inventory.numbers()
 			inventory.set_hand(numbers[numbers.size() - 1], 0)
+		# Taken, each potion filled a free arm (the owner, 2026-11-20); laid out by hand here.
+		for slot in Inventory.QUICK_SLOTS:
+			inventory.bind_quick(slot, POTIONS, &"")
 		inventory.bind_quick(1, POTIONS, &"max_health")
 		inventory.bind_quick(3, POTIONS, &"small_healing")
 		inventory.take(POTIONS, &"small_healing", 1)

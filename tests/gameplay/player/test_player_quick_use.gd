@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## gameplay/actor/inventory.gd, gameplay/player/player.gd): `quick_bind_requested` binds a slot of the
 ## shown body to an item it holds and can use (moved from another slot, let go on its own),
 ## `quick_use_requested` uses one as `bag_use_requested` does; with none left the binding stays and
-## is full again as one is taken; `quick_bound` tells the HUD each slot; a binding is in the player
+## is full again as one is taken; no slot is bound at first, and a usable item taken that no slot is
+## bound to fills the first free one (up, right, down, left; the owner, 2026-11-20); `quick_bound` tells the HUD each slot; a binding is in the player
 ## loadout, hashed and saved by a snapshot.
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
@@ -47,10 +48,13 @@ func _quick(body: Actor) -> Array:
 
 func test_a_slot_binds_a_usable_item_moves_it_and_lets_it_go() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
-	check(wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two healing potions")
-	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 5)), "five coins")
 	_world.run(1)
-	check_equal(_quick(wizard), [&"", &"", &"", &""], "nothing bound at first")
+	check_equal(_quick(wizard), [&"", &"", &"", &""], "nothing bound at first: no default bindings")
+	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 5)), "five coins")
+	check_equal(_quick(wizard), [&"", &"", &"", &""], "coins are never used: never bound")
+	check(wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two healing potions")
+	check_equal(_quick(wizard), [&"healing", &"", &"", &""], "taken, it fills the first free slot: up")
+	wizard.inventory.bind_quick(0, POTIONS, &"")
 	_bind(wizard, 0, &"healing")
 	check_equal(_quick(wizard), [&"healing", &"", &"", &""], "up: the healing potion")
 	check_equal(wizard.inventory.quick_bag(0), POTIONS, "of the potions bag")
@@ -71,11 +75,34 @@ func test_a_slot_binds_a_usable_item_moves_it_and_lets_it_go() -> void:
 	check_equal(_quick(wizard), [&"", &"healing", &"", &""], "kept")
 
 
+func test_a_usable_item_taken_fills_the_first_free_slot_once() -> void:
+	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
+	_world.run(1)
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1))
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1))
+	check_equal(_quick(wizard), [&"healing", &"max_health", &"", &""], "each new kind the next free slot, in order")
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2))
+	check_equal(_quick(wizard), [&"healing", &"max_health", &"", &""], "one bound already is not bound twice")
+	wizard.inventory.bind_quick(0, POTIONS, &"max_health")
+	check_equal(_quick(wizard), [&"max_health", &"", &"", &""], "rebound by the player, it moves")
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"vigor", 1))
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"small_healing", 1))
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"large_healing", 1))
+	check_equal(_quick(wizard), [&"max_health", &"vigor", &"small_healing", &"large_healing"], "free slots filled up, right, down, left")
+	wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1))
+	check_equal(_quick(wizard), [&"max_health", &"vigor", &"small_healing", &"large_healing"], "none free: nothing changes")
+	var made := Inventory.new()
+	made.take_loadout(wizard.inventory.loadout(), _world.registry)
+	check_equal([made.quick_id(0), made.quick_id(3)], [&"max_health", &"large_healing"], "a loadout taken keeps its own bindings")
+	made.free()
+
+
 func test_a_press_uses_one_and_an_empty_binding_stays_until_refilled() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1)), "one healing potion")
 	_world.run(1)
 	_bind(wizard, 3, &"healing")
+	check_equal(_quick(wizard), [&"", &"", &"", &"healing"], "bound left, off up where it fell")
 	_use(3)
 	check_equal(_refused, ["You are already whole."] as Array[String], "whole: never wasted")
 	check_equal(wizard.inventory.count_of(POTIONS, &"healing"), 1, "kept")
@@ -103,6 +130,7 @@ func test_the_slots_are_announced_with_the_body() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1)), "a potion")
 	wizard.inventory.bind_quick(1, POTIONS, &"max_health")
+	check_equal(wizard.inventory.quick_id(0), &"", "moved off up")
 	_bound.clear()
 	var controller: PlayerController = Fixture.controller(wizard)
 	controller.rebuild_derived()
@@ -114,6 +142,7 @@ func test_the_slots_are_announced_with_the_body() -> void:
 func test_a_binding_is_in_the_loadout_the_hash_and_a_snapshot() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two potions")
+	wizard.inventory.bind_quick(0, POTIONS, &"")
 	_world.run(1)
 	var loadout: PlayerLoadout = wizard.inventory.loadout()
 	var before: int = SimHash.of(wizard)

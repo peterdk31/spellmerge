@@ -62,7 +62,9 @@ extends ActorComponent
 ##   (`ItemKinds.USE`; refused NO_ITEM, NO_USE): bound on another slot already, it moves; bound on
 ##   this slot already, it is let go (as a hand's button takes its staff off). A binding names the
 ##   item, not a copy: with none left it stays (the HUD greys it) and is full again as one is taken.
-##   It is in the player loadout, so a run's start and a rejoin keep it.
+##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
+##   and a usable item taken (`add`) that no slot is bound to fills the first slot bound to nothing**
+##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
 ## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went), `hands_changed` and
@@ -370,10 +372,25 @@ func add(stack: ItemStack) -> bool:
 	if not has_room(stack):
 		return false
 	var numbered: PackedInt32Array = _put(stack)
-	_say_bag(ItemKinds.bag_of(stack.kind))
+	var bag: StringName = ItemKinds.bag_of(stack.kind)
+	_say_bag(bag)
 	for number in numbered:
 		_say_staff(number)
+	_bind_if_free(bag, stack.id, stack.kind)
 	return true
+
+
+## A usable item just taken that no quick-use slot is bound to fills the first slot bound to nothing.
+func _bind_if_free(bag: StringName, id: StringName, kind: StringName) -> void:
+	if not ItemKinds.can(kind, ItemKinds.USE):
+		return
+	for slot in QUICK_SLOTS:
+		if _quick_bags[slot] == bag and _quick_ids[slot] == id:
+			return
+	for slot in QUICK_SLOTS:
+		if _quick_ids[slot] == &"":
+			_set_quick(slot, bag, id)
+			return
 
 
 ## What its body carries from the start (an enemy's coins, its data's: `Actor`): `stack` added as

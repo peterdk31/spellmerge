@@ -103,6 +103,9 @@ func _point(inventory: InventoryScript, id: StringName) -> void:
 func test_a_dpad_arm_in_the_inventory_binds_the_potion_pointed_at() -> void:
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two healing potions")
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1)), "a max health potion")
+	check_equal([_wizard.inventory.quick_id(0), _wizard.inventory.quick_id(1)], [&"healing", &"max_health"], "taken, each filled a free arm (the owner, 2026-11-20)")
+	_wizard.inventory.bind_quick(0, POTIONS, &"")
+	_wizard.inventory.bind_quick(1, POTIONS, &"")
 	_frame()
 	var inventory: InventoryScript = _open_potions()
 	_point(inventory, &"healing")

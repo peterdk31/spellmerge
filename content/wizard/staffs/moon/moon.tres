@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"moon"
 display_name = "Moon staff"
-slots = 4
+slots = 6
 draw = 1
 cooldown = 0.15
 spread = 3.0

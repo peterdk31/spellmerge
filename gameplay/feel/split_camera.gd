@@ -16,6 +16,12 @@ extends RefCounted
 ##   an edge); a view looks where its group is drawn at its own place, at SPLIT_ZOOM, kept to the
 ##   camera's limits. The screen is cut along the bisectors between where the groups are drawn
 ##   (`VoronoiCells.fill`): cells that cover it without overlap, each holding its own group.
+## - **Close foes in view** (the owner, 2026-11-19). A view zooms out from SPLIT_ZOOM, no further
+##   than the party camera's MIN_ZOOM, until the enemies close to its group (`close_foes.gd`) are
+##   drawn inside its cell with FOE_MARGIN to spare (`zoom_for_foes`: the cell as the half-planes
+##   between its group's place and the others' and the screen's edges). It zooms about its group's
+##   place, so its wizards only come nearer it and the cell still holds them; whether to split or
+##   merge is still the wizards' alone. Eased like everything else here.
 ## - **No jump** (docs/STYLE.md, "Smooth"). Every view eases to its place and zoom (the party
 ##   camera's FOLLOW_SPEED). A new view starts as the picture it splits from (the world camera's, or
 ##   the view that held its seats), so at first both sides of the line show the same picture; and a
@@ -31,10 +37,13 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 
 const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
 ## A split view's zoom (1: the world at its own size, as one player sees it). The owner's to tune.
 const SPLIT_ZOOM: float = 1.0
+## The room kept between a close foe and its view's cell's edge, in screen pixels.
+const FOE_MARGIN: float = 32.0
 ## Split views merge again once the box round the wizards fits at the widest zoom this many times
 ## over (each way), so a party at the edge does not split and merge frame by frame.
 const MERGE_ROOM: float = 1.1
@@ -111,6 +120,8 @@ var _group_site: PackedVector2Array = PackedVector2Array()
 ## By group (lowest seat): the slot that shows it.
 var _group_slot: PackedInt32Array = PackedInt32Array()
 var _cells: VoronoiCellsScript = VoronoiCellsScript.new()
+## The foes close to this machine's wizards this frame (null: none).
+var _foes: CloseFoesScript = null
 
 
 func _init() -> void:
@@ -176,9 +187,11 @@ func divider_between(a: int, b: int) -> int:
 ## A drawn frame, `delta` real seconds on: find this machine's wizards in `table` (`seats`, a bit a
 ## seat; none of them in the world: everyone, as the party camera does), and lay the views out on a
 ## screen of `screen` pixels from the world camera `camera` (its place, zoom, limits and shake).
-## With no camera nothing is split.
-func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2) -> void:
+## With no camera nothing is split. `foes` (null: none): the enemies close to each seat's wizards,
+## which each view zooms out to frame.
+func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2, foes: CloseFoesScript = null) -> void:
 	views.screen = screen
+	_foes = foes
 	if camera == null or not is_instance_valid(camera) or table == null or screen.x <= 0.0 or screen.y <= 0.0:
 		reset()
 		return
@@ -438,7 +451,7 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		var rise: float = clampf(_age[slot] / EASE_IN, 0.0, 1.0)
 		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
 		var group: int = _group_holding(slot)
-		var aim_zoom: float = lerpf(_zoom[slot], SPLIT_ZOOM, pull)
+		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM, pull)
 		var aim: Vector2 = _centre[slot]
 		if group >= 0:
 			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
@@ -468,6 +481,50 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 			_state[slot] = FREE
 			_members[slot] = 0
 			_kin[slot] = -1
+
+
+## The zoom group `group`'s view frames its close foes at: SPLIT_ZOOM while they are drawn inside its
+## cell with FOE_MARGIN to spare, else lower, down to the party camera's MIN_ZOOM. The cell is where
+## the screen is nearer the group's place than any other group's, within the screen; the view zooms
+## about the group's middle drawn at its place. Never wider than `limits` (the world camera's; none:
+## no bound) allow: a picture past them would be pushed off its group's place.
+func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> float:
+	var zoom: float = SPLIT_ZOOM
+	if _foes == null or _foes.count == 0:
+		return zoom
+	var site: Vector2 = _group_site[group]
+	var seats: int = _group_seats[group]
+	for i in _foes.count:
+		if _foes.seats_of[i] & seats == 0:
+			continue
+		var way: Vector2 = _foes.at[i] - _group_middle[group]
+		if way.length_squared() < 1.0:
+			continue
+		# The screen's four edges, then the line half way to each other group's place.
+		zoom = _fit_along(zoom, way, Vector2.LEFT, site.x)
+		zoom = _fit_along(zoom, way, Vector2.RIGHT, screen.x - site.x)
+		zoom = _fit_along(zoom, way, Vector2.UP, site.y)
+		zoom = _fit_along(zoom, way, Vector2.DOWN, screen.y - site.y)
+		for other in ActorsScript.SEATS:
+			if other == group or _group_seats[other] == 0:
+				continue
+			var apart: Vector2 = _group_site[other] - site
+			if apart.length_squared() < 1.0:
+				continue
+			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
+	var widest: float = PartyCameraScript.MIN_ZOOM
+	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
+		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
+	return clampf(zoom, minf(widest, SPLIT_ZOOM), SPLIT_ZOOM)
+
+
+## `zoom`, lowered so a point `way` from the place (drawn `way` × zoom from it) stays FOE_MARGIN
+## inside `room` of it along `normal`.
+static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) -> float:
+	var reach: float = way.dot(normal)
+	if reach <= 0.0:
+		return zoom
+	return minf(zoom, maxf(room - FOE_MARGIN, 0.0) / reach)
 
 
 ## The group (lowest seat) live slot `slot` shows, or -1.

@@ -2,11 +2,25 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-11-20: The bots start in the hub; the mender takes a rack staff (heal, dash and attack)
+## 2026-11-20: The bots start in the hub and take normal staffs from its rack
 
-The owner's decision after #886 (tests/bots/README.md, "The hub"). The smoke runner, the sweep and the playtest now record the hub instead of Play. Each bot plays a hub errand (`tests/bots/bot_hub.gd`). It draws its build from the hub's dice. The mender walks to the rack's Wild star and takes it with A, the way a player does. Every bot sets its build and walks to its own corner of the teleporter stone, and P1 presses A once the stone is lit. The run from the stone takes the whole player along, so the builds and the rack staff are in the run, and the runners check that. No game code changed. The mender holds three staffs: its mend on RB, a dash on RT, and the Wild star rebuilt as the seeker's homing bigger bolt on LB. Its brain picks the staff by what each one casts next. Only the mender takes a rack staff, because every other rack staff is built on the dev staff (no mana cost, no cooldown) and would make the sweep meaningless.
+The owner's decision after #886, and their answers on #891 (tests/bots/README.md, "The hub"; content/items/README.md). The hub's rack gets three normal premade staffs beside the crazy ones, each on a starter staff with its own test: the Firebolt (fire on a bolt), the Frost seeker (a homing frost bolt) and the Twin bolt (a bolt split in two). The smoke runner, the sweep and the playtest record the hub instead of Play. Each bot plays a hub errand (`tests/bots/bot_hub.gd`):
+- It draws its build from the hub's dice.
+- It takes its rack staff with A as a player does: the mender the Firebolt, P1 the Frost seeker, P3 the Twin bolt.
+- It sets its build and walks to its own corner of the teleporter stone.
+- P1 presses A once the stone is lit.
 
-The replay seed now deals the hub's seed first and the run's second. So the run of every replay seed is a new map, and the before and after numbers are not on the same maps. A control run on the new maps (hub start with the old heal-and-attack mender) separates the two changes. Sweep 1-60: main lost 2 (10, 31), the control 1 (42), this branch 2 (8, 26). The playtest on seed 11 cleared, for 1/2/4 bots: main 2/10, 3/10, 8/10; control 2/9, 2/9, 8/9; this branch 2/9, 2/9, 8/9. Downs by bot (summed): main P1 4, P2 6, P3 2, P4 1; control P1 6, P2 6, P3 3, P4 3; this branch P1 6, P2 10, P3 4, P4 3. The pinned seed 11 still wins (its run is a new map). Tests: `test_bot_hub.gd` (new), `test_bot_builds.gd` (the mender heals with RB, dashes from shots with RT, attacks with LB), `test_four_bot_seed.gd` (the stone's run plays the replay's second seed).
+The run from the stone takes the whole player along, and the runners check that each bot carried its build in. The mender holds its heal on RB, a dash on RT and the Firebolt on LB. A fighter holds a dash on RB, its drawn attack on RT and its rack staff on LB. The brain picks the staff by what each one casts next. Bots never take a dev staff or the Wild star. No game rule changed: the content added is the rack's three staffs.
+
+The replay seed now deals the hub's seed first and the run's second, so every replay seed's run is a new map. The comparison is therefore against a control on the same maps: the hub start with the old heal-and-attack mender and no rack staffs.
+
+| | Control | This change |
+|---|---|---|
+| Sweep 1-60, seeds lost | 1 (42) | 1 (16) |
+| Fights cleared on seed 11, 1 / 2 / 4 bots | 2/9, 2/9, 8/9 | 5/9, 8/9, 8/9 |
+| Downs by bot, summed | P1 6, P2 6, P3 3, P4 3 | P1 3, P2 10, P3 1, P4 2 |
+
+The mender's downs rise because the runs go further. On main (the Play start, other maps), the sweep lost 2 (10, 31). The pinned seed 11 still wins on its new map. Tests: `test_bot_hub.gd` (new), `test_bot_builds.gd` (the mender heals with RB, dashes from shots with RT and attacks with LB; bots take only normal rack staffs), `test_four_bot_seed.gd` (the stone's run plays the replay's second seed), `test_hub_data.gd` (the normal staffs' row), and the three staffs' own tests.
 
 ## 2026-11-20: More rooms show the done look
 

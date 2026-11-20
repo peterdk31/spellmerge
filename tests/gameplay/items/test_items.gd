@@ -369,7 +369,7 @@ func test_a_recordings_ground_is_laid_again_as_it_was() -> void:
 	var lying: Array[GroundItem] = _items.lying()
 	check_equal(lying.size(), 2, "what the registry has none of is left out")
 	check_equal([lying[0].stack.id, lying[0].title, lying[0].stack.mana, lying[0].at], [&"star", "Wild star", 12.5, Vector2(4, 5)], "the staff as it lay")
-	check_equal(lying[0].stack.cards, [&"bolt", &"fire", &"", &""] as Array[StringName], "with its cards in its slots")
+	check_equal(lying[0].stack.cards, [&"bolt", &"fire", &"", &"", &"", &""] as Array[StringName], "with its cards in its slots")
 	check(lying[0].stack.staff == WILD_STAR.staff, "its staff found by its id")
 	check(_items.ground_now().equals(ground) == false, "the missing card is not said to lie there")
 

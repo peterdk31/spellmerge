@@ -363,9 +363,10 @@ func set_native(on: bool) -> void:
 		"KIND_CODE": KIND_CODE, "TRAIL_SPEED": TRAIL_SPEED, "LOOK_LAYERS": LOOK_LAYERS,
 	}
 	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
-	wrong.append_array(_kernel.call(&"check_regions", regions))
 	if not _kernel.call(&"configure", numbers):
 		wrong.append("the motes' numbers")
+	# The regions' copy of the row, against the numbers just configured.
+	wrong.append_array(_kernel.call(&"check_regions", regions))
 	if not wrong.is_empty():
 		push_error("Motes: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		_kernel = null

@@ -6,28 +6,45 @@ extends Resource
 ## controller applies through Combat: `health_gift_requested`), whether it is `consumed` (one copy
 ## taken: a potion) or kept, and its `cooldown` (a kept active relic recharges for it, its passive
 ## stat changes staying with it). Read-only data; a potion's is made from its own numbers
-## (`PotionBase`), a relic's is its `active_use`. A new kind of effect is a field here and its line
-## in the controller.
+## (`PotionBase`, `drink`), a relic's is its `active_use`. A new kind of effect is a field here and
+## its line in the controller.
 ##
-##     var drink := ItemUse.health(30.0, 0.0)
+## **Kept by default** (the owner, 2026-11-20): `consumed` is false unless a use says otherwise, and
+## this field's default is the one place that says so; a potion's drink says it is consumed
+## (`drink`). A kept use recharges, so it needs a cooldown above 0 (`problems`); a relic's use is
+## never consumed (`RelicBase.problems`). The recharge itself is the item's, not its holder's
+## (`ItemStack.recharge_left`).
+##
+##     var drink := ItemUse.drink(30.0, 0.0)
 ##     if not drink.wasted_on(health, most): ...
 
 ## The health a use heals.
 @export_range(0.0, 999.0) var heal: float = 0.0
 ## The most health a use adds (and as much health).
 @export_range(0.0, 999.0) var more_most: float = 0.0
-## Whether a use takes one copy (a potion), or keeps it (an active relic).
-@export var consumed: bool = true
+## Whether a use takes one copy (a potion), or keeps it (an active relic: the default).
+@export var consumed: bool = false
 ## Seconds after a use before it can be used again (0: at once), counted down with the simulation's
 ## delta (the inventory's `step`).
 @export_range(0.0, 600.0) var cooldown: float = 0.0
 
 
-## A use that heals `heals` and adds `adds` most health, consumed, with no cooldown (a drink).
-static func health(heals: float, adds: float) -> ItemUse:
+## A drink (a potion's use): heals `heals` and adds `adds` most health, consumed, with no cooldown.
+static func drink(heals: float, adds: float) -> ItemUse:
 	var made := ItemUse.new()
 	made.heal = heals
 	made.more_most = adds
+	made.consumed = true
+	return made
+
+
+## A kept use (an active relic's): heals `heals` and adds `adds` most health, recharging for
+## `every` seconds after each use.
+static func kept(heals: float, adds: float, every: float) -> ItemUse:
+	var made := ItemUse.new()
+	made.heal = heals
+	made.more_most = adds
+	made.cooldown = every
 	return made
 
 
@@ -49,4 +66,6 @@ func problems(owner_name: String) -> PackedStringArray:
 		found.append("%s has a use that does nothing: give it a heal or more_most, or remove the use so it is not usable." % owner_name)
 	if cooldown < 0.0:
 		found.append("%s has a use with a negative cooldown (%s): make it 0 or more." % [owner_name, cooldown])
+	elif not consumed and cooldown <= 0.0:
+		found.append("%s has a kept use (not consumed) with no cooldown, so it could be used every tick: give it a cooldown above 0 seconds." % owner_name)
 	return found

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-20: The recharge travels with the relic; a use is kept by default
+
+The owner's follow-up to #882 (docs/milestones/connected-biomes.md, "Quick-use", third round). An `ItemUse` is kept unless it says otherwise (the field's default, the one place; a potion's drink says consumed), and the item validator refuses a relic use that is consumed and a kept use with a cooldown of 0, naming the item and the fix. The cooldown left is now the item's own (`ItemStack.recharge_left`), not its holder's: the inventory steps the stacks it holds, the Items area those on the ground, so a dropped relic keeps recharging and is picked up mid-recharge, its new holder's HUD told; a run's start begins ready, and a rejoin keeps it (Flow's `LeftPlayers`). Tests: `tests/gameplay/items/test_relic_recharge.gd` (new), `test_rejoin.gd`, `test_item_kinds.gd`, `test_usable_items.gd`.
+
 ## 2026-11-20: Per-room batches, per-view culling, views named by a uniform
 
 The owner's three next performance steps after #885 (docs/milestones/connected-biomes.md, "Per-room batches, per-view culling"). In a biome a view draws only the rooms it shows: each shot batch hands its rows to a batch a room boxed to its room (`DrawRegions`, in the native kernel too), the ground cover's batches take their room's box, and the floor marks have a layer a room (no 4,096 px cap: a wide biome's far rooms keep their marks). The motes, one ring written in time order, are culled per view in their shader instead, by the box each view draws. The mote sources, the air and the shadows work by each view's own box, so the split's air is as thick as one picture's. What reads the light is drawn once a view with its view's copy of the material, naming its light buffer by a uniform (an instance uniform hit the compatibility renderer's 256-item limit in a four-way split). No change to the simulation.

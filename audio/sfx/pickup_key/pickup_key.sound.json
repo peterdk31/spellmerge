@@ -1,0 +1,74 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.34,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 902
+	},
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": 392,
+			"ratio": 1.0,
+			"index": {
+				"from": 2.2,
+				"to": 0.4
+			},
+			"length": 0.1,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "fm",
+			"pitch": 587,
+			"ratio": 1.0,
+			"index": {
+				"from": 2.0,
+				"to": 0.3
+			},
+			"start": 0.08,
+			"length": 0.16,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 1.4
+			},
+			"gain": -1
+		},
+		{
+			"source": "partials",
+			"pitch": 1175,
+			"start": 0.085,
+			"gain": -14,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.08
+				},
+				{
+					"ratio": 2.76,
+					"gain": -14,
+					"decay": 0.04
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 0.6
+		},
+		"lowpass": 4000
+	},
+	"notes": "A key picked up: two brassy FM notes rising a fifth, the second with a faint jingle of the ring on it. Plainly a different thing from a coin's clink."
+}

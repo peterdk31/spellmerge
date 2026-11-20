@@ -29,6 +29,13 @@ extends RefCounted
 ## played on another machine) and each stays inside its pane (`hud_corners_changed`; the HUD moves them,
 ## hud/panels/seat_corners.gd). A spot is `quarter * 2 + inner` (inner 1 for the inner side).
 ##
+## **The menus' quarter** (`menus`; the owner, 2026-11-20): a seat's builder, inventory and reward
+## menu open in its panel's quarter, but where two seats share a half (two pairs, or the pair of four
+## players in three groups) and their panels sit in one quarter, the one at the inner side takes the
+## half's other quarter, so two players' menus never overlap (a pair of three players in two groups
+## too). A pane of a quarter never holds two seats; a trio's half has three menus for two quarters,
+## and two of them share one.
+##
 ## Made once, filled by `lay`; nothing allocated after it is made.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -48,6 +55,8 @@ var twin_quarter: int = -1
 var twin_group: int = -1
 ## By seat: its HUD spot (`quarter * 2 + inner`); its own corner's outer side for a seat in no group.
 var corner: PackedInt32Array = PackedInt32Array()
+## By seat: the quarter its menus open in (its spot's quarter, or its half's other one: above).
+var menus: PackedInt32Array = PackedInt32Array()
 ## How many groups the last `lay` had.
 var groups: int = 0
 
@@ -58,9 +67,11 @@ var _firsts: PackedInt32Array = PackedInt32Array()
 func _init() -> void:
 	quarters.resize(ActorsScript.SEATS)
 	corner.resize(ActorsScript.SEATS)
+	menus.resize(ActorsScript.SEATS)
 	_firsts.resize(ActorsScript.SEATS)
 	for seat in ActorsScript.SEATS:
 		corner[seat] = home_spot(seat)
+		menus[seat] = seat
 
 
 ## Seat `seat`'s spot unsplit: its own corner's quarter, at its outer side.
@@ -79,6 +90,7 @@ func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 	for seat in ActorsScript.SEATS:
 		quarters[seat] = 0
 		corner[seat] = home_spot(seat)
+		menus[seat] = seat
 		if group_seats[seat] != 0:
 			_firsts[groups] = seat
 			groups += 1
@@ -110,6 +122,7 @@ func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 			reserved |= 1 << home_spot(seat)
 	for at in groups:
 		_spots(group_seats[_firsts[at]], quarters[_firsts[at]], reserved)
+		_menus(group_seats[_firsts[at]], quarters[_firsts[at]])
 
 
 ## Group `group`'s pane (lowest seat) on a screen of `screen` pixels; an empty rect for no group.
@@ -285,6 +298,35 @@ func _spots(seats: int, mask: int, reserved: int) -> void:
 				corner[seat] = spot
 				taken |= 1 << spot
 				left &= ~(1 << seat)
+
+
+## The menus' quarters of the seats `seats` in the pane of the quarters `mask`: each its spot's
+## quarter; in a half, a seat at a quarter's inner side whose quarter another of them has the
+## half's other quarter while no one's menus are there.
+func _menus(seats: int, mask: int) -> void:
+	var used: int = 0
+	for seat in ActorsScript.SEATS:
+		if seats & (1 << seat) != 0:
+			menus[seat] = corner[seat] >> 1
+			used |= 1 << menus[seat]
+	if mask != LEFT_QUARTERS and mask != RIGHT_QUARTERS:
+		return
+	for seat in ActorsScript.SEATS:
+		if seats & (1 << seat) == 0 or corner[seat] & 1 == 0:
+			continue
+		var quarter: int = corner[seat] >> 1
+		var other: int = quarter ^ 2
+		if used & (1 << other) == 0 and _shared(seats, seat, quarter):
+			menus[seat] = other
+			used |= 1 << other
+
+
+## True when a seat of `seats` but `seat` has its spot in quarter `quarter`.
+func _shared(seats: int, seat: int, quarter: int) -> bool:
+	for other in ActorsScript.SEATS:
+		if other != seat and seats & (1 << other) != 0 and corner[other] >> 1 == quarter:
+			return true
+	return false
 
 
 ## A free spot for seat `seat` in a quarter of `mask` on pass `pass_at`: 0 its row's outer side,

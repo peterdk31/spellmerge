@@ -120,3 +120,30 @@ func test_the_reward_room_slides_with_its_quarter_never_jumping() -> void:
 		check(room.position.y <= last.position.y + 0.01, "always up, never back")
 		last = room
 	check_equal(last.position.y, 32.0, "it ends under the top band")
+
+
+## Regression: a slanted slide rounded to whole pixels came out longer than SLIDE_MOST (16.1 px), a
+## menus' quarter moving from the top right to the bottom left (the owner, 2026-11-20).
+func test_a_slanted_slide_never_steps_past_the_most() -> void:
+	var at := Vector2(320.0, 0.0)
+	var to := Vector2(0.0, 180.0)
+	for i in 100:
+		var next: Vector2 = SeatCornersScript.slide(at, to)
+		check(next.distance_to(at) <= SeatCornersScript.SLIDE_MOST, "at most %d px a frame (%s to %s)" % [SeatCornersScript.SLIDE_MOST, at, next])
+		at = next
+	check_equal(at, to, "it arrives")
+
+
+## The menus' quarter told apart from the spot: the panel stays, the quarter slides.
+func test_the_menus_quarter_is_its_own() -> void:
+	var corners := SeatCornersScript.new()
+	corners.step(1, VIEW, SIZE)
+	corners.set_spots(PackedInt32Array([0, 1, 7, 6]), PackedInt32Array([0, 2, 1, 3]))
+	for i in 60:
+		corners.step(1, VIEW, SIZE)
+	check_equal(corners.panel_at(1), SeatCornersScript.panel_spot(1, VIEW, SIZE), "P2's panel at the top left quarter's inner side")
+	check_equal(corners.quarter_at(1), SeatCornersScript.quarter_origin(2, VIEW), "P2's menus in the bottom left quarter")
+	corners.set_spots(PackedInt32Array([0, 1, 7, 6]))
+	for i in 60:
+		corners.step(1, VIEW, SIZE)
+	check_equal(corners.quarter_at(1), SeatCornersScript.quarter_origin(0, VIEW), "no menus told: its spot's quarter")

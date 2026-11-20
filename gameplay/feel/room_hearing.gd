@@ -106,10 +106,12 @@ func _on_rooms_rewards_left(left: PackedByteArray, again: bool) -> void:
 
 
 ## A fountain's pool as it stands (room -1: every one forgotten): used once it holds less than its
-## most (a restore says every pool again after -1, with the rooms cleared told again).
+## most. Room -1 comes only as a world goes or before a restore says every pool again, so it counts
+## as told again (`cleared_again`): what follows is drawn as it stands, whatever else is told.
 func _on_fountain_changed(room: int, _area: Rect2, left: float, most: float) -> void:
 	if room < 0:
 		_used = PackedByteArray()
+		_cleared_again += 1
 		return
 	if _used.size() <= room:
 		_used.resize(room + 1)
@@ -141,7 +143,8 @@ static func _has(rooms: PackedByteArray, room: int) -> bool:
 
 
 ## How many times the rooms done were told again after a restore (`rooms_cleared`, `rooms_opened`,
-## `rooms_rewards_left`; it changes with each): the looks draw the cleared look as it stands then.
+## `rooms_rewards_left`, every fountain forgotten; it changes with each): the looks draw the cleared
+## look (the done look: the names say "cleared" since #884) as it stands then.
 func cleared_again() -> int:
 	return _cleared_again
 

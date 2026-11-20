@@ -426,6 +426,50 @@ func test_a_reward_rooms_signs_show_it_done_once_its_rewards_are_taken() -> void
 	check_equal(view.cleared_of(EAST), KindSymbolScript.CLEARED_STAGES, "the map's symbol shows it done")
 
 
+## After a restore each new kind's done look is drawn as it stands, either way, on the signs and
+## the map, nothing played in (the owner, 2026-11-20, after #884).
+func test_a_restore_draws_each_new_kinds_done_look_as_it_stands() -> void:
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	for kind: StringName in [&"treasure", &"fountain", &"reward"]:
+		flow.stop_run()
+		var map: BiomeMap = _start_kinds(1, kind, &"boss" if kind == &"treasure" else &"fight")
+		var symbols: MouthSymbolsScript = _laid_symbols()
+		var wizard: Actor = _wizard(0)
+		if kind == &"reward":
+			_into(map, WEST, RoomSocket.Facing.EAST)
+			tick.run(DT)
+		var before := Snapshot.take(tick.state_areas(), root)
+		if kind == &"treasure":
+			wizard.global_position = flow.locks.key_at[0]
+			tick.run(DT)
+			wizard.global_position = BiomeMaps.socket_point(registry, map, WEST, RoomSocket.Facing.EAST) + RoomSocket.way(RoomSocket.Facing.EAST) * 40.0
+			tick.run(DT)
+			tick.run(DT)
+		elif kind == &"fountain":
+			_into(map, WEST, RoomSocket.Facing.EAST)
+			wizard.health.health = wizard.health.max_health * 0.5
+			wizard.global_position = flow.biome.room_rect(WEST).get_center()
+			tick.run(DT)
+			tick.run(DT)
+		else:
+			var mine: Array = root.get_node("Rewards").call(&"waiting_of", 0)
+			events.call(&"apply_command", &"reward_pick_requested", [0, int((mine[0] as Dictionary)["offer"]), 0])
+		check(_hearing().is_done(WEST), "%s: done" % kind)
+		var after := Snapshot.take(tick.state_areas(), root)
+		for way in 2:
+			var into_done: bool = way == 0
+			check((after if into_done else before).restore(tick.state_areas(), root).is_empty(), "%s: restored" % kind)
+			symbols = _laid_symbols()
+			view.step(0.0, actors, 1, _grid(), _two_views())
+			var stage: int = KindSymbolScript.CLEARED_STAGES if into_done else 0
+			if into_done:
+				_check_only_done(symbols, WEST)
+			for mouth in symbols.count():
+				if (feel.call(&"mouth_looks") as MouthLooksScript).room_of(mouth) == WEST:
+					check_equal(symbols.cleared_of(mouth), stage, "%s, restored %s: the sign as it stands" % [kind, "done" if into_done else "not done"])
+			check_equal(view.cleared_of(WEST), stage, "%s, restored: the map as it stands" % kind)
+
+
 ## The split map with the antechamber of kind `west` and the court of `east`, `players` seats.
 func _start_kinds(players: int, west: StringName, east: StringName) -> BiomeMap:
 	var map: BiomeMap = BiomeMaps.split(registry)

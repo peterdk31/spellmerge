@@ -317,17 +317,29 @@ func _next_scenario() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
-	var registry: Node = get_tree().root.get_node_or_null("Registry")
-	if registry != null:
-		_flow.set(&"run_id_to_play", PinnedRun.pin(registry, STRESS_ROOM))
-	# As a player starts: the first Play loads behind the loading screen (the shaders compile
-	# there, not while this run is measured); the scenario goes on when the room is up.
-	_events.emit_signal("play_requested", 0)
+	_start_play(scenario)
 	var loading: Node = get_tree().root.get_node_or_null("Loading")
 	if loading != null and bool(loading.call("is_loading")):
 		_events.connect("room_entered", _on_loaded, CONNECT_ONE_SHOT)
 		return
 	_start_measuring(scenario)
+
+
+## Start the scenario's run, as a player presses Play: here the stress room pinned as a one-room
+## biome. A runner built on this one plays another run (the biome frames, a generated biome).
+## As a player starts: the first Play loads behind the loading screen (the shaders compile there,
+## not while this run is measured); the scenario goes on when the room is up.
+func _start_play(_scenario: Dictionary) -> void:
+	var registry: Node = get_tree().root.get_node_or_null("Registry")
+	if registry != null:
+		_flow.set(&"run_id_to_play", PinnedRun.pin(registry, STRESS_ROOM))
+	_events.emit_signal("play_requested", 0)
+
+
+## Where the next stress enemy stands (world pixels): somewhere in the stress room's ENEMY_AREA.
+## A runner built on this one spreads them over its own rooms.
+func _enemy_spot() -> Vector2:
+	return ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y)
 
 
 func _on_loaded(_room_id: StringName, _room: int) -> void:
@@ -527,7 +539,7 @@ func _top_up_enemies() -> void:
 		if enemy == null:
 			continue
 		enemy.data = _enemy_data
-		enemy.position = ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y)
+		enemy.position = _enemy_spot()
 		world.add_child(enemy)
 		_enemies.append(enemy)
 		alive += 1

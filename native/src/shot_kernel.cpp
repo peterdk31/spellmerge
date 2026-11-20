@@ -56,6 +56,10 @@ constexpr int S_EXPIRE = 6;
 constexpr int S_FROZEN = 9;
 constexpr double GRID_CELL = 64.0;
 constexpr double WALL_CELL = 8.0;
+// The room grid's place squares and the code of a square `place_at` must be asked about (`PLACE_CELL`,
+// `PLACE_ASK`: RoomGrid's PLACE_CELL and WHOLE_ASK, on the manager).
+constexpr double PLACE_CELL = 32.0;
+constexpr int64_t PLACE_ASK = 255;
 constexpr int S_HELD = 2;
 constexpr int S_RETURNING = 3;
 constexpr int S_WAITING = 8;
@@ -198,6 +202,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_along, "_cand_along", PACKED_FLOAT32_ARRAY) \
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
 	X(room_grid, "_room_grid", OBJECT) \
+	X(places_found, "_places_found", PACKED_BYTE_ARRAY) \
 	X(bounds, "_bounds", RECT2) \
 	X(grid_x, "_grid_x", FLOAT) \
 	X(grid_y, "_grid_y", FLOAT) \
@@ -308,7 +313,10 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(wall_w, "_wall_w", INT) \
 	X(wall_h, "_wall_h", INT) \
 	X(has_walls, "_has_walls", BOOL) \
-	X(wall_bounds, "_bounds", RECT2)
+	X(wall_bounds, "_bounds", RECT2) \
+	X(place_whole, "_place_whole", PACKED_BYTE_ARRAY) \
+	X(place_w, "_place_w", INT) \
+	X(place_h, "_place_h", INT)
 
 // Every member of the manager's hit batch (`HitBatch`, `_hit_batch`) the hit pass reads: its entries
 // (each one's next on its target, caster, target, tag, shot and its sequence, point, heading, count,
@@ -1387,6 +1395,8 @@ const Constant CONSTANTS[] = {
 	{ "S_FROZEN", (double)S_FROZEN },
 	{ "GRID_CELL", (double)GRID_CELL },
 	{ "WALL_CELL", (double)WALL_CELL },
+	{ "PLACE_CELL", (double)PLACE_CELL },
+	{ "PLACE_ASK", (double)PLACE_ASK },
 	{ "S_HELD", (double)S_HELD },
 	{ "S_RETURNING", (double)S_RETURNING },
 	{ "S_WAITING", (double)S_WAITING },
@@ -2624,6 +2634,49 @@ double ShotKernel::threat_query(Object *m, const Vector2 &point, double radius, 
 	return t.slot >= 0 ? best : -1.0;
 }
 
+// `shot_places`' loop from slot `from`: each live shot in a square of the room grid's
+// `_place_whole` that names a place marks it in `_places_found`, a square of none is passed by. Returns
+// the first slot GDScript must ask `place_at` about (a square of PLACE_ASK, or a shot outside the
+// squares), -1 once every shot is seen, or -2 on bad sizes (GDScript then takes the shots from `from`).
+int64_t ShotKernel::shot_places(Object *m, int64_t from) {
+	const Names &k = *names;
+	Object *grid = m->get(k.room_grid);
+	ERR_FAIL_NULL_V(grid, -2);
+	Arr<PackedByteArray> alive, found, whole;
+	Arr<PackedVector2Array> pos;
+	alive.load(m, k.alive);
+	pos.load(m, k.pos);
+	found.load(m, k.places_found);
+	whole.load(grid, k.place_whole);
+	const int64_t high = m->get(k.high);
+	const int64_t w = grid->get(k.place_w);
+	const int64_t h = grid->get(k.place_h);
+	const Rect2 bounds = grid->get(k.wall_bounds);
+	ERR_FAIL_COND_V(from < 0 || high > alive.n || high > pos.n || whole.n < w * h, -2);
+	const double origin_x = bounds.position.x;
+	const double origin_y = bounds.position.y;
+	for (int64_t s = from; s < high; s++) {
+		if (alive[s] == 0) {
+			continue;
+		}
+		const Vector2 at = pos[s];
+		const int64_t x = floori(((double)at.x - origin_x) / PLACE_CELL);
+		const int64_t y = floori(((double)at.y - origin_y) / PLACE_CELL);
+		if (x < 0 || x >= w || y < 0 || y >= h) {
+			return s;
+		}
+		const int64_t code = whole[y * w + x];
+		if (code == 0) {
+			continue;
+		}
+		if (code == PLACE_ASK || code - 1 >= found.n) {
+			return s;
+		}
+		found[code - 1] = 1;
+	}
+	return -1;
+}
+
 void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
 	ClassDB::bind_method(D_METHOD("set_threads", "threads"), &ShotKernel::set_threads);
@@ -2639,4 +2692,5 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("threat_scan", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_scan);
 	ClassDB::bind_method(D_METHOD("threat_fill", "manager", "horizon"), &ShotKernel::threat_fill);
 	ClassDB::bind_method(D_METHOD("threat_query", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_query);
+	ClassDB::bind_method(D_METHOD("shot_places", "manager", "from"), &ShotKernel::shot_places);
 }

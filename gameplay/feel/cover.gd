@@ -76,6 +76,9 @@ const BEND_PIXELS: float = 4.0
 ## lie in, the row just in front of it too, whose tufts stand over the trail (GC9: a one-cell
 ## trail was hidden by them in dense grass).
 const FOOTPRINT: PackedVector2Array = [Vector2(-6.0, -4.0), Vector2(6.0, -4.0), Vector2(-6.0, 10.0), Vector2(6.0, 10.0)]
+## The least and the most of FOOTPRINT's offsets each way (`_walk`'s test of a body off the piece).
+const FOOT_REACH_LOW: Vector2 = Vector2(-6.0, -4.0)
+const FOOT_REACH_HIGH: Vector2 = Vector2(6.0, 10.0)
 ## Flat, a tuft with no trampled frame is pressed down by this much of its height (how long a walked
 ## cell lies flat and springs back is its kind's: `CoverKind.trample_hold`, `trample_spring`).
 const FLATTEN: float = 0.5
@@ -433,7 +436,15 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 ## The covered cells under the bodies found (their `FOOTPRINT`), walked at `now`; the grid marked
 ## to be handed over when one was.
 func _walk(now: float) -> void:
+	# A body whose footprint lies wholly off this piece's cells walks none of them: passed by with
+	# one test (a biome's every piece hears every body found; the performance pass, 2026-11-20). The
+	# box is a pixel wider than FOOTPRINT's reach each way, so no foot on a cell is passed by.
+	var low: Vector2 = layout.origin - FOOT_REACH_HIGH - Vector2.ONE
+	var high: Vector2 = layout.origin + Vector2(float(layout.columns * CoverLayout.CELL), float(layout.rows * CoverLayout.CELL)) - FOOT_REACH_LOW + Vector2.ONE
 	for at in _near_count:
+		var body: Vector2 = _near_at[at]
+		if body.x < low.x or body.y < low.y or body.x > high.x or body.y > high.y:
+			continue
 		for foot in FOOTPRINT:
 			var cell: int = layout.cell_of(_near_at[at] + foot)
 			if cell < 0 or layout.cells[cell] == 0:

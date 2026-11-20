@@ -130,9 +130,14 @@ func clear() -> void:
 		_set_near(seat, NONE)
 
 
-## The tick's step: each seat's driven body takes the coins it walks over (seats in order), then
-## the item in reach of it, said when it changed.
-func step(_delta: float) -> void:
+## The tick's step: what lies here recharges on (`ItemStack.step_recharge`: an active relic dropped
+## mid-recharge keeps recharging on the ground, the owner's of 2026-11-20); then each seat's driven
+## body takes the coins it walks over (seats in order), then the item in reach of it, said when it
+## changed.
+func step(delta: float) -> void:
+	for row: GroundItem in _rows:
+		if row.stack.recharge_left > 0.0:
+			row.stack.step_recharge(delta)
 	for seat in SEATS:
 		var found: int = NONE
 		var body: Actor = _holder(actors.actor_of_seat(seat)) if actors != null else null

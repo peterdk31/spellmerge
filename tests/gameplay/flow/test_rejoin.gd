@@ -119,6 +119,50 @@ func test_what_was_kept_is_hashed_and_saved_by_a_snapshot() -> void:
 	check_equal(back.inventory.staff_mana(), left_mana, "and the same mana")
 
 
+## The recharge travels with the relic (the owner, 2026-11-20): a player who leaves while an active
+## relic recharges comes back holding it mid-recharge, as it left (the time away not counted), its
+## HUD told; what was kept is hashed and saved by a snapshot.
+func test_a_rejoin_keeps_a_relic_mid_recharge() -> void:
+	var registry: Node = root.get_node("Registry")
+	var relic := RelicBase.new()
+	relic.id = &"test_rejoin_idol"
+	relic.active_use = ItemUse.kept(10.0, 0.0, 5.0)
+	check(registry.call("add", &"relics", relic), "a test-only active relic")
+	var told: Array = []
+	var hear := func(seat: int, _bag: StringName, id: StringName, left: float, _whole: float) -> void: told.append([seat, id, left])
+	root.get_node("Events").item_recharging.connect(hear)
+	var wizard: Actor = _start_with_a_full_inventory()
+	var stack := ItemStack.new()
+	stack.kind = ItemKinds.RELIC
+	stack.id = relic.id
+	check(wizard.inventory.add(stack), "it takes the relic")
+	wizard.inventory.start_recharge(&"relics", relic.id, 5.0)
+	tick.run(DT)
+	var left: float = wizard.inventory.recharge_left(&"relics", relic.id)
+	check(left > 4.9 and left < 5.0, "recharging (%s)" % left)
+	var hash_here: int = SimHash.areas({"Flow": flow})["Flow"]
+	flow._on_player_left(SEAT)
+	check(SimHash.areas({"Flow": flow})["Flow"] != hash_here, "what was kept is in Flow's hash")
+	var away := Snapshot.take(tick.state_areas(), root)
+	for i in 30:
+		tick.run(DT)
+	flow._on_player_joined(SEAT)
+	var back := flow.get_wizard(SEAT) as Actor
+	check(back != null and back != wizard, "a new wizard came")
+	check_equal(back.inventory.count_of(&"relics", relic.id), 1, "holding the relic")
+	check_equal(back.inventory.recharge_left(&"relics", relic.id), left, "mid-recharge, as it left")
+	check_equal(back.inventory.recharge_whole(&"relics", relic.id), 5.0, "of its whole cooldown")
+	check(told.has([SEAT, relic.id, left]), "its HUD told it recharges (%s)" % [told])
+	tick.run(DT)
+	check(back.inventory.recharge_left(&"relics", relic.id) < left, "and it counts down again")
+	check(away.restore(tick.state_areas(), root).is_empty(), "restored to while it was away")
+	flow._on_player_joined(SEAT)
+	back = flow.get_wizard(SEAT) as Actor
+	check(back != null and back.inventory.recharge_left(&"relics", relic.id) == left, "after the restore it comes back as mid-recharge")
+	root.get_node("Events").item_recharging.disconnect(hear)
+	registry.call("remove", &"relics", relic.id)
+
+
 # --- Joining only while the party is in the start room (the owner, 2026-11-19) ------------------
 
 func test_a_join_waits_for_the_runs_end_once_a_player_left_the_start_room() -> void:

@@ -579,6 +579,20 @@ Built from those answers (gameplay/feel/README.md, "Equal panes"; hud/README.md,
 2. **Two pairs:** the left and right halves, each panel kept in its own corner's row within its pair's half (no crossing): P2's panel at the top left quarter's inner side, P3's at the bottom right's.
 3. **The void quarter unlit:** fine.
 
+## Equal split: a quarter each for two players' menus (2026-11-20)
+
+The owner decided after #880: in Equal mode, when two players share a half (two pairs, the pair of four players in three groups, or a pair of three players), each player's menus open in their own quarter of that half, so two players' builders, inventories and reward menus never overlap. Built (Equal only; Dynamic as it was; nothing in the simulation):
+
+- **A quarter each** (`EqualPanes._part`, gameplay/feel/equal_panes.gd): a seat's menus open in its panel's quarter. Where both panels of a half's pair would sit on one row of one quarter (P1 and P2, P3 and P4), the one at the inner side (moved off its own corner) moves to the half's other quarter, its outer side, panel and menus together: with two pairs P2's at the bottom left and P3's at the top right; the pair of four players in three groups, P2's in the twin quarter; three players with P1 joining P2, P1's at the bottom right. Never onto the panel of a seat played on another machine (that pair then shares its quarter). A pair already on two rows (P1 and P3) keeps its corners. A trio's half has three seats for two quarters, and two share one.
+- **The HUD** (`hud/panels/seat_corners.gd`) slides the panel and its quarter together by whole pixels (at least three frames, at most 16 px a frame, a slant too), and the builder, inventory and reward menu follow (`move_quarter`, `move_room`). A corner panel hides only while its own open builder, inventory or reward menu covers it (`panels.gd` `_covered`).
+- **Tests:** `tests/hud/test_shared_half_menus.gd` (both players of a half open their builders, inventories and reward menus at once, for two pairs and the pair of three groups: no overlap, each inside its pane, the panel hidden only when covered; panel and menus sliding together), `tests/gameplay/feel/test_split_equal.gd` (every way of four players in pairs or a pair and two alone a quarter each inside its pane, three players with a pair, a seat played elsewhere, in play), `tests/hud/test_seat_corners.gd` (a slanted slide). Screenshots: `tests/screenshots/shot_shared_half_menus.gd`.
+
+### Answered by the owner (2026-11-20, on #881)
+
+1. **The panel moves too:** the inner player's corner panel slides to the half's other row with its menus. Built as above.
+2. **The panel stays shown** while its menu is open unless the menu covers it. Built; today a builder or inventory is always laid over its own panel's quarter, and a reward menu covers the band of a two-row panel (57 px against the menus' 32 px band), so those still hide it.
+3. **A trio's two shared menus:** fine as built.
+
 ## The d-pad never walks; quick-use bindings (2026-11-20)
 
 The owner decided on 2026-11-20 (on #876's map teleport): **the D-pad never walks**, and **each D-pad direction can be bound to a usable item** (a quick-use button, e.g. a quick potion). How it was built (answers #876's open question 1: the d-pad, not the walking stick, picks on the map):

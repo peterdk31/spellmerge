@@ -120,3 +120,15 @@ func test_the_reward_room_slides_with_its_quarter_never_jumping() -> void:
 		check(room.position.y <= last.position.y + 0.01, "always up, never back")
 		last = room
 	check_equal(last.position.y, 32.0, "it ends under the top band")
+
+
+## Regression: a slanted slide rounded to whole pixels came out longer than SLIDE_MOST (16.1 px), a
+## menus' quarter moving from the top right to the bottom left (the owner, 2026-11-20).
+func test_a_slanted_slide_never_steps_past_the_most() -> void:
+	var at := Vector2(320.0, 0.0)
+	var to := Vector2(0.0, 180.0)
+	for i in 100:
+		var next: Vector2 = SeatCornersScript.slide(at, to)
+		check(next.distance_to(at) <= SeatCornersScript.SLIDE_MOST, "at most %d px a frame (%s to %s)" % [SeatCornersScript.SLIDE_MOST, at, next])
+		at = next
+	check_equal(at, to, "it arrives")

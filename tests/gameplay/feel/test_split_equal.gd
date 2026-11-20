@@ -219,11 +219,49 @@ func test_two_panes_are_always_left_and_right_with_the_panels_moved_into_them() 
 		var pane: Rect2 = pairs.pane(0 if seat < 2 else 2, SCREEN)
 		check(pane.encloses(EqualPanesScript.quarter_rect(pairs.corner[seat] >> 1, SCREEN)), "pairs: seat %d's spot (%d) in its half" % [seat, pairs.corner[seat]])
 	# The owner, 2026-11-20: each panel keeps its corner's row in its pair's half (no crossing).
-	check_equal(pairs.corner, PackedInt32Array([0, 1, 7, 6]), "pairs: P2's panel at the top left quarter's inner side, P3's at the bottom right's")
+	check_equal(pairs.corner, PackedInt32Array([0, 4, 2, 6]), "pairs: P2's panel to the bottom left, P3's to the top right (the owner, on #881)")
 	var trio: EqualPanesScript = _laid([[0, 1, 2], [3]])
 	var spots: int = 0
 	for seat in 3:
 		check(LEFT.encloses(EqualPanesScript.quarter_rect(trio.corner[seat] >> 1, SCREEN)), "a trio left: seat %d's spot in the left half" % seat)
+		check(spots & (1 << trio.corner[seat]) == 0, "a trio: no two panels on one spot")
+		spots |= 1 << trio.corner[seat]
+
+
+## The owner, 2026-11-20 (on #881): two players sharing a half have each their own quarter of it,
+## the panel with its menus: with both panels on one row, the inner one's moves to the half's other
+## quarter (its outer side).
+func test_two_seats_sharing_a_half_have_their_own_quarters() -> void:
+	check_equal(_laid([[0, 1], [2, 3]]).corner, PackedInt32Array([0, 4, 2, 6]), "two pairs: P2's panel the bottom left, P3's the top right")
+	check_equal(_laid([[0, 2], [1, 3]]).corner, PackedInt32Array([0, 2, 4, 6]), "pairs on two rows: their own corners")
+	var three: EqualPanesScript = _laid([[0, 1], [2], [3]])
+	check_equal(three.twin_quarter, 2, "the pair's twin the bottom left")
+	check_equal(three.corner, PackedInt32Array([0, 4, 2, 6]), "a pair and two alone: P2's panel in the twin quarter")
+	var half_three: EqualPanesScript = _laid([[0, 1], [2]])
+	check_equal(half_three.corner[0], 6, "three players, the pair right: P1's panel the bottom right")
+	check_equal(half_three.corner[1], 2, "P2's its own corner")
+	check_equal(_laid([[0], [1], [2], [3]]).corner, PackedInt32Array([0, 2, 4, 6]), "four apart: their own corners")
+	# Every way of four players in pairs, or a pair and two alone: four quarters, each inside its pane.
+	var ways: Array = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]], [[0, 1], [2], [3]], [[0, 2], [1], [3]], [[0, 3], [1], [2]], [[1, 2], [0], [3]], [[1, 3], [0], [2]], [[2, 3], [0], [1]]]
+	for groups: Array in ways:
+		var panes: EqualPanesScript = _laid(groups)
+		var seen: int = 0
+		for group: Array in groups:
+			var first: int = group.min()
+			for seat: int in group:
+				var quarter: Rect2 = EqualPanesScript.quarter_rect(panes.corner[seat] >> 1, SCREEN)
+				check(panes.pane(first, SCREEN).encloses(quarter), "%s: seat %d's quarter inside its pane" % [groups, seat])
+				seen |= 1 << (panes.corner[seat] >> 1)
+		check_equal(seen, 0b1111, "%s: every seat a quarter of its own" % [groups])
+	# Regression (review): never onto the panel of a seat played on another machine.
+	var remote := EqualPanesScript.new()
+	remote.lay(PackedInt32Array([0b0011, 0, 0b0100, 0]), 1 << 3)
+	check_equal(remote.corner[0], 3, "P1, P2 right and P3 left, P4 elsewhere: P1's panel stays at the top right's inner side, off P4's")
+	# A trio in a half: three seats in two quarters, each inside the half, no two on one spot.
+	var trio: EqualPanesScript = _laid([[0, 1, 2], [3]])
+	var spots: int = 0
+	for seat in 3:
+		check(LEFT.encloses(EqualPanesScript.quarter_rect(trio.corner[seat] >> 1, SCREEN)), "a trio left: seat %d in the left half" % seat)
 		check(spots & (1 << trio.corner[seat]) == 0, "a trio: no two panels on one spot")
 		spots |= 1 << trio.corner[seat]
 
@@ -249,7 +287,7 @@ func test_three_and_four_panes_are_quarters_with_a_blank_for_three() -> void:
 	check_equal(pair.twin_group, 0, "the pair has a twin")
 	check_equal(pair.twin_quarter, 2, "its half's bottom quarter")
 	check_equal(pair.site(0, SCREEN), LEFT.get_center(), "and drawn at its half's middle")
-	check_equal(pair.corner, PackedInt32Array([0, 1, 2, 6]), "P2's panel at the top left quarter's inner side, P3's in its quarter")
+	check_equal(pair.corner, PackedInt32Array([0, 4, 2, 6]), "P2's panel in the twin quarter (the owner, on #881), P3's in its quarter")
 	var three_alone: EqualPanesScript = _laid([[0], [1], [2]])
 	check_equal(three_alone.twin_group, -1, "three players in three groups: no twin")
 	check_equal(three_alone.blank_quarter, 3, "but the void")
@@ -463,7 +501,7 @@ func test_three_players_two_close_share_a_half_and_part_past_the_leave_reach() -
 	# the top right quarter's inner side (it keeps its row).
 	check_equal(_split.panes().pane(2, SCREEN), LEFT, "P3 the left half")
 	check_equal(_split.panes().pane(0, SCREEN), RIGHT, "the pair the right half")
-	check_equal(_split.corners, PackedInt32Array([3, 2, 4, 6]), "P1's panel moves into the right half, on its row")
+	check_equal(_split.corners, PackedInt32Array([6, 2, 4, 6]), "P1's panel moves into the right half's free bottom quarter (the owner, on #881)")
 	# Between the join and the leave reach they stay together: no flicker at the join distance.
 	var between: float = (SplitCameraScript.JOIN_REACH + SplitCameraScript.LEAVE_REACH) * 0.5
 	near.global_position = _rooms[0] + Vector2(between, 0.0)
@@ -497,6 +535,7 @@ func test_four_players_in_pairs_are_halves_and_a_pair_and_two_alone_are_quarters
 	_frames(240)
 	_check_panes([[0, 1], [2, 3]], "two pairs")
 	check_equal(_split.panes().pane(0, SCREEN), LEFT, "P1's pair the left half")
+	check_equal(_split.corners, PackedInt32Array([0, 4, 2, 6]), "two pairs: each seat a quarter of its own in its half")
 	# P4 walks off to the middle: three groups, P3 and P4 apart.
 	walker.global_position = _rooms[6]
 	_frames(300)
@@ -508,6 +547,7 @@ func test_four_players_in_pairs_are_halves_and_a_pair_and_two_alone_are_quarters
 	check(_split.blank_anchor(0).distance_to(QUARTERS[2].get_center()) < 0.5, "the twin on the bottom left quarter")
 	check(_split.views.anchor[owner].distance_to(QUARTERS[0].get_center()) < 0.5, "the pair cut as the top left quarter")
 	check_equal(_split.views.view_at(QUARTERS[2].get_center()), owner, "readers see the bottom left as the pair's")
+	check_equal(_split.corners, PackedInt32Array([0, 4, 2, 6]), "the pair's P2 in the twin quarter, the two alone their own")
 	# Back to two pairs: the twin moves out, never jumping; the anchors walk.
 	var before := PackedVector2Array()
 	for view in _split.views.count:

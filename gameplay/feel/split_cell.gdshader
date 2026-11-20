@@ -15,6 +15,9 @@ shader_type canvas_item;
 // many others there are, which of them come before this view (a bit each: ties go to them), and
 // the divider's width towards each (whole pixels; 0: none).
 uniform vec2 screen_size = vec2(640.0, 360.0);
+// Where the rect's top left is on the screen (screen pixels): a view draws only its cell's box
+// (`SplitScreen.view_box`), so `screen_size` is the rect's size and this its corner.
+uniform vec2 cell_origin = vec2(0.0);
 uniform vec2 own = vec2(0.0);
 uniform vec2 other_0 = vec2(0.0);
 uniform vec2 other_1 = vec2(0.0);
@@ -30,7 +33,7 @@ uniform vec4 divider_colour : source_color = vec4(0.05, 0.04, 0.09, 1.0);
 
 void fragment() {
 	// The pixel's middle, in screen pixels.
-	vec2 p = (floor(UV * screen_size) + 0.5);
+	vec2 p = (floor(UV * screen_size) + 0.5) + cell_origin;
 	bool line = false;
 	for (int k = 0; k < 4; k++) {
 		if (k >= others) {

@@ -6,11 +6,13 @@ extends Node
 ##
 ## - **One picture:** with no view (everyone fits) nothing here draws; the root viewport draws the
 ##   world through the world's camera, as without a split.
-## - **A view** is a SubViewport the screen's size sharing the root's World2D (the same world,
-##   nothing copied), its canvas transform the view's own (`ScreenViews.to_screen`: no camera node).
-##   It is shown on the root's screen by a rect over the whole screen on a canvas layer (LAYER, over
-##   the world and under the HUD's panels), textured with the view, whose shader keeps its cell and
-##   draws the divider (`split_cell.gdshader`). A view keeps its node while it lives (its slot).
+## - **A view** is a SubViewport the size of its cell's box (`view_box`; the performance pass,
+##   2026-11-20: a quarter pane draws a quarter of the screen's pixels, not the whole screen's)
+##   sharing the root's World2D (the same world, nothing copied), its canvas transform the view's
+##   own (`ScreenViews.to_screen`, moved by the box's corner: no camera node). It is shown on the
+##   root's screen by a rect over that box on a canvas layer (LAYER, over the world and under the
+##   HUD's panels), textured with the view, whose shader keeps its cell and draws the divider
+##   (`split_cell.gdshader`). A view keeps its node while it lives (its slot).
 ## - **The root stops drawing the world** while there is a view: its canvas cull mask drops the
 ##   world's visibility layer (WORLD_LAYER, every canvas item's default) and keeps SCREEN_LAYER,
 ##   which every canvas item on one of the root's canvas layers gets (the HUD's panels, the markers,
@@ -60,6 +62,18 @@ const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divid
 ## How far past the biome's top left corner (each way, world pixels) the void view looks: inside the
 ## void's black (`VoidBackdrop.GROW`) and past any view's limits.
 const VOID_AWAY: float = 1024.0
+## A view's box is snapped out to this many screen pixels (`view_box`): a multiple of every light
+## buffer's downscale (SpellLight.DOWNSCALE and the budget's), so a view's light buffer texels lie
+## where the whole screen's would, and the light looks the same in a box as on the screen.
+const BOX_SNAP: int = 8
+## A view's box reaches this many screen pixels past its cell's corners (`view_box`): the light
+## readers sample a light buffer linearly, so a cell pixel near the box's edge reads texels up to
+## half a texel past it; a texel is at most the budget's largest downscale (8) screen pixels.
+const BOX_PAD: int = 8
+## How much larger a view's box may be than its cell's needs, each way, before it is made again
+## (`kept_box`): a box resized makes its view's and its light buffer's render targets anew, so it
+## keeps its size while the dividers slide a few pixels, and is made with this much room.
+const BOX_SLACK: int = 32
 
 ## The frame-time budget: which of CB1's fallbacks the split's frames need now.
 var budget: SplitBudgetScript = SplitBudgetScript.new()
@@ -82,6 +96,8 @@ var _twin_cell: TextureRect = null
 ## By slot: its view and the rect that shows it (made as needed).
 var _views: Array[SubViewport] = []
 var _cells: Array[TextureRect] = []
+## The box each slot's view drew last (`kept_box`).
+var _boxes: Array[Rect2i] = []
 ## The views drawn now, in order (`views()`), kept while they are the same.
 var _shown: Array[Viewport] = []
 ## True while the views draw the world (the root does not); the root's cull mask before.
@@ -94,6 +110,7 @@ func _init() -> void:
 	ShaderWarmupScript.want(CELL_SHADER, ShaderWarmupScript.RECT)
 	_views.resize(ScreenViewsScript.VIEWS_MOST)
 	_cells.resize(ScreenViewsScript.VIEWS_MOST)
+	_boxes.resize(ScreenViewsScript.VIEWS_MOST)
 
 
 func _ready() -> void:
@@ -163,6 +180,45 @@ func view_in_slot(slot: int) -> SubViewport:
 	return _views[slot]
 
 
+## The box of the screen view `view` of `laid` needs (screen pixels): its cell's corners' box,
+## grown by BOX_PAD (no pixel the cell's shader keeps is outside it, nor the light texels it reads)
+## and snapped out to BOX_SNAP pixels, within `screen`; the whole screen when `whole` (the twin's view, whose picture
+## is shown over the blank's quarter too) or for a cell of fewer than 3 corners. A view draws only
+## its box, so a quarter pane draws a quarter of the screen's pixels, not all of them; its picture
+## is the same, the box's part of the whole screen's.
+static func view_box(laid: ScreenViewsScript, view: int, screen: Vector2, whole: bool = false) -> Rect2i:
+	var full := Rect2i(Vector2i.ZERO, Vector2i(screen))
+	var n: int = laid.corners(view)
+	if whole or n < 3:
+		return full
+	var low: Vector2 = laid.corner(view, 0)
+	var high: Vector2 = low
+	for at in range(1, n):
+		var point: Vector2 = laid.corner(view, at)
+		low = low.min(point)
+		high = high.max(point)
+	var start := Vector2i((low - Vector2.ONE * BOX_PAD).floor())
+	var end := Vector2i((high + Vector2.ONE * BOX_PAD).ceil())
+	start = Vector2i(floori(float(start.x) / BOX_SNAP) * BOX_SNAP, floori(float(start.y) / BOX_SNAP) * BOX_SNAP)
+	end = Vector2i(ceili(float(end.x) / BOX_SNAP) * BOX_SNAP, ceili(float(end.y) / BOX_SNAP) * BOX_SNAP)
+	var box := Rect2i(start, end - start).intersection(full)
+	return box if box.has_area() else full
+
+
+## The box a view draws, given the box it drew last (`current`; empty for none) and the one its cell
+## needs now (`needed`, `view_box`): the last one while it holds the needed one with at most
+## BOX_SLACK more on each side, else the needed one grown by half BOX_SLACK each way (snapped, within
+## `screen`), so a view is resized only now and then while the dividers slide.
+static func kept_box(current: Rect2i, needed: Rect2i, screen: Vector2) -> Rect2i:
+	var full := Rect2i(Vector2i.ZERO, Vector2i(screen))
+	if current.has_area() and current.encloses(needed) and needed.position.x - current.position.x <= BOX_SLACK and needed.position.y - current.position.y <= BOX_SLACK and current.end.x - needed.end.x <= BOX_SLACK and current.end.y - needed.end.y <= BOX_SLACK:
+		return current
+	if needed == full:
+		return full
+	var grown: Rect2i = needed.grow(BOX_SLACK / 2).intersection(full)
+	return grown if grown.has_area() else full
+
+
 ## A drawn frame, `delta` real seconds on: the views for this machine's wizards (`seats`, a bit a
 ## seat) in `table`, split from the world's camera `world_camera`, laid out and drawn.
 func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D, foes: CloseFoesScript = null) -> void:
@@ -177,10 +233,12 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 		return
 	_start()
 	var used: int = 0
+	var twin_of: int = camera.blank_owner_view() if camera.blank_count() > 0 else -1
 	for view in laid.count:
 		var slot: int = camera.slot_of(view)
 		used |= 1 << slot
-		_show(slot, view, laid, screen)
+		_boxes[slot] = kept_box(_boxes[slot], view_box(laid, view, screen, view == twin_of), screen)
+		_show(slot, view, laid, screen, _boxes[slot])
 	for slot in ScreenViewsScript.VIEWS_MOST:
 		if used & (1 << slot) == 0 and _views[slot] != null:
 			_views[slot].render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -198,19 +256,21 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 		ScreenViewsScript.withdraw(_root)
 
 
-## Draw view `view` (in slot `slot`) of `laid`: its world transform, and its cell's anchors and dividers.
-func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2) -> void:
+## Draw view `view` (in slot `slot`) of `laid` over `box` of the screen (`view_box`): its world
+## transform, and its cell's place, anchors and dividers.
+func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2, box: Rect2i) -> void:
 	var shown: SubViewport = _view(slot)
-	var size := Vector2i(screen)
-	if shown.size != size:
-		shown.size = size
-	shown.canvas_transform = laid.to_screen[view]
+	if shown.size != box.size:
+		shown.size = box.size
+	shown.canvas_transform = laid.to_screen[view].translated(-Vector2(box.position))
 	shown.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var cell: TextureRect = _cells[slot]
 	cell.visible = true
-	cell.size = screen
+	cell.position = Vector2(box.position)
+	cell.size = Vector2(box.size)
 	var material := cell.material as ShaderMaterial
-	material.set_shader_parameter(&"screen_size", screen)
+	material.set_shader_parameter(&"screen_size", Vector2(box.size))
+	material.set_shader_parameter(&"cell_origin", Vector2(box.position))
 	material.set_shader_parameter(&"own", laid.anchor[view])
 	var others: int = 0
 	var before: int = 0
@@ -334,7 +394,7 @@ func _view(slot: int) -> SubViewport:
 	return view
 
 
-## A view the screen's size sharing the root's world and its pixel settings, drawing only the world.
+## A view (the screen's size until its first box) sharing the root's world and its pixel settings, drawing only the world.
 func _new_view(named: String) -> SubViewport:
 	var view := SubViewport.new()
 	view.name = named

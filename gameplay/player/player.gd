@@ -51,8 +51,9 @@ extends ActorController
 ##   this seat only, a staff named by its number) puts the shown body's staffs on hands, in the bag
 ##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
 ##   refusal is `inventory_refused` with its words. `bag_use_requested` (the owner, 2026-11-19)
-##   drinks one potion of the shown body's potions bag (`PotionBase`, found in the registry): one is
-##   taken and the body is given what it does through Combat (`health_gift_requested`); refused for
+##   uses one item of the shown body's bag that is tagged usable (a potion, an active relic: its
+##   `ItemContent.use_of`, found in the registry): one is taken and the body is given what its use
+##   does through Combat (`health_gift_requested`); refused for
 ##   none held (NO_ITEM), a thing not tagged usable (NO_USE, `ItemKinds.usable`) and a potion that only heals while the
 ##   body is whole (NO_NEED: never wasted).
 ## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the
@@ -682,9 +683,8 @@ func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number
 	_answer_inventory(refusal)
 
 
-## The inventory menu asked to drink one `id` of `bag` (the owner, 2026-11-19): a potion the shown
-## body holds is taken and does what it does (`PotionBase`: more most health, then a heal, through
-## Combat), refused as the class doc says.
+## The inventory menu asked to use one `id` of `bag` (the owner, 2026-11-19): an item tagged usable
+## the shown body holds is taken and its use done (`_use_item`), refused as the class doc says.
 func _on_bag_use_requested(player: int, bag: StringName, id: StringName, body: int) -> void:
 	if player != seat:
 		return
@@ -722,26 +722,27 @@ func _on_quick_use_requested(player: int, slot: int) -> void:
 	_use_item(body.inventory.quick_bag(slot), body.inventory.quick_id(slot))
 
 
-## Use one `id` of `bag` of the shown body: a potion is taken and does what it does (more most
-## health, then a heal, through Combat), refused as the class doc says.
+## Use one `id` of `bag` of the shown body: an item tagged usable (a potion, an active relic) is
+## taken and its use (`ItemContent.use_of`, an `ItemUse`) done: more most health, then a heal,
+## through Combat; refused as the class doc says.
 func _use_item(bag: StringName, id: StringName) -> void:
 	var shown_body: Actor = shown()
 	var inventory: Inventory = shown_body.inventory
-	var kind: StringName = ItemKinds.kind_in(bag, id)
 	if inventory == null or inventory.count_of(bag, id) < 1:
 		_refuse_inventory(NO_ITEM)
 		return
-	var potion := ItemLooks.content_of(kind, id, registry) as PotionBase
-	if not ItemKinds.usable(bag, id, registry) or potion == null:
+	var item := ItemKinds.content(ItemKinds.kind_in(bag, id), id, registry) as ItemContent
+	var use: ItemUse = item.use_of() if item != null and item.usable else null
+	if use == null:
 		_refuse_inventory(NO_USE)
 		return
-	if shown_body.health == null or potion.wasted_on(shown_body.health.health, shown_body.health.max_health):
+	if shown_body.health == null or use.wasted_on(shown_body.health.health, shown_body.health.max_health):
 		_refuse_inventory(NO_NEED)
 		return
 	var bus: EventsScript = _bus()
 	if bus == null or not inventory.take(bag, id, 1):
 		return
-	bus.health_gift_requested.emit(shown_body.id, potion.heal, potion.more_most)
+	bus.health_gift_requested.emit(shown_body.id, use.heal, use.more_most)
 
 
 ## A refusal of the inventory menu's to the seat (`inventory_refused`); nothing for a change made.

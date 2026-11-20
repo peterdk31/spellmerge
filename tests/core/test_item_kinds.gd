@@ -81,6 +81,26 @@ func test_every_content_folder_named_is_there_and_holds_its_kind() -> void:
 				check(found > 0, "%s: the registry finds some under %s (%d)" % [kind, folder, found])
 
 
+func test_the_content_validator_passes_every_item_and_rejects_a_tagged_one_with_no_use() -> void:
+	var registry: Node = root.get_node("Registry")
+	check_equal(registry.call("validate_items"), PackedStringArray(), "every item is sound")
+	var bare := PotionBase.new()
+	bare.id = &"test_empty_flask"
+	bare.usable = true
+	var said: PackedStringArray = bare.use_problems()
+	check_equal(said.size(), 1, "a tagged potion that neither heals nor adds health: rejected")
+	check(said[0].contains("test_empty_flask") and said[0].contains("tagged usable but has no use") and said[0].contains("clear its usable tag"), "naming the item and the fix: %s" % [said])
+	var relic := RelicBase.new()
+	relic.id = &"test_idol"
+	relic.usable = true
+	check(relic.problems()[0].contains("test_idol"), "a tagged relic with no active use: rejected (%s)" % [relic.problems()])
+	relic.active_use = ItemUse.health(20.0, 0.0)
+	check_equal(relic.problems(), PackedStringArray(), "with its active use: sound")
+	relic.usable = false
+	check(relic.problems()[0].contains("not tagged usable"), "a use with no tag is never used: said (%s)" % [relic.problems()])
+	check(registry.call("validate_items") is PackedStringArray, "the validator is the registry's")
+
+
 func test_potions_and_the_coin_are_sound_content() -> void:
 	var registry: Node = root.get_node("Registry")
 	for folder: StringName in [&"potions", &"coins", &"keys"]:

@@ -15,8 +15,8 @@ extends PanelContainer
 ## the line of a seat played on another machine), `set_purse` (a small line under the health line
 ## with the seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0),
 ## `set_keys` (the shown body's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
-## while there are none), `set_rerolls` (its room rerolls and reward rerolls after the keys, each a
-## `key_count.gd` of its own picture, the same way; the owner, 2026-11-19),
+## while there are none), `set_rerolls` (its reward rerolls after the keys, a `key_count.gd` of its
+## own picture, the same way; the owner, 2026-11-19),
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
@@ -40,6 +40,10 @@ const ONLINE_TEXT: String = "ONLINE"
 ## The purse line's words (`set_purse`): the coins, and the rewards waiting (A opens the oldest).
 const COINS_TEXT: String = "%d coins"
 const UNSPENT_TEXT: String = "%d to pick"
+## A seat that joined while the run could not be joined (`set_join_held`; the owner, 2026-11-19):
+## the word in the health number's place, and the line under it that says why.
+const WAIT_TEXT: String = "WAIT"
+const JOIN_HELD_TEXT: String = "Joins after this run:\nthe party left the start room"
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -47,6 +51,9 @@ const UNSPENT_TEXT: String = "%d to pick"
 var _health: float = -1.0
 var _downed: bool = false
 var _menu_open: bool = false
+var _join_held: bool = false
+## The line that says why a seat waits to join (`set_join_held`), made in `_ready`.
+var _held_note: Label = null
 var _rows: Array[StaffRowScript] = []
 ## Per staff: whether its plan has a card (an empty staff shows no row).
 var _has_cards: Array[bool] = [false, false, false, false]
@@ -55,7 +62,6 @@ var _purse: Label = null
 ## The purse's row (the purse line, then the shown body's keys) and its key count (`set_keys`).
 var _purse_row: HBoxContainer = null
 var _keys: KeyCountScript = null
-var _room_rerolls: KeyCountScript = null
 var _reward_rerolls: KeyCountScript = null
 var _coins: int = 0
 var _unspent: int = 0
@@ -94,11 +100,18 @@ func _ready() -> void:
 	_keys.name = "Keys"
 	_keys.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_purse_row.add_child(_keys)
-	_room_rerolls = _count_of("RoomRerolls", KeyCountScript.ROOM_REROLL, &"ice")
 	_reward_rerolls = _count_of("RewardRerolls", KeyCountScript.REWARD_REROLL, &"void")
 	_purse_row.add_child(_purse)
 	_staffs.get_parent().add_child(_purse_row)
 	_staffs.get_parent().move_child(_purse_row, _staffs.get_index())
+	_held_note = Label.new()
+	_held_note.name = "JoinHeld"
+	_held_note.visible = false
+	_held_note.text = JOIN_HELD_TEXT
+	_held_note.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
+	_held_note.add_theme_font_size_override(&"font_size", 8)
+	_staffs.get_parent().add_child(_held_note)
+	_staffs.get_parent().move_child(_held_note, _purse_row.get_index())
 	_align_rows()
 	_refresh_status()
 
@@ -146,6 +159,19 @@ func set_online(on: bool) -> void:
 		_seat_row.visible = on
 
 
+## The seat joined while the run could not be joined (`held`), or no more: "WAIT" in the health
+## number's place and the line that says why (the owner, 2026-11-19).
+func set_join_held(held: bool) -> void:
+	_join_held = held
+	_held_note.visible = held
+	_refresh_status()
+
+
+## True while the panel says its seat waits to join (for tests).
+func is_join_held() -> bool:
+	return _join_held
+
+
 ## Show the seat's coins and how many rewards wait to be picked (the unspent icon, DESIGN rule 4):
 ## one line under the bars, "12 coins  1 to pick", hidden while both are 0. Text changes only when
 ## a number did.
@@ -169,18 +195,13 @@ func set_keys(count: int, at_once: bool) -> void:
 	_keys.set_count(count, at_once)
 
 
-## Show the room rerolls and the reward rerolls the seat's shown body holds, after its keys (each
-## played in by whole pixels as the keys are; `at_once`: drawn as they stand).
-func set_rerolls(room: int, reward: int, at_once: bool) -> void:
-	_room_rerolls.set_count(room, at_once)
+## Show the reward rerolls the seat's shown body holds, after its keys (played in by whole pixels as
+## the keys are; `at_once`: drawn as they stand).
+func set_rerolls(reward: int, at_once: bool) -> void:
 	_reward_rerolls.set_count(reward, at_once)
 
 
-## The room reroll count and the reward reroll count it shows (their widgets, for tests).
-func room_reroll_count() -> KeyCountScript:
-	return _room_rerolls
-
-
+## The reward reroll count it shows (its widget, for tests).
 func reward_reroll_count() -> KeyCountScript:
 	return _reward_rerolls
 
@@ -331,7 +352,9 @@ func _refresh_rows() -> void:
 
 
 func _refresh_status() -> void:
-	if _downed:
+	if _join_held:
+		_status.text = WAIT_TEXT
+	elif _downed:
 		_status.text = DOWN_TEXT
 	elif _menu_open:
 		_status.text = MENU_TEXT

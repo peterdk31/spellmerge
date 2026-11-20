@@ -31,14 +31,13 @@ func test_every_bag_holds_its_kinds() -> void:
 
 
 func test_the_currency_bag_holds_the_coins_and_the_keys() -> void:
-	check_equal(ItemKinds.kinds_in(&"currency"), [ItemKinds.COIN, ItemKinds.KEY, ItemKinds.REROLL] as Array[StringName], "the coins, the keys and the rerolls share the currency bag")
-	check_equal(ItemKinds.kind_in(&"currency", RerollBase.ROOM), ItemKinds.REROLL, "a room reroll's id is a reroll")
+	check_equal(ItemKinds.kinds_in(&"currency"), [ItemKinds.COIN, ItemKinds.KEY, ItemKinds.REROLL] as Array[StringName], "the coins, the keys and the reward rerolls share the currency bag")
 	check_equal(ItemKinds.kind_in(&"currency", RerollBase.REWARD), ItemKinds.REROLL, "a reward reroll's id is a reroll")
 	check(ItemKinds.stacks(ItemKinds.REROLL) and ItemKinds.can(ItemKinds.REROLL, ItemKinds.DROP), "a reroll is a stack, dropped as any currency")
-	for id: StringName in [RerollBase.ROOM, RerollBase.REWARD]:
-		var made: ItemContent = root.get_node("Registry").get_resource(&"rerolls", id) as ItemContent
-		check(made is RerollBase and ItemKinds.kind_of(made) == ItemKinds.REROLL, "%s is found under rerolls" % id)
-		check(made != null and made.problems().is_empty(), "%s has no problems" % id)
+	var made: ItemContent = root.get_node("Registry").get_resource(&"rerolls", RerollBase.REWARD) as ItemContent
+	check(made is RerollBase and ItemKinds.kind_of(made) == ItemKinds.REROLL, "the reward reroll is found under rerolls")
+	check(made != null and made.problems().is_empty(), "the reward reroll has no problems")
+	check(root.get_node("Registry").get_resource(&"rerolls", &"room_reroll") == null, "no room reroll (the owner, 2026-11-19: rewards only)")
 	check_equal(ItemKinds.kind_in(&"currency", CoinBase.ID), ItemKinds.COIN, "the coin's id is a coin")
 	check_equal(ItemKinds.kind_in(&"currency", KeyBase.ID), ItemKinds.KEY, "the key's id is a key")
 	check(ItemKinds.stacks(ItemKinds.KEY) and ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP), "a key is one stack, dropped (everything is droppable, the owner, 2026-11-19)")

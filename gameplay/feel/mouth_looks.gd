@@ -77,10 +77,6 @@ var _sealed: PackedByteArray = PackedByteArray()
 ## The grid the mouths were found on: its places and the world it was (`RoomHearing.world`).
 var _found_places: int = -1
 var _found_world: int = -1
-## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a
-## room reroll's) gives its mouths its kind's light anew; nothing else is found again.
-var _found_versions: PackedInt32Array = PackedInt32Array()
-var _found_relaid: int = -1
 var _clock: float = 0.0
 var _shimmer_clock: float = 0.0
 var _shimmer_frame: int = 0
@@ -141,14 +137,6 @@ func step(delta: float, grid: RoomGrid) -> void:
 	var places: int = grid.places() if grid != null else 0
 	if places != _found_places or _found_world != _world_now():
 		_find(grid, places)
-	elif pieces != null and pieces.relaid() != _found_relaid:
-		var changed: PackedInt32Array = pieces.changed_since(_found_versions, places)
-		_found_relaid = pieces.relaid()
-		_found_versions = pieces.versions()
-		for mouth in _areas.size():
-			if changed.has(_rooms[mouth]):
-				_lights[mouth] = _light_of(_rooms[mouth])
-		queue_redraw()
 	if _areas.is_empty():
 		return
 	read(grid)
@@ -248,8 +236,6 @@ func _any_glow() -> bool:
 func _find(grid: RoomGrid, places: int) -> void:
 	_found_places = places
 	_found_world = _world_now()
-	_found_relaid = pieces.relaid() if pieces != null else 0
-	_found_versions = pieces.versions() if pieces != null else PackedInt32Array()
 	_areas.clear()
 	_rooms.resize(0)
 	_wide.resize(0)

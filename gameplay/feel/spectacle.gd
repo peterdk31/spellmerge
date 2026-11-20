@@ -200,8 +200,6 @@ var _later_size: PackedVector2Array = PackedVector2Array()
 var _later_walls: Array[Array] = []
 var _later_holes: Array[Array] = []
 var _later_at: PackedVector2Array = PackedVector2Array()
-## The piece number each later mist is of (its light key's, `_later_key`).
-var _later_piece: PackedInt32Array = PackedInt32Array()
 var _feet: PackedVector2Array = PackedVector2Array()
 var _feet_count: int = 0
 ## The pool's material the stirs were last handed to, and their `version` then.
@@ -249,10 +247,6 @@ var _mark_room: StringName = &""
 ## The walls of every piece of the world built so far (a biome's pieces, each at its place; a row
 ## run's one room): what the light is blocked by (`_on_room_built`).
 var _world_walls: Array[Rect2] = []
-## Each piece's walls by its number (told 1 in `_piece_told`): a piece laid again alone (a room
-## reroll's) replaces its own, every other piece's kept.
-var _piece_walls: Array[Array] = []
-var _piece_told: PackedByteArray = PackedByteArray()
 ## Feel's clock at the last step.
 var _clock: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -1151,7 +1145,7 @@ func _fit_mist(at_once: bool) -> void:
 ## Later room `at`'s mist made (while the first room's is), as laid.
 func _make_later_mist(at: int) -> void:
 	var made := MistScript.new(MARK_Z)
-	made.name = "Mist%d" % _later_piece[at]
+	made.name = "Mist%d" % (at + 1)
 	made.set_share(_mist_share)
 	add_child(made)
 	var walls: Array[Rect2] = []
@@ -1160,14 +1154,14 @@ func _make_later_mist(at: int) -> void:
 	holes.assign(_later_holes[at])
 	made.lay(_later_size[at], walls, holes, _later_at[at])
 	made.use(_later_data[at])
-	room_mists.insert(mini(at, room_mists.size()), made)
+	room_mists.append(made)
 	if light != null:
 		made.use_light(light.buffer())
 		light.read_by(_later_key(at), made.material as ShaderMaterial)
 
 
 func _later_key(at: int) -> StringName:
-	return StringName("mist_%d" % _later_piece[at])
+	return StringName("mist_%d" % (at + 1))
 
 
 ## Every later room's mist node freed (the laid rooms kept unless `forget`).
@@ -1184,7 +1178,6 @@ func _free_later_mists(forget: bool) -> void:
 		_later_walls.clear()
 		_later_holes.clear()
 		_later_at.resize(0)
-		_later_piece.resize(0)
 
 
 func _free_mist() -> void:
@@ -1290,11 +1283,8 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	if number != EventsScript.FIRST_ROOM:
 		# A biome's later piece: its walls join the world's; the room's look is the first room's, and
 		# a room naming a mist draws its own where it stands (the owner, 2026-11-19).
-		var again: bool = number >= 0 and number < _piece_told.size() and _piece_told[number] != 0
-		_tell_piece_walls(number, walls)
-		if again:
-			# Laid again alone (a room reroll's): only its own mist goes, and its new one comes.
-			_forget_later_mist(number)
+		_world_walls.append_array(walls)
+		blockers.use_walls(_world_walls)
 		var later: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 		if later != null and later.mist != null and not later.walkway:
 			var piece := layout_root as Node2D
@@ -1303,15 +1293,11 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 			_later_walls.append(walls.duplicate())
 			_later_holes.append(PieceShape.laid_holes(layout_root))
 			_later_at.append(piece.position if piece != null else Vector2.ZERO)
-			_later_piece.append(number)
 			if mist != null:
 				_make_later_mist(_later_data.size() - 1)
 				_keep_mist_last()
 		return
 	_free_later_mists(true)
-	_piece_walls.clear()
-	_piece_told.resize(0)
-	_tell_piece_walls(number, walls)
 	_world_walls = walls.duplicate()
 	blockers.use_walls(walls)
 	# The mist's room (atmosphere F), read only when the room names a mist.
@@ -1339,47 +1325,6 @@ func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], at: Vecto
 
 
 ## The mist is the last of the children at the marks' z, so it lies over the marks and the shadows.
-## Piece `number`'s walls are `walls` (a piece laid, or laid again alone): the world's walls the
-## pieces' together, for the light's blockers.
-func _tell_piece_walls(number: int, walls: Array[Rect2]) -> void:
-	if number < 0:
-		return
-	var again: bool = number < _piece_told.size() and _piece_told[number] != 0
-	while _piece_walls.size() <= number:
-		_piece_walls.append([])
-		_piece_told.append(0)
-	_piece_walls[number] = walls.duplicate()
-	_piece_told[number] = 1
-	if again:
-		_world_walls.clear()
-		for told: Array in _piece_walls:
-			for rect: Rect2 in told:
-				_world_walls.append(rect)
-	elif number != EventsScript.FIRST_ROOM:
-		_world_walls.append_array(walls)
-	if number != EventsScript.FIRST_ROOM:
-		blockers.use_walls(_world_walls)
-
-
-## Later piece `number`'s mist gone (its node freed, its light read no more), every other kept.
-func _forget_later_mist(number: int) -> void:
-	var at: int = _later_piece.find(number)
-	if at < 0:
-		return
-	if at < room_mists.size():
-		if light != null:
-			light.read_by(_later_key(at), null)
-		remove_child(room_mists[at])
-		room_mists[at].queue_free()
-		room_mists.remove_at(at)
-	_later_data.remove_at(at)
-	_later_size.remove_at(at)
-	_later_walls.remove_at(at)
-	_later_holes.remove_at(at)
-	_later_at.remove_at(at)
-	_later_piece.remove_at(at)
-
-
 func _keep_mist_last() -> void:
 	if mist != null and mist.get_parent() == self:
 		move_child(mist, -1)

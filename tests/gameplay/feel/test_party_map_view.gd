@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The map as this machine draws it (connected biomes CB9): each bridge mouth's kind symbol, big and
-## lit, rising in by rows as a wizard comes near (the owner, 2026-11-19), turning over on a reroll; the held Y map, opening over frames inside its own player's view's
+## lit, rising in by rows as a wizard comes near (the owner, 2026-11-19); the held Y map, opening over frames inside its own player's view's
 ## cell only; and the party's map and the dark over the unvisited rooms right on a machine that joins
 ## mid-run (it hears only the restore). On the real autoloads with the split test map
 ## (tests/support/biome_maps.gd: the nave the start room, the antechamber west, the ossuary court
@@ -477,70 +477,71 @@ func test_a_reward_types_glyphs() -> void:
 			check(light != Palette.shades_of(owned), "%s is in no owned colour" % id)
 
 
-# --- A room reroll (the owner, 2026-11-19): the signs and the open map turn over, Smooth ---------
+# --- The map held while moving (the owner, 2026-11-19: it opened and closed in a loop) ---------
 
-## The split map as the world has it, its west room a fountain (a reroll's answer).
-func _rerolled_west() -> BiomeMap:
-	var made: BiomeMap = flow.biome.map.copy()
-	made.room_kinds[WEST] = &"fountain"
-	return made
-
-
-func test_a_rerolled_rooms_sign_sinks_out_and_its_new_one_rises() -> void:
-	var map: BiomeMap = _start(1)
-	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
-	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
-	mouths.step(0.0, _grid())
-	symbols.step(0.0, actors, 1, _grid())
-	var into_west: int = -1
-	for mouth in mouths.mouths():
-		if mouths.room_of(mouth) == WEST:
-			into_west = mouth
-	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
-	symbols.step(0.0, actors, 1, _grid())
-	while symbols.is_moving():
-		symbols.advance()
-	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "the fight's sign shown")
-	var old_light: Marker2D = symbols.light_of(into_west)
-	flow.call(&"_reroll_room", WEST, _rerolled_west(), RoomFight.new())
-	mouths.step(0.0, _grid())
-	symbols.step(0.0, actors, 1, _grid())
-	check(symbols.is_turning(into_west), "the sign turns over")
-	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "no jump: the old sign still shows")
-	var rows: Array[int] = []
-	var strengths: Array[float] = []
-	while symbols.is_moving():
-		symbols.advance()
-		rows.append(symbols.rows_of(into_west))
-		var light: Marker2D = symbols.light_of(into_west)
-		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
-	check_equal(rows, [6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7] as Array[int], "it sinks out a row a frame and the new one rises")
-	for i in strengths.size():
-		check(is_equal_approx(strengths[i], MouthSymbolsScript.LIGHT_STRENGTH * rows[i] / RoomKind.SYMBOL_SIDE), "its light follows its rows, never a jump (%s)" % [strengths])
-	check(not symbols.is_turning(into_west), "turned")
-	check(symbols.light_of(into_west) != old_light and symbols.light_of(into_west).get_meta(LightSpot.TINT) == KindSymbolScript.shades_of(_hearing().kind_of(WEST))[1], "its light is the new kind's")
-	check(map != null, "the map")
+## One view of a small screen (the map cut by it), its anchor at `anchor`.
+static func _small_view(anchor: Vector2) -> ScreenViewsScript:
+	var views := ScreenViewsScript.new()
+	var screen := Vector2(100, 70)
+	views.screen = screen
+	views.count = 1
+	views.set_view(0, 1, Transform2D.IDENTITY, anchor)
+	var corners := PackedVector2Array([Vector2.ZERO, Vector2(screen.x, 0), screen, Vector2(0, screen.y)])
+	for at in 4:
+		views.set_corner(0, at, corners[at])
+	views.set_corners(0, 4)
+	return views
 
 
-func test_an_open_map_stays_open_over_a_reroll_and_the_room_comes_in_again() -> void:
+func test_a_held_map_stays_open_while_its_player_moves() -> void:
 	_start(1)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	var anchor := Vector2(46, 33)
+	view.step(0.0, actors, 1, _grid(), _small_view(anchor))
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), _small_view(anchor))
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "held, it is open")
+	var size: Vector2i = view.frame_of(0).size
+	check(view.scale_of(0) == 1 and size.x < 100, "cut by its small cell (as a split's cell or a big biome's map is): %s" % size)
+	# The player walks: its view's anchor and its wizard move a little every frame, as the camera
+	# follows and zooms.
+	var lowest: int = PartyMapViewScript.OPEN_STAGES
+	for frame in 90:
+		anchor += Vector2(0.13, -0.07) if frame < 45 else Vector2(-0.11, 0.06)
+		_wizard(0).global_position += Vector2(1.5, 0.5)
+		view.step(1.0 / 60.0, actors, 1, _grid(), _small_view(anchor))
+		lowest = mini(lowest, view.stage_of(0))
+	check_equal(lowest, PartyMapViewScript.OPEN_STAGES, "it never closes while held and moving")
+	check_equal(view.frame_of(0).size, size, "its frame keeps its size")
+	# A split that changes under it still closes it to open again at its new size (never a jump).
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.is_moving() and view.stage_of(0) == PartyMapViewScript.OPEN_STAGES, "a new split: it closes first, at the size it has")
+	view.advance()
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES - 1, "closing a stage a frame")
+
+
+func test_the_picked_room_is_outlined_on_its_players_open_map_in_stages() -> void:
+	_start(2)
 	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
 	var views: ScreenViewsScript = _two_views()
 	view.input = input as InputManagerScript
 	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
-	view.step(0.0, actors, 1, _grid(), views)
+	view.step(0.0, actors, 3, _grid(), views)
 	while view.is_moving():
 		view.advance()
-		view.step(0.0, actors, 1, _grid(), views)
-	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "open")
-	check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "the antechamber's symbol drawn")
-	flow.call(&"_reroll_room", WEST, _rerolled_west(), RoomFight.new())
-	view.step(0.0, actors, 1, _grid(), views)
-	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "still open: a reroll closes nothing")
-	check_equal(view.symbol_rows_of(WEST), 0, "the rerolled room's symbol comes in again")
-	var rows: Array[int] = []
+		view.step(0.0, actors, 3, _grid(), views)
+	events.map_pick_changed.emit(0, 0)
+	check_equal(view.pick_of(0), 0, "seat 0 picked the start room")
+	var stages: Array[int] = []
 	while view.is_moving():
 		view.advance()
-		rows.append(view.symbol_rows_of(WEST))
-	check_equal(rows, [1, 2, 3, 4, 5, 6, 7] as Array[int], "a row a frame")
-	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 0.0)
+		stages.append(view.pick_stage_of(0))
+	check_equal(stages, [1, 2, 3] as Array[int], "its outline steps in a stage a frame (Smooth)")
+	check_equal(view.pick_stage_of(1), 0, "nothing on the other player's map")
+	events.map_pick_changed.emit(0, WEST)
+	check_equal(view.pick_stage_of(0), 0, "a new pick steps in again from nothing")
+	events.map_pick_changed.emit(0, -1)
+	check(not view.is_moving() or view.pick_stage_of(0) == 0, "no pick: no outline")

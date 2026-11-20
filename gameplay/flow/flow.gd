@@ -228,7 +228,7 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal", &"_cover_held", &"_departure_told", &"_driven", &"_reroll_answer"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal", &"_cover_held", &"_departure_told", &"_driven"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -321,11 +321,10 @@ var life: RoomLife = RoomLife.new()
 var gates: GatherDoors = GatherDoors.new()
 ## A biome's key doors, secret rocks and keys (connected biomes CB11, `LockDoors`).
 var locks: LockDoors = LockDoors.new()
-## The room rerolls the run made and the hints at their doorways (the owner, 2026-11-19; `RoomRerolls`).
-var rerolls: RoomRerolls = RoomRerolls.new()
-## The Run area's answer to a room reroll asked (`run_room_rerolled`), heard while Flow asks: [map,
-## group, refill_at, stagger], empty for none. Scratch, not state.
-var _reroll_answer: Array = []
+## The teleports from the held Y map and their hints (the owner, 2026-11-19; `MapTeleport`).
+var teleports: MapTeleport = MapTeleport.new()
+## Who may join part way through a run, and who waits for its end (the owner, 2026-11-19; `JoinGate`).
+var joins: JoinGate = JoinGate.new()
 ## The party's map: the rooms seen (connected biomes CB9, `PartyMap`), and how far past a room entered
 ## the run's map shows (the run stat `map_reveal`, as the run began; a test's own biome: 0).
 var party_map: PartyMap = PartyMap.new()
@@ -386,7 +385,8 @@ func _ready() -> void:
 	boss_intro.events = events
 	gates.events = events
 	locks.events = events
-	rerolls.events = events
+	teleports.events = events
+	joins.events = events
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -398,8 +398,7 @@ func _ready() -> void:
 	events.listen(&"run_requested", _on_run_requested)
 	events.listen(&"boss_intro_next_requested", _on_boss_intro_next_requested)
 	events.listen(&"all_cards_requested", _on_all_cards_requested)
-	events.listen(&"room_reroll_requested", _on_room_reroll_requested)
-	events.run_room_rerolled.connect(_on_run_room_rerolled)
+	events.listen(&"map_teleport_requested", _on_map_teleport_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -1081,6 +1080,11 @@ func _on_player_joined(player: int) -> void:
 		return
 	if get_wizard(player) != null:
 		return
+	if mode == MODE_RUN and biome.map != null and JoinGate.closed(life):
+		# A player has left the biome's start room: this seat waits for the run's end (the owner,
+		# 2026-11-19), its wizard made with everyone's as the next world is.
+		joins.hold(player)
+		return
 	var joiners: PackedVector2Array = _places.joiner_spawns
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
 	# A player back after leaving this run comes back holding what it left with (`LeftPlayers`), its
@@ -1109,6 +1113,7 @@ func _on_player_joined(player: int) -> void:
 func _on_player_left(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
+	joins.release(player)
 	var wizard: Node2D = get_wizard(player)
 	if wizard == null:
 		return
@@ -1611,7 +1616,8 @@ func _clear_run() -> void:
 	life.clear()
 	gates.clear()
 	locks.clear()
-	rerolls.clear()
+	teleports.forget()
+	joins.clear()
 	if party_map.rooms() > 0:
 		party_map.clear()
 		_tell_seen(false)
@@ -1791,106 +1797,18 @@ func _element_ids() -> Array[StringName]:
 	return found
 
 
-## Seat `player` pressed X with no menu open (`room_reroll_requested`, a command; the owner,
-## 2026-11-19): at a doorway its driven body may reroll at (`RoomRerolls.doorway_of`), one room reroll
-## of that body's own currency bag is spent and the room behind it rerolled by the Run area
-## (`run_room_reroll_asked`, answered at once): laid anew in place (`_reroll_room`). Refused, nothing
-## spent (`room_reroll_refused`), when the body holds none or nothing valid could stand there;
-## nothing at all away from such a doorway (X does nothing there).
-func _on_room_reroll_requested(player: int) -> void:
+## Seat `player` picked room `room` on its open Y map (`map_teleport_requested`, a command; the
+## owner, 2026-11-19): its own wizard teleports there alone when it still may (`MapTeleport.go`), at
+## the room's spawn nearest its middle (a player's, else an enemy's: open floor clear of its props),
+## else its middle, on the nearest clear ground.
+func _on_map_teleport_requested(player: int, room: int) -> void:
 	if mode != MODE_RUN or state != State.RUNNING or biome.map == null or player < 0 or player >= PLAYER_SLOTS:
 		return
-	var body := _driven_bodies()[player] as Actor
-	var door: Vector2i = RoomRerolls.doorway_of(body, biome, life, _kind_of)
-	if door.x == RoomRerolls.NONE:
+	if room < 0 or room >= biome.map.rooms():
 		return
-	if body.inventory == null or body.inventory.count_of(ItemKinds.bag_of(ItemKinds.REROLL), RerollBase.ROOM) <= 0:
-		events.room_reroll_refused.emit(player, &"none_held")
-		return
-	var room: int = biome.map.end_room(door.x, door.y)
-	_reroll_answer = []
-	events.run_room_reroll_asked.emit(biome.map.copy(), room, rerolls.rolls)
-	rerolls.rolls += 1
-	var answer: Array = _reroll_answer
-	_reroll_answer = []
-	var made: BiomeMap = answer[0] as BiomeMap if not answer.is_empty() else null
-	if made == null:
-		events.room_reroll_refused.emit(player, &"no_room")
-		return
-	if _room_occupied(room, made):
-		# Nobody may stand where the room's walls could move (a downed wizard who crawled in, a foe
-		# that walked in): refused, nothing spent. The Run area's map stays as Flow's (`rerolls.rolls`
-		# only counts the rolls asked, so asking again rolls afresh).
-		events.room_reroll_refused.emit(player, &"occupied")
-		return
-	var scale: float = made.room_scales[room] if room < made.room_scales.size() else 0.0
-	var fight: RoomFight = RoomFight.of(made.enemies_of(room), int(answer[1]), int(answer[2]), float(answer[3]), scale, made.elites_of(room))
-	body.inventory.take(ItemKinds.bag_of(ItemKinds.REROLL), RerollBase.ROOM)
-	_reroll_room(room, made, fight)
-
-
-## The Run area's answer to a room reroll asked (`run_room_rerolled`), kept for the asker.
-func _on_run_room_rerolled(_room: int, map: RefCounted, group: int, refill_at: int, stagger: float) -> void:
-	_reroll_answer = [map, group, refill_at, stagger]
-
-
-## True when a wizard, a foe or a body that is not the room's own prop stands in room `room` as it
-## is or as `made` would lay it, off the bridges (a room reroll is refused then: nobody is left
-## inside a wall).
-func _room_occupied(room: int, made: BiomeMap) -> bool:
-	var old: Rect2 = biome.room_rect(room)
-	var shape: PieceShape = made.room_shape(room, biome.shapes_of(made))
-	var new: Rect2 = shape.rect_at(made.room_places[room]) if shape != null else old
-	var bodies: Array[Node] = []
-	bodies.append_array(_wizards)
-	bodies.append_array(_enemies)
-	for body: Node in contents.bodies:
-		if body != null and not contents.of_kind(PropBase).has(body):
-			bodies.append(body)
-	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
-	for body: Node in bodies:
-		var at := body as Node2D
-		if at == null or not is_instance_valid(at):
-			continue
-		# A body on a bridge (its lip past the room's mouth too) stays on it: the bridges never move.
-		var place: int = grid.place_at(at.position) if grid != null else RoomGrid.NO_PLACE
-		if place >= biome.map.rooms():
-			continue
-		if place == room or old.has_point(at.position) or new.has_point(at.position):
-			return true
-	return false
-
-
-## Room `room` rerolled to the map `made` (only that room differs: its kind, template, mirroring,
-## place and fill), its fight `fight`: the props it stood go, the map is the world's from now on, the
-## room is told rerolled (`room_rerolled`: its cover begins at rest, the view turns its signs over),
-## and that room alone is laid again (`BiomeWorld.relay_room`, the owner's of 2026-11-19: no hitch,
-## no other room's mist, cover or look touched): its layout (`room_built` under its number), its grid
-## layers and its place, the shut doors' mouths shut again over it; no other state touched. A world
-## laid fresh from the same map, or a restore of it, is the same world (`test_room_reroll.gd`). Then
-## the new room's props stand. Its placed enemies stand as it is entered, as any room's.
-func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
-	var old: Rect2 = biome.room_rect(room)
-	for body: Node in contents.of_kind(PropBase):
-		var prop := body as Node2D
-		if prop != null and is_instance_valid(prop) and old.has_point(prop.position):
-			contents.forget(prop)
-			_detach(prop)
-	biome.map = made
-	if room < life.fights.size():
-		life.fights[room] = fight
-	events.room_rerolled.emit(room, made.room_kinds[room])
-	# The biome's area never moves (`BiomeGenerator.reroll_room`): the camera is kept, not snapped.
-	if world == null or not is_instance_valid(world) or not biome.relay_room(room):
-		_rebuild_biome(false)
-	elif projectiles != null:
-		gates.lay(biome, projectiles.grid())
-		locks.lay(biome, projectiles.grid())
-		rerolls.forget()
-	if projectiles != null:
-		projectiles.set_room_size(biome.biggest_room())
-	if world != null and is_instance_valid(world):
-		contents.stand_more(world, biome.room_places(room), registry, false)
+	var wizard := get_wizard(player) as Actor
+	var at: Vector2 = _on_ground(MapTeleport.spot_in(biome.room_places(room), biome.room_rect(room)), PORTAL_GROUND * 0.5)
+	teleports.go(player, wizard, _driven_bodies()[player], life, biome.map, room, at)
 
 
 ## The kind of the biome's room `room` (`RoomKind`, from the registry), or null.
@@ -1954,7 +1872,7 @@ func _step_biome(delta: float) -> bool:
 	if gated != GatherDoors.NONE:
 		_open_gate(gated)
 	locks.step(_driven_bodies(), life, projectiles.grid() if projectiles != null else null)
-	rerolls.tell(_driven_bodies(), biome, life, _kind_of)
+	teleports.tell(get_wizard, _driven_bodies(), biome, life)
 	if gates.count_portal(_wizards):
 		_take_portal_home()
 		return true
@@ -2198,7 +2116,7 @@ func _places_for(room: int) -> RoomPlaces:
 ## After a snapshot was restored into a biome: the biome laid again where it differs (the world's
 ## own `rebuild_derived`, or here into a world that laid none), its start room's places, and the
 ## seals and the places' sleep told to the grid again (they are not state there).
-func _rebuild_biome(camera: bool = true) -> void:
+func _rebuild_biome() -> void:
 	if world == null or not is_instance_valid(world):
 		return
 	if _layout != null and is_instance_valid(_layout):
@@ -2210,7 +2128,7 @@ func _rebuild_biome(camera: bool = true) -> void:
 	biome.rebuild_derived()
 	if biome.map != null:
 		_places = biome.room_places(EventsScript.FIRST_ROOM)
-		if projectiles != null and camera:
+		if projectiles != null:
 			_add_camera_over(world, biome.area())
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
@@ -2219,7 +2137,8 @@ func _rebuild_biome(camera: bool = true) -> void:
 		locks.lay(biome, projectiles.grid())
 	gates.tell_all(_wizards, life)
 	locks.tell_all()
-	rerolls.forget()
+	teleports.forget()
+	joins.tell_all()
 	_tell_seen(true)
 
 

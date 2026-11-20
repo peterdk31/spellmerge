@@ -16,7 +16,11 @@ const EVENTS: Dictionary = {
 	&"staff_cards_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["cards", TYPE_ARRAY], ["body", TYPE_INT]],
 	&"reward_pick_requested": [["player", TYPE_INT], ["offer", TYPE_INT], ["choice", TYPE_INT]],
 	&"reward_reroll_requested": [["player", TYPE_INT], ["offer", TYPE_INT]],
-	&"room_reroll_requested": [["player", TYPE_INT]],
+	&"map_teleport_requested": [["player", TYPE_INT], ["room", TYPE_INT]],
+	&"map_pick_changed": [["player", TYPE_INT], ["room", TYPE_INT]],
+	&"teleport_rooms_shown": [["player", TYPE_INT], ["rooms", TYPE_PACKED_INT32_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
+	&"wizard_teleported": [["player", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
+	&"join_held": [["player", TYPE_INT], ["held", TYPE_BOOL]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
 	&"hub_requested": [["player", TYPE_INT]],
@@ -159,11 +163,6 @@ const EVENTS: Dictionary = {
 	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT]],
 	&"run_room_filled": [["room", TYPE_INT], ["enemies", TYPE_ARRAY], ["scale", TYPE_FLOAT], ["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT], ["elites", TYPE_ARRAY]],
 	&"run_biome_chosen": [["map", TYPE_OBJECT]],
-	&"run_room_reroll_asked": [["map", TYPE_OBJECT], ["room", TYPE_INT], ["roll", TYPE_INT]],
-	&"run_room_rerolled": [["room", TYPE_INT], ["map", TYPE_OBJECT], ["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
-	&"room_reroll_shown": [["player", TYPE_INT], ["at", TYPE_VECTOR2], ["shown", TYPE_BOOL]],
-	&"room_rerolled": [["room", TYPE_INT], ["kind", TYPE_STRING_NAME]],
-	&"room_reroll_refused": [["player", TYPE_INT], ["reason", TYPE_STRING_NAME]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
 	&"room_left": [["room", TYPE_INT]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
@@ -213,7 +212,6 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_room_reroll_asked", &"run_room_rerolled", &"room_rerolled",
 	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",

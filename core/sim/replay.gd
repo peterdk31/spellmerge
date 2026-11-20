@@ -48,9 +48,10 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## the frames' commands with `bag_use_requested`, `InputFrame.VERSION` 9, every reward an item; 16: the coins
 ## bag renamed the currency bag (its loadouts' stacks, its rule `bag_currency`) and the keys in it;
 ## 17: the frames' commands with `reward_reroll_requested` and `room_reroll_requested`,
-## `InputFrame.VERSION` 10, the rerolls).
+## `InputFrame.VERSION` 10, the rerolls; 18: the frames' commands without `room_reroll_requested` and
+## with `map_teleport_requested`, `InputFrame.VERSION` 11, the room rerolls gone).
 ## A replay of another format is refused.
-const FORMAT: int = 17
+const FORMAT: int = 18
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the hub (online-lobby L1; the main

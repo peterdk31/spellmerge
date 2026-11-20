@@ -137,6 +137,7 @@ const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
+const MapPickerScript := preload("res://hud/panels/map_picker.gd")
 const RewardMenuScript := preload("res://hud/menus/reward/reward_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
@@ -152,9 +153,6 @@ const INVENTORY_ACTION: StringName = &"inventory"
 ## else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
 const TAKE_ACTION: StringName = &"take"
-## X in play with no menu open at a doorway it may reroll sends `room_reroll_requested` (the owner,
-## 2026-11-19); in the inventory X drops, in the reward picker it rerolls the offer (their own).
-const REROLL_ACTION: StringName = &"alternate"
 ## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
 ## How far below the online line the stone line sits, in pixels.
@@ -195,7 +193,6 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
-var _seen_reroll: Array[int] = [0, 0, 0, 0]
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
@@ -218,6 +215,8 @@ var _stone_line: StoneLineScript = null
 ## Every player's hint over the item in reach (items I6), and by player whether a menu hides it
 ## (filled each frame in place).
 var _item_hints: ItemHintsScript = null
+## The pick on each seat's open Y map: a room to teleport to (the owner, 2026-11-19; `map_picker.gd`).
+var _map_picker: MapPickerScript = MapPickerScript.new()
 var _hint_menus: Array[bool] = [false, false, false, false]
 var _pad_line: PadLineScript = null
 ## The boss bar (top middle) and the entrance banner (upper middle), boss plan OB16.
@@ -290,7 +289,6 @@ func _ready() -> void:
 			_seen_inventory[player] = input.get_press_count(player, INVENTORY_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
-			_seen_reroll[player] = input.get_press_count(player, REROLL_ACTION)
 	# The menus' focus moves and backs, heard before any menu hears UIFocus, so it knows a press
 	# was a choice or a back before that menu moves the focus in answer (ui_sounds.gd).
 	_ui_sounds = UiSounds.new()
@@ -372,6 +370,7 @@ func _ready() -> void:
 	root_control.add_child(_item_hints)
 	root_control.move_child(_item_hints, 1)
 	_item_hints.bind(events, input, spells)
+	_map_picker.bind(events)
 	# The loading screen over every line and overlay made above. Over it: the pause menu and the pad
 	# line, since either stops the game, and a departure from the stone with it (the screen stays down
 	# until the run starts), and the frame rate readout (the freeze it covers is what that counts).
@@ -382,6 +381,7 @@ func _ready() -> void:
 		events.pad_wait_changed.connect(_on_pad_wait_changed)
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
+		events.join_held.connect(_on_join_held)
 		events.player_stats_changed.connect(_on_stats_changed)
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
@@ -466,11 +466,11 @@ func poll() -> void:
 		var take_count: int = input.get_press_count(player, TAKE_ACTION)
 		var take_now: bool = take_count > _seen_take[player]
 		_seen_take[player] = take_count
-		var reroll_count: int = input.get_press_count(player, REROLL_ACTION)
-		var reroll_now: bool = reroll_count > _seen_reroll[player]
-		_seen_reroll[player] = reroll_count
 		var had_menu: bool = _had_menu[player]
-		if input.is_joined(player):
+		# The open Y map's pick: A there teleports (the owner, 2026-11-19) and does nothing else.
+		var map_held: bool = _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and _map_picker.holds(player, input)
+		var map_took: bool = _map_picker.poll(player, map_held, input.get_move(player), start_now or take_now)
+		if input.is_joined(player) and not map_took:
 			if _boss_intro.is_open():
 				# A is the intro's while it is open (it asks whether the pause menu is).
 				if start_now and not had_menu and not _has_menu(player):
@@ -494,9 +494,6 @@ func poll() -> void:
 				elif start_now and _rewards[player].waiting_away() > 0 and _in_room and not _panels[player].is_downed():
 					# An offer lying nowhere (rolled while away): A anywhere opens it.
 					_open_reward(player)
-			if reroll_now and _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and events != null and _item_hints.reroll_of(player):
-				_item_hints.reroll_asked(player)
-				events.room_reroll_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and _may_open_menu(player, had_menu):
@@ -568,7 +565,7 @@ func get_reward(player: int) -> RewardMenuScript:
 
 
 ## A bag of the seat's shown body changed: its currency bag is the purse's coins, its keys and its
-## rerolls.
+## reward rerolls.
 func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
 	if player < 0 or player >= PLAYER_COUNT or bag != ItemKinds.bag_of(ItemKinds.COIN):
 		return
@@ -576,7 +573,7 @@ func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], count
 	_coins[player] = counts[at] if at >= 0 and at < counts.size() else 0
 	_panels[player].set_purse(_coins[player], _unspent[player])
 	_panels[player].set_keys(_count_in(ids, counts, KeyBase.ID), false)
-	_panels[player].set_rerolls(_count_in(ids, counts, RerollBase.ROOM), _count_in(ids, counts, RerollBase.REWARD), false)
+	_panels[player].set_rerolls(_count_in(ids, counts, RerollBase.REWARD), false)
 
 
 ## The count of `id` in a bag's `ids` and `counts` (0 when it holds none).
@@ -735,6 +732,13 @@ func _on_player_joined(player: int) -> void:
 		return
 	_joined[player] = true
 	_refresh(player)
+
+
+## Seat `player` waits to join (the party left the biome's start room) or no more (`join_held`): its
+## corner panel says so.
+func _on_join_held(player: int, held: bool) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_panels[player].set_join_held(held)
 
 
 func _on_player_left(player: int) -> void:

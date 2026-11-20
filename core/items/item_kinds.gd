@@ -44,8 +44,8 @@ const USE: StringName = &"use"
 ## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one); a key is a
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
 ## room's door (the owner, 2026-11-19: "Keys are also just inventory items"); a reroll is a
-## `RerollBase` (content/rerolls), two stacks beside them, a room reroll and a reward reroll, spent by
-## X at an unvisited doorway or in the reward picker (the owner, 2026-11-19). Everything is dropped
+## `RerollBase` (content/rerolls), one stack beside them, the reward reroll, spent by X in the
+## reward picker (the owner, 2026-11-19). Everything is dropped
 ## (the owner, 2026-11-19: "Everything is droppable"): a coin or a key one copy at a time, as a potion,
 ## lying as any item, taken by A into the taker's own bag (a dropped coin is not shared: only the
 ## coins a foe dies with are, gameplay/rewards).
@@ -56,7 +56,7 @@ const RULES: Dictionary = {
 	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop", &"use"], "premade": []},
 	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [&"drop"], "premade": [], "ids": [&"coin"]},
 	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [&"drop"], "premade": [], "ids": [&"key"]},
-	&"reroll": {"bag": &"currency", "stacks": true, "content": [&"rerolls"], "type": &"RerollBase", "actions": [&"drop"], "premade": [], "ids": [&"room_reroll", &"reward_reroll"]},
+	&"reroll": {"bag": &"currency", "stacks": true, "content": [&"rerolls"], "type": &"RerollBase", "actions": [&"drop"], "premade": [], "ids": [&"reward_reroll"]},
 }
 ## The class of a kind with none of its own yet.
 const NO_CLASS: StringName = &"Resource"

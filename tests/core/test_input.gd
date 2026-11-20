@@ -130,8 +130,8 @@ func test_each_action_is_bound_to_its_documented_keys() -> void:
 
 func test_each_action_is_bound_to_its_documented_gamepad_buttons() -> void:
 	var pad: Dictionary = {
-		&"move_left": JOY_BUTTON_DPAD_LEFT, &"move_right": JOY_BUTTON_DPAD_RIGHT,
-		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
+		&"quick_left": JOY_BUTTON_DPAD_LEFT, &"quick_right": JOY_BUTTON_DPAD_RIGHT,
+		&"quick_up": JOY_BUTTON_DPAD_UP, &"quick_down": JOY_BUTTON_DPAD_DOWN,
 		&"staff_1": JOY_BUTTON_RIGHT_SHOULDER, &"staff_3": JOY_BUTTON_LEFT_SHOULDER,
 		&"accept": JOY_BUTTON_A, &"back": JOY_BUTTON_B, &"alternate": JOY_BUTTON_X, &"pause": JOY_BUTTON_START,
 		&"join": JOY_BUTTON_A, &"inventory": JOY_BUTTON_BACK,
@@ -139,6 +139,9 @@ func test_each_action_is_bound_to_its_documented_gamepad_buttons() -> void:
 	for action: StringName in pad:
 		check(InputMap.action_has_event(action, _button(0, pad[action])), "%s is bound to gamepad button %d" % [action, pad[action]])
 	check(InputMap.action_has_event(&"join", _button(0, JOY_BUTTON_START)), "join is bound to Start")
+	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down"]:
+		for button: JoyButton in [JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_DOWN]:
+			check(not InputMap.action_has_event(action, _button(0, button)), "the d-pad never walks (the owner, 2026-11-20): %s is not on button %d" % [action, button])
 
 
 func test_tab_is_not_back() -> void:
@@ -1092,19 +1095,13 @@ func _keyboard_and_two_pads() -> void:
 	_press_join(2)
 
 
-func test_a_stick_at_rest_does_not_cancel_a_held_dpad() -> void:
+func test_the_stick_walks_whatever_the_dpad_does() -> void:
 	_keyboard_and_two_pads()
-	manager.handle_event(_button(2, JOY_BUTTON_DPAD_LEFT))
-	manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 0.0))
-	check_equal(manager.get_move(2), Vector2.LEFT, "a stick at rest does not cancel the held d-pad")
-
-
-func test_the_stick_still_moves_after_the_dpad_is_released() -> void:
-	_keyboard_and_two_pads()
-	manager.handle_event(_button(2, JOY_BUTTON_DPAD_LEFT))
 	manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, -1.0))
-	manager.handle_event(_button(2, JOY_BUTTON_DPAD_LEFT, false))
-	check_equal(manager.get_move(2), Vector2.LEFT, "the stick still moves left after the d-pad is released")
+	manager.handle_event(_button(2, JOY_BUTTON_DPAD_RIGHT))
+	check_equal(manager.get_move(2), Vector2.LEFT, "the d-pad held the other way changes nothing of the stick's walk")
+	manager.handle_event(_button(2, JOY_BUTTON_DPAD_RIGHT, false))
+	check_equal(manager.get_move(2), Vector2.LEFT, "nor does letting it go")
 	manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 0.0))
 	check_equal(manager.get_move(2), Vector2.ZERO, "everything released stops")
 
@@ -1126,16 +1123,19 @@ func test_the_right_trigger_still_casts_after_rb_is_released() -> void:
 	check(not manager.is_action_pressed(2, &"staff_2"), "the cast stops when the last input is released")
 
 
-func test_the_dpad_moves() -> void:
+func test_the_dpad_never_walks_and_is_the_quick_use_slots() -> void:
 	_press_join(0)
 	var dpad: Dictionary = {
-		JOY_BUTTON_DPAD_LEFT: Vector2.LEFT, JOY_BUTTON_DPAD_RIGHT: Vector2.RIGHT,
-		JOY_BUTTON_DPAD_UP: Vector2.UP, JOY_BUTTON_DPAD_DOWN: Vector2.DOWN,
+		JOY_BUTTON_DPAD_UP: 0, JOY_BUTTON_DPAD_RIGHT: 1, JOY_BUTTON_DPAD_DOWN: 2, JOY_BUTTON_DPAD_LEFT: 3,
 	}
 	for button: JoyButton in dpad:
+		var action: StringName = InputManagerScript.QUICK_ACTIONS[dpad[button]]
+		var presses: int = manager.get_press_count(0, action)
 		manager.handle_event(_button(0, button))
-		check(manager.get_move(0) == dpad[button], "d-pad button %d moves %s" % [button, dpad[button]])
+		check_equal(manager.get_move(0), Vector2.ZERO, "d-pad button %d walks nowhere (the owner, 2026-11-20)" % button)
+		check(manager.is_action_pressed(0, action) and manager.get_press_count(0, action) == presses + 1, "d-pad button %d is %s, slot %d" % [button, action, dpad[button]])
 		manager.handle_event(_button(0, button, false))
+	check_equal(InputManagerScript.QUICK_WAYS, [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT] as Array[Vector2], "each slot's arm points its way")
 
 
 func test_each_gamepad_button_routes_to_its_action() -> void:
@@ -1158,6 +1158,7 @@ func test_each_key_routes_to_its_action() -> void:
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
 		KEY_SHIFT: &"staff_1", KEY_SPACE: &"staff_1", KEY_TAB: &"inventory", KEY_E: &"back", KEY_J: &"staff_2",
 		KEY_K: &"staff_3", KEY_Q: &"staff_4", KEY_L: &"staff_4", KEY_ENTER: &"accept", KEY_X: &"alternate",
+		KEY_1: &"quick_up", KEY_2: &"quick_right", KEY_3: &"quick_down", KEY_4: &"quick_left",
 		KEY_ESCAPE: &"pause", KEY_R: &"extra", KEY_PAGEUP: &"kind_prev", KEY_PAGEDOWN: &"kind_next",
 	}
 	for key: Key in keys:

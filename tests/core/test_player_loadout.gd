@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The player loadout (core/sim/player_loadout.gd, items I4) and the party's (party_loadout.gd): what
-## a run's start takes along, each seat's bags, staffs by number and hands. It comes back from its
+## a run's start takes along, each seat's bags, staffs by number, hands and quick-use slots. It comes back from its
 ## bytes as it was, a copy stands apart, a writer refuses what is no id or past a limit, and the
 ## decoder refuses every cut, count, number and id out of range and a section it does not know,
 ## changing nothing.
@@ -28,6 +28,7 @@ func _player() -> PlayerLoadout:
 	made.add_staff(7, &"star", _ids(""))
 	made.add_staff(2, &"dev", _ids("fire"))
 	made.set_hands(PackedInt32Array([0, NONE, 2, NONE]))
+	made.set_quick(2, &"potions", &"healing")
 	return made
 
 
@@ -56,6 +57,8 @@ func test_it_comes_back_from_its_bytes_as_it_was() -> void:
 	check_equal(back.staff_cards(7), _ids(""), "a staff of no cards")
 	check_equal(back.hands(), PackedInt32Array([0, NONE, 2, NONE]), "the hands, an empty one too")
 	check_equal([back.hand_of(2), back.hand_of(7), back.hand_of(NONE)], [2, -1, -1], "a staff's hand, none for one in the bag")
+	check_equal([back.quick_bag(2), back.quick_id(2)], [&"potions", &"healing"], "the quick-use slot bound (the owner, 2026-11-20)")
+	check_equal([back.quick_id(0), back.quick_id(9)], [&"", &""], "a slot bound to nothing, and none past the four")
 	check(back.stack_ids(&"potions").is_empty() and back.staff_id(5) == &"" and back.staff_cards(5).is_empty(), "nothing for a bag or a number it has not")
 	var none := PlayerLoadout.new()
 	check(none.is_empty() and not loadout.is_empty(), "a new one holds nothing")
@@ -77,6 +80,10 @@ func test_a_copy_stands_apart() -> void:
 	var other: PlayerLoadout = _player()
 	other.set_hands(PackedInt32Array([0, 2, NONE, NONE]))
 	check(not other.equals(loadout), "the same things on other hands are not the same player")
+	var rebound: PlayerLoadout = _player()
+	check(rebound.set_quick(2, &"", &"") and rebound.size() < loadout.size(), "a slot let go takes its bytes back")
+	check(not rebound.equals(loadout), "the same things bound to no slot are not the same player")
+	check(not rebound.set_quick(4, &"potions", &"healing") and not rebound.set_quick(0, &"potions", &"") and not rebound.set_quick(0, &"pot.ions", &"healing"), "no slot past the four, half a binding or what is no id")
 
 
 func test_a_writer_refuses_what_is_no_id_or_past_a_limit() -> void:
@@ -124,13 +131,27 @@ func test_a_writer_refuses_what_is_no_id_or_past_a_limit() -> void:
 	check_equal(PlayerLoadout.new().decode_at(_bytes(big), 0), "", "and is read back")
 
 
-## Where the sections start in `_player()`'s bytes: [BAGS, STAFFS, HANDS], each at its tag.
+## Where the sections start in `_player()`'s bytes: [BAGS, STAFFS, HANDS, QUICK], each at its tag.
 func _sections(bytes: PackedByteArray) -> PackedInt32Array:
 	var out := PackedInt32Array()
 	var at: int = 1
 	for tag in PlayerLoadout.SECTIONS:
 		out.append(at)
 		at += 3 + bytes.decode_u16(at + 1)
+	return out
+
+
+## A loadout of nothing but the quick-use bindings `bindings` ([slot, bag, id] each), by hand.
+func _quick_bytes(bindings: Array) -> PackedByteArray:
+	var payload := PackedByteArray([bindings.size()])
+	for binding: Array in bindings:
+		payload.append(int(binding[0]))
+		for text: String in [String(binding[1]), String(binding[2])]:
+			payload.append(text.length())
+			payload.append_array(text.to_ascii_buffer())
+	var out := PackedByteArray([4, PlayerLoadout.BAGS, 1, 0, 0, PlayerLoadout.STAFFS, 1, 0, 0, PlayerLoadout.HANDS, 1, 0, 0, PlayerLoadout.QUICK, 0, 0])
+	out.encode_u16(out.size() - 2, payload.size())
+	out.append_array(payload)
 	return out
 
 
@@ -150,10 +171,11 @@ func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 		bytes[index] = value
 		cases[name] = bytes
 	change.call("two sections", 0, 2)
-	change.call("four sections", 0, 4)
+	change.call("three sections", 0, 3)
+	change.call("five sections", 0, 5)
 	change.call("a section it does not know", bags, 9)
 	change.call("a section out of its place", bags, PlayerLoadout.STAFFS)
-	change.call("a later section it does not know", hands, 4)
+	change.call("a later section it does not know", at[3], 9)
 	change.call("a section longer than its payload", bags + 1, good[bags + 1] + 1)
 	change.call("a section shorter than its payload", bags + 1, good[bags + 1] - 1)
 	# BAGS: count, then "cards" (5, c a r d s), its stacks (2 bytes), "bolt" (4, b o l t), 19 (2 bytes).
@@ -175,9 +197,9 @@ func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 	twice_bytes[1 + 3 + 1 + 1 + 5 + 2 + 5 + 2 + 5] = 0x73
 	cases["a bag twice"] = twice_bytes
 	# By hand: the bag "cards" with a stack count of 0, then no staffs and no hands.
-	var no_stacks := PackedByteArray([3, PlayerLoadout.BAGS, 9, 0, 1, 5])
+	var no_stacks := PackedByteArray([4, PlayerLoadout.BAGS, 9, 0, 1, 5])
 	no_stacks.append_array("cards".to_ascii_buffer())
-	no_stacks.append_array(PackedByteArray([0, 0, PlayerLoadout.STAFFS, 1, 0, 0, PlayerLoadout.HANDS, 1, 0, 0]))
+	no_stacks.append_array(PackedByteArray([0, 0, PlayerLoadout.STAFFS, 1, 0, 0, PlayerLoadout.HANDS, 1, 0, 0, PlayerLoadout.QUICK, 1, 0, 0]))
 	cases["a bag that holds nothing"] = no_stacks
 	# STAFFS: count, then number 0 (2 bytes), "curl" (4, c u r l), 3 cards: "bolt", "", "dash".
 	change.call("more staffs than it holds", staffs + 3, 4)
@@ -197,6 +219,20 @@ func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 	change.call("a hand holding a staff it does not own", hands + 4, 5)
 	change.call("one staff on two hands", hands + 6, 0)
 	change.call("the same staff on two hands (the second byte)", hands + 7, 0)
+	# QUICK: count, then slot 2, "potions" (7), "healing" (7).
+	var quick: int = at[3]
+	change.call("more bindings than it holds", quick + 3, 2)
+	change.call("more bindings than there are slots", quick + 3, PlayerLoadout.QUICK_SLOTS + 1)
+	change.call("a slot past the four", quick + 4, PlayerLoadout.QUICK_SLOTS)
+	change.call("a bound bag that is no id", quick + 6, 0x2e)
+	change.call("a bound item with no name", quick + 13, 0)
+	change.call("a bound item that is no id", quick + 14, 0x2f)
+	# Bindings the writer never writes: an empty one, slots out of order, one item on two slots.
+	cases["quick-use slots out of order"] = _quick_bytes([[3, "potions", "vigor"], [1, "potions", "healing"]])
+	cases["one item on two quick-use slots"] = _quick_bytes([[0, "potions", "healing"], [1, "potions", "healing"]])
+	cases["one quick-use slot twice"] = _quick_bytes([[1, "potions", "vigor"], [1, "potions", "healing"]])
+	cases["an empty quick-use binding"] = _quick_bytes([[0, "", ""], [0, "potions", "healing"]])
+	check_equal(PlayerLoadout.new().decode_at(_quick_bytes([[1, "potions", "healing"], [3, "potions", "vigor"]]), 0), "", "the same built by hand as the writer writes it is read")
 	var left_over: PackedByteArray = good.duplicate()
 	left_over.encode_u16(hands + 1, left_over.decode_u16(hands + 1) + 1)
 	left_over.append(0)

@@ -56,11 +56,22 @@ extends ActorComponent
 ##   for a staff it does not own (NO_STAFF), a hand it has not (NO_HAND) or an item it holds none
 ##   of (NO_ITEM).
 ##
+## - **Quick-use slots** (the owner, 2026-11-20): one per d-pad arm (QUICK_SLOTS: 0 up, 1 right, 2
+##   down, 3 left), each bound to a usable item by its bag and id or to nothing (`quick_bag`,
+##   `quick_id`). `bind_quick(slot, bag, id)` binds one it holds a copy of and can use
+##   (`ItemKinds.USE`; refused NO_ITEM, NO_USE): bound on another slot already, it moves; bound on
+##   this slot already, it is let go (as a hand's button takes its staff off). A binding names the
+##   item, not a copy: with none left it stays (the HUD greys it) and is full again as one is taken.
+##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
+##   and a usable item taken (`add`) that no slot is bound to fills the first slot bound to nothing**
+##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
+##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
-## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went) and `hands_changed`.
+## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went), `hands_changed` and
+## `quick_changed(slot)`.
 
 ## Why a change was refused (NONE: it was made).
-enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP }
+enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP, NO_USE }
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -72,6 +83,8 @@ const NO_HAND: int = -1
 const HANDS: int = Caster.MAX_STAFFS
 ## How many of each card the dev bag holds (the hub's; owner, 2026-11-13).
 const DEV_COPIES: int = 20
+## The quick-use slots, one per d-pad arm (0 up, 1 right, 2 down, 3 left).
+const QUICK_SLOTS: int = 4
 
 ## The contents of bag `bag` changed (`stacks_in`, `count_of`, `copies`).
 signal bag_changed(bag: StringName)
@@ -79,6 +92,8 @@ signal bag_changed(bag: StringName)
 signal staff_changed(number: int)
 ## Which staff is on which hand changed (`hands`).
 signal hands_changed()
+## What quick-use slot `slot` is bound to changed (`quick_bag`, `quick_id`).
+signal quick_changed(slot: int)
 
 ## By bag (each of `ItemKinds.BAGS`): its stacks, in the order they came.
 var _bags: Dictionary = {}
@@ -103,6 +118,9 @@ var carried: bool = false
 var _carried_bag: StringName = &""
 var _carried_id: StringName = &""
 var _carried_kept: int = 0
+## By quick-use slot: the bag and the id of the item bound to it (`&""`: none).
+var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
+var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
 
 
 func _init() -> void:
@@ -159,6 +177,9 @@ func loadout() -> PlayerLoadout:
 		for stack: ItemStack in _stacks(bag):
 			if stack.number == NO_STAFF:
 				made.add_stack(bag, stack.id, stack.count)
+	for slot in QUICK_SLOTS:
+		if _quick_ids[slot] != &"":
+			made.set_quick(slot, _quick_bags[slot], _quick_ids[slot])
 	return made
 
 
@@ -176,6 +197,12 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 	_carried_kept = 0
 	for bag: StringName in _bags:
 		_stacks(bag).clear()
+	for slot in QUICK_SLOTS:
+		var bag: StringName = loadout.quick_bag(slot)
+		var id: StringName = loadout.quick_id(slot)
+		var bound: bool = _bags.has(bag) and ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE)
+		_quick_bags[slot] = bag if bound else &""
+		_quick_ids[slot] = id if bound else &""
 	for bag: StringName in loadout.bags():
 		if not _bags.has(bag):
 			continue
@@ -345,10 +372,25 @@ func add(stack: ItemStack) -> bool:
 	if not has_room(stack):
 		return false
 	var numbered: PackedInt32Array = _put(stack)
-	_say_bag(ItemKinds.bag_of(stack.kind))
+	var bag: StringName = ItemKinds.bag_of(stack.kind)
+	_say_bag(bag)
 	for number in numbered:
 		_say_staff(number)
+	_bind_if_free(bag, stack.id, stack.kind)
 	return true
+
+
+## A usable item just taken that no quick-use slot is bound to fills the first slot bound to nothing.
+func _bind_if_free(bag: StringName, id: StringName, kind: StringName) -> void:
+	if not ItemKinds.can(kind, ItemKinds.USE):
+		return
+	for slot in QUICK_SLOTS:
+		if _quick_bags[slot] == bag and _quick_ids[slot] == id:
+			return
+	for slot in QUICK_SLOTS:
+		if _quick_ids[slot] == &"":
+			_set_quick(slot, bag, id)
+			return
 
 
 ## What its body carries from the start (an enemy's coins, its data's: `Actor`): `stack` added as
@@ -424,6 +466,47 @@ func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	for number in gone:
 		_say_staff(number)
 	return true
+
+
+# --- Quick-use slots ---------------------------------------------------------------------
+
+## The bag of the item quick-use slot `slot` is bound to (`&""`: none, or no such slot).
+func quick_bag(slot: int) -> StringName:
+	return _quick_bags[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
+
+
+## The id of the item quick-use slot `slot` is bound to (`&""`: none, or no such slot).
+func quick_id(slot: int) -> StringName:
+	return _quick_ids[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
+
+
+## Bind quick-use slot `slot` to `id` of `bag`, as the class doc says (`&""` lets the slot go).
+## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item it holds none of (NO_ITEM)
+## and one that is never used (NO_USE).
+func bind_quick(slot: int, bag: StringName, id: StringName) -> Refusal:
+	if slot < 0 or slot >= QUICK_SLOTS:
+		return Refusal.NO_SLOT
+	if id == &"" or (_quick_bags[slot] == bag and _quick_ids[slot] == id):
+		_set_quick(slot, &"", &"")
+		return Refusal.NONE
+	if not ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE):
+		return Refusal.NO_USE
+	if count_of(bag, id) < 1:
+		return Refusal.NO_ITEM
+	for other in QUICK_SLOTS:
+		if other != slot and _quick_bags[other] == bag and _quick_ids[other] == id:
+			_set_quick(other, &"", &"")
+	_set_quick(slot, bag, id)
+	return Refusal.NONE
+
+
+func _set_quick(slot: int, bag: StringName, id: StringName) -> void:
+	if _quick_bags[slot] == bag and _quick_ids[slot] == id:
+		return
+	_quick_bags[slot] = bag
+	_quick_ids[slot] = id
+	_edited = _edited or _started
+	quick_changed.emit(slot)
 
 
 # --- Staffs and hands -------------------------------------------------------------------

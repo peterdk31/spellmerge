@@ -37,8 +37,9 @@ extends RefCounted
 ## inventory, every reward an item, the owner's of 2026-11-19; 10: `reward_reroll_requested` and
 ## `room_reroll_requested` added, the rerolls' X, the owner's of 2026-11-19; 11: `room_reroll_requested`
 ## gone with the room rerolls and `map_teleport_requested` added, a teleport from the Y map, the
-## owner's of 2026-11-19).
-const VERSION: int = 11
+## owner's of 2026-11-19; 12: `quick_bind_requested` and `quick_use_requested` added, the d-pad's
+## quick-use slots, the owner's of 2026-11-20).
+const VERSION: int = 12
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -83,6 +84,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"bag_use_requested",
 	&"reward_reroll_requested",
 	&"map_teleport_requested",
+	&"quick_bind_requested", &"quick_use_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -100,6 +102,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"ssi",
 	"i",
 	"i",
+	"issi", "i",
 ]
 
 var seat: int = 0

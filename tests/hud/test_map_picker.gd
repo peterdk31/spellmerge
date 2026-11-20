@@ -1,9 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## The pick on the open Y map (the owner, 2026-11-19; hud/panels/map_picker.gd): while the map is
 ## held and Flow says there are rooms to go to (`teleport_rooms_shown`), a room is picked (the last
-## one if it still may be, else the first), a flick of the stick moves it to the nearest room that
-## way, A sends `map_teleport_requested` once a press, and the pick is told to the view
-## (`map_pick_changed`), none as the map is let go.
+## one if it still may be, else the first), a press of a d-pad arm moves it to the nearest room that
+## way (the owner, 2026-11-20: the left stick no longer picks, so the wizard walks on), A sends
+## `map_teleport_requested` once a press, and the pick is told to the view (`map_pick_changed`), none
+## as the map is let go. Through the panels: the d-pad moves the pick while the map is held and is
+## never a quick-use then.
 
 const EventsScript := preload("res://core/events/events.gd")
 const MapPickerScript := preload("res://hud/panels/map_picker.gd")
@@ -32,23 +34,23 @@ func test_nothing_is_picked_while_the_map_is_shut() -> void:
 	check(_asked.is_empty(), "no teleport asked")
 
 
-func test_held_a_room_is_picked_and_a_flick_moves_it_that_way() -> void:
+func test_held_a_room_is_picked_and_a_dpad_press_moves_it_that_way() -> void:
 	_picker.poll(0, true, Vector2.ZERO, false)
 	check_equal(_picker.pick_of(0), 0, "the first room picked")
+	check(_picker.picking(0), "the seat picks")
 	check_equal(_picks.back(), [0, 0], "told to the view")
-	_picker.poll(0, true, Vector2(-1, 0), false)
-	check_equal(_picker.pick_of(0), 3, "a flick west: the room west")
-	_picker.poll(0, true, Vector2(-1, 0), false)
-	check_equal(_picker.pick_of(0), 3, "held over, it moves no further (one room a flick)")
+	_picker.poll(0, true, Vector2.LEFT, false)
+	check_equal(_picker.pick_of(0), 3, "left: the room west")
 	_picker.poll(0, true, Vector2.ZERO, false)
-	_picker.poll(0, true, Vector2(-1, 0), false)
+	check_equal(_picker.pick_of(0), 3, "no press, it stays")
+	_picker.poll(0, true, Vector2.LEFT, false)
 	check_equal(_picker.pick_of(0), 3, "nothing further west: it stays")
-	_picker.poll(0, true, Vector2.ZERO, false)
-	_picker.poll(0, true, Vector2(1, 0), false)
-	check_equal(_picker.pick_of(0), 0, "a flick east: back to the middle room")
-	_picker.poll(0, true, Vector2.ZERO, false)
-	_picker.poll(0, true, Vector2(0.7, -0.7), false)
-	check_equal(_picker.pick_of(0), 5, "a flick north-east: the room that way")
+	_picker.poll(0, true, Vector2.RIGHT, false)
+	check_equal(_picker.pick_of(0), 0, "right: back to the middle room")
+	_picker.poll(0, true, Vector2.UP, false)
+	check_equal(_picker.pick_of(0), 5, "up: the room north-east, within the cone")
+	_picker.poll(0, true, Vector2.DOWN, false)
+	check_equal(_picker.pick_of(0), 0, "down: back to the middle room")
 
 
 func test_a_sends_the_teleport_once_and_letting_go_clears_the_pick() -> void:

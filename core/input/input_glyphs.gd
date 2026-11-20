@@ -18,7 +18,8 @@ enum Kind { KEYBOARD, KEYBOARD_MOUSE, XBOX, PLAYSTATION, SWITCH, GAMEPAD }
 ## How a glyph is drawn: a key cap with its label, a round face button with a letter, a
 ## round PlayStation button with a symbol (label is `cross`, `circle`, `square` or
 ## `triangle`), a shoulder button (a bumper, or Start and Back), a trigger, or the mouse with
-## its left button lit, or the d-pad with one arm lit (label `left` or `right`).
+## its left button lit, or the d-pad with one arm lit (label `up`, `right`, `down` or `left`) or
+## none (label `all`: the whole d-pad, `DPAD`).
 enum Shape { KEY, FACE, SYMBOL, SHOULDER, MOUSE, TRIGGER, DPAD }
 
 const FACE_GREEN: Color = Color(0.36, 0.72, 0.4)
@@ -38,7 +39,13 @@ const _KEYS: Dictionary = {
 	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
 	&"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
 	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn", &"take": "F", &"inventory": "Tab", &"map": "M",
+	&"quick_up": "1", &"quick_right": "2", &"quick_down": "3", &"quick_left": "4", &"dpad": "1-4",
 }
+## Not an action: the whole d-pad (all four `quick_*` arms), for a hint such as the map's "Move
+## teleport target"; on the keyboard the four keys, "1-4".
+const DPAD: StringName = &"dpad"
+## The d-pad arms' labels, by action.
+const _ARMS: Dictionary = {&"quick_up": "up", &"quick_right": "right", &"quick_down": "down", &"quick_left": "left", &"dpad": "all"}
 
 ## Name fragments (lower case) of a gamepad's name, per family.
 ## Browsers name a pad like "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
@@ -90,6 +97,8 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 			return {"shape": Shape.DPAD, "label": "left", "color": PLAIN}
 		&"kind_next":
 			return {"shape": Shape.DPAD, "label": "right", "color": PLAIN}
+		&"quick_up", &"quick_right", &"quick_down", &"quick_left", &"dpad":
+			return {"shape": Shape.DPAD, "label": _ARMS[action], "color": PLAIN}
 		&"pause":
 			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
 			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}

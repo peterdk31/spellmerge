@@ -1864,9 +1864,11 @@ func _room_occupied(room: int, made: BiomeMap) -> bool:
 ## Room `room` rerolled to the map `made` (only that room differs: its kind, template, mirroring,
 ## place and fill), its fight `fight`: the props it stood go, the map is the world's from now on, the
 ## room is told rerolled (`room_rerolled`: its cover begins at rest, the view turns its signs over),
-## the world is laid again from the map as after a restore that brought another map (every piece told
-## again, the grid's layers, the doors' and the seals laid again; no other state touched), and the new
-## room's props stand. Its placed enemies stand as it is entered, as any room's.
+## and that room alone is laid again (`BiomeWorld.relay_room`, the owner's of 2026-11-19: no hitch,
+## no other room's mist, cover or look touched): its layout (`room_built` under its number), its grid
+## layers and its place, the shut doors' mouths shut again over it; no other state touched. A world
+## laid fresh from the same map, or a restore of it, is the same world (`test_room_reroll.gd`). Then
+## the new room's props stand. Its placed enemies stand as it is entered, as any room's.
 func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
 	var old: Rect2 = biome.room_rect(room)
 	for body: Node in contents.of_kind(PropBase):
@@ -1879,7 +1881,12 @@ func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
 		life.fights[room] = fight
 	events.room_rerolled.emit(room, made.room_kinds[room])
 	# The biome's area never moves (`BiomeGenerator.reroll_room`): the camera is kept, not snapped.
-	_rebuild_biome(false)
+	if world == null or not is_instance_valid(world) or not biome.relay_room(room):
+		_rebuild_biome(false)
+	elif projectiles != null:
+		gates.lay(biome, projectiles.grid())
+		locks.lay(biome, projectiles.grid())
+		rerolls.forget()
 	if projectiles != null:
 		projectiles.set_room_size(biome.biggest_room())
 	if world != null and is_instance_valid(world):
@@ -2108,7 +2115,7 @@ func _clear_biome_room(room: int) -> void:
 		if kind != null and kind.rewards != &"":
 			# Each player's reward (connected biomes CB11): however its foes left it.
 			# A reward room's of its type, decided as the biome was made (the owner, 2026-11-19).
-			events.room_rewards_due.emit(room, kind.rewards, biome.map.reward_type_of(room).to_row())
+			events.room_rewards_due.emit(room, kind.rewards, biome.map.reward_type_of(room).to_row(), _reward_spots(room))
 	_drop_keys(room)
 	if gates.opens_home(room):
 		_open_portal_home(room)
@@ -2124,11 +2131,30 @@ func _open_special_room(room: int) -> void:
 	var middle: Vector2 = biome.room_rect(room).get_center()
 	var spots := PackedVector2Array()
 	var pool := Rect2()
+	var board: Vector2 = Vector2.ZERO
 	if kind.fill == RoomKind.FILL_SHOP:
 		spots = SpecialPlaces.shelf(places, middle)
+		# Its reroll sign (the owner's ask of 2026-11-19), on clear ground.
+		board = _on_ground(SpecialPlaces.sign_spot(places, middle), PORTAL_GROUND * 0.5)
 	else:
 		pool = SpecialPlaces.pool(places, middle)
-	events.special_room_opened.emit(room, kind.fill, kind.shelf, pool, spots)
+	events.special_room_opened.emit(room, kind.fill, kind.shelf, pool, spots, board)
+
+
+## Where each seat's reward item lies in room `room` as it is cleared (the owner's ask of
+## 2026-11-19): `SpecialPlaces.reward_spots`, each on the nearest clear ground.
+func _reward_spots(room: int) -> PackedVector2Array:
+	var spots: PackedVector2Array = SpecialPlaces.reward_spots(biome.room_places(room), biome.room_rect(room).get_center())
+	for at in spots.size():
+		spots[at] = _on_ground(spots[at], PORTAL_GROUND * 0.5)
+	return spots
+
+
+## `spot` (world pixels) on the nearest clear ground `radius` round, as a dropped key is put.
+func _on_ground(spot: Vector2, radius: float) -> Vector2:
+	if projectiles == null or world == null:
+		return spot
+	return world.to_local(projectiles.grid().nearest_ground(world.to_global(spot), radius))
 
 
 ## Room `room` was cleared: each key that drops in it lies at its zone `key`, else its middle, on the

@@ -26,6 +26,8 @@ const VIEW_MARGIN: float = 32.0
 ## kind's average life): the dust never crowds out a fight's motes, whatever the "Particles"
 ## setting (Minimal's 2,048 rows: 256 of dust at most).
 const RING_SHARE: float = 0.125
+## How many points a mote that must leave from outside every place tries (`give_off`'s `outside`).
+const OUTSIDE_TRIES: int = 4
 
 ## The air given off (null: none), its colours as the ramp table's sources, and motes owed (a part
 ## of one). Read only.
@@ -85,8 +87,10 @@ static func area_of(view: Rect2, bounds: Rect2) -> Rect2:
 ## Give off the motes owed since the last call, at Feel's clock `now`, into `pool` (null: none, the
 ## particles or the light are off), over `area_of(view, bounds)`, holding at most `share` of the
 ## motes' ring at once (RING_SHARE for the room's air; a kind's air in each of its rooms takes a part
-## of its own, gameplay/feel/kind_air.gd).
-func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE) -> void:
+## of its own, gameplay/feel/kind_air.gd). With `outside` (a grid with places) a mote leaves only
+## from a point in none of its places (the void between a biome's slabs, `void_air`): a point inside
+## one is drawn again up to OUTSIDE_TRIES times, then that mote is not given off.
+func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
 	if look == null or pool == null:
@@ -111,6 +115,13 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: 
 	while _owed >= 1.0:
 		_owed -= 1.0
 		var at := Vector2(area.position.x + _rng.randf() * area.size.x, area.position.y + _rng.randf() * area.size.y)
+		if outside != null:
+			var tries: int = 1
+			while outside.place_at(at) != RoomGrid.NO_PLACE and tries < OUTSIDE_TRIES:
+				at = Vector2(area.position.x + _rng.randf() * area.size.x, area.position.y + _rng.randf() * area.size.y)
+				tries += 1
+			if outside.place_at(at) != RoomGrid.NO_PLACE:
+				continue
 		var ramp: int = sources[_rng.randi() % sources.size()]
 		pool.throw_part(k, at, look.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 		given_box = given_box.expand(at) if given > 0 else Rect2(at, Vector2.ZERO)

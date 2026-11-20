@@ -1,0 +1,77 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.36,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 901
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": 1046,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 2.41,
+					"gain": -14,
+					"decay": 0.1
+				},
+				{
+					"ratio": 3.93,
+					"gain": -24,
+					"decay": 0.05
+				}
+			],
+			"amp": {
+				"attack": 0.007
+			}
+		},
+		{
+			"source": "partials",
+			"pitch": 1318,
+			"start": 0.045,
+			"gain": -5,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.26
+				},
+				{
+					"ratio": 2.41,
+					"gain": -15,
+					"decay": 0.08
+				}
+			],
+			"amp": {
+				"attack": 0.007
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": 523,
+			"length": 0.08,
+			"gain": -12,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.5
+		},
+		"lowpass": 4200
+	},
+	"notes": "A coin picked up: a small, soft clink of two struck metal notes a third apart, with a low body under it. Bright enough to read as a coin, rounded off so a boss's handful never stings."
+}

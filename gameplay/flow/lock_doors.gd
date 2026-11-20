@@ -258,6 +258,9 @@ func step(bodies: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 			if actor.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)):
 				key_states[key] = KEY_TAKEN
 				_tell_key(key)
+				if events != null:
+					# For its pickup sound (the owner's ask of 2026-11-19).
+					events.item_picked_up.emit(actor.id, ItemKinds.KEY, KeyBase.ID, key_at[key])
 				break
 	var opened_room: int = NONE
 	for seat in bodies.size():

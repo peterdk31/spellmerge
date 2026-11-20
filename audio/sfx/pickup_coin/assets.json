@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/pickup_coin/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_coin/pickup_coin.sound.json",
+			"recipe_hash": "sha256:cf17a68ea1608501dcb7df2e0e30e18eddb1f11d5853b801783af87982051bc3",
+			"audio_hash": "sha256:04358287e57cd5aabfb0e692e71314b8d5a54bafd1b3069a6d769e50b937e5d2",
+			"loudness": -20.1,
+			"peak": -4.1
+		},
+		{
+			"path": "audio/sfx/pickup_coin/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_coin/pickup_coin.sound.json",
+			"recipe_hash": "sha256:cf17a68ea1608501dcb7df2e0e30e18eddb1f11d5853b801783af87982051bc3",
+			"audio_hash": "sha256:a4e3492253a30a9f32ad26db66d2170256ca497e27bc2194a52e04fd0ee628f2",
+			"loudness": -20.2,
+			"peak": -4.9
+		},
+		{
+			"path": "audio/sfx/pickup_coin/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_coin/pickup_coin.sound.json",
+			"recipe_hash": "sha256:cf17a68ea1608501dcb7df2e0e30e18eddb1f11d5853b801783af87982051bc3",
+			"audio_hash": "sha256:4b83640058bebd5ca91de7d4a82616b50b05cc14a3b11c0d3903ea32437d618f",
+			"loudness": -19.7,
+			"peak": -4.7
+		},
+		{
+			"path": "audio/sfx/pickup_coin/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_coin/pickup_coin.sound.json",
+			"recipe_hash": "sha256:cf17a68ea1608501dcb7df2e0e30e18eddb1f11d5853b801783af87982051bc3",
+			"audio_hash": "sha256:5a6fc129b2f2a1bacec660e460a4d5ada737094af09b9cb40998fe0881c8bf03",
+			"loudness": -20.0,
+			"peak": -4.1
+		}
+	]
+}

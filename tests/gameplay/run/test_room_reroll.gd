@@ -3,8 +3,10 @@ extends "res://tests/support/suite.gd"
 ## maps, a reroll of a room past the start room changes that room alone (its kind, template,
 ## mirroring, place and fill), keeps every bridge where it was, its sockets meeting them, inside the
 ## biome's area, and keeps every rule of the map (`problems`, `rule_problems`: the fixed kinds there,
-## the boss deepest, a template once a biome); a door's kind stays its door's; the same roll the same
-## map, another roll another; the start room is never rerolled; refills keep the other rooms' foes.
+## the boss deepest, a template once a biome; a kind's `max_per_run` may be broken, never its
+## `least`); a door's kind stays its door's; in the made-up biome a room changes kind, to more than
+## one kind and past a count (the crypt has one template of each kind but the fight); `kind_weight`; the same roll the same map, another roll another; the start room is
+## never rerolled; refills keep the other rooms' foes.
 const RegistryScript := preload("res://core/registry/registry.gd")
 const MadeUpBiome := preload("res://tests/support/made_up_biome.gd")
 
@@ -45,7 +47,7 @@ func test_a_reroll_changes_that_room_alone_and_keeps_the_map_valid() -> void:
 				continue
 			rerolled += 1
 			var what: String = "seed %d room %d" % [seed_value, room]
-			check_equal(made.problems(_shapes) + BiomeGenerator.rule_problems(made, rules, _content, _shapes), PackedStringArray(), "%s: sound" % what)
+			check_equal(made.problems(_shapes) + BiomeGenerator.rule_problems(made, rules, _content, _shapes, true, false), PackedStringArray(), "%s: sound (a kind's count may be broken, never its least)" % what)
 			check_equal(made.bridge_templates, map.bridge_templates, "%s: the same bridges" % what)
 			check_equal(made.bridge_places, map.bridge_places, "%s: where they were" % what)
 			check_equal(made.depths, map.depths, "%s: the same depths" % what)
@@ -78,27 +80,6 @@ func test_the_same_roll_the_same_map_and_the_start_room_never() -> void:
 		if not one.same_as(BiomeGenerator.reroll_room(_crypt, _content, _shapes, sim, 1, map, room, roll)):
 			differs = true
 	check(differs, "another roll, another map")
-
-
-func test_a_reroll_changes_the_kind_where_the_rules_leave_room() -> void:
-	# The made-up biome's maps hold more rooms than their fixed kinds: a room past them may turn
-	# into another kind that opens freely.
-	var biome: MadeUpBiome = MadeUpBiome.new()
-	var rules: MapRules = MadeUpBiome.rules()
-	var definition: RunDefinition = MadeUpBiome.run(rules)
-	var changed: int = 0
-	for seed_value in 12:
-		var sim: Sim = _sim(seed_value)
-		var map: BiomeMap = BiomeGenerator.generate(definition, biome.content, biome.shapes, sim)
-		for room in range(1, map.rooms()):
-			var made: BiomeMap = BiomeGenerator.reroll_room(definition, biome.content, biome.shapes, sim, 1, map, room, 0)
-			if made == null:
-				continue
-			check_equal(made.problems(biome.shapes) + BiomeGenerator.rule_problems(made, rules, biome.content, biome.shapes), PackedStringArray(), "seed %d room %d: sound" % [seed_value, room])
-			if made.room_kinds[room] != map.room_kinds[room]:
-				changed += 1
-				check_equal(biome.content.kind(made.room_kinds[room]).door, biome.content.kind(map.room_kinds[room]).door, "a kind of the same door")
-	check(changed > 0, "some rooms change their kind (%d)" % changed)
 
 
 func test_a_refill_keeps_the_rooms_after_it() -> void:
@@ -135,3 +116,54 @@ func test_a_rerolled_reward_room_rolls_its_type_again() -> void:
 				differs += 1
 	check(rerolled > 0, "reward rooms reroll (%d)" % rerolled)
 	check(differs > 0, "and their type is rolled again (%d differ)" % differs)
+
+
+func test_a_reroll_can_change_the_kind_breaking_a_count_and_every_fixed_kind_survives() -> void:
+	# The owner, 2026-11-19: any kind of the same door, a kind's count broken if need be, as long as
+	# every fixed kind is still somewhere (and fights enough on every way to the boss). The made-up
+	# biome holds two templates of the reward and the shop, so a room may become a second one.
+	var biome: MadeUpBiome = MadeUpBiome.new()
+	var rules: MapRules = MadeUpBiome.rules()
+	var definition: RunDefinition = MadeUpBiome.run(rules)
+	var changed: int = 0
+	var broke: int = 0
+	var into: Dictionary = {}
+	for seed_value in 6:
+		var sim: Sim = _sim(seed_value)
+		var map: BiomeMap = BiomeGenerator.generate(definition, biome.content, biome.shapes, sim)
+		for room in range(1, map.rooms()):
+			if map.room_kinds[room] == &"boss":
+				continue
+			for roll in 2:
+				var made: BiomeMap = BiomeGenerator.reroll_room(definition, biome.content, biome.shapes, sim, 1, map, room, roll)
+				if made == null:
+					continue
+				var what: String = "seed %d room %d roll %d" % [seed_value, room, roll]
+				check_equal(made.problems(biome.shapes) + BiomeGenerator.rule_problems(made, rules, biome.content, biome.shapes, true, false), PackedStringArray(), "%s: sound" % what)
+				for rule: KindRule in rules.biome_lines(biome.content, biome.shapes):
+					check(made.room_kinds.count(rule.kind) >= rule.least, "%s: at least %d of '%s' still" % [what, rule.least, rule.kind])
+					if rule.max_per_run > 0 and made.room_kinds.count(rule.kind) > rule.max_per_run:
+						broke += 1
+				check(BiomeGenerator.fights_on_way(made, biome.content, made.room_kinds.find(&"boss")) >= rules.fights_on_way, "%s: fights enough on every way" % what)
+				check_equal(made.room_kinds.count(&"boss"), 1, "%s: the boss still one" % what)
+				check(made.room_kinds[room] != &"boss" and made.room_kinds[room] != rules.start_kind, "%s: never the boss or the start room" % what)
+				if made.room_kinds[room] != map.room_kinds[room]:
+					changed += 1
+					into[made.room_kinds[room]] = true
+					check_equal(biome.content.kind(made.room_kinds[room]).door, biome.content.kind(map.room_kinds[room]).door, "%s: the same door" % what)
+	check(changed > 0, "rooms change their kind (%d)" % changed)
+	check(broke > 0, "a kind's count may be broken (%d)" % broke)
+	check(into.size() > 1, "into more than one kind (%s)" % [into.keys()])
+
+
+func test_a_kind_is_weighed_by_how_many_the_biome_holds() -> void:
+	var map := BiomeMap.new()
+	for kind: StringName in [&"start", &"fight", &"fight", &"fight", &"shop", &"reward"]:
+		map.add_room(&"t", Vector2.ZERO, 0, kind)
+	var fight := KindRule.make(&"fight")
+	var shop := KindRule.make(&"shop", 0, -1, 2.0)
+	var fountain := KindRule.make(&"fountain")
+	check_equal(BiomeGenerator.kind_weight(map, 5, fight), 0.25, "three fights held: a quarter")
+	check_equal(BiomeGenerator.kind_weight(map, 1, fight), 1.0 / 3.0, "the room itself not counted")
+	check_equal(BiomeGenerator.kind_weight(map, 5, shop), 1.0, "its line's weight over two")
+	check_equal(BiomeGenerator.kind_weight(map, 5, fountain), 1.0, "a kind the biome holds none of: its weight")

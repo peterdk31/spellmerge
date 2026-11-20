@@ -115,11 +115,13 @@ const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
+const PickupSoundsScript := preload("res://gameplay/feel/pickup_sounds.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
@@ -132,6 +134,7 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
 const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
 const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
@@ -139,6 +142,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const CoinsScript := preload("res://gameplay/feel/coins.gd")
 const SpecialRoomLooksScript := preload("res://gameplay/feel/special_room_looks.gd")
+const RewardItemsScript := preload("res://gameplay/feel/reward_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
@@ -458,6 +462,8 @@ var _body_sounds: BodySoundsScript = null
 ## The boss intro's two cues, played while the tree is paused for it, and what holds a boss with an
 ## intro's entrance cue back until it is known whether its intro played.
 var _intro_sound: BossIntroSoundScript = null
+## Each kind of pickup's sound (`pickup_sounds.gd`).
+var _pickup_sounds: PickupSoundsScript = PickupSoundsScript.new()
 var _intro_wait: BossIntroWait = BossIntroWait.new()
 ## The sound the death cue being played sounds in place of its own (an enemy's `death_sound`), read
 ## once by the next `play_cue` (so a cue its parts play does not take it).
@@ -518,6 +524,9 @@ var _fall_motes: Callable = Callable()
 var _spawn_look: SpawnLook = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
+## The enemies close to each seat's wizards, found once a drawn frame for the party camera and the
+## split views to frame (`close_foes.gd`; the owner, 2026-11-19).
+var close_foes: CloseFoesScript = CloseFoesScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
 ## What dead layered bodies leave: their parts flying apart (boss plan OB8, `remnants.gd`).
@@ -544,6 +553,8 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
 var _unseen: UnseenDarkScript = null
+## The black void under a biome's slabs (`void_backdrop.gd`; the owner, 2026-11-19).
+var _void: VoidBackdropScript = null
 ## Each room's own light tinted by its kind (`room_tints.gd`; CB12b), onto the spell light.
 var _tints: RoomTintsScript = null
 ## What each mouth tells of the room behind it, and the held Y map (connected biomes CB9).
@@ -556,6 +567,8 @@ var _coins: CoinsScript = null
 ## The shops' shelves, the fountains' pools and the keys on the floor (`special_room_looks.gd`,
 ## connected biomes CB11).
 var _special_rooms: SpecialRoomLooksScript = null
+## The players' reward items on the floor (`reward_items.gd`; the owner's ask of 2026-11-19).
+var _reward_items: RewardItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
 var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -867,6 +880,7 @@ func _ready() -> void:
 	_intro_sound.registry = registry
 	_intro_sound.audio = audio
 	add_child(_intro_sound)
+	_pickup_sounds.audio = audio
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
@@ -905,6 +919,9 @@ func _ready() -> void:
 	_locks.registry = registry
 	add_child(_locks)
 	_locks.bind(events)
+	_void = VoidBackdropScript.new()
+	_void.name = "VoidBackdrop"
+	add_child(_void)
 	_unseen = UnseenDarkScript.new()
 	_unseen.name = "UnseenDark"
 	_unseen.pieces = _hearing
@@ -937,6 +954,10 @@ func _ready() -> void:
 	_special_rooms.name = "SpecialRoomLooks"
 	add_child(_special_rooms)
 	_special_rooms.bind(events)
+	_reward_items = RewardItemsScript.new()
+	_reward_items.name = "RewardItems"
+	add_child(_reward_items)
+	_reward_items.bind(events)
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -984,6 +1005,7 @@ func _ready() -> void:
 	events.possess_ended.connect(_on_possess_ended)
 	events.boss_shown.connect(_on_boss_shown)
 	_intro_sound.bind(events)
+	_pickup_sounds.bind(events)
 	_intro_wait.bind(events)
 	_intro_wait.released.connect(_on_boss_released)
 	events.projectile_impact.connect(_on_projectile_impact)
@@ -1052,11 +1074,12 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	party_camera.follow(_live_camera())
 	var seats_here: int = _seats_here()
-	party_camera.look(_actor_table(), seats_here)
+	close_foes.find(_actor_table(), projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null)
+	party_camera.look(_actor_table(), seats_here, close_foes)
 	party_camera.step(real_delta)
 	if split_screen != null:
 		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
-		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera, close_foes)
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
@@ -1137,6 +1160,8 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_mouth_symbols.step(real_delta, table, seats_here, grid)
 	if _unseen != null:
 		_unseen.step(real_delta, grid)
+	if _void != null:
+		_void.step(grid, projectiles.bounds() if grid != null else Rect2())
 	if _tints != null:
 		_tints.step(real_delta, grid, _spectacle.light if _spectacle != null else null)
 	if _party_map != null:
@@ -2496,6 +2521,10 @@ func ground_items() -> GroundItemsScript:
 
 
 ## The coins on the floor's look (for tests).
+func reward_items() -> RewardItemsScript:
+	return _reward_items
+
+
 func coins() -> CoinsScript:
 	return _coins
 
@@ -2526,6 +2555,11 @@ func lock_looks() -> LockLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## The black void under a biome's slabs (for tests).
+func void_backdrop() -> VoidBackdropScript:
+	return _void
 
 
 ## Each room's tint by its kind (CB12b; for tests and the screenshots).

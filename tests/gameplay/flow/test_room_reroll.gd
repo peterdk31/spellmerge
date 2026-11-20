@@ -88,7 +88,7 @@ func _on_rerolled(room: int, kind: StringName) -> void:
 	rerolled.append([room, kind])
 
 
-func _on_opened(room: int, fill: StringName, _table: StringName, _area: Rect2, _spots: PackedVector2Array) -> void:
+func _on_opened(room: int, fill: StringName, _table: StringName, _area: Rect2, _spots: PackedVector2Array, _sign: Vector2) -> void:
 	opened.append([room, fill])
 
 

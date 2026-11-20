@@ -193,6 +193,35 @@ func test_a_enters_a_bag_and_b_goes_back_out() -> void:
 	check(inventory.hub_lines().has("Empty"), "which says so")
 
 
+## The owner, 2026-11-19: the thumb is on the stick turning the ring, so RT opens a bag as A does
+## (as in the builder), and a card kind too; on the staffs ring RT is still its hand's button.
+func test_rt_enters_a_bag_and_a_card_kind_as_a_does() -> void:
+	_start()
+	var inventory: InventoryScript = _open()
+	_point("bag", CARDS)
+	_tap(&"staff_2")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.KINDS, "RT enters the bag pointed at")
+	_point("kind", &"carrier")
+	_tap(&"staff_2")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.CARDS, "and the card kind pointed at")
+	check(_hand_asks.is_empty() and _drop_asks.is_empty(), "asking for nothing")
+	_tap(&"back")
+	_frame()
+	_tap(&"back")
+	_frame()
+	_point("bag", STAFFS)
+	_tap(&"staff_2")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.STAFFS, "RT enters the staff bag")
+	check(_hand_asks.is_empty(), "the press that enters puts nothing on a hand")
+	_point("staff", 4)
+	_tap(&"staff_2")
+	_frame()
+	check_equal(_hand_asks, [[0, 4, 1]], "on the staffs ring RT still puts the staff on its hand")
+
+
 func test_a_drinks_the_potion_pointed_at() -> void:
 	_start()
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two healing potions")

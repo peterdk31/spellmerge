@@ -724,7 +724,11 @@ func _keyboard_and_a_guest() -> bool:
 func test_feels_camera_heads_for_the_wizard_played_here_alone() -> void:
 	if not _keyboard_and_a_guest():
 		return
-	check(party.target_position.is_equal_approx(_wizard(0).global_position) and is_equal_approx(party.target_zoom, PartyCameraScript.MAX_ZOOM), "Feel's step heads the camera for the keyboard's wizard alone (%s, %f)" % [party.target_position, party.target_zoom])
+	# The keyboard's wizard and its own close foes (the owner, 2026-11-19), never the guest's wizard.
+	var foes: Object = feel.get("close_foes")
+	var framed: Rect2 = foes.call("box_for", 0b0001, Rect2(_wizard(0).global_position, Vector2.ZERO)) as Rect2
+	check(party.target_position.is_equal_approx(framed.get_center()), "Feel's step heads the camera for the keyboard's wizard and its close foes alone (%s, %f)" % [party.target_position, party.target_zoom])
+	check(not framed.has_point(_wizard(1).global_position) or framed.get_area() == 0.0, "not for the guest's wizard")
 
 
 ## The wizard played elsewhere is out of the picture: Feel marks it at the picture's edge.

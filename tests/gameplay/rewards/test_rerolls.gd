@@ -8,6 +8,8 @@ extends "res://tests/support/suite.gd"
 ## state, through a snapshot.
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
+## Where a test shop's reroll sign stands: out of every wizard's reach.
+const FAR: Vector2 = Vector2(0, 4000)
 const BAG: StringName = &"currency"
 
 var _world: Fixture
@@ -50,7 +52,7 @@ func _tick() -> void:
 
 func _clear(room: int, table: StringName = &"clear") -> void:
 	_world.bus.room_cleared.emit(&"test_room", room)
-	_world.bus.room_rewards_due.emit(room, table, PackedStringArray())
+	_world.bus.room_rewards_due.emit(room, table, PackedStringArray(), PackedVector2Array())
 	_rewards.step(Fixture.STEP)
 
 
@@ -104,7 +106,7 @@ func test_a_reward_reroll_spends_one_and_changes_only_that_players_offer() -> vo
 	var others: Array = _choices_of(1)
 	var offer: int = int(_rewards.waiting_of(0)[0]["offer"])
 	_reroll(0, offer)
-	check_equal(_rerolled, [[0, offer, 2]], "said, with as many choices as it had")
+	check_equal(_rerolled, [[0, offer, 3]], "said, with as many choices as it had")
 	check_equal(_held(one, RerollBase.REWARD), 0, "one reward reroll spent")
 	check_equal(_choices_of(0)[0].size(), before[0].size(), "the same number of choices")
 	check_equal(_choices_of(1), others, "only that player's offer changes")
@@ -178,7 +180,7 @@ func test_a_shop_sells_both_rerolls_and_its_shelf_rolls_anew_when_rerolled() -> 
 	var seen: bool = false
 	var spots := PackedVector2Array([Vector2(300, 0), Vector2(320, 0), Vector2(340, 0)])
 	for room in 12:
-		_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
+		_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots, FAR)
 	for item: Dictionary in _rewards.shelf():
 		if (item["choice"] as Dictionary)["kind"] == ItemKinds.REROLL:
 			seen = true
@@ -192,7 +194,7 @@ func test_a_shop_sells_both_rerolls_and_its_shelf_rolls_anew_when_rerolled() -> 
 		for room in range(30, 36):
 			if pass_rerolled:
 				_world.bus.room_rerolled.emit(room, &"shop")
-			_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
+			_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots, FAR)
 		var ids: Array = []
 		for item: Dictionary in _rewards.shelf():
 			ids.append([(item["choice"] as Dictionary)["kind"], (item["choice"] as Dictionary)["id"]])

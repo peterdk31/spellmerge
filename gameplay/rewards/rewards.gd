@@ -9,12 +9,15 @@ extends Node
 ##   reward room's `reward`, ...; rolled at the area's next step), however its foes left it (the
 ##   owner, 2026-11-19: a possessed foe killed elsewhere too), every seat with a wizard gets an offer
 ##   of its own (`RewardOffer`), its choices rolled from that table (content/rewards, `RewardRoll`),
-##   as many as that player's `reward_choices` (`RunStats`: "pick 1 of 2", decision 17), said by
+##   as many as that player's `reward_choices` (`RunStats`: "pick 1 of 3", decision 17, the owner's 3 of 2026-11-19), said by
 ##   `reward_rolled`. A reward room's rolls are of its type (`RewardType`, the owner's ask of
 ##   2026-11-19: decided as its biome is made, told with `room_rewards_due`): each choice among the
 ##   items of the type, widened a level while it has none left (`RewardRoll`).
-##   A seat whose wizard was in the room (`here`) has its menu opened by the HUD;
-##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). Nobody
+##   A seat whose wizard was in the room (`here`) has it lie as an item at its spot of the room
+##   (`room_rewards_due`'s spots; the owner, 2026-11-19: nothing pops up; `reward_item_changed`), and
+##   its own driven body in reach (REWARD_REACH; `reward_near_changed`) opens it with A (the HUD's);
+##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). An item
+##   left lying is lost with its world (the owner, 2026-11-19; `_unlay_rewards`). Nobody
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
@@ -42,6 +45,9 @@ extends Node
 ##   its own currency bag and room for it, takes it into its inventory, the coins come out of its
 ##   stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
 ##   over an item buys nothing. The shelf keeps what is left all run (`shelf_changed`).
+##   Its reroll sign (the owner, 2026-11-19; one a shop, numbered with its items, so A at it is a
+##   `shelf_buy_requested` too): for `sign_price` of its uses (3, 5, 8, ...) times the player's
+##   `price_scale`, every spot is stocked anew with items the shelf did not hold (`_reroll_shelf`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
 ##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry
@@ -116,9 +122,23 @@ const DROP_PURPOSE: StringName = &"coin_drop"
 ## so a reroll never shifts the seat's later offers.
 const REROLL_PURPOSE: StringName = &"reward_reroll"
 const REROLL_CARD_PURPOSE: StringName = &"reward_reroll_card"
+## How near the feet of the body a seat drives must come to its own reward item to open it, in pixels
+## (the owner's ask of 2026-11-19).
+const REWARD_REACH: float = 14.0
+## A shop's reroll sign (the owner's ask of 2026-11-19): the chance's purposes a reroll of its shelf
+## rolls under (keyed by its room, counted by the sign's uses; the FILL ones only when the table has
+## too few items the shelf did not hold), its price by its uses before (in coins, before a buyer's
+## `price_scale`: 3, 5, 8, then each the sum of the two before: `sign_price`), and its view's words.
+const SIGN_PURPOSE: StringName = &"shop_sign"
+const SIGN_CARD_PURPOSE: StringName = &"shop_sign_card"
+const SIGN_FILL_PURPOSE: StringName = &"shop_sign_fill"
+const SIGN_FILL_CARD_PURPOSE: StringName = &"shop_sign_fill_card"
+const SIGN_PRICES: PackedInt32Array = [3, 5, 8]
+const SIGN_NAME: String = "Reroll shelf"
+const SIGN_TEXT: String = "New items on this shop's shelf. Costs more each time."
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items", &"_said_rewards"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
@@ -141,6 +161,8 @@ var _next_offer: int = 0
 var _due_rooms: PackedInt32Array = PackedInt32Array()
 var _due_tables: Array[StringName] = []
 var _due_types: PackedStringArray = PackedStringArray()
+## And where each seat's reward item lies in it (SEATS a room, one after the other; Vector2.INF: none).
+var _due_spots: PackedVector2Array = PackedVector2Array()
 ## The shops' shelves: each item's number, room, place, what it is (an item: kind, id, count) and
 ## price (before a buyer's `price_scale`), by the same index, in the order stocked.
 var _item_numbers: PackedInt32Array = PackedInt32Array()
@@ -150,8 +172,19 @@ var _item_kinds: Array[StringName] = []
 var _item_ids: Array[StringName] = []
 var _item_counts: PackedInt32Array = PackedInt32Array()
 var _item_prices: PackedInt32Array = PackedInt32Array()
-## The number the next shelf item gets.
+## The number the next shelf item (or reroll sign) gets.
 var _next_item: int = 0
+## The shops' reroll signs (the owner's ask of 2026-11-19; one a shop): each one's number (from the
+## shelf items' numbers), room, place, the shelf table it rerolls from and how many times it was used,
+## by the same index.
+var _sign_numbers: PackedInt32Array = PackedInt32Array()
+var _sign_rooms: PackedInt32Array = PackedInt32Array()
+var _sign_at: PackedVector2Array = PackedVector2Array()
+var _sign_tables: Array[StringName] = []
+var _sign_uses: PackedInt32Array = PackedInt32Array()
+## The shops' shelf spots (a reroll restocks every one): each spot's room and place, in order.
+var _spot_rooms: PackedInt32Array = PackedInt32Array()
+var _spot_at: PackedVector2Array = PackedVector2Array()
 ## The fountains: each one's room, pool, healing left and most, by the same index.
 var _pool_rooms: PackedInt32Array = PackedInt32Array()
 var _pool_areas: Array[Rect2] = []
@@ -166,6 +199,9 @@ var _room_rerolls: PackedInt32Array = PackedInt32Array()
 ## By seat: the shelf item (its number) in reach of its standing wizard, last said
 ## (`shelf_near_changed`), -1 for none.
 var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+## By seat: its own reward item (its offer's number) in reach of the standing body it drives, last
+## said (`reward_near_changed`), -1 for none.
+var _reward_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 ## The seats whose starting coins came this run, a bit each.
 var _funded: int = 0
 ## The drop rolls made this run (`DROP_PURPOSE`'s counter).
@@ -178,8 +214,12 @@ var _next_coin: int = 0
 ## The coin numbers this machine's looks were last told lie there (`coin_changed`): a restore tells
 ## them gone for those it no longer holds. Not state: what was said here.
 var _said_coins: Dictionary = {}
-## The shelf items this machine's looks were last told lie there (`shelf_changed`), as `_said_coins`.
+## The shelf items and signs this machine's looks were last told lie there (`shelf_changed`), as
+## `_said_coins`.
 var _said_items: Dictionary = {}
+## The reward items (offer numbers) this machine's looks were last told lie there
+## (`reward_item_changed`), as `_said_coins`.
+var _said_rewards: Dictionary = {}
 
 
 func _ready() -> void:
@@ -214,10 +254,12 @@ func _ready() -> void:
 func begin_run() -> void:
 	_clear_coins()
 	_clear_rooms()
+	_unlay_rewards()
 	SimFresh.renew(self)
 	for seat in SEATS:
 		_say_waiting(seat)
 		_say_shelf_near(seat)
+		_say_reward_near(seat)
 		_say_stats(seat)
 
 
@@ -232,11 +274,13 @@ func step(delta: float) -> void:
 		var rooms: PackedInt32Array = _due_rooms.duplicate()
 		var tables: Array[StringName] = _due_tables.duplicate()
 		var types: PackedStringArray = _due_types.duplicate()
+		var spots: PackedVector2Array = _due_spots.duplicate()
 		_due_rooms.clear()
 		_due_tables.clear()
 		_due_types.clear()
+		_due_spots.clear()
 		for at in rooms.size():
-			_roll_clear(rooms[at], tables[at], RewardType.from_row(types.slice(at * 3, at * 3 + 3)))
+			_roll_clear(rooms[at], tables[at], RewardType.from_row(types.slice(at * 3, at * 3 + 3)), spots.slice(at * SEATS, at * SEATS + SEATS))
 	for seat in SEATS:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
@@ -249,18 +293,21 @@ func step(delta: float) -> void:
 			_say_shelf_near(seat)
 	var at: int = 0
 	while at < _coin_numbers.size():
-		if _taker_of(_coin_at[at]) != ActorsScript.NONE:
+		var taker: int = _taker_of(_coin_at[at])
+		if taker != ActorsScript.NONE:
 			var number: int = _coin_numbers[at]
 			var where: Vector2 = _coin_at[at]
 			_coin_numbers.remove_at(at)
 			_coin_at.remove_at(at)
 			_say_coin(number, where, false)
+			_say_picked(actors.actor_of_seat(taker), ItemKinds.COIN, CoinBase.ID, where)
 			for seat in SEATS:
 				if actors.home_of_seat(seat) != ActorsScript.NONE:
 					_add_coins(seat, 1)
 		else:
 			at += 1
 	_look_at_shelves()
+	_look_at_rewards()
 	_draw_on_pools(delta)
 
 
@@ -302,7 +349,33 @@ func shelf() -> Array[Dictionary]:
 ## `price_scale`, 1 at least; -1 for no such item.
 func price_for(seat: int, item: int) -> int:
 	var at: int = _item_numbers.find(item)
-	return _price_of(at, stat_of(seat, &"price_scale")) if at >= 0 else -1
+	if at < 0:
+		var board: int = _sign_numbers.find(item)
+		return _sign_price_of(board, stat_of(seat, &"price_scale")) if board >= 0 else -1
+	return _price_of(at, stat_of(seat, &"price_scale"))
+
+
+## The shops' reroll signs: each one's view (`number`, `room`, `at`, `uses` and `price` as the run's
+## own `price_scale` makes it), in the order stocked.
+func signs() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for at in _sign_numbers.size():
+		out.append({"number": _sign_numbers[at], "room": _sign_rooms[at], "at": _sign_at[at], "uses": _sign_uses[at], "price": _sign_shown_price(at)})
+	return out
+
+
+## A reroll sign's price after `uses` rerolls of its shelf, before a buyer's `price_scale`: 3, 5, 8,
+## then each the sum of the two before.
+static func sign_price(uses: int) -> int:
+	if uses < SIGN_PRICES.size():
+		return SIGN_PRICES[maxi(uses, 0)]
+	var before: int = SIGN_PRICES[SIGN_PRICES.size() - 2]
+	var last: int = SIGN_PRICES[SIGN_PRICES.size() - 1]
+	for _i in uses - SIGN_PRICES.size() + 1:
+		var next: int = before + last
+		before = last
+		last = next
+	return last
 
 
 ## The healing left in room `room`'s fountain (-1: no fountain there).
@@ -350,34 +423,48 @@ func rebuild_derived() -> void:
 	for at in _coin_numbers.size():
 		_say_coin(_coin_numbers[at], _coin_at[at], true)
 	for number: int in _said_items.keys():
-		if not _item_numbers.has(number):
+		if not _item_numbers.has(number) and not _sign_numbers.has(number):
 			_said_items.erase(number)
 			events.shelf_changed.emit(number, Vector2.ZERO, {}, 0, false)
 	for at in _item_numbers.size():
 		_say_item(at, true)
+	for at in _sign_numbers.size():
+		_say_sign(at, true)
+	for number: int in _said_rewards.keys():
+		if not _lies(number):
+			_said_rewards.erase(number)
+			events.reward_item_changed.emit(-1, number, Vector2.ZERO, false)
+	for offer: RewardOffer in _offers:
+		if offer.lying:
+			_say_reward_item(offer, true)
 	events.fountain_changed.emit(-1, Rect2(), 0.0, 0.0)
 	for at in _pool_rooms.size():
 		_say_pool(at)
 	for seat in SEATS:
 		_say_waiting(seat)
 		_say_shelf_near(seat)
+		_say_reward_near(seat)
 		_say_stats(seat)
 
 
 # --- Heard ------------------------------------------------------------------------------
 
 ## The room `room` was cleared and its kind rewards it from `table`, of the type `type` (a
-## `RewardType` row; any for every room but a reward room): rolled for at the next step.
-func _on_room_rewards_due(room: int, table: StringName, type: PackedStringArray) -> void:
+## `RewardType` row; any for every room but a reward room), each seat's reward item to lie at its
+## spot of `spots` (by seat): rolled for at the next step.
+func _on_room_rewards_due(room: int, table: StringName, type: PackedStringArray, spots: PackedVector2Array) -> void:
 	if not _due_rooms.has(room):
 		_due_rooms.append(room)
 		_due_tables.append(table)
 		_due_types.append_array(RewardType.from_row(type).to_row())
+		for seat in SEATS:
+			_due_spots.append(spots[seat] if seat < spots.size() else Vector2.INF)
 
 
 ## Room `room`'s clear: every seat with a wizard rolls its own offer from the table `table_id`,
-## among items of the room's type `type`.
-func _roll_clear(room: int, table_id: StringName, type: RewardType) -> void:
+## among items of the room's type `type`; one whose wizard is there has it lie as an item at its spot
+## of `spots` (the owner's ask of 2026-11-19), one who is not finds it waiting.
+func _roll_clear(room: int, table_id: StringName, type: RewardType, spots: PackedVector2Array) -> void:
 	if actors == null:
 		return
 	var table: RewardTable = registry.get_resource(TABLES, table_id) as RewardTable if registry != null else null
@@ -394,6 +481,8 @@ func _roll_clear(room: int, table_id: StringName, type: RewardType) -> void:
 		offer.seat = seat
 		offer.room = room
 		offer.here = body.room == room or body.room == RoomGrid.NO_PLACE
+		offer.lying = offer.here and seat < spots.size() and spots[seat].is_finite()
+		offer.at = spots[seat] if offer.lying else Vector2.ZERO
 		offer.table = table_id
 		offer.type_row = type.to_row() if type != null else PackedStringArray()
 		RewardRoll.fill(offer, table, int(stat_of(seat, &"reward_choices")), _sim(), seat, _rolls[seat], cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
@@ -407,6 +496,8 @@ func _roll_clear(room: int, table_id: StringName, type: RewardType) -> void:
 			var choices: Array[Dictionary] = []
 			choices.assign(view["choices"])
 			events.reward_rolled.emit(seat, offer.number, choices, offer.here)
+		if offer.lying:
+			_say_reward_item(offer, true)
 		_say_waiting(seat)
 
 
@@ -429,9 +520,14 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 			events.reward_refused.emit(player, offer)
 		return
 	_offers.remove_at(at)
+	var wizard: Actor = _wizard_of(player)
+	if row.lying:
+		_say_reward_item(row, false)
+	_say_picked(wizard.id, EventsScript.PICKUP_REWARD, row.ids[choice], row.at if row.lying else wizard.position)
 	if events != null:
 		events.reward_taken.emit(player, offer, choice, _choice_view(row, choice))
 	_say_waiting(player)
+	_look_at_rewards()
 
 
 ## Seat `player` asked to reroll its offer `offer` (a command; the class doc): one reward reroll
@@ -479,6 +575,10 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 	if room == EventsScript.FIRST_ROOM:
 		_clear_coins()
 		_clear_rooms()
+		_unlay_rewards()
+		# A clear of the world before not yet rolled: rolled now, waiting, never at the old spots.
+		for at in _due_spots.size():
+			_due_spots[at] = Vector2.INF
 
 
 ## Seat `player` asked to buy shelf item `item` (a command): sold if it still lies on its shelf, in
@@ -488,8 +588,13 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 func _on_shelf_buy_requested(player: int, item: int) -> void:
 	if player < 0 or player >= SEATS:
 		return
-	var at: int = _item_numbers.find(item)
 	var body: Actor = _driven_of(player)
+	var board: int = _sign_numbers.find(item)
+	if board >= 0:
+		if body != null and not body.is_down() and body.position.distance_squared_to(_sign_at[board]) <= SHELF_REACH * SHELF_REACH:
+			_reroll_shelf(player, board, body)
+		return
+	var at: int = _item_numbers.find(item)
 	if at < 0 or body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
 		return
 	var price: int = _price_of(at, stat_of(player, &"price_scale"))
@@ -498,22 +603,17 @@ func _on_shelf_buy_requested(player: int, item: int) -> void:
 			events.shelf_refused.emit(player, item)
 		return
 	body.inventory.take(COIN_BAG, CoinBase.ID, price)
+	_say_picked(body.id, _item_kinds[at], _item_ids[at], _item_at[at])
 	_say_item(at, false)
-	_item_numbers.remove_at(at)
-	_item_rooms.remove_at(at)
-	_item_at.remove_at(at)
-	_item_kinds.remove_at(at)
-	_item_ids.remove_at(at)
-	_item_counts.remove_at(at)
-	_item_prices.remove_at(at)
+	_remove_item(at)
 	_look_at_shelves()
 
 
-## A special room opened (Flow's, CB11): a shop's shelf is stocked from `table` at `spots`, a
-## fountain's pool filled at `area`. Once a room.
-func _on_special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array) -> void:
-	if fill == RoomKind.FILL_SHOP and not _item_rooms.has(room):
-		_stock_shelf(room, table, spots)
+## A special room opened (Flow's, CB11): a shop's shelf is stocked from `table` at `spots` with its
+## reroll sign at `board`, a fountain's pool filled at `area`. Once a room.
+func _on_special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array, board: Vector2) -> void:
+	if fill == RoomKind.FILL_SHOP and not _sign_rooms.has(room) and not _item_rooms.has(room):
+		_stock_shelf(room, table, spots, board)
 	elif fill == RoomKind.FILL_FOUNTAIN and not _pool_rooms.has(room):
 		var most: float = 0.0
 		for seat in SEATS:
@@ -686,19 +786,35 @@ func _clear_coins() -> void:
 		_say_coin(numbers[i], at[i], false)
 
 
-## Room `room`'s shelf stocked from the table `table_id`: one item a spot of `spots`, rolled once.
-func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) -> void:
+## Room `room`'s shelf stocked from the table `table_id`: one item a spot of `spots`, rolled once,
+## and its reroll sign at `board`.
+func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array, board: Vector2) -> void:
 	var table: RewardTable = registry.get_resource(TABLES, table_id) as RewardTable if registry != null else null
 	if table == null:
 		push_warning("Rewards: no shelf table '%s' (content/rewards), so the shop stands empty." % table_id)
 		return
-	var cards: RewardCards = _cards()
 	var stock := RewardOffer.new()
 	var lines: Array[RewardEntry] = []
 	# A room rerolled before it opened (`room_rerolled`) rolls its shelf anew: its rerolls are the roll.
 	var roll: int = _room_rerolls[room] if room >= 0 and room < _room_rerolls.size() else 0
-	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, cards, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
-	for at in stock.size():
+	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, _cards(), SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
+	for at in spots.size():
+		_spot_rooms.append(room)
+		_spot_at.append(spots[at])
+	_put_on_shelf(room, stock, lines, spots)
+	_sign_numbers.append(_next_item)
+	_next_item += 1
+	_sign_rooms.append(room)
+	_sign_at.append(board)
+	_sign_tables.append(table_id)
+	_sign_uses.append(0)
+	_say_sign(_sign_numbers.size() - 1, true)
+
+
+## The items of `stock` (each its line of `lines`, by the same index) put on room `room`'s shelf, one
+## a spot of `spots`, each said.
+func _put_on_shelf(room: int, stock: RewardOffer, lines: Array[RewardEntry], spots: PackedVector2Array) -> void:
+	for at in mini(stock.size(), spots.size()):
 		_item_numbers.append(_next_item)
 		_next_item += 1
 		_item_rooms.append(room)
@@ -710,8 +826,71 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 		_say_item(_item_numbers.size() - 1, true)
 
 
-## Each seat's shelf item in reach: the one nearest the own feet of the standing body it drives
-## within SHELF_REACH (the first stocked of two as near), said as it changes.
+## Seat `player`'s body `body`, at reroll sign `board` (its index), asked to reroll its shop's shelf
+## (the owner's ask of 2026-11-19): with the sign's price (`sign_price` of its uses, times the
+## player's `price_scale`) in the body's own coins, the price comes off its coin stack, everything on
+## the shelf goes and every spot is stocked anew from the shop's table under SIGN_PURPOSE (keyed by
+## the room, counted by the sign's uses), with items the shelf did not hold while the table has them;
+## the sign's price rises. Else `shelf_refused`.
+func _reroll_shelf(player: int, board: int, body: Actor) -> void:
+	var room: int = _sign_rooms[board]
+	var price: int = _sign_price_of(board, stat_of(player, &"price_scale"))
+	var table: RewardTable = registry.get_resource(TABLES, _sign_tables[board]) as RewardTable if registry != null else null
+	var spots := PackedVector2Array()
+	for at in _spot_rooms.size():
+		if _spot_rooms[at] == room:
+			spots.append(_spot_at[at])
+	var fresh := RewardOffer.new()
+	var lines: Array[RewardEntry] = []
+	if table != null and _coins_in(body) >= price:
+		# The roll keeps off what the shelf holds now, so a reroll brings new items.
+		var held := RewardOffer.new()
+		for at in _item_numbers.size():
+			if _item_rooms[at] == room:
+				held.add(_item_kinds[at], _item_ids[at], _item_counts[at])
+		var before: int = held.size()
+		RewardRoll.fill(held, table, spots.size(), _sim(), room, _sign_uses[board], _cards(), SIGN_PURPOSE, SIGN_CARD_PURPOSE, lines)
+		for at in range(before, held.size()):
+			fresh.add(held.kinds[at], held.ids[at], held.counts[at])
+		if fresh.size() < spots.size():
+			# Too few new ones in the table: the rest from all of it, apart from the new ones.
+			RewardRoll.fill(fresh, table, spots.size() - fresh.size(), _sim(), room, _sign_uses[board], _cards(), SIGN_FILL_PURPOSE, SIGN_FILL_CARD_PURPOSE, lines)
+	if fresh.size() == 0:
+		if events != null:
+			events.shelf_refused.emit(player, _sign_numbers[board])
+		return
+	body.inventory.take(COIN_BAG, CoinBase.ID, price)
+	_sign_uses[board] += 1
+	var at: int = 0
+	while at < _item_numbers.size():
+		if _item_rooms[at] == room:
+			_say_item(at, false)
+			_remove_item(at)
+		else:
+			at += 1
+	_put_on_shelf(room, fresh, lines, spots)
+	_say_sign(board, true)
+	_look_at_shelves()
+	for seat in SEATS:
+		if _shelf_near[seat] == _sign_numbers[board]:
+			# Its price for them rose.
+			_say_shelf_near(seat)
+
+
+## Shelf item `at` gone from the lists.
+func _remove_item(at: int) -> void:
+	_item_numbers.remove_at(at)
+	_item_rooms.remove_at(at)
+	_item_at.remove_at(at)
+	_item_kinds.remove_at(at)
+	_item_ids.remove_at(at)
+	_item_counts.remove_at(at)
+	_item_prices.remove_at(at)
+
+
+## Each seat's shelf item (or reroll sign) in reach: the one nearest the own feet of the standing
+## body it drives within SHELF_REACH (the first stocked of two as near; an item before a sign), said
+## as it changes.
 func _look_at_shelves() -> void:
 	for seat in SEATS:
 		var near: int = -1
@@ -723,9 +902,64 @@ func _look_at_shelves() -> void:
 				if gap <= best and (near < 0 or gap < best):
 					best = gap
 					near = _item_numbers[at]
+			for at in _sign_numbers.size():
+				var gap: float = body.position.distance_squared_to(_sign_at[at])
+				if gap <= best and (near < 0 or gap < best):
+					best = gap
+					near = _sign_numbers[at]
 		if near != _shelf_near[seat]:
 			_shelf_near[seat] = near
 			_say_shelf_near(seat)
+
+
+## Each seat's own reward item in reach: the oldest of its lying offers nearest the own feet of the
+## standing body it drives within REWARD_REACH, said as it changes.
+func _look_at_rewards() -> void:
+	for seat in SEATS:
+		var near: int = -1
+		var body: Actor = _driven_of(seat)
+		if body != null and not body.is_down():
+			var best: float = REWARD_REACH * REWARD_REACH
+			for offer: RewardOffer in _offers:
+				if offer.seat != seat or not offer.lying:
+					continue
+				var gap: float = body.position.distance_squared_to(offer.at)
+				if gap <= best and (near < 0 or gap < best):
+					best = gap
+					near = offer.number
+		if near != _reward_near[seat]:
+			_reward_near[seat] = near
+			_say_reward_near(seat)
+
+
+## Every reward item lying is lost with its world (a new world, a run's start; the owner, 2026-11-19:
+## an unopened chest is gone with the biome): its offer goes, said gone. An offer waiting lying nowhere
+## (its player was away, rule 4) still waits.
+func _unlay_rewards() -> void:
+	var changed: int = 0
+	var at: int = 0
+	while at < _offers.size():
+		var offer: RewardOffer = _offers[at]
+		if offer.lying:
+			_say_reward_item(offer, false)
+			changed |= 1 << offer.seat
+			_offers.remove_at(at)
+		else:
+			at += 1
+	for seat in SEATS:
+		if changed & (1 << seat) != 0:
+			_say_waiting(seat)
+		if _reward_near[seat] >= 0:
+			_reward_near[seat] = -1
+			_say_reward_near(seat)
+
+
+## Whether offer number `number` lies as an item.
+func _lies(number: int) -> bool:
+	for offer: RewardOffer in _offers:
+		if offer.number == number:
+			return offer.lying
+	return false
 
 
 ## Each fountain `delta` seconds on: every hurt standing wizard whose own feet are in its pool draws
@@ -763,10 +997,22 @@ func _shown_price(at: int) -> int:
 	return _price_of(at, RunStats.value_of(&"price_scale", _run_changes))
 
 
-## Every shelf and pool gone (each said gone).
+## Reroll sign `at`'s price for a player whose `price_scale` is `scale`: 1 at least.
+func _sign_price_of(at: int, scale: float) -> int:
+	return maxi(roundi(float(sign_price(_sign_uses[at])) * scale), 1)
+
+
+## Reroll sign `at`'s price as shown (the run's own `price_scale`).
+func _sign_shown_price(at: int) -> int:
+	return _sign_price_of(at, RunStats.value_of(&"price_scale", _run_changes))
+
+
+## Every shelf, reroll sign and pool gone (each said gone).
 func _clear_rooms() -> void:
 	for at in _item_numbers.size():
 		_say_item(at, false)
+	for at in _sign_numbers.size():
+		_say_sign(at, false)
 	for seat in SEATS:
 		if _shelf_near[seat] >= 0:
 			_shelf_near[seat] = -1
@@ -778,6 +1024,13 @@ func _clear_rooms() -> void:
 	_item_ids.clear()
 	_item_counts.clear()
 	_item_prices.clear()
+	_sign_numbers.clear()
+	_sign_rooms.clear()
+	_sign_at.clear()
+	_sign_tables.clear()
+	_sign_uses.clear()
+	_spot_rooms.clear()
+	_spot_at.clear()
 	if not _pool_rooms.is_empty() and events != null:
 		events.fountain_changed.emit(-1, Rect2(), 0.0, 0.0)
 	_pool_rooms.clear()
@@ -801,12 +1054,13 @@ func _sim() -> Sim:
 	return sim if sim != null else Sim.found(self)
 
 
-## The plain view of offer `offer`: its number, whether its player was there and its choices' views.
+## The plain view of offer `offer`: its number, whether its player was there, whether it lies as an
+## item in the room (opened there, not from the corner panel) and its choices' views.
 func _offer_view(offer: RewardOffer) -> Dictionary:
 	var choices: Array[Dictionary] = []
 	for choice in offer.size():
 		choices.append(_choice_view(offer, choice))
-	return {"offer": offer.number, "here": offer.here, "choices": choices}
+	return {"offer": offer.number, "here": offer.here, "lying": offer.lying, "choices": choices}
 
 
 ## The plain view of choice `choice` of `offer`: its kind, id, count, name and icon.
@@ -854,12 +1108,58 @@ func _say_shelf_near(seat: int) -> void:
 	if events == null:
 		return
 	var at: int = _item_numbers.find(_shelf_near[seat])
+	var board: int = _sign_numbers.find(_shelf_near[seat])
+	if board >= 0:
+		var shown: Dictionary = _sign_view()
+		shown["price"] = _sign_price_of(board, stat_of(seat, &"price_scale"))
+		events.shelf_near_changed.emit(seat, _shelf_near[seat], _sign_at[board], shown)
+		return
 	if at < 0:
 		events.shelf_near_changed.emit(seat, -1, Vector2.ZERO, {})
 		return
 	var view: Dictionary = _item_view(at)
 	view["price"] = _price_of(at, stat_of(seat, &"price_scale"))
 	events.shelf_near_changed.emit(seat, _shelf_near[seat], _item_at[at], view)
+
+
+## A reroll sign's view, as a shelf item's choice (its `kind` SHELF_SIGN, no icon: the view draws a sign).
+static func _sign_view() -> Dictionary:
+	return {"kind": EventsScript.SHELF_SIGN, "id": &"", "count": 1, "name": SIGN_NAME, "icon": null, "description": SIGN_TEXT}
+
+
+func _say_sign(at: int, lying: bool) -> void:
+	var number: int = _sign_numbers[at]
+	if lying:
+		_said_items[number] = true
+	else:
+		_said_items.erase(number)
+	if events != null:
+		events.shelf_changed.emit(number, _sign_at[at], _sign_view() if lying else {}, _sign_shown_price(at), lying)
+
+
+func _say_reward_item(offer: RewardOffer, lying: bool) -> void:
+	if lying:
+		_said_rewards[offer.number] = true
+	else:
+		_said_rewards.erase(offer.number)
+	if events != null:
+		events.reward_item_changed.emit(offer.seat, offer.number, offer.at, lying)
+
+
+func _say_reward_near(seat: int) -> void:
+	if events == null:
+		return
+	for offer: RewardOffer in _offers:
+		if offer.number == _reward_near[seat]:
+			events.reward_near_changed.emit(seat, offer.number, offer.at)
+			return
+	events.reward_near_changed.emit(seat, -1, Vector2.ZERO)
+
+
+## Actor `actor` picked up an item of `kind` `id` at `at` (for its sound: `item_picked_up`).
+func _say_picked(actor: int, kind: StringName, id: StringName, at: Vector2) -> void:
+	if events != null and actor != ActorsScript.NONE:
+		events.item_picked_up.emit(actor, kind, id, at)
 
 
 func _say_pool(at: int) -> void:

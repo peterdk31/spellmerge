@@ -127,7 +127,7 @@ func test_a_possessing_seat_buys_with_the_possessed_bodys_coins() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO, [[&"possess", &"bolt"], [], [], []])
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 99)), "a rich wizard")
 	var imp := _possess(wizard)
-	_world.bus.special_room_opened.emit(4, RoomKind.FILL_SHOP, &"shelf", Rect2(), PackedVector2Array([imp.position]))
+	_world.bus.special_room_opened.emit(4, RoomKind.FILL_SHOP, &"shelf", Rect2(), PackedVector2Array([imp.position]), imp.position + Vector2(0, 400))
 	var item: Dictionary = rewards.shelf()[0]
 	var refused: Array = []
 	_world.bus.shelf_refused.connect(func(seat: int, number: int) -> void: refused.append([seat, number]))

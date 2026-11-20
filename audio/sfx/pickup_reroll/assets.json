@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/pickup_reroll/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
+			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
+			"audio_hash": "sha256:3b37018e404b661ea8e59fe0d2827ed7338fb09380910568bb41e5936109f3e6",
+			"loudness": -20.0,
+			"peak": -7.4
+		},
+		{
+			"path": "audio/sfx/pickup_reroll/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
+			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
+			"audio_hash": "sha256:d023bcabb6dc41cdb0b6cba26afcf457333c1e8d0ff0843ff3e964734543fb30",
+			"loudness": -19.8,
+			"peak": -7.1
+		},
+		{
+			"path": "audio/sfx/pickup_reroll/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
+			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
+			"audio_hash": "sha256:7c954b6d4943123c7d04ae1b91629ed87b6e373b98b641f7eb2e7dc446ef2dd2",
+			"loudness": -20.1,
+			"peak": -7.9
+		},
+		{
+			"path": "audio/sfx/pickup_reroll/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
+			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
+			"audio_hash": "sha256:bd1a3f6cc42a5541da271cd758b69c4c79f2dc225a3cc1da40fbaac148fc4262",
+			"loudness": -20.0,
+			"peak": -7.8
+		}
+	]
+}

@@ -106,7 +106,6 @@ func take() -> void:
 func _relic_recharging(flow: Node, registry: Node) -> void:
 	var relic := RelicBase.new()
 	relic.id = &"shot_active_idol"
-	relic.display_name = "Idol"
 	relic.icon = load("res://content/potions/vigor/icon.svg") as Texture2D
 	relic.active_use = ItemUse.health(10.0, 0.0)
 	relic.active_use.consumed = false

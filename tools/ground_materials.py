@@ -56,6 +56,7 @@ class Material:
         self.seed = room_seed * 7 + index * 31
         slabs = spec.get("slabs")
         self.slabs = slabs
+        self._slabs_near: dict[tuple[int, int], list[tuple[float, float, Colour]]] = {}
         if slabs is not None:
             self.slab_size = float(slabs["size"])
             self.slab_jitter = float(slabs.get("jitter", 0.8))
@@ -109,35 +110,47 @@ class Material:
                 rgb = _mix(rgb, self.edge_colour, share)
         return rgb
 
+    def _slabs_round(self, cx0: int, cy0: int) -> list[tuple[float, float, Colour]]:
+        """The nine slabs round cell (cx0, cy0), row by row: where each one's middle lies, jittered,
+        and its tone (remembered: every pixel of the cell asks for the same nine)."""
+        found = self._slabs_near.get((cx0, cy0))
+        if found is None:
+            s, sq = self.slab_size, self.slab_squash
+            found = []
+            for cy in range(cy0 - 1, cy0 + 2):
+                # Every other row is offset half a slab, so the joints never line up into a grid.
+                shift = 0.5 if cy % 2 else 0.0
+                for cx in range(cx0 - 1, cx0 + 2):
+                    px = (cx + shift + 0.5 + (self.noise.unit(self.seed, cx, cy, 1) - 0.5) * self.slab_jitter) * s
+                    py = (cy + 0.5 + (self.noise.unit(self.seed, cx, cy, 2) - 0.5) * self.slab_jitter) * s * sq
+                    tone = _mix(self.base, self.slab_tone, self.noise.unit(self.seed, cx, cy, 3) * self.slab_vary)
+                    found.append((px, py, tone))
+            self._slabs_near[(cx0, cy0)] = found
+        return found
+
     def _slab(self, x: int, y: int) -> Colour:
         """The flagstone this pixel lies in (the nearest of the jittered cell middles round it), its
         tone, and whether the pixel is on its joint or its lit upper edge."""
         s = self.slab_size
         sq = self.slab_squash
         fx, fy = (x + 0.5) / s, (y + 0.5) / (s * sq)
-        cx0, cy0 = math.floor(fx), math.floor(fy)
         best = second = 1e18
-        best_cell = (0, 0)
+        best_tone = self.base
         best_dy = 0.0
-        for cy in range(cy0 - 1, cy0 + 2):
-            # Every other row is offset half a slab, so the joints never line up into a grid.
-            shift = 0.5 if cy % 2 else 0.0
-            for cx in range(cx0 - 1, cx0 + 2):
-                px = (cx + shift + 0.5 + (self.noise.unit(self.seed, cx, cy, 1) - 0.5) * self.slab_jitter) * s
-                py = (cy + 0.5 + (self.noise.unit(self.seed, cx, cy, 2) - 0.5) * self.slab_jitter) * s * sq
-                dx, dy = x + 0.5 - px, (y + 0.5 - py) / sq
-                d = dx * dx + dy * dy
-                if d < best:
-                    second = best
-                    best = d
-                    best_cell = (cx, cy)
-                    best_dy = dy
-                elif d < second:
-                    second = d
+        for px, py, tone in self._slabs_round(math.floor(fx), math.floor(fy)):
+            dx, dy = x + 0.5 - px, (y + 0.5 - py) / sq
+            d = dx * dx + dy * dy
+            if d < best:
+                second = best
+                best = d
+                best_tone = tone
+                best_dy = dy
+            elif d < second:
+                second = d
         edge = math.sqrt(second) - math.sqrt(best)
         if edge < self.joint_width:
             return self.joint
-        rgb = _mix(self.base, self.slab_tone, self.noise.unit(self.seed, best_cell[0], best_cell[1], 3) * self.slab_vary)
+        rgb = best_tone
         # The upper edge of a slab (its middle lies below the pixel) catches the light.
         if self.light is not None and edge < self.joint_width + self.light_width and best_dy < 0.0:
             rgb = self.light

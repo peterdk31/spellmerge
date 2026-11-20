@@ -19,9 +19,11 @@ off its edge, and its edge still an invisible wall.
 from __future__ import annotations
 
 import math
+import os
 import re
 import sys
 import unittest
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,6 +55,21 @@ HALL = {
 }
 # Where the hall's things stand: its frame's floor is pushed out to these.
 HALL_CLEAR = [(60.0, 40.0, 24.0)]
+
+
+def _room_problems(path: Path) -> list[str]:
+    """What is wrong with the committed ground of the shape file `path` (nothing when it is up to
+    date): stale, or drawn again here, a file that is not the one committed (a hand-edited scene or
+    picture fails). At module level, so a worker process can run it."""
+    try:
+        why = gs.stale(path)
+        if why is not None:
+            return [why]
+        outs = gs.outputs_of(path)
+        return [f"{outs[kind].relative_to(gs.ROOT)} is not as drawn"
+                for kind, data in gs.files_of(gs.draw(path), path).items() if outs[kind].read_bytes() != data]
+    except Exception as error:  # named with its room, and the other rooms are still checked
+        return [f"drawing it failed: {error!r}"]
 
 
 class GroundShapeTest(unittest.TestCase):
@@ -295,12 +312,12 @@ class GroundShapeTest(unittest.TestCase):
     def test_every_rooms_ground_is_up_to_date(self) -> None:
         shapes = gs.shape_files()
         self.assertTrue(shapes, "the hub has a shape file")
-        for path in shapes:
-            self.assertIsNone(gs.stale(path), f"{path.relative_to(gs.ROOT)}: run python3 tools/ground_shape.py {path.relative_to(gs.ROOT)}")
-            # Drawn again here, every file is the one committed (a hand-edited scene or picture fails).
-            outs = gs.outputs_of(path)
-            for kind, data in gs.files_of(gs.draw(path), path).items():
-                self.assertEqual(outs[kind].read_bytes(), data, f"{outs[kind].relative_to(gs.ROOT)} is as drawn")
+        # Every room is drawn again, one a process at a time (they share nothing), the slowest first.
+        shapes.sort(key=lambda path: path.stat().st_size, reverse=True)
+        with ProcessPoolExecutor(max_workers=min(len(shapes), os.process_cpu_count() or 1)) as pool:
+            found = {path: problems for path, problems in zip(shapes, pool.map(_room_problems, shapes)) if problems}
+        self.assertEqual(found, {}, "run python3 tools/ground_shape.py on each of these: "
+                         + "; ".join(f"{path.relative_to(gs.ROOT)}: {', '.join(problems)}" for path, problems in found.items()))
 
 
 class HallTest(unittest.TestCase):
@@ -421,6 +438,23 @@ class HallTest(unittest.TestCase):
         self.assertFalse(any(d.glow[3::4]), "no glow")
         self.assertFalse(any(d.under[3::4]), "no rock face")
         self.assertFalse(d.holes, "no holes")
+
+    def test_the_remembered_slabs_are_the_ones_worked_out(self) -> None:
+        # A material keeps the nine slabs round a cell; each is where the jitter puts it, with its tone.
+        spec = gs.load_ground("flagstone")
+        noise = gs.ground_materials.Noise(gs.unit, gs.noise1, gs.fbm2)
+        mat = gs.ground_materials.Material(spec, 1, 5, (320, 320), (160.0, 160.0), lambda c: gs.colour(c, self.drawing.mats), noise)
+        s, sq = mat.slab_size, mat.slab_squash
+        for cx0, cy0 in ((0, 0), (3, -2), (-1, 7)):
+            got = mat._slabs_round(cx0, cy0)
+            self.assertIs(mat._slabs_round(cx0, cy0), got, "worked out once")
+            cells = [(cx, cy) for cy in range(cy0 - 1, cy0 + 2) for cx in range(cx0 - 1, cx0 + 2)]
+            for (cx, cy), (px, py, tone) in zip(cells, got, strict=True):
+                shift = 0.5 if cy % 2 else 0.0
+                self.assertEqual(px, (cx + shift + 0.5 + (gs.unit(mat.seed, cx, cy, 1) - 0.5) * mat.slab_jitter) * s)
+                self.assertEqual(py, (cy + 0.5 + (gs.unit(mat.seed, cx, cy, 2) - 0.5) * mat.slab_jitter) * s * sq)
+                self.assertEqual(tone, gs.ground_materials._mix(mat.base, mat.slab_tone, gs.unit(mat.seed, cx, cy, 3) * mat.slab_vary))
+        self.assertEqual(gs._corner(9, -4, 11), gs.unit(9, -4, 11), "a remembered corner of the noise is its hash")
 
     def test_slabs_never_tile(self) -> None:
         d = self.drawing

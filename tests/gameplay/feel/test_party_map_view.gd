@@ -185,7 +185,7 @@ func test_a_mouth_tells_the_kind_behind_it_big_and_lit_rising_as_a_wizard_comes_
 
 ## The done look (the owner, 2026-11-20, #883): stepped, whole shades of the symbol's own
 ## palette, the check drawn a pixel a stage, and only for a kind with a fight.
-func test_the_cleared_look_dims_the_symbol_and_draws_a_check_in_stages() -> void:
+func test_the_done_look_dims_the_symbol_and_draws_a_check_in_stages() -> void:
 	check(KindSymbolScript.DONE_STAGES >= 3, "at least 3 frames between the two looks")
 	var shades: PackedColorArray = KindSymbolScript.shades_of(registry.call(&"get_resource", &"room_kinds", &"fight") as RoomKind)
 	check_equal(KindSymbolScript.colour_of(RoomKind.SYMBOL_LIT, shades, 0), shades[2], "uncleared: lit pixels in the light")
@@ -281,7 +281,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 
 
 ## After a restore the done look is drawn as it stands, either way, nothing played in.
-func test_a_restore_draws_the_cleared_look_as_it_stands() -> void:
+func test_a_restore_draws_the_done_look_as_it_stands() -> void:
 	var map: BiomeMap = _start(1)
 	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
 	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
@@ -498,6 +498,21 @@ func test_a_restore_draws_each_new_kinds_done_look_as_it_stands() -> void:
 			check_equal(view.done_of(WEST), stage, "%s, restored: the map as it stands" % kind)
 			if kind == &"secret" and not into_done:
 				check_equal(symbols.rows_of(_mouth_into(WEST)), 0, "a secret room restored to before it was found: no sign, at once")
+		if kind == &"secret":
+			# With the map held open: the secret room's symbol found or lost at once by a restore.
+			check(after.restore(tick.state_areas(), root).is_empty(), "secret: restored, found")
+			view.input = input as InputManagerScript
+			input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+			view.step(0.0, actors, 1, _grid(), _two_views())
+			while view.is_moving():
+				view.advance()
+				view.step(0.0, actors, 1, _grid(), _two_views())
+			check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "open, its symbol shown")
+			check(before.restore(tick.state_areas(), root).is_empty(), "secret: restored to before it was found")
+			view.step(0.0, actors, 1, _grid(), _two_views())
+			check_equal(view.symbol_rows_of(WEST), 0, "open, its symbol gone at once, nothing played out")
+			input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 0.0)
+			view.input = null
 
 
 ## The treasure room west: its key taken (where it dropped) and its door walked into.

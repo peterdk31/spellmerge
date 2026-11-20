@@ -142,11 +142,12 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 		_read(grid, found, world_now, table, seats_here)
 	if _rows.is_empty():
 		return
+	_see(table, seats_here, grid)
 	var again: int = pieces.done_again() if pieces != null else 0
 	if again != _read_again:
+		# After `_see`, so a hidden sign settled is drawn as this frame's wizards stand.
 		_read_again = again
 		_settle_done()
-	_see(table, seats_here, grid)
 	if not is_moving():
 		_clock = 0.0
 		return

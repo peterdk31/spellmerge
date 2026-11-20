@@ -355,10 +355,13 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 		_lay(grid, places, world_now)
 	var again: int = pieces.done_again() if pieces != null else 0
 	if again != _read_again:
-		# The rooms cleared told again after a restore: drawn as they stand.
+		# The rooms done (cleared, opened, rewards left, fountains) told again after a restore: drawn as
+		# they stand, a secret room's symbol found or lost by it too.
 		_read_again = again
 		for place in _done.size():
 			_done[place] = _done_wanted(place)
+			if _secret[place] != 0:
+				_symbol_rows[place] = _rows_wanted(place)
 	for seat in ActorsScript.SEATS:
 		_held[seat] = 1 if not _rects.is_empty() and seats_here & (1 << seat) != 0 and _holds(seat) else 0
 	if not _any_open():
@@ -694,7 +697,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
 		_floors.append(floor_of(grid, place))
 		var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
-		_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
+		_secret[place] = 1 if KindSymbolScript.hidden_until_opened(kind) else 0
 		_tells_done[place] = 1 if KindSymbolScript.shows_done(kind) else 0
 		_symbols.append(kind.symbol_pixels() if kind != null else PackedByteArray())
 		_symbol_shades.append(KindSymbolScript.shades_of(kind))

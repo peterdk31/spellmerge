@@ -19,9 +19,11 @@ off its edge, and its edge still an invisible wall.
 from __future__ import annotations
 
 import math
+import os
 import re
 import sys
 import unittest
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,6 +55,18 @@ HALL = {
 }
 # Where the hall's things stand: its frame's floor is pushed out to these.
 HALL_CLEAR = [(60.0, 40.0, 24.0)]
+
+
+def _room_problems(path: Path) -> list[str]:
+    """What is wrong with the committed ground of the shape file `path` (nothing when it is up to
+    date): stale, or drawn again here, a file that is not the one committed (a hand-edited scene or
+    picture fails). At module level, so a worker process can run it."""
+    why = gs.stale(path)
+    if why is not None:
+        return [why]
+    outs = gs.outputs_of(path)
+    return [f"{outs[kind].relative_to(gs.ROOT)} is not as drawn"
+            for kind, data in gs.files_of(gs.draw(path), path).items() if outs[kind].read_bytes() != data]
 
 
 class GroundShapeTest(unittest.TestCase):
@@ -295,12 +309,11 @@ class GroundShapeTest(unittest.TestCase):
     def test_every_rooms_ground_is_up_to_date(self) -> None:
         shapes = gs.shape_files()
         self.assertTrue(shapes, "the hub has a shape file")
-        for path in shapes:
-            self.assertIsNone(gs.stale(path), f"{path.relative_to(gs.ROOT)}: run python3 tools/ground_shape.py {path.relative_to(gs.ROOT)}")
-            # Drawn again here, every file is the one committed (a hand-edited scene or picture fails).
-            outs = gs.outputs_of(path)
-            for kind, data in gs.files_of(gs.draw(path), path).items():
-                self.assertEqual(outs[kind].read_bytes(), data, f"{outs[kind].relative_to(gs.ROOT)} is as drawn")
+        # Every room is drawn again, one a process at a time (they share nothing), the slowest first.
+        shapes.sort(key=lambda path: path.stat().st_size, reverse=True)
+        with ProcessPoolExecutor(max_workers=os.cpu_count() or 1) as pool:
+            for path, problems in zip(shapes, pool.map(_room_problems, shapes)):
+                self.assertEqual(problems, [], f"{path.relative_to(gs.ROOT)}: run python3 tools/ground_shape.py {path.relative_to(gs.ROOT)}")
 
 
 class HallTest(unittest.TestCase):

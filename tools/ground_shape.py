@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import array
+import functools
 import hashlib
 import json
 import math
@@ -167,15 +168,22 @@ def noise1(s: float, seed: int, period: int = 0) -> float:
     return unit(seed, a) * (1.0 - t) + unit(seed, b) * t
 
 
+@functools.lru_cache(maxsize=1 << 18)
+def _corner(seed: int, ix: int, iy: int) -> float:
+    """`unit(seed, ix, iy)`, remembered: neighbouring pixels read the same corners of the noise's
+    cells, so each is worked out once (the same number, only faster)."""
+    return unit(seed, ix, iy)
+
+
 def noise2(x: float, y: float, scale: float, seed: int) -> float:
     """Smooth value noise over the plane, cells of `scale` pixels, in [0, 1)."""
     fx, fy = x / scale, y / scale
     ix, iy = math.floor(fx), math.floor(fy)
     tx, ty = _smooth(fx - ix), _smooth(fy - iy)
-    a = unit(seed, ix, iy)
-    b = unit(seed, ix + 1, iy)
-    c = unit(seed, ix, iy + 1)
-    d = unit(seed, ix + 1, iy + 1)
+    a = _corner(seed, ix, iy)
+    b = _corner(seed, ix + 1, iy)
+    c = _corner(seed, ix, iy + 1)
+    d = _corner(seed, ix + 1, iy + 1)
     return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty
 
 
@@ -464,6 +472,10 @@ class Ground:
                 px, py = x + 0.5, y + 0.5
                 qx, qy = abs(px - cx) - hw, abs(py - cy) - hh
                 inward = -(length_of(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - corner)
+                if inward >= reach:
+                    # Deep inside: no wander, bay or keep-clear circle can change it.
+                    self.land[p] = 1
+                    continue
                 pinned = 1.0
                 for x0, y0, x1, y1 in pins:
                     dx = max(x0 - px, 0.0, px - x1)
@@ -479,7 +491,8 @@ class Ground:
                             inside = True
                             break
                 if not inside and pinned >= 1.0:
-                    inside = any(length_of(px - kx, py - ky) < kr for kx, ky, kr in clear)
+                    # Only a circle whose square round it holds the pixel can (a length is never shorter than either side).
+                    inside = any(abs(px - kx) < kr and abs(py - ky) < kr and length_of(px - kx, py - ky) < kr for kx, ky, kr in clear)
                 if inside:
                     self.land[p] = 1
 

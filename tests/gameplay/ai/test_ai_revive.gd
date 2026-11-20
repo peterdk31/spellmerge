@@ -18,6 +18,15 @@ const MATE_AT: Vector2 = Vector2(300.0, 100.0)
 var _world: Fixture
 var _brain: AIBrain
 var _intent: ActorIntent
+## What the brain did in the last drive, a line each time its behaviour changed (`_note`): shown in
+## a failed check's message, so a failure says why on its own (a flaky one, 2026-11-20, left only
+## "failed in its batch": its log was gone with the machine that ran it).
+var _trace: PackedStringArray = PackedStringArray()
+var _traced: String = ""
+## The most lines a trace keeps (a brain that changed its mind every step would make a message of
+## tens of kilobytes); the rest are counted.
+const TRACE_LINES: int = 24
+var _untraced: int = 0
 
 
 func before_each() -> void:
@@ -39,6 +48,9 @@ func after_each() -> void:
 ## downed (Coop drains a revive that is left, so only a run in a row brings it back).
 func _drive(profile: AIProfile, steps: int) -> int:
 	_brain.setup(_world.players[0], profile, 4111)
+	_trace.clear()
+	_traced = ""
+	_untraced = 0
 	var run: int = 0
 	var longest: int = 0
 	var bot: Actor = _world.players[0]
@@ -47,6 +59,7 @@ func _drive(profile: AIProfile, steps: int) -> int:
 		_intent.begin_step()
 		_brain.think(Fixture.STEP, _intent)
 		bot.position += _intent.move.limit_length(1.0) * WALK * Fixture.STEP
+		_note(i)
 		run = run + 1 if bot.position.distance_to(MATE_AT) <= CoopScript.REVIVE_RANGE else 0
 		longest = maxi(longest, run)
 	return longest
@@ -55,6 +68,9 @@ func _drive(profile: AIProfile, steps: int) -> int:
 ## How many steps of `steps` the brain chose to revive.
 func _revive_steps(profile: AIProfile, steps: int) -> int:
 	_brain.setup(_world.players[0], profile, 4111)
+	_trace.clear()
+	_traced = ""
+	_untraced = 0
 	var chosen: int = 0
 	var bot: Actor = _world.players[0]
 	for i in steps:
@@ -62,9 +78,30 @@ func _revive_steps(profile: AIProfile, steps: int) -> int:
 		_intent.begin_step()
 		_brain.think(Fixture.STEP, _intent)
 		bot.position += _intent.move.limit_length(1.0) * WALK * Fixture.STEP
+		_note(i)
 		if _brain.behaviour != null and _brain.behaviour.name() == "revive":
 			chosen += 1
 	return chosen
+
+
+## Notes step `step` in the trace when the brain's behaviour or target changed: the step, the
+## behaviour, whether it has a target, the bot's place and its health.
+func _note(step: int) -> void:
+	var doing: String = _brain.behaviour.name() if _brain.behaviour != null else "none"
+	var now: String = "%s%s" % [doing, " (target)" if _brain.target != null else ""]
+	if now == _traced:
+		return
+	_traced = now
+	if _trace.size() >= TRACE_LINES:
+		_untraced += 1
+		return
+	_trace.append("step %d: %s at %s, health %.2f" % [step, now, _world.players[0].position, _brain.health_fraction])
+
+
+## The last drive's trace, for a failed check's message.
+func _why() -> String:
+	var more: String = "; and %d changes more" % _untraced if _untraced > 0 else ""
+	return "; what it did: " + ("; ".join(_trace) if not _trace.is_empty() else "nothing") + more
 
 
 func test_it_stands_well_inside_the_revive_range() -> void:
@@ -76,24 +113,24 @@ func test_in_a_quiet_room_it_walks_to_the_downed_mate_and_stays() -> void:
 	var steps: int = int((2.5 + CoopScript.REVIVE_HOLD_TIME + 1.5) / Fixture.STEP)
 	var near: int = _drive(BOT_PROFILE, steps)
 	var hold: int = int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP)
-	check(near >= hold + 4, "it stood in revive range long enough to revive (%d steps, needs %d)" % [near, hold])
+	check(near >= hold + 4, "it stood in revive range long enough to revive (%d steps, needs %d)%s" % [near, hold, _why()])
 	var end: Vector2 = _world.players[0].position
-	check(end.distance_to(MATE_AT) <= ReviveScript.NEAR + 2.0, "it stands beside the mate (at %s)" % [end])
+	check(end.distance_to(MATE_AT) <= ReviveScript.NEAR + 2.0, "it stands beside the mate (at %s)%s" % [end, _why()])
 
 
 func test_with_a_lone_enemy_far_off_it_still_revives() -> void:
 	_world.imp(Vector2(100.0, 400.0))
 	var steps: int = int(6.0 / Fixture.STEP)
 	var near: int = _drive(BOT_PROFILE, steps)
-	check(_brain.target != null, "the bot has a target (the imp)")
-	check(near >= int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP), "it went to the mate with a fight on (%d steps in range)" % near)
+	check(_brain.target != null, "the bot has a target (the imp)" + _why())
+	check(near >= int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP), "it went to the mate with a fight on (%d steps in range)%s" % [near, _why()])
 
 
 func test_it_does_not_walk_into_a_crowd_to_revive() -> void:
 	for way: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.RIGHT]:
 		_world.imp(MATE_AT + way * 40.0)
 	var chosen: int = _revive_steps(BOT_PROFILE, int(4.0 / Fixture.STEP))
-	check_equal(chosen, 0, "steps it chose to revive with foes round the mate")
+	check_equal(chosen, 0, "steps it chose to revive with foes round the mate" + _why())
 
 
 ## Low after a fight, it still revives: with no foe left nothing can down it beside the one downed
@@ -103,20 +140,20 @@ func test_low_with_the_fight_over_it_still_revives() -> void:
 	health.health = health.max_health * ReviveScript.LOW * 0.5
 	var steps: int = int((2.5 + CoopScript.REVIVE_HOLD_TIME + 1.5) / Fixture.STEP)
 	var near: int = _drive(BOT_PROFILE, steps)
-	check(near >= int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP), "it stood in revive range long enough to revive (%d steps)" % near)
+	check(near >= int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP), "it stood in revive range long enough to revive (%d steps)%s" % [near, _why()])
 
 
 func test_low_with_a_fight_on_it_does_not_go() -> void:
 	_world.imp(Vector2(100.0, 400.0))
 	var health: Health = _world.players[0].health
 	health.health = health.max_health * ReviveScript.LOW * 0.5
-	check_equal(_revive_steps(BOT_PROFILE, int(4.0 / Fixture.STEP)), 0, "steps it chose to revive, low with a foe about")
+	check_equal(_revive_steps(BOT_PROFILE, int(4.0 / Fixture.STEP)), 0, "steps it chose to revive, low with a foe about" + _why())
 
 
 func test_a_profile_that_does_not_revive_never_goes() -> void:
 	var enemy_like: AIProfile = BOT_PROFILE.duplicate() as AIProfile
 	enemy_like.revives = 0.0
-	check_equal(_revive_steps(enemy_like, int(4.0 / Fixture.STEP)), 0, "steps it chose to revive")
+	check_equal(_revive_steps(enemy_like, int(4.0 / Fixture.STEP)), 0, "steps it chose to revive" + _why())
 	check_equal(_world.players[0].position, BOT_AT, "it stayed where it was (no target, nothing to do)")
 
 
@@ -172,4 +209,4 @@ func test_two_runs_go_the_same() -> void:
 	var first: Vector2 = _world.players[0].position
 	_world.players[0].position = BOT_AT
 	_drive(BOT_PROFILE, steps)
-	check_equal(_world.players[0].position, first, "the same walk on a second run")
+	check_equal(_world.players[0].position, first, "the same walk on a second run" + _why())

@@ -99,12 +99,15 @@ func _chase(room: RoomBase, enemy_at: Vector2, player_at: Vector2) -> String:
 	if fx != null:
 		fx.free_all()
 	fx = Fixture.new(root)
-	var layout: Node = own(room.scene.instantiate()) as Node
+	# The layout is read for its walls and holes, then freed: one is made per chase (thousands), and
+	# kept to the test's end they held over a gigabyte for the rest of the process's batch.
+	var layout: Node = room.scene.instantiate()
 	var size: Vector2 = room.places().size
 	var mgr: Fixture.ProjectileManagerScript = fx.projectiles
 	mgr.set_bounds(Rect2(Vector2(-64.0, -64.0), size + Vector2(128.0, 128.0)))
 	mgr.set_walls(RoomPlaces.wall_rects(layout))
 	mgr.set_holes(RoomPlaces.hole_rects(layout))
+	layout.free()
 	mgr.set_holes_outside(Rect2(Vector2.ZERO, size))
 	_stand_props(room.places())
 	var wizard: Actor = fx.players[0]

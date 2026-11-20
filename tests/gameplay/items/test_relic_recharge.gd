@@ -182,3 +182,47 @@ func test_what_lies_recharging_is_hashed_and_snapshotted() -> void:
 	check_equal(SimHash.of(_items), hashed, "and the hash")
 	_tick(2)
 	check(_lying().stack.recharge_left < left, "and counts down again")
+
+
+## A copy taken beside one held: the readiest is what is used and shown (the HUD told only when that
+## changes); `take` lets the least ready copy go, as a drop does; a rejoin's list
+## (`recharges`/`set_recharges`) gives each copy its own recharge back.
+func test_copies_taken_beside_one_held() -> void:
+	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
+	_tick()
+	check(wizard.inventory.add(_relic_stack()), "a ready copy held")
+	_told.clear()
+	var tired: ItemStack = _relic_stack()
+	tired.start_recharge(COOLDOWN)
+	check(wizard.inventory.add(tired), "a recharging copy taken beside it")
+	check_equal(wizard.inventory.recharge_left(RELICS, _relic.id), 0.0, "still usable: the ready copy")
+	check_equal(_told, [], "nothing told: what is shown did not change")
+	check(wizard.inventory.is_recharging(), "but the taken copy recharges")
+	check(wizard.inventory.take(RELICS, _relic.id, 1), "one taken out")
+	check_equal(wizard.inventory.recharge_left(RELICS, _relic.id), 0.0, "the least ready went: the ready copy kept")
+	check(not wizard.inventory.is_recharging(), "nothing recharges now")
+	wizard.inventory.start_recharge(RELICS, _relic.id, COOLDOWN)
+	_told.clear()
+	check(wizard.inventory.add(_relic_stack()), "a ready copy taken while its own recharges")
+	check_equal(wizard.inventory.recharge_left(RELICS, _relic.id), 0.0, "usable at once")
+	check_equal(_told, [[0, _relic.id, 0.0, 0.0]], "the HUD told it is ready")
+	wizard.inventory.start_recharge(RELICS, _relic.id, 1.0)
+	var list: Array = wizard.inventory.recharges()
+	check_equal(list.size(), 2, "two copies recharging, each its own")
+	var fresh := Inventory.new()
+	fresh.take_loadout(wizard.inventory.loadout(), _world.registry)
+	check(not fresh.is_recharging(), "a loadout: both ready")
+	fresh.set_recharges(list)
+	check_equal(fresh.recharges(), list, "a rejoin's list gives each copy its recharge back")
+	check_equal(fresh.recharge_left(RELICS, _relic.id), 1.0, "the readiest shown")
+	fresh.free()
+
+
+## A held relic recharges in the simulation's time whatever holds its body (the owner's "sim time"):
+## while its holder spawns in, as one lying on the ground does.
+func test_a_held_relic_recharges_while_its_holder_is_held() -> void:
+	var wizard: Actor = _used_by_seat_0()
+	var left: float = wizard.inventory.recharge_left(RELICS, _relic.id)
+	wizard.spawn_left = 10.0
+	_tick(4)
+	check(absf(wizard.inventory.recharge_left(RELICS, _relic.id) - (left - 4.0 * Fixture.STEP)) < 0.001, "counted while it spawns in (%s of %s)" % [wizard.inventory.recharge_left(RELICS, _relic.id), left])

@@ -400,6 +400,9 @@ func add(stack: ItemStack) -> bool:
 		return false
 	var bag: StringName = ItemKinds.bag_of(stack.kind)
 	var was: Vector2 = _recharge_of(bag, stack.id)
+	if stack.is_recharging():
+		# Not at rest any more, whenever it is taken (`is_recharging` asks that first).
+		_edited = true
 	var numbered: PackedInt32Array = _put(stack)
 	_say_bag(bag)
 	for number in numbered:
@@ -470,7 +473,8 @@ func drop_taken(kind: StringName) -> int:
 
 
 ## Take `count` copies of `id` out of `bag` (a stack left empty goes; of a kind that does not
-## stack, the first `count` stacks of that id: a staff taken is said gone, `staff_changed`).
+## stack, `count` stacks of that id, the least ready first (`_least_ready`; with none recharging, in
+## bag order): a staff taken is said gone, `staff_changed`).
 ## Returns false, and nothing changes, when it holds fewer.
 func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	if count <= 0 or count_of(bag, id) < count:
@@ -480,17 +484,15 @@ func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	if ItemKinds.stacks(ItemKinds.kind_in(bag, id)):
 		_change_count(bag, id, -count)
 	else:
+		# The least ready copies go first (as a drop lets go), so the readiest is kept for a use.
 		var stacks: Array[ItemStack] = _bags[bag]
 		var left: int = count
-		var at: int = 0
-		while left > 0 and at < stacks.size():
-			if stacks[at].id == id:
-				if stacks[at].number != NO_STAFF:
-					gone.append(stacks[at].number)
-				left -= stacks[at].count
-				stacks.remove_at(at)
-			else:
-				at += 1
+		while left > 0:
+			var going: ItemStack = _least_ready(bag, id)
+			if going.number != NO_STAFF:
+				gone.append(going.number)
+			left -= going.count
+			stacks.erase(going)
 	_say_bag(bag)
 	for number in gone:
 		_say_staff(number)
@@ -931,8 +933,12 @@ func start_recharge(bag: StringName, id: StringName, seconds: float) -> void:
 	recharge_changed.emit(bag, id)
 
 
-## True while anything it holds recharges (its body steps it then: `step`).
+## True while anything it holds recharges (its body steps it then: `step`). Asked of every actor
+## every tick: an inventory untouched since its start (`at_rest`: most foes and props) holds nothing
+## recharging, so it answers at once.
 func is_recharging() -> bool:
+	if not _edited:
+		return false
 	for bag: StringName in ItemKinds.BAGS:
 		for stack: ItemStack in _stacks(bag):
 			if stack.is_recharging():
@@ -1005,11 +1011,12 @@ func _readiest(bag: StringName, id: StringName) -> ItemStack:
 	return found
 
 
-## The copy of `id` in `bag` with the most recharge left (the last of those), or null for none.
+## The copy of `id` in `bag` with the most recharge left (the first of those, so with none
+## recharging the first copy), or null for none.
 func _least_ready(bag: StringName, id: StringName) -> ItemStack:
 	var found: ItemStack = null
 	for stack: ItemStack in _stacks(bag):
-		if stack.id == id and (found == null or stack.recharge_left >= found.recharge_left):
+		if stack.id == id and (found == null or stack.recharge_left > found.recharge_left):
 			found = stack
 	return found
 

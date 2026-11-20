@@ -136,7 +136,8 @@ func clear() -> void:
 ## changed.
 func step(delta: float) -> void:
 	for row: GroundItem in _rows:
-		row.stack.step_recharge(delta)
+		if row.stack.recharge_left > 0.0:
+			row.stack.step_recharge(delta)
 	for seat in SEATS:
 		var found: int = NONE
 		var body: Actor = _holder(actors.actor_of_seat(seat)) if actors != null else null

@@ -728,7 +728,10 @@ func _begin_run_of_rooms(players: int) -> RoomBase:
 	_biome_fights.clear()
 	for at in map.rooms():
 		var fight: RoomFight = _chosen_fights[at] if at < _chosen_fights.size() else null
-		_biome_fights.append(fight if fight != null else RoomFight.new())
+		if fight == null:
+			fight = RoomFight.new()
+		fight.level = map.level_of(at)
+		_biome_fights.append(fight)
 	_chosen_fights.clear()
 	return room
 
@@ -1662,7 +1665,10 @@ func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party:
 	_biome_reveal = 0
 	_biome_fights.clear()
 	for fight: RoomFight in fights:
-		_biome_fights.append(fight.fresh() if fight != null else RoomFight.new())
+		var made: RoomFight = fight.fresh() if fight != null else RoomFight.new()
+		if made.level <= 0.0:
+			made.level = map.level_of(_biome_fights.size())
+		_biome_fights.append(made)
 	mode = MODE_RUN
 	_biome_given = true
 	if start_run(requester, party):
@@ -1825,6 +1831,7 @@ func _on_room_reroll_requested(player: int) -> void:
 		return
 	var scale: float = made.room_scales[room] if room < made.room_scales.size() else 0.0
 	var fight: RoomFight = RoomFight.of(made.enemies_of(room), int(answer[1]), int(answer[2]), float(answer[3]), scale, made.elites_of(room))
+	fight.level = made.level_of(room)
 	body.inventory.take(ItemKinds.bag_of(ItemKinds.REROLL), RerollBase.ROOM)
 	_reroll_room(room, made, fight)
 
@@ -2082,11 +2089,15 @@ func _call_room_spawning(room: int, delta: float) -> void:
 		id = queue.next(0.0, _standing_cost(room))
 
 
-## Difficulty told room `room`'s scale (its `RoomFight.scale`; 0: as it is) before an enemy of its
-## fight stands: two fights at once each stand at their own.
+## Difficulty told room `room`'s scale and depth level (its `RoomFight.scale` and `level`; 0: as it
+## is) before an enemy of its fight stands: two fights at once each stand at their own.
 func _scale_for(room: int) -> void:
-	if events != null and room >= 0 and room < life.rooms() and life.fights[room].scale > 0.0:
+	if events == null or room < 0 or room >= life.rooms():
+		return
+	if life.fights[room].scale > 0.0:
 		events.run_room_scaled.emit(life.fights[room].scale)
+	if life.fights[room].level > 0.0:
+		events.run_room_leveled.emit(life.fights[room].level)
 
 
 ## Room `room`'s fight is over when its queue is empty and nothing it must beat stands in it (an

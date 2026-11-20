@@ -22,7 +22,7 @@ func test_the_starter_heads_and_dev_staffs_are_found_under_wizard() -> void:
 		check(head != null, "the %s staff is found" % id)
 		if head == null:
 			continue
-		check_equal(head.slots, 4, "the %s staff has 4 slots (the owner's choice)" % id)
+		check_equal(head.slots, 6, "the %s staff has 6 slots (the owner, 2026-11-20)" % id)
 		check(dev.slots > head.slots, "the dev staff (the premade builds' on the hub's rack) has more slots than the %s staff" % id)
 		check_equal(SpellValidator.check_staff(head).size(), 0, "the %s staff is valid" % id)
 

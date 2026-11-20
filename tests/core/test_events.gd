@@ -165,6 +165,7 @@ const EVENTS: Dictionary = {
 	&"room_rerolled": [["room", TYPE_INT], ["kind", TYPE_STRING_NAME]],
 	&"room_reroll_refused": [["player", TYPE_INT], ["reason", TYPE_STRING_NAME]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
+	&"run_room_leveled": [["level", TYPE_FLOAT]],
 	&"room_left": [["room", TYPE_INT]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"room_built": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT], ["layout_root", TYPE_OBJECT]],
@@ -214,7 +215,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_room_reroll_asked", &"run_room_rerolled", &"room_rerolled",
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

@@ -13,6 +13,9 @@ var group: int = 0
 var refill_at: int = 0
 var stagger: float = 0.0
 var scale: float = 0.0
+## Its depth level (`BiomeMap.level_of`: its scale with one player; told as `run_room_leveled` with
+## its scale, which an enemy's aim sharpens by; 0: the level as it is).
+var level: float = 0.0
 ## Each enemy's elite card by the same index as `enemies` (connected biomes CB11; empty: no elite,
 ## a short list: none past its end).
 var elites: Array[StringName] = []
@@ -39,7 +42,9 @@ func has_enemies() -> bool:
 
 ## A copy as it was given (its queue not begun), for a run started again.
 func fresh() -> RoomFight:
-	return of(enemies, group, refill_at, stagger, scale, elites)
+	var made: RoomFight = of(enemies, group, refill_at, stagger, scale, elites)
+	made.level = level
+	return made
 
 
 ## The elite card of the fight's enemy `at` (empty: no elite).

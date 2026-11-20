@@ -79,8 +79,8 @@ Shared presets live as files (`content/enemies/profiles/*.tres`); an enemy names
 | --- | --- | --- |
 | `aggression` | 0–1 | How far inside its reach it fights; how readily it closes in |
 | `caution` | 0–1 | When it evades or guards: health, being crowded, shots coming |
-| `accuracy` | 0–1 | Aim error (1: exact) |
-| `lead` | 0–1 | How far it aims ahead of a moving target |
+| `accuracy` | 0–1 | Aim error (1: exact; an enemy's tuned by `AimTuning`, gameplay/ai/README.md "Aim") |
+| `lead` | 0–1 | How far it aims ahead of a moving target (0: at it; 1: where a shot meets it; an enemy's tuned by `AimTuning`) |
 | `reaction` | seconds | How often it looks and decides (also how late it notices a shot) |
 | `dodge` | 0–1 | How well it dodges (0: never; the horde's swarmers) |
 | ~~`windup_scale`~~ | × | Every telegraph (gone: the staff's `wind_up`, cast timing T6) |

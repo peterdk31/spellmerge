@@ -32,7 +32,7 @@ extends RefCounted
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
 ##   element) and each key lying (`key_shown`) as it changes; -1 when every one is forgotten (the biome
 ##   left, a restore: told again by `tell_all`), and the rooms opened (`rooms_opened`: as one opens,
-##   empty as the biome goes, `again` after a restore; a treasure room's done look). The HUD is told, by seat, the shut key door its body
+##   empty as the biome goes, `again` after a restore; a secret room's symbol shows once found). The HUD is told, by seat, the shut key door its body
 ##   stands at with no key (`key_needed_shown`), and reads a body's keys from its bag (`bag_changed`).
 ##   Never read back by the simulation.
 

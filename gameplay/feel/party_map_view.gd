@@ -35,11 +35,12 @@ extends CanvasLayer
 ## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
 ## pixels; nothing fades.
 ##
-## **A cleared room** (the owner, 2026-11-20, #883): a room that is done (Feel's room hearing,
-## `is_done`: a fight's cleared, a treasure room opened, a fountain used, a reward room's rewards
-## taken; `KindSymbol.done_by`, never a shop) shows its symbol in the calm cleared look
+## **A done room** (the owner, 2026-11-20, #883 and #888): a room that is done (Feel's room hearing,
+## `is_done`: a fight's cleared, a fountain drawn dry, a reward, treasure or secret room's rewards
+## taken; `KindSymbol.done_by`, never a shop) shows its symbol in the calm done look
 ## (`kind_symbol.gd`: dimmed, a check across it), as its doorway signs do; on an open map it steps in a
-## stage a frame at FPS, with every map shut (or told again after a restore) drawn as it stands.
+## stage a frame at FPS, with every map shut (or told again after a restore) drawn as it stands. A
+## secret room's symbol is drawn only once the room is found (its rock broken: `is_opened`).
 ##
 ## **Told to the HUD:** each seat's frame and whether it is fully open (`map_frame_shown`, as either
 ## changes), so the HUD's legend sits under it (`hud/panels/map_legend.gd`).
@@ -134,10 +135,10 @@ var _pick_stage: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By place: the stone's shade drawn (0 none, 1 shadow, 2 base, 3 light) and its symbol's rows shown.
 var _shade: PackedInt32Array = PackedInt32Array()
 var _symbol_rows: PackedInt32Array = PackedInt32Array()
-## By place: a room whose kind shows the cleared look once done (1), and that look's stage drawn; the room
-## hearing's `cleared_again` read last.
+## By place: a room whose kind shows the done look once done (1), and that look's stage drawn; the room
+## hearing's `done_again` read last.
 var _tells_done: PackedByteArray = PackedByteArray()
-var _cleared: PackedInt32Array = PackedInt32Array()
+var _done: PackedInt32Array = PackedInt32Array()
 var _read_again: int = 0
 ## The wizards' places and colours this frame (world pixels; INF: none), by seat.
 var _wizard_at: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
@@ -257,9 +258,9 @@ func shade_of(place: int) -> int:
 	return _shade[place] if place >= 0 and place < _shade.size() else 0
 
 
-## Room `place`'s symbol's cleared look's stage (0 none ... `KindSymbol.CLEARED_STAGES`; for tests).
-func cleared_of(place: int) -> int:
-	return _cleared[place] if place >= 0 and place < _cleared.size() else 0
+## Room `place`'s symbol's done look's stage (0 none ... `KindSymbol.DONE_STAGES`; for tests).
+func done_of(place: int) -> int:
+	return _done[place] if place >= 0 and place < _done.size() else 0
 
 
 func symbol_rows_of(place: int) -> int:
@@ -333,6 +334,9 @@ func draws(place: int) -> bool:
 func draws_symbol(place: int) -> bool:
 	if place < 0 or place >= _rects.size() or _room[place] == 0 or _symbols[place].is_empty():
 		return false
+	if _secret[place] != 0 and (pieces == null or not pieces.is_opened(place)):
+		# A secret room's symbol only once it is discovered (its rock broken; the owner, #888).
+		return false
 	if _level(place) >= SHOWN:
 		return true
 	for other in _rects.size():
@@ -349,12 +353,12 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	var world_now: int = pieces.world() if pieces != null else 0
 	if places != _laid_places or world_now != _laid_world:
 		_lay(grid, places, world_now)
-	var again: int = pieces.cleared_again() if pieces != null else 0
+	var again: int = pieces.done_again() if pieces != null else 0
 	if again != _read_again:
 		# The rooms cleared told again after a restore: drawn as they stand.
 		_read_again = again
-		for place in _cleared.size():
-			_cleared[place] = _cleared_wanted(place)
+		for place in _done.size():
+			_done[place] = _done_wanted(place)
 	for seat in ActorsScript.SEATS:
 		_held[seat] = 1 if not _rects.is_empty() and seats_here & (1 << seat) != 0 and _holds(seat) else 0
 	if not _any_open():
@@ -392,7 +396,7 @@ func is_moving() -> bool:
 			return true
 	if _any_open():
 		for place in _shade.size():
-			if _shade[place] != _shade_wanted(place) or _symbol_rows[place] != _rows_wanted(place) or _cleared[place] != _cleared_wanted(place):
+			if _shade[place] != _shade_wanted(place) or _symbol_rows[place] != _rows_wanted(place) or _done[place] != _done_wanted(place):
 				return true
 		for at in _sense_shade.size():
 			if _sense_shade[at] != _sense_wanted(at):
@@ -412,7 +416,7 @@ func advance() -> void:
 	for place in _shade.size():
 		_shade[place] += signi(_shade_wanted(place) - _shade[place])
 		_symbol_rows[place] += signi(_rows_wanted(place) - _symbol_rows[place])
-		_cleared[place] += signi(_cleared_wanted(place) - _cleared[place])
+		_done[place] += signi(_done_wanted(place) - _done[place])
 	for at in _sense_shade.size():
 		_sense_shade[at] += signi(_sense_wanted(at) - _sense_shade[at])
 
@@ -457,10 +461,10 @@ func _rows_wanted(place: int) -> int:
 	return RoomKind.SYMBOL_SIDE if draws_symbol(place) else 0
 
 
-func _cleared_wanted(place: int) -> int:
+func _done_wanted(place: int) -> int:
 	if _tells_done[place] == 0 or pieces == null or not pieces.is_done(place):
 		return 0
-	return KindSymbolScript.CLEARED_STAGES
+	return KindSymbolScript.DONE_STAGES
 
 
 func _any_open() -> bool:
@@ -475,7 +479,7 @@ func _settle() -> void:
 	for place in _shade.size():
 		_shade[place] = _shade_wanted(place)
 		_symbol_rows[place] = _rows_wanted(place)
-		_cleared[place] = _cleared_wanted(place)
+		_done[place] = _done_wanted(place)
 	for at in _sense_shade.size():
 		_sense_shade[at] = _sense_wanted(at)
 
@@ -612,7 +616,7 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 		if _symbol_rows[place] > 0:
 			var middle: Vector2 = origin + ((_rects[place].get_center() - _area.position) / MAP_CELL).floor() * scale
 			var half: float = float(RoomKind.SYMBOL_SIDE * scale / 2)
-			KindSymbolScript.draw(canvas, _symbols[place], _symbol_shades[place], middle - Vector2(half, half), _symbol_rows[place], scale, RoomKind.SYMBOL_SIDE, _cleared[place])
+			KindSymbolScript.draw(canvas, _symbols[place], _symbol_shades[place], middle - Vector2(half, half), _symbol_rows[place], scale, RoomKind.SYMBOL_SIDE, _done[place])
 			if (_glyphs[place] as Array).size() > 0:
 				RewardGlyphsScript.draw(canvas, _glyphs[place], _glyph_shades[place], glyphs_corner(middle, (_glyphs[place] as Array).size(), scale), true, _symbol_rows[place], scale)
 	_draw_pick(canvas, seat, origin, scale)
@@ -677,9 +681,9 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_shade.resize(places)
 	_symbol_rows.resize(places)
 	_tells_done.resize(places)
-	_cleared.resize(places)
-	_cleared.fill(0)
-	_read_again = pieces.cleared_again() if pieces != null else 0
+	_done.resize(places)
+	_done.fill(0)
+	_read_again = pieces.done_again() if pieces != null else 0
 	_ends.resize(places * 2)
 	_ends.fill(-1)
 	_area = Rect2()

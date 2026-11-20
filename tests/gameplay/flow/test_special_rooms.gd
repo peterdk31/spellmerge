@@ -503,8 +503,8 @@ func test_a_reward_rooms_type_comes_with_its_rewards() -> void:
 		check_equal((registry.call(&"get_resource", &"spells", choice["id"]) as SpellComponent).kind(), &"modifier", "a modifier room offers modifiers")
 
 
-## The owner, 2026-11-20 (after #884): a treasure room's done look is its door opened. Flow tells the
-## view the rooms opened (`rooms_opened`, its `LockDoors.opened`): shut as the biome starts, as the
+## The owner's answers on #888: a secret room's symbol shows once it is found (its rock broken). Flow
+## tells the view the rooms opened (`rooms_opened`, its `LockDoors.opened`): shut as the biome starts, as the
 ## door opens, `again` after a restore, empty as the biome goes.
 func test_the_rooms_opened_are_told_to_the_view() -> void:
 	var told: Array = []
@@ -529,7 +529,8 @@ func test_the_rooms_opened_are_told_to_the_view() -> void:
 	events.disconnect("rooms_opened", on_opened)
 
 
-## The owner, 2026-11-20 (after #884): a reward room's done look waits for its rewards to be taken.
+## The owner, 2026-11-20 (after #884): a reward room's done look waits for its rewards to be taken
+## (and a treasure or secret room's, the owner's answers on #888).
 ## Rewards tells the view which rooms still hold one (`rooms_rewards_left`): from the clear (due)
 ## through its roll while a present player's item lies there; a player who was away has its offer
 ## waiting elsewhere (rule 4), which keeps nothing in the room; the item taken, the room holds none.

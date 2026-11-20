@@ -99,6 +99,9 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_followed = NONE
 		_touch_places = -1
 		_world += 1
+		# A new world's rooms are none of them cleared until Flow says so (an old biome's never carry
+		# over by number: a restore into the hub or a row run tells no empty map).
+		_cleared = PackedByteArray()
 	if number < 0:
 		return
 	while _templates.size() <= number:

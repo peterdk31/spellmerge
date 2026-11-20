@@ -12,7 +12,8 @@ extends Node2D
 ## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 8, 6, 4, 2,
 ## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. Fine
 ## and quick (the owner, 2026-11-20, #883: 16 px blocks at 12 fps read as a hard grid of black lines
-## mid-way): 8 px blocks over `reveal_seconds()`, still 3 frames between covered and lit. A
+## mid-way): 8 px blocks over `reveal_seconds()`, still 3 frames between covered and lit, and never
+## more than a stage a drawn frame however slow the frame (a frame under 24 fps opens it slower). A
 ## stage is a tiled texture made once (the solid stage a plain rectangle); it lines up with the
 ## world's pixels, as every place stands on the 32 px grid.
 ##
@@ -132,8 +133,9 @@ func step(delta: float, grid: RoomGrid) -> void:
 		return
 	_clock += delta
 	var change: float = 1.0 / FPS
-	while _clock >= change:
-		_clock -= change
+	if _clock >= change:
+		# At most a stage a drawn frame: a slow frame never skips one (Smooth's 3 frames between).
+		_clock = minf(_clock - change, change)
 		advance()
 
 

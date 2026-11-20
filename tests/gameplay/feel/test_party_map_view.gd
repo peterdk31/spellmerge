@@ -18,6 +18,7 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
 const DT: float = 1.0 / 60.0
 const WEST: int = 1
 const EAST: int = 2
@@ -246,7 +247,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 	check_equal(stages, [1, 2, 3, 4, 5, 6, 7] as Array[int], "it steps to the cleared look a stage at a time, while its sign rises")
 	check(is_equal_approx(strengths[strengths.size() - 1], MouthSymbolsScript.LIGHT_STRENGTH * MouthSymbolsScript.CLEARED_LIGHT), "its light dimmed (%s)" % [strengths])
 	for i in range(1, strengths.size()):
-		check(strengths[i] <= strengths[i - 1] + MouthSymbolsScript.LIGHT_STRENGTH / RoomKind.SYMBOL_SIDE + 0.0001, "and never jumps")
+		check(absf(strengths[i] - strengths[i - 1]) <= MouthSymbolsScript.LIGHT_STRENGTH / RoomKind.SYMBOL_SIDE + 0.0001, "and never jumps, up or down")
 	for mouth in symbols.count():
 		var room: int = mouths.room_of(mouth)
 		check_equal(symbols.cleared_of(mouth), KindSymbolScript.CLEARED_STAGES if room == WEST else 0, "mouth %d into room %d" % [mouth, room])
@@ -293,8 +294,34 @@ func test_a_restore_draws_the_cleared_look_as_it_stands() -> void:
 	for mouth in symbols.count():
 		check_equal(symbols.cleared_of(mouth), KindSymbolScript.CLEARED_STAGES if mouths.room_of(mouth) == WEST else 0, "mouth %d as it stands" % mouth)
 	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "the map too")
+	# A restore with the map held open: drawn as it stands, nothing stepped.
+	check(before.restore(tick.state_areas(), root).is_empty(), "back again")
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.stage_of(0) > 0 and view.cleared_of(WEST) == 0, "open, the antechamber not cleared")
+	check(after.restore(tick.state_areas(), root).is_empty(), "into the cleared one, the map open")
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "cleared as it stands at once, on an open map too")
 	flow.stop_run()
 	check(not _hearing().is_cleared(WEST), "the biome gone, nothing cleared")
+
+
+## A new world never shows an old biome's rooms cleared by number, even when nothing told the view
+## the old map was gone (a restore into the hub, then a new biome).
+func test_a_new_world_starts_with_nothing_cleared() -> void:
+	var bus := own(EventsScript.new()) as EventsScript
+	var hearing := RoomHearingScript.new()
+	hearing.bind(bus)
+	bus.room_built.emit(&"", EventsScript.FIRST_ROOM, null)
+	bus.rooms_cleared.emit(PackedByteArray([1, 1, 0]), false)
+	check(hearing.is_cleared(WEST), "the antechamber cleared")
+	# The view hears a new world built, with no empty map told before it.
+	bus.room_built.emit(&"", EventsScript.FIRST_ROOM, null)
+	check(not hearing.is_cleared(WEST), "a new world: nothing cleared")
 
 
 func test_the_y_map_opens_over_frames_inside_its_own_players_view_only() -> void:
@@ -440,7 +467,8 @@ func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reope
 	while view.is_moving():
 		view.advance()
 		shades.append(view.shade_of(WEST))
-	# Its empty fight is cleared as it is entered, so its symbol's cleared look steps on after the shades.
+	# Its empty fight is cleared as it is entered: its symbol's cleared look steps with the shades and
+	# goes on after them.
 	check_equal(shades.slice(0, 3), [1, 2, 3] as Array[int], "entered while the map is open: it comes in a shade a frame")
 	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "and, cleared, its symbol stepped to the cleared look")
 	# The screen merges under it: one view of the whole screen, a bigger frame. It closes, then opens again.

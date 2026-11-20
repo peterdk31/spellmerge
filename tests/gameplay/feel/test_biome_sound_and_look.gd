@@ -287,6 +287,14 @@ func test_the_reveal_is_fine_and_quick_and_stepped() -> void:
 			stages.append(dark.stage_of(1))
 	check_equal(stages, [4, 3, 2, 1, 0] as Array[int], "a stage at a time")
 	check(absf(frames * frame - UnseenDarkScript.reveal_seconds()) <= frame * 1.5, "open in %d frames, about %.3f s" % [frames, UnseenDarkScript.reveal_seconds()])
+	# A slow machine (10 fps): every stage is still drawn, one a frame.
+	_wizard(0).global_position = _by_socket(map, 2, RoomSocket.Facing.WEST, 24.0)
+	tick.run(DT)
+	var slow: Array[int] = [dark.stage_of(2)]
+	for i in 8:
+		dark.step(0.1, _grid())
+		slow.append(dark.stage_of(2))
+	check_equal(slow.slice(0, 5), [4, 3, 2, 1, 0] as Array[int], "a slow frame skips no stage")
 
 
 ## The void between a biome's slabs is pure black under everything, over the biome and past it; its

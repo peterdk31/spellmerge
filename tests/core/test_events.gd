@@ -182,6 +182,7 @@ const EVENTS: Dictionary = {
 	&"special_room_opened": [["room", TYPE_INT], ["fill", TYPE_STRING_NAME], ["table", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["spots", TYPE_PACKED_VECTOR2_ARRAY], ["board", TYPE_VECTOR2]],
 	&"rooms_seen": [["seen", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"rooms_cleared": [["cleared", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
+	&"rooms_opened": [["opened", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
 	&"loading_finished": [],
@@ -212,6 +213,7 @@ const EVENTS: Dictionary = {
 	&"shelf_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"shelf_refused": [["player", TYPE_INT], ["item", TYPE_INT]],
 	&"fountain_changed": [["room", TYPE_INT], ["area", TYPE_RECT2], ["left", TYPE_FLOAT], ["most", TYPE_FLOAT]],
+	&"rooms_rewards_left": [["left", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"run_stats_told": [["player", TYPE_INT], ["stats", TYPE_DICTIONARY]],
 	&"run_stats_ruled": [["changes", TYPE_ARRAY]],
 	&"health_gift_requested": [["actor", TYPE_INT], ["heal", TYPE_FLOAT], ["more_most", TYPE_FLOAT]],
@@ -221,7 +223,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"rooms_opened", &"rooms_rewards_left", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

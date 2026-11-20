@@ -252,6 +252,32 @@ func test_the_blank_quarter_shows_the_void_view_in_a_biome() -> void:
 	_split.void_bounds = Rect2()
 
 
+## Four players, a pair and two alone (the owner, 2026-11-20): the pair has a half, its bottom
+## quarter its twin, which the twin rect shows with the pair's own view (no void view, no divider).
+func test_a_pairs_twin_quarter_shows_the_pairs_own_picture() -> void:
+	_split.camera.set_equal(true)
+	_split.void_bounds = Rect2(-500.0, -500.0, 4000.0, 3500.0)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(60.0, 0.0))
+	_wizard(2, Vector2(3000.0, 0.0))
+	_wizard(3, Vector2(3000.0, 2500.0))
+	_frames(240)
+	var laid: ScreenViewsScript = _split.camera.views
+	check_equal(laid.count, 3, "three panes")
+	var owner: int = _split.camera.blank_owner_view()
+	check_equal(owner, laid.view_of_seat(0), "the blank is the pair's twin")
+	var twin: TextureRect = _split.twin_cell()
+	check(twin != null and twin.visible, "the twin rect is shown")
+	if twin != null:
+		check_equal(twin.texture, _split.view_in_slot(_split.camera.slot_of(owner)).get_texture(), "with the pair's view")
+		check(twin.get_index() < _split.get_node(^"Views/Cell0").get_index(), "under the cells")
+	check(_split.void_view() == null or _split.void_view().render_target_update_mode == SubViewport.UPDATE_DISABLED, "no void drawn")
+	var material := (_split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(owner))) as TextureRect).material as ShaderMaterial
+	check_equal(int(material.get_shader_parameter(&"others")), 3, "the pair's cell knows the two others and its twin")
+	check_equal(material.get_shader_parameter(&"divider_2"), 0.0, "no divider from the pair to its twin")
+	_split.void_bounds = Rect2()
+
+
 ## Every seat's wizard moved beside the others.
 func _wizard_move_all_together() -> void:
 	for id in ActorsScript.SEATS:

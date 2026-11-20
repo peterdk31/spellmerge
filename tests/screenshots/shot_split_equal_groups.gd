@@ -8,6 +8,9 @@ extends "res://tests/support/screenshot.gd"
 ##   court: two panes, the halves, the pair sharing one (P1's panel moved into its half).
 ## - `split_equal_groups_void`: the three apart: three quarters, the fourth the void with its
 ##   drifting motes; `split_equal_groups_void_quarter` that quarter alone, twice the size.
+## - `split_equal_groups_4_pairs`: four players in two pairs: the halves, each panel keeping its row.
+## - `split_equal_groups_4_pair_half`: a pair and two alone: the pair the left half (its bottom
+##   quarter its twin, the same picture), the two alone the right half's quarters; no void.
 
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 
@@ -60,6 +63,23 @@ func take() -> void:
 	var quarter: Image = image.get_region(Rect2i(half, half))
 	quarter.resize(half.x * 2, half.y * 2, Image.INTERPOLATE_NEAREST)
 	save(quarter, "split_equal_groups_void_quarter")
+	# Four: two pairs, then a pair and two alone.
+	input.call("add_virtual_device", 3)
+	if not await _start(flow, map):
+		return
+	_wizard(flow, 0).global_position = west
+	_wizard(flow, 1).global_position = west + Vector2(40.0, 24.0)
+	_wizard(flow, 2).global_position = east
+	_wizard(flow, 3).global_position = east + Vector2(-40.0, 24.0)
+	await settle(240)
+	if not _views_are(feel, 2, "two pairs"):
+		return
+	await shot("split_equal_groups_4_pairs")
+	_wizard(flow, 3).global_position = nave + Vector2(0.0, 40.0)
+	await settle(300)
+	if not _views_are(feel, 3, "a pair and two alone"):
+		return
+	await shot("split_equal_groups_4_pair_half")
 
 
 func _start(flow: Node, map: BiomeMap) -> bool:

@@ -573,10 +573,11 @@ Built from those answers (gameplay/feel/README.md, "Equal panes"; hud/README.md,
 - **The empty fourth quarter** (three panes) shows the void with its drifting motes: a void view (one more SubViewport, made once) looking past the biome's corner into the void's black, where the spectacle gives the void's motes off too; outside a biome it stays plain black.
 - **Tests:** `test_split_equal.gd` (grouping by distance for three and four players with the hysteresis, halves always for two, P1 and P3 with P3's HUD spot moved, the HUD spots inside the panes, a reset counted), `test_split_screen.gd` and `test_biome_sound_and_look.gd` (the void view and its motes), `tests/hud/test_seat_corners.gd` (the slide, P3's panel and menus moved and back). Nothing under the simulation's folders changed. Screenshots: `tests/screenshots/shot_split_equal_groups.gd`.
 
-### Open questions for the owner
+### Answered by the owner (2026-11-20, on #880)
 
-1. Four players in three groups (a pair and two alone): the pair shares one quarter, as asked (quarters for three groups), its second panel at the quarter's inner side; their two builders or inventories open at once would share that quarter (so would a trio's third seat in a half). Alternative: give the pair a half and the two alone the other half's quarters (no void quarter then). Keep quarters?
-2. Four players in two pairs (P1+P2, P3+P4): each seat takes a quarter of its own in its half (so menus never overlap), which moves P2's panel to the bottom left and P3's to the top right, crossing. The alternative keeps each row (the quarter's inner side) but makes the pair share a quarter for their menus. Keep?
+1. **Four players in three groups:** the pair gets a half, the two alone a quarter each; no empty quarter then (the void quarter only for three players in three groups). Built: the pair's view is cut as its half's top quarter and the bottom quarter is its twin, a blank site shown with the pair's own picture and no divider (gameplay/feel/README.md, "Equal panes").
+2. **Two pairs:** the left and right halves, each panel kept in its own corner's row within its pair's half (no crossing): P2's panel at the top left quarter's inner side, P3's at the bottom right's.
+3. **The void quarter unlit:** fine.
 
 ## The d-pad never walks; quick-use bindings (2026-11-20)
 

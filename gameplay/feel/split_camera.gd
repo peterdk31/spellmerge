@@ -158,6 +158,8 @@ var _foes: CloseFoesScript = null
 ## The equal split's blank quarter: which quarter it is (-1: none), how far it has moved in
 ## from its rest (0 out to 1 on its quarter's middle), and where its site is drawn now.
 var _blank_quarter: int = -1
+## The group (lowest seat) whose twin the blank is (it shows that group's picture; -1: the void).
+var _blank_owner: int = -1
 var _blank_in: float = 0.0
 var _blank_at: Vector2 = Vector2.INF
 ## The equal split's panes for this frame's groups.
@@ -207,6 +209,7 @@ func reset() -> void:
 	split = false
 	views.count = 0
 	_blank_quarter = -1
+	_blank_owner = -1
 	_blank_in = 0.0
 	_blank_at = Vector2.INF
 	_set_corners(false)
@@ -237,7 +240,24 @@ func blank_anchor(_blank: int) -> Vector2:
 ## pixels): twice the view's own, since the shader draws half a line a side and no view draws the
 ## blank's side, so the view draws the whole line; it grows in with the split, shrinks with the merge.
 func blank_divider(view: int) -> int:
+	if view == blank_owner_view():
+		# Its own twin: one pane, no line between.
+		return 0
 	return _stage[_slot_of[view]] * 2
+
+
+## The view whose picture the blank shows (its twin, three groups of four players; the owner,
+## 2026-11-20), or -1: the blank is the void.
+func blank_owner_view() -> int:
+	if _blank_owner < 0 or blank_count() == 0:
+		return -1
+	var slot: int = _group_slot[_blank_owner] if _group_seats[_blank_owner] != 0 else -1
+	if slot < 0 or _state[slot] != LIVE:
+		return -1
+	for view in views.count:
+		if _slot_of[view] == slot:
+			return view
+	return -1
 
 
 ## The slot of view `view` (0 to `views.count` - 1).
@@ -629,12 +649,20 @@ static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) 
 ## The equal split's blank quarter moved on: in from its rest while split with three seats, out while
 ## not (or before it moves to another quarter), at most BLANK_STEP_MOST of the way a drawn frame.
 func _step_blank(delta: float, screen: Vector2) -> void:
-	var want: int = _panes.blank_quarter if equal and split else -1
+	var want: int = -1
+	var want_owner: int = -1
+	if equal and split:
+		want = _panes.blank_quarter
+		if _panes.twin_group >= 0:
+			want = _panes.twin_quarter
+			want_owner = _panes.twin_group
 	var step: float = minf(maxf(delta, 0.0) / BLANK_TIME, BLANK_STEP_MOST)
-	if want != _blank_quarter:
+	if want != _blank_quarter or want_owner != _blank_owner:
+		# Another quarter, or the void turning a pair's twin (or back): out first, then in.
 		_blank_in = maxf(_blank_in - step, 0.0)
 		if _blank_in <= 0.0:
 			_blank_quarter = want
+			_blank_owner = want_owner
 	elif want >= 0:
 		_blank_in = minf(_blank_in + step, 1.0)
 	if _blank_quarter < 0:
@@ -748,7 +776,7 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 		count += 1
 	views.count = count
 	_apart(count)
-	_cells.fill(views, _blank_at if blank_count() > 0 else Vector2.INF)
+	_cells.fill(views, _blank_at if blank_count() > 0 else Vector2.INF, blank_owner_view())
 
 
 ## The seats held by the views merging into live slot `slot`.
@@ -787,7 +815,13 @@ func _anchor_of(slot: int, own: Vector2) -> Vector2:
 ## picture is (its pull this frame, so the cut follows the picture it cuts) and moving at least
 ## ANCHOR_STEP and at most PANE_ANCHOR_STEP a frame.
 func _pane_anchor(slot: int, drawn: Vector2, screen: Vector2) -> Vector2:
-	var site: Vector2 = _group_site[_group_holding(slot)]
+	var group: int = _group_holding(slot)
+	var site: Vector2 = _group_site[group]
+	if group == _blank_owner and _blank_quarter >= 2:
+		# A pair with a twin: cut as its half's top quarter, eased there as the twin comes in, so the
+		# twin's site and its own cut the half from the others as two quarters do.
+		var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)
+		site = site.lerp(EqualPanesScript.quarter_site(_blank_quarter - 2, screen), t)
 	if not _shown[slot].is_finite():
 		_shown[slot] = drawn.clamp(Vector2.ZERO, screen)
 	var step: float = clampf(_shown[slot].distance_to(site) * _pull[slot], ANCHOR_STEP, PANE_ANCHOR_STEP)

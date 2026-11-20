@@ -9,16 +9,22 @@ extends RefCounted
 ## - **Two groups:** the left and right halves, always (the owner, 2026-11-20), whichever seats
 ##   they hold: the group whose seats' corner panels are more on the left takes the left half (a tie:
 ##   the group of the lowest seat).
-## - **Three or four groups:** the 2×2 grid of quarters, each group the quarter that keeps most of
-##   its seats' panels where they are (`_score`). With three, the fourth quarter is a blank: no
-##   view's, drawn as the void (`blank_quarter`).
+## - **Three groups of three players, or four groups:** the 2×2 grid of quarters, each group the
+##   quarter that keeps most of its seats' panels where they are (`_score`). With three, the fourth
+##   quarter is a blank: no view's, drawn as the void (`blank_quarter`).
+## - **Three groups of four players** (a pair and two alone; the owner, 2026-11-20): the pair a half,
+##   the two alone a quarter each of the other half; no void. A bisector cut cannot make that
+##   layout, so the pair's view is cut as its half's top quarter (`cut_site`) and the bottom quarter
+##   is its **twin** (`twin_quarter`, `twin_group`): a blank site whose part of the screen shows the
+##   pair's own picture with no divider between, so the two read as one pane.
 ##
 ## **The HUD's corners** (`corner`): each seat's corner panel, builder, inventory and reward menu
 ## sit in one quarter of the screen, and a panel at that quarter's outer side (the screen's corner)
 ## or its inner side (toward the screen's middle line). Unsplit, a seat's is its own corner's quarter
 ## at its outer side (P1 top left, P2 top right, P3 bottom left, P4 bottom right). Laid on panes,
 ## each seat takes a spot inside its own group's pane: its own corner if that is in the pane, else
-## a free quarter of its row, else any free quarter, else a quarter's inner side, so no two panels
+## a free spot on its own row (a quarter's outer side, then its inner side: a panel keeps its row,
+## the owner, 2026-11-20), else one on the other row, so no two panels
 ## stand on one spot (nor on the corner of a seat with a body but no pane here, `elsewhere`: a seat
 ## played on another machine) and each stays inside its pane (`hud_corners_changed`; the HUD moves them,
 ## hud/panels/seat_corners.gd). A spot is `quarter * 2 + inner` (inner 1 for the inner side).
@@ -34,8 +40,12 @@ const ALL_QUARTERS: int = 0b1111
 
 ## By group (its lowest seat): the quarters its pane covers (a bit each; 0: no group).
 var quarters: PackedInt32Array = PackedInt32Array()
-## The quarter no group's (the blank with three groups), or -1.
+## The quarter no group's (the blank with three groups of three players), or -1.
 var blank_quarter: int = -1
+## The pair's twin quarter with three groups of four players (its half's bottom quarter, shown with
+## the pair's picture), and the pair (its lowest seat); -1: none.
+var twin_quarter: int = -1
+var twin_group: int = -1
 ## By seat: its HUD spot (`quarter * 2 + inner`); its own corner's outer side for a seat in no group.
 var corner: PackedInt32Array = PackedInt32Array()
 ## How many groups the last `lay` had.
@@ -64,6 +74,8 @@ static func home_spot(seat: int) -> int:
 func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 	groups = 0
 	blank_quarter = -1
+	twin_quarter = -1
+	twin_group = -1
 	for seat in ActorsScript.SEATS:
 		quarters[seat] = 0
 		corner[seat] = home_spot(seat)
@@ -81,12 +93,14 @@ func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 		var a_left: bool = kept >= swapped
 		quarters[a] = LEFT_QUARTERS if a_left else RIGHT_QUARTERS
 		quarters[b] = RIGHT_QUARTERS if a_left else LEFT_QUARTERS
+	elif groups == 3 and _seats_in(group_seats) == 4:
+		_lay_pair_half(group_seats)
 	elif groups >= 3:
 		_lay_quarters(group_seats)
 	var used: int = 0
 	for at in groups:
 		used |= quarters[_firsts[at]]
-	if groups == 3:
+	if groups == 3 and twin_group < 0:
 		for quarter in 4:
 			if used & (1 << quarter) == 0:
 				blank_quarter = quarter
@@ -115,6 +129,14 @@ func pane(group: int, screen: Vector2) -> Rect2:
 ## The middle of group `group`'s pane (where its view draws its wizards and its anchor stands).
 func site(group: int, screen: Vector2) -> Vector2:
 	return pane(group, screen).get_center()
+
+
+## Where group `group`'s view is cut from the others (its anchor's place): its pane's middle, or
+## for the pair with a twin its half's top quarter's middle (the twin's site is the bottom's).
+func cut_site(group: int, screen: Vector2) -> Vector2:
+	if group == twin_group:
+		return quarter_site(twin_quarter - 2, screen)
+	return site(group, screen)
 
 
 ## The middle of the blank quarter, or Vector2.INF (none).
@@ -149,6 +171,14 @@ static func count_of(seats: int) -> int:
 	while mask != 0:
 		mask &= mask - 1
 		n += 1
+	return n
+
+
+## How many seats the groups hold.
+func _seats_in(group_seats: PackedInt32Array) -> int:
+	var n: int = 0
+	for seat in ActorsScript.SEATS:
+		n += count_of(group_seats[seat])
 	return n
 
 
@@ -201,6 +231,47 @@ func _lay_quarters(group_seats: PackedInt32Array) -> void:
 		quarters[_firsts[at]] = 1 << ((best >> (at * 2)) & 3)
 
 
+## Three groups of four players: the pair a half, the two alone the other half's quarters; the way
+## of the best score (the pair 4 a seat whose corner is in its half, the two alone `_score`), the
+## first on a tie (the pair left, then the lower seat on top). The pair's half's bottom quarter is
+## its twin.
+func _lay_pair_half(group_seats: PackedInt32Array) -> void:
+	var pair: int = -1
+	var one: int = -1
+	var other: int = -1
+	for at in groups:
+		var first: int = _firsts[at]
+		if count_of(group_seats[first]) == 2:
+			pair = first
+		elif one < 0:
+			one = first
+		else:
+			other = first
+	var best_score: int = -1
+	var best: int = 0
+	for way in 4:
+		var side: int = way >> 1
+		var half: int = LEFT_QUARTERS if side == 0 else RIGHT_QUARTERS
+		var top: int = 1 - side
+		var bottom: int = 3 - side
+		var score: int = 0
+		for seat in ActorsScript.SEATS:
+			if group_seats[pair] & (1 << seat) != 0 and half & (1 << seat) != 0:
+				score += 4
+		var one_at: int = top if way & 1 == 0 else bottom
+		var other_at: int = bottom if way & 1 == 0 else top
+		score += _score(group_seats[one], one_at) + _score(group_seats[other], other_at)
+		if score > best_score:
+			best_score = score
+			best = way
+	var picked: int = best >> 1
+	quarters[pair] = LEFT_QUARTERS if picked == 0 else RIGHT_QUARTERS
+	quarters[one] = 1 << ((1 - picked) if best & 1 == 0 else (3 - picked))
+	quarters[other] = 1 << ((3 - picked) if best & 1 == 0 else (1 - picked))
+	twin_group = pair
+	twin_quarter = 2 + picked
+
+
 ## The spots of the seats `seats` inside the pane of the quarters `mask`, none in `reserved`.
 func _spots(seats: int, mask: int, reserved: int) -> void:
 	var taken: int = reserved
@@ -213,27 +284,26 @@ func _spots(seats: int, mask: int, reserved: int) -> void:
 			taken |= 1 << home_spot(seat)
 		else:
 			left |= 1 << seat
-	for inner in 2:
+	for pass_at in 4:
 		for seat in ActorsScript.SEATS:
 			if left & (1 << seat) == 0:
 				continue
-			var spot: int = _free_spot(seat, mask, taken, inner)
+			var spot: int = _free_spot(seat, mask, taken, pass_at)
 			if spot >= 0:
 				corner[seat] = spot
 				taken |= 1 << spot
 				left &= ~(1 << seat)
 
 
-## A free spot for seat `seat` at side `inner` of a quarter in `mask` (its row's first), or -1.
-static func _free_spot(seat: int, mask: int, taken: int, inner: int) -> int:
-	var row: int = seat >> 1
-	for pass_row in 2:
-		for quarter in 4:
-			if mask & (1 << quarter) == 0:
-				continue
-			if pass_row == 0 and quarter >> 1 != row:
-				continue
-			var spot: int = quarter * 2 + inner
-			if taken & (1 << spot) == 0:
-				return spot
+## A free spot for seat `seat` in a quarter of `mask` on pass `pass_at`: 0 its row's outer side,
+## 1 its row's inner side, 2 the other row's outer side, 3 its inner side; or -1.
+static func _free_spot(seat: int, mask: int, taken: int, pass_at: int) -> int:
+	var row: int = seat >> 1 if pass_at < 2 else 1 - (seat >> 1)
+	var inner: int = pass_at & 1
+	for quarter in 4:
+		if mask & (1 << quarter) == 0 or quarter >> 1 != row:
+			continue
+		var spot: int = quarter * 2 + inner
+		if taken & (1 << spot) == 0:
+			return spot
 	return -1

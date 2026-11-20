@@ -28,7 +28,11 @@ extends Node
 ##   one more SubViewport (the quarter's size) sharing the world, looking at a spot of the void
 ##   VOID_AWAY past the biome's corner at the views' zoom (`void_bounds`, Feel's; no room, bridge or
 ##   view is there), so it shows the void's black and its drifting motes (the blank's part past its
-##   quarter while it moves in or out is the plain black under it) (`void_rect`: Feel has the spectacle give them off there too,
+##   quarter while it moves in or out is the plain black under it)
+## - **A pair's twin** (three groups of four players; the owner, 2026-11-20): when the blank is the
+##   twin of a pair's half (`SplitCamera.blank_owner_view`), the twin rect shows that view's own
+##   texture over the whole screen under the cells, so the blank's part is the pair's picture, no
+##   divider between (nothing more is drawn: the view draws the whole screen anyway) (`void_rect`: Feel has the spectacle give them off there too,
 ##   `Spectacle.set_void_blank`). Outside a biome (no bounds) the blank is the plain black.
 ##
 ## Every view and cell is made the first time it is needed and kept; nothing is allocated a frame.
@@ -73,6 +77,8 @@ var void_bounds: Rect2 = Rect2()
 ## The view of the void the blank quarter shows, and its rect (made the first time).
 var _void_view: SubViewport = null
 var _void_cell: TextureRect = null
+## Under the cells: the picture of the view the blank is the twin of (made the first time).
+var _twin_cell: TextureRect = null
 ## By slot: its view and the rect that shows it (made as needed).
 var _views: Array[SubViewport] = []
 var _cells: Array[TextureRect] = []
@@ -182,7 +188,9 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 	_blank.visible = camera.blank_count() > 0
 	if _blank.visible:
 		_blank.size = screen
-	_show_void(camera.blank_quarter() if _blank.visible and void_bounds.has_area() else -1, screen)
+	var owner: int = camera.blank_owner_view() if _blank.visible else -1
+	_show_twin(owner, screen)
+	_show_void(camera.blank_quarter() if _blank.visible and owner < 0 and void_bounds.has_area() else -1, screen)
 	_keep_shown(laid)
 	if laid.is_split():
 		ScreenViewsScript.publish(_root, laid)
@@ -237,6 +245,29 @@ func void_rect() -> Rect2:
 ## The void view (null before it was first needed; for tests).
 func void_view() -> SubViewport:
 	return _void_view
+
+
+## The twin rect showing view `view`'s picture under the cells over the whole screen (-1: hidden).
+func _show_twin(view: int, screen: Vector2) -> void:
+	if view < 0:
+		if _twin_cell != null:
+			_twin_cell.visible = false
+		return
+	var shown: SubViewport = _views[camera.slot_of(view)]
+	if _twin_cell == null:
+		_twin_cell = _new_cell("TwinCell", shown)
+		# Over the blank's black, under every view's cell.
+		_layer.move_child(_twin_cell, _blank.get_index() + 1)
+	var texture: Texture2D = shown.get_texture()
+	if _twin_cell.texture != texture:
+		_twin_cell.texture = texture
+	_twin_cell.size = screen
+	_twin_cell.visible = true
+
+
+## The twin rect (null before it was first needed; for tests).
+func twin_cell() -> TextureRect:
+	return _twin_cell
 
 
 ## The void view drawn under the cells over quarter `quarter` of the screen (-1: not drawn),
@@ -334,6 +365,7 @@ func _stop() -> void:
 	if _blank != null:
 		_blank.visible = false
 	_show_void(-1, Vector2.ZERO)
+	_show_twin(-1, Vector2.ZERO)
 	if is_inside_tree() and get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.disconnect(_on_node_added)
 	for slot in ScreenViewsScript.VIEWS_MOST:

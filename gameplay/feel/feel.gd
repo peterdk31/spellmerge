@@ -433,6 +433,12 @@ var _juiced_frame: PackedInt64Array = PackedInt64Array()
 var _juiced_step: PackedInt64Array = PackedInt64Array()
 ## Feel's steps so far (`step`).
 var _steps: int = 0
+## A benchmark's look at where a step goes (`profile_parts`): microseconds summed a part of
+## `PROFILE_PARTS`, by the clock it hands (`profile_clock`), as the Tick's `step_profile`; empty
+## (the default) times nothing.
+var step_profile: PackedInt64Array = PackedInt64Array()
+var profile_clock: Callable = Callable()
+var _profile_since: int = 0
 var _juiced_body: PackedInt64Array = PackedInt64Array()
 var _juiced_by: PackedInt32Array = PackedInt32Array()
 var _juiced_kind: Array[StringName] = []
@@ -1063,8 +1069,30 @@ func _process(delta: float) -> void:
 	step(real_delta)
 
 
+## The parts of a step `step_profile` sums, in order.
+const PROFILE_PARTS: PackedStringArray = ["camera and split", "markers, flashes and beams", "carriers, statuses, falls, spawns", "cover", "spectacle", "rooms and sound", "labels and numbers"]
+
+
+## Time each part of every step from now, by `clock` (microseconds); `step_profile` sums them from 0.
+func profile_parts(clock: Callable) -> void:
+	profile_clock = clock
+	step_profile = PackedInt64Array()
+	step_profile.resize(PROFILE_PARTS.size())
+
+
+## The part `part` of this step ends now (a profile's; nothing without one).
+func _profile_mark(part: int) -> void:
+	if step_profile.is_empty():
+		return
+	var now: int = int(profile_clock.call())
+	if part >= 0:
+		step_profile[part] += now - _profile_since
+	_profile_since = now
+
+
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
+	_profile_mark(-1)
 	# The world's camera now, for the party camera: looked for afresh every drawn frame (a new
 	# world's is there at once), before the step is counted, so the first hit after it still looks
 	# again (`_refresh_camera` looks once a step).
@@ -1097,6 +1125,7 @@ func step(real_delta: float) -> void:
 		_spectacle.set_void_blank(split_screen.void_rect())
 		_tell_hud_corners()
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
+	_profile_mark(0)
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
 	if _away_bars != null:
@@ -1108,6 +1137,7 @@ func step(real_delta: float) -> void:
 	_flashes_shown = 0
 	_hit_sounds = 0
 	_draw_live_beams(real_delta)
+	_profile_mark(1)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
 	if _spectacle.motes_on():
@@ -1125,6 +1155,7 @@ func step(real_delta: float) -> void:
 	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
 	if _spawn_look != null:
 		_spawn_look.step(_actor_table(), real_delta)
+	_profile_mark(2)
 	var picture: Rect2 = _picture()
 	var focus: Vector2 = _focus(picture)
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
@@ -1132,7 +1163,9 @@ func step(real_delta: float) -> void:
 	_cover_rooms.step(_clock, _actor_table(), focus, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
 	_spectacle.hand_bodies(cover().bodies(), cover().body_count())
+	_profile_mark(3)
 	_spectacle.step(_clock, _actor_table())
+	_profile_mark(4)
 	if _lanes != null:
 		_lanes.spells = spells
 		_lanes.step(real_delta)
@@ -1144,12 +1177,14 @@ func step(real_delta: float) -> void:
 		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
 		_ambience.step(real_delta, focus)
+	_profile_mark(5)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
 	if _numbers != null:
 		_numbers.step(real_delta)
 	_step_statuses(real_delta)
+	_profile_mark(6)
 
 
 ## A biome's rooms as this machine sees and hears them (connected biomes CB12): the places heard

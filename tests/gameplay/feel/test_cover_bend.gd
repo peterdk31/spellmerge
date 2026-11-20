@@ -150,6 +150,19 @@ func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
 	check_equal(cover.walked_at(cell), CoverScript.NEVER, "a room laid again starts never walked")
 
 
+## A body beside the piece (its middle off it) walks the edge cell its feet reach; one whose feet
+## all miss the piece walks nothing (the performance pass passes such a body by with one test).
+func test_a_body_beside_the_piece_walks_the_edge_cell_its_feet_reach() -> void:
+	var cover: CoverScript = _cover()
+	var edge: int = 5 * cover.layout.columns
+	cover.layout.cells[edge] = 1
+	var corner: Vector2 = cover.layout.cell_rect(edge).position
+	cover.step(5.0, _table(PackedVector2Array([corner + Vector2(-7.0, 2.0)])), Vector2.ZERO)
+	check_equal(cover.walked_at(edge), CoverScript.NEVER, "feet a pixel short of the piece walk nothing")
+	cover.step(6.0, _table(PackedVector2Array([corner + Vector2(-5.0, 2.0)])), Vector2.ZERO)
+	check_equal(cover.walked_at(edge), 6.0, "a foot a pixel onto the piece walks its edge cell")
+
+
 func test_a_states_trampled_frames_ride_in_its_rows() -> void:
 	var cover: CoverScript = _cover()
 	var rows: PackedFloat32Array = cover.rows_of(&"test_grass")

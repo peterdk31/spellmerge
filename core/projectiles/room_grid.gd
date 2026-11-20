@@ -65,12 +65,14 @@ const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
 ## walking grid), set up again in `rebuild_derived` (see the class doc).
 ## The places, their seals and their sleep too (`add_place`, `set_sealed`, `set_awake`): laid from
 ## the biome map and Flow's room state by whoever lays them.
-const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells", &"_place_over", &"_place_mixed"]
+const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells", &"_place_over", &"_place_mixed", &"_place_touched", &"_place_whole", &"_whole_due"]
 ## What `place_at` answers outside every place (and everywhere in a world with none).
 const NO_PLACE: int = -1
 ## The side of a cell of the places' lookup (`place_at`), in pixels: a biome's pieces stand on the
 ## 32 px grid (`PieceShape.GRID`), so nearly every cell lies in one place.
 const PLACE_CELL: float = 32.0
+## `whole_places`' code for a square whose points `place_at` must be asked about one by one.
+const WHOLE_ASK: int = 255
 
 ## The area the grid covers: the projectile manager's bounds (`size_to`).
 var _bounds: Rect2 = Rect2(-1024.0, -1024.0, 2048.0, 2048.0)
@@ -117,6 +119,15 @@ var _place_cells: PackedByteArray = PackedByteArray()
 ## `place_at` asks those places first).
 var _place_over: PackedByteArray = PackedByteArray()
 var _place_mixed: PackedByteArray = PackedByteArray()
+## 1 for a PLACE_CELL square any place reaches into at all: a point in a square no place reaches is in
+## no place, answered at once (a shot over the void between the rooms, every tick; the performance
+## pass, 2026-11-20: it walked every place twice).
+var _place_touched: PackedByteArray = PackedByteArray()
+## By PLACE_CELL square, what `place_at` answers for every point in it (`whole_places`): 0 no place,
+## a place plus one (up to 254) when the square lies wholly in the place `place_at` finds there, or
+## WHOLE_ASK when its points may differ; worked out when first asked after the places changed.
+var _place_whole: PackedByteArray = PackedByteArray()
+var _whole_due: bool = true
 
 func _init() -> void:
 	_footprint_at.resize(ACTORS)
@@ -445,6 +456,7 @@ func add_place(rect: Rect2, over: bool = false) -> int:
 	_asleep.append(0)
 	_place_over.append(1 if over else 0)
 	var number: int = _place_rects.size() - 1
+	_whole_due = true
 	if _place_cells.is_empty():
 		_place_w = maxi(ceili(_bounds.size.x / PLACE_CELL), 1)
 		_place_h = maxi(ceili(_bounds.size.y / PLACE_CELL), 1)
@@ -452,6 +464,15 @@ func add_place(rect: Rect2, over: bool = false) -> int:
 		_place_cells.fill(0)
 		_place_mixed.resize(_place_w * _place_h)
 		_place_mixed.fill(0)
+		_place_touched.resize(_place_w * _place_h)
+		_place_touched.fill(0)
+	var tx0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
+	var ty0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
+	var tx1: int = mini(ceili((rect.end.x - _bounds.position.x) / PLACE_CELL), _place_w)
+	var ty1: int = mini(ceili((rect.end.y - _bounds.position.y) / PLACE_CELL), _place_h)
+	for y in range(ty0, ty1):
+		for x in range(tx0, tx1):
+			_place_touched[y * _place_w + x] = 1
 	if over:
 		var ox0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
 		var oy0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
@@ -481,6 +502,9 @@ func clear_places() -> void:
 	_place_over.resize(0)
 	_place_cells.resize(0)
 	_place_mixed.resize(0)
+	_place_touched.resize(0)
+	_place_whole.resize(0)
+	_whole_due = true
 	_place_w = 0
 	_place_h = 0
 
@@ -493,6 +517,55 @@ func places() -> int:
 ## The world rectangle of place `place` (empty for none).
 func place_rect(place: int) -> Rect2:
 	return _place_rects[place] if place >= 0 and place < _place_rects.size() else Rect2()
+
+
+## The places' squares (PLACE_CELL across, from `place_origin()`, `place_columns()` by
+## `place_rows()`), each what `place_at` answers for every point in it: 0 for no place, a place plus
+## one, or WHOLE_ASK where `place_at` must be asked (a square an `over` place reaches, one cut by a
+## place's edge). For a loop over many points (every shot of a tick, `shot_places`), which asks
+## `place_at` only for a WHOLE_ASK square or a point outside them. Read only.
+func whole_places() -> PackedByteArray:
+	if _whole_due:
+		_whole_due = false
+		_work_out_whole()
+	return _place_whole
+
+
+func place_origin() -> Vector2:
+	return _bounds.position
+
+
+func place_columns() -> int:
+	return _place_w
+
+
+func place_rows() -> int:
+	return _place_h
+
+
+## `_place_whole` from the places, by `place_at`'s own rules: a square no place reaches is in none;
+## one no `over` place reaches, lying wholly in the place its middle is in, is in that place.
+func _work_out_whole() -> void:
+	_place_whole.resize(_place_cells.size())
+	for y in _place_h:
+		for x in _place_w:
+			var at: int = y * _place_w + x
+			if _place_touched[at] == 0:
+				_place_whole[at] = 0
+				continue
+			_place_whole[at] = WHOLE_ASK
+			var guess: int = _place_cells[at] - 1
+			if _place_mixed[at] != 0 or guess < 0 or guess + 1 >= WHOLE_ASK:
+				continue
+			# The square's points run from its corner up to (not including) its far edges, in doubles
+			# as `place_at` works out the square (a point's square is exact there); the rect's end in
+			# single precision, as `Rect2.has_point` works it out.
+			var left: float = _bounds.position.x + float(x) * PLACE_CELL
+			var top: float = _bounds.position.y + float(y) * PLACE_CELL
+			var rect: Rect2 = _place_rects[guess]
+			var end: Vector2 = rect.end
+			if rect.position.x <= left and rect.position.y <= top and left + PLACE_CELL <= end.x and top + PLACE_CELL <= end.y:
+				_place_whole[at] = guess + 1
 
 
 ## The place `point` is in (the first whose rectangle holds it), or NO_PLACE.
@@ -509,6 +582,8 @@ func place_at(point: Vector2) -> int:
 		var guess: int = _place_cells[y * _place_w + x] - 1
 		if guess >= 0 and _place_rects[guess].has_point(point):
 			return guess
+		if _place_touched[y * _place_w + x] == 0:
+			return NO_PLACE
 	for place in _place_rects.size():
 		if _place_over[place] != 0 and _place_rects[place].has_point(point):
 			return place

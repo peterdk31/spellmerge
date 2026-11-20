@@ -93,7 +93,9 @@ func test_a_split_draws_the_world_in_views_and_the_hud_on_the_root() -> void:
 	for view in laid.count:
 		var shown: SubViewport = _split.views()[view] as SubViewport
 		check(shown.world_2d == root.world_2d, "view %d draws the root's world" % view)
-		check_equal(shown.canvas_transform, laid.to_screen[view], "view %d draws through its own transform" % view)
+		var box: Rect2i = SplitScreenScript.view_box(laid, view, root.get_visible_rect().size)
+		check_equal(shown.canvas_transform, laid.to_screen[view].translated(-Vector2(box.position)), "view %d draws through its own transform, from its box's corner" % view)
+		check_equal(shown.size, box.size, "view %d is its box's size" % view)
 		check_equal(shown.canvas_cull_mask, SplitScreenScript.WORLD_LAYER, "view %d draws the world's layer" % view)
 	# Merged again: everything put back.
 	far.global_position = Vector2(60.0, 0.0)
@@ -121,7 +123,7 @@ func test_the_light_has_a_buffer_a_view_and_tells_its_readers_each_view() -> voi
 	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 2, "the apply rect reads two views")
 	check_equal(int(reader.get_shader_parameter(&"light_view_count")), 2, "and so does a reader")
 	check(reader.get_shader_parameter(&"light_buffer_1") == light.view_buffer(1).get_texture(), "the reader has the second view's buffer")
-	var drawn: Transform2D = _split.camera.views.to_screen[1]
+	var drawn: Transform2D = (_split.views()[1] as SubViewport).canvas_transform
 	var named: Vector4 = apply.get_shader_parameter(&"light_view_1")
 	check(named.is_equal_approx(Vector4(drawn.x.x, drawn.origin.x, drawn.origin.y, 0.0)), "the second view's transform is named (%s)" % named)
 	var expected: Transform2D = Transform2D(0.0, Vector2.ONE / SpellLightScript.DOWNSCALE, 0.0, Vector2.ZERO) * drawn
@@ -167,6 +169,65 @@ func test_the_divider_is_its_width_in_whole_pixels_wherever_the_line_is() -> voi
 					if from_a == 1 or from_b == 1:
 						row += 1
 				check_equal(row, width, "a line at %.2f (slant %.1f) is %d pixels across" % [middle, slant, width])
+
+
+## A view draws only its cell's box (the performance pass): no pixel its cell's shader keeps lies
+## outside the box (the cells are convex, so none on the ring of pixels just outside it), in the
+## Voronoi split and the equal one, with two, three and four views, the box is snapped to
+## BOX_SNAP, the cell's rect covers it, and a quarter pane's box is about a quarter of the screen.
+func test_a_view_draws_only_its_cells_box() -> void:
+	var screen: Vector2 = root.get_visible_rect().size
+	var places: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(3000.0, 0.0), Vector2(0.0, 2500.0), Vector2(3000.0, 2600.0)]
+	for equal: bool in [false, true]:
+		for count in range(2, 5):
+			before_each_again()
+			_split.camera.set_equal(equal)
+			for seat in count:
+				_wizard(seat, places[seat] + Vector2(37.0 * float(seat), 11.0 * float(seat)))
+			_frames(200)
+			var laid: ScreenViewsScript = _split.camera.views
+			check_equal(laid.count, count, "%d views (equal %s)" % [count, equal])
+			var twin: int = _split.camera.blank_owner_view() if _split.camera.blank_count() > 0 else -1
+			for view in laid.count:
+				var slot: int = _split.camera.slot_of(view)
+				var shown: SubViewport = _split.view_in_slot(slot)
+				var cell := _split.get_node(NodePath("Views/Cell%d" % slot)) as TextureRect
+				var box := Rect2i(Vector2i(cell.position), shown.size)
+				var what: String = "view %d of %d (equal %s)" % [view, count, equal]
+				check_equal(Vector2i(cell.size), shown.size, "%s: its rect is its box" % what)
+				check(box.position.x % SplitScreenScript.BOX_SNAP == 0 and box.position.y % SplitScreenScript.BOX_SNAP == 0, "%s: its box is snapped (%s)" % [what, box])
+				if equal and count == 4:
+					check(box.size.x <= int(screen.x * 0.5) + SplitScreenScript.BOX_SNAP * 2 and box.size.y <= int(screen.y * 0.5) + SplitScreenScript.BOX_SNAP * 2, "%s: a quarter pane draws about a quarter (%s)" % [what, box])
+				if view == twin:
+					check_equal(box, Rect2i(Vector2i.ZERO, Vector2i(screen)), "%s: the twin's view draws the whole screen" % what)
+					continue
+				var material := cell.material as ShaderMaterial
+				var others := PackedVector2Array()
+				var widths := PackedFloat32Array()
+				for k in int(material.get_shader_parameter(&"others")):
+					others.append(material.get_shader_parameter(StringName("other_%d" % k)))
+					widths.append(float(material.get_shader_parameter(StringName("divider_%d" % k))))
+				var own_at: Vector2 = material.get_shader_parameter(&"own")
+				var before: int = int(material.get_shader_parameter(&"before_mask"))
+				var kept_outside: int = 0
+				var ring := box.grow(1).intersection(Rect2i(Vector2i.ZERO, Vector2i(screen)))
+				for x in range(ring.position.x, ring.end.x):
+					for y: int in [ring.position.y, ring.end.y - 1]:
+						if not box.has_point(Vector2i(x, y)) and SplitScreenScript.cell_pixel(Vector2(x, y) + Vector2(0.5, 0.5), own_at, others, widths, before) >= 0:
+							kept_outside += 1
+				for y in range(ring.position.y, ring.end.y):
+					for x: int in [ring.position.x, ring.end.x - 1]:
+						if not box.has_point(Vector2i(x, y)) and SplitScreenScript.cell_pixel(Vector2(x, y) + Vector2(0.5, 0.5), own_at, others, widths, before) >= 0:
+							kept_outside += 1
+				check_equal(kept_outside, 0, "%s: no pixel of its cell outside its box %s" % [what, box])
+
+
+## A fresh split screen and actor table, for a test that lays out several splits.
+func before_each_again() -> void:
+	if is_instance_valid(_split) and _split.is_inside_tree():
+		root.remove_child(_split)
+	root.canvas_cull_mask = _mask
+	before_each()
 
 
 ## The equal split with three seats: each cell's shader is told of the blank quarter as one more

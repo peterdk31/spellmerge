@@ -625,6 +625,10 @@ const TINT_STRENGTH: float = 0.45
 ## The room grid's cell size (`RoomGrid`; others read it here, and the native kernel checks it here)
 ## and a room wall's mark in it (the manager's own checks of a shot born in a wall).
 const WALL_CELL: float = RoomGrid.WALL_CELL
+## The room grid's place squares and its code for a square whose points `place_at` is asked about
+## one by one (`shot_places`; the native kernel holds copies, checked as it is switched on).
+const PLACE_CELL: float = RoomGrid.PLACE_CELL
+const PLACE_ASK: int = RoomGrid.WHOLE_ASK
 const ROOM_CELL: int = RoomGrid.ROOM_CELL
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
@@ -671,7 +675,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -1267,6 +1271,8 @@ var _threat_stamp: int = 0
 var native: bool = true:
 	set = set_native
 var _kernel: Object = null
+## `shot_places`' scratch for the native kernel: 1 for each place it found a shot in.
+var _places_found: PackedByteArray = PackedByteArray()
 ## The threads the native kernel's loops run on: 0 for its own choice (the machine's cores less
 ## one; 1 on the web). This machine's, never a run's: the kernel gives the same bits on one thread
 ## or many (shot scale H5, rule T2), and tests compare the two.
@@ -4803,12 +4809,64 @@ func shot_places(grid: RoomGrid, out: PackedByteArray) -> void:
 	out.fill(0)
 	if count == 0:
 		return
-	for slot in _high:
+	# A shot in a square wholly in one place, or in none, is answered by the grid's table, as
+	# `place_at` would answer it; `place_at` is asked only where the square's points may differ
+	# (the performance pass, 2026-11-20: asked for every shot, this was most of Flow's tick). The
+	# native kernel walks the shots (`ShotKernel.shot_places`) and hands back each ask.
+	var whole: PackedByteArray = grid.whole_places()
+	var from: int = 0
+	if _kernel != null and grid == _room_grid:
+		if _places_found.size() != count:
+			_places_found.resize(count)
+		_places_found.fill(0)
+		while true:
+			var asked: int = _kernel.call(&"shot_places", self, from)
+			if asked < -1:
+				break
+			if asked == -1:
+				from = _high
+				break
+			var found: int = grid.place_at(_pos[asked])
+			if found >= 0:
+				_places_found[found] = 1
+			from = asked + 1
+		for place in count:
+			out[place] = _places_found[place]
+	_shot_places_from(grid, whole, from, out)
+
+
+## `shot_places`' GDScript, from slot `from` on (the reference the kernel is held to, and its
+## fallback): marks in `out` the place of every live shot, from `whole` (`RoomGrid.whole_places`).
+func _shot_places_from(grid: RoomGrid, whole: PackedByteArray, from: int, out: PackedByteArray) -> void:
+	var count: int = out.size()
+	var left: int = 0
+	for place in count:
+		if out[place] == 0:
+			left += 1
+	if left == 0:
+		return
+	var origin: Vector2 = grid.place_origin()
+	var columns: int = grid.place_columns()
+	var rows: int = grid.place_rows()
+	for slot in range(from, _high):
 		if _alive[slot] == 0:
 			continue
-		var place: int = grid.place_at(_pos[slot])
-		if place >= 0:
+		var at: Vector2 = _pos[slot]
+		var x: int = floori((at.x - origin.x) / PLACE_CELL)
+		var y: int = floori((at.y - origin.y) / PLACE_CELL)
+		var place: int = RoomGrid.NO_PLACE
+		if x >= 0 and x < columns and y >= 0 and y < rows:
+			var code: int = whole[y * columns + x]
+			if code == 0:
+				continue
+			place = code - 1 if code != PLACE_ASK else grid.place_at(at)
+		else:
+			place = grid.place_at(at)
+		if place >= 0 and out[place] == 0:
 			out[place] = 1
+			left -= 1
+			if left == 0:
+				return
 
 
 ## Puts the shot in `slot` at `at` at once, flying `velocity` (a shot that came out of a gate): no

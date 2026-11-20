@@ -5,8 +5,7 @@
 #
 # Every tests/**/test_*.gd and card test (content/**/test_*.gd), the suites 8 to a Godot process
 # (TEST_BATCH), processes side by side, the longest first; one import first. The runner is
-# ci/build/unit_tests.sh (batches, fixed frames, shards, the timed tests run again alone if they fail
-# among the others). Needs the pinned Godot
+# ci/build/unit_tests.sh (batches, fixed frames, shards). Needs the pinned Godot
 # in build/godot (run ci/build/build.sh --quick once). `jobs` defaults to the cores. Logs and
 # each run's time: build/logs/ptest/ (unit-results.txt has one line per run). A failure is printed
 # with why (tools/ptest_failures.py).

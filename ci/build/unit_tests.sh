@@ -23,8 +23,8 @@
 # - Longest first: the runs are started in the order of their times in the last run
 #   (build/unit-test-times.txt, per file; a batch weighs its files' sum; a file with no time yet goes
 #   first), so a long one does not start last.
-# - The tests that time the machine (TIMED_TESTS: budgets in wall time) run alone, with the rest;
-#   one that fails is run again alone after, and fails only if it fails alone too.
+# - Tests that time the machine get no special run: their budgets (tests/support/wall_clock.gd) are
+#   measured against a reference workload, so they hold with other tests beside them.
 # Writes one line per file (per shard) to <logs dir>/unit-results.txt, "PASS|FAIL <seconds> <test>
 # <K/N or -> <log>" (a batched file's seconds are its own, without the start), and one log per file
 # (<logs dir>/unit-<path>[-shard-K].log, the test's path with "-" for "/":
@@ -39,7 +39,6 @@ FILTER="${3:-.}"
 JOBS="${TEST_JOBS:-$(nproc)}"
 BATCH="${TEST_BATCH:-8}"
 TIMES=build/unit-test-times.txt
-TIMED_TESTS='test_projectiles_kit|test_spell_fuzz'
 HOST=tests/support/run.gd
 RESULTS="$LOGS/unit-results.txt"
 mkdir -p "$LOGS" "$DATA" build
@@ -66,8 +65,7 @@ runs() {
     shards=$(grep -m1 -oE '^# unit-test-shards: [0-9]+' "$test" | grep -oE '[0-9]+$' || true)
     if [[ -n "$shards" ]] && ((shards > 1)); then
       for ((k = 0; k < shards; k++)); do echo "alone $test $k/$shards"; done
-    elif ((BATCH > 1)) && is_suite "$test" && ! grep -qE '^# unit-test-alone' "$test" \
-      && ! [[ "$(basename "$test" .gd)" =~ ^($TIMED_TESTS)$ ]]; then
+    elif ((BATCH > 1)) && is_suite "$test" && ! grep -qE '^# unit-test-alone' "$test"; then
       batched+=("$test")
     else
       echo "alone $test -"
@@ -201,15 +199,6 @@ run() { # run alone <test> <K/N or -> | run batch - <test>...
 export -f is_suite log_of run_one run_batch run
 export GODOT LOGS DATA HOST
 ordered | xargs -P "$JOBS" -L1 bash -c 'run "$@"' _ >"$RESULTS"
-
-# A timed test that failed among the others: again, alone.
-while read -r _ _ test shard _; do
-  echo "$test ($shard) failed with the other tests running: again, alone" >&2
-  again=$(run_one "$test" "$shard")
-  grep -vF " $test $shard " "$RESULTS" >"$RESULTS.new"
-  echo "$again" >>"$RESULTS.new"
-  mv "$RESULTS.new" "$RESULTS"
-done < <(grep -E "^FAIL [0-9.]+ [^ ]*/($TIMED_TESTS)\.gd " "$RESULTS")
 
 # This run's times, over the last run's (a filtered run keeps the others').
 awk -v times="$TIMES" 'FILENAME == times { took[$2 " " $3] = $1; next } { took[$3 " " $4] = $2 }

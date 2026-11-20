@@ -586,8 +586,15 @@ signal rooms_seen(seen: PackedByteArray, again: bool)
 ## room by its number whose fight is over or that had none (`RoomLife.CLEARED`, Flow's state, read
 ## here and never kept again), a copy. Sent as a room is cleared; empty as the biome goes; `again`
 ## after a restore (drawn as it stands, not played in). For the view only. Heard by feel (the
-## doorway signs' and the held Y map's cleared look, `room_hearing.gd`).
+## doorway signs' and the held Y map's done look, `room_hearing.gd`).
 signal rooms_cleared(cleared: PackedByteArray, again: bool)
+## Sender: flow (the owner, 2026-11-20, after #884). The biome's locked rooms opened:
+## `opened[room]` 1 for each room by its number whose key door or secret rock opened
+## (`LockDoors.opened`, Flow's state, read here and never kept again), a copy. Sent as a room opens;
+## empty as the biome goes; `again` after a restore (drawn as it stands). For the view only. Heard by
+## feel (a secret room's symbol, shown on its doorway signs and the held Y map only once it is
+## found, the owner's answer on #888; `room_hearing.gd`).
+signal rooms_opened(opened: PackedByteArray, again: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
@@ -768,6 +775,14 @@ signal shelf_refused(player: int, item: int)
 ## on it, and after a snapshot is restored; room -1 (the rest empty): every fountain forgotten (the
 ## world went; a restore, before each is said again). For the view only. Heard by feel.
 signal fountain_changed(room: int, area: Rect2, left: float, most: float)
+## Sender: rewards (the owner, 2026-11-20, after #884). The rooms still holding a reward to take:
+## `left[room]` 1 for each room by its number with a reward due to be rolled there or a player's
+## reward item lying unopened in it (read from the offers, Rewards' state, never kept again), a copy
+## (it may be shorter than the biome: a room past its end holds none). Sent as that changes (a clear
+## due, its roll, a pick, the world gone); `again` after a restore (drawn as it stands). For the view
+## only. Heard by feel (a reward, treasure or secret room's done look, once its rewards are taken,
+## `room_hearing.gd`).
+signal rooms_rewards_left(left: PackedByteArray, again: bool)
 ## Sender: rewards (connected biomes CB11's follow-up). Seat `player`'s run stats now (`stats`: every
 ## `RunStats` row by name, its value for this player: the base, the run's changes, its relics): at a
 ## run's start, as the run's changes come (`run_stats_ruled`), as the seat's wizard comes, and after a

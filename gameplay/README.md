@@ -87,8 +87,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table, among items of the room's reward type; each seat's reward item at its spot) |
 | `special_room_opened` | `flow` (a shop or a fountain entered the first time: its shelf's spots and reroll sign, or its pool; CB11) | `rewards` (stocks the shelf, fills the pool) |
 | `key_door_shown`, `secret_rock_shown`, `key_shown` | `flow` (a biome's key doors, secret rocks and keys; CB11) | `feel` (`lock_looks.gd`, `special_room_looks.gd`) |
-| `shelf_changed`, `fountain_changed` | `rewards` (a shop's items, a fountain's pool; CB11) | `feel` (`special_room_looks.gd`) |
+| `shelf_changed`, `fountain_changed` | `rewards` (a shop's items, a fountain's pool; CB11) | `feel` (`special_room_looks.gd`; `fountain_changed` also `room_hearing.gd`: a fountain's done look once dry) |
 | `rooms_seen` | `flow` (the party's map: each room unseen, shown or entered; again after a restore; connected biomes CB9) | `feel` (the dark over the unvisited rooms, the held Y map) |
+| `rooms_cleared`, `rooms_opened` | `flow` (the rooms cleared, `RoomLife.CLEARED`, and the locked rooms opened, `LockDoors.opened`; again after a restore) | `feel` (the done look of the doorway signs and the held Y map, a secret room's sign once found, `room_hearing.gd`) |
+| `rooms_rewards_left` | `rewards` (the rooms with a clear due or a reward item lying; again after a restore) | `feel` (a reward, treasure or secret room's done look) |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |

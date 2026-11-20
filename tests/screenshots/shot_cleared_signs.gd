@@ -70,8 +70,8 @@ func take() -> void:
 	save_crop(image, on_screen(west_mouth + Vector2(-112.0, 0.0)), "reveal_midway_crop", Vector2i(64, 40))
 	feel.process_mode = Node.PROCESS_MODE_INHERIT
 	await settle(40)
-	if symbols.cleared_of(into_west) != KindSymbolLook.CLEARED_STAGES:
-		fail("the antechamber's sign is not cleared (%d)" % symbols.cleared_of(into_west))
+	if symbols.done_of(into_west) != KindSymbolLook.DONE_STAGES:
+		fail("the antechamber's sign is not cleared (%d)" % symbols.done_of(into_west))
 		return
 	image = await grab()
 	save_crop(image, on_screen(sign_at), "sign_cleared_crop", Vector2i(24, 24))

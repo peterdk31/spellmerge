@@ -457,7 +457,7 @@ func step_corners() -> void:
 			_radials[player].move_quarter(at)
 			_inventories[player].move_quarter(at)
 			_rewards[player].move_room(reward_room(player))
-		_refresh(player)
+		_refresh_in(player, view)
 
 
 ## Where seats' panels and menus sit (for tests and screenshots).
@@ -815,19 +815,28 @@ func get_panel(player: int) -> PlayerPanelScript:
 ## when UIFocus says so; `step_corners` asks again each frame (panels and quarters slide, a reward
 ## menu unrolls).
 func _refresh(player: int) -> void:
-	_panels[player].visible = _in_room and _joined[player] and not _covered(player)
+	_refresh_in(player, (get_node("Root") as Control).size)
 
 
-## True while seat `player`'s open builder, inventory or reward menu lies over its corner panel.
-func _covered(player: int) -> bool:
+## `_refresh` on a view of `view` pixels (`step_corners` has it at hand).
+func _refresh_in(player: int, view: Vector2) -> void:
+	_panels[player].visible = _in_room and _joined[player] and not _covered(player, view)
+
+
+## True while seat `player`'s open builder, inventory or reward menu lies over its corner panel, on
+## a view of `view` pixels: a reward menu by its whole laid-out height (so rolling up and down for a
+## reroll never shows the panel between), a builder or inventory by its quarter, and while panel
+## and quarter slide (their paths differ) the panel stays hidden under them.
+func _covered(player: int, view: Vector2) -> bool:
 	var panel: PlayerPanelScript = _panels[player]
 	var at := Rect2(panel.position, panel.size)
 	var reward: RewardMenuScript = _rewards[player]
-	if reward.visible and Rect2(reward.position, reward.size).intersects(at):
+	if reward.visible and Rect2(reward.position, Vector2(reward.size.x, reward.full_height())).intersects(at):
 		return true
 	if not _radials[player].visible and not _inventories[player].visible:
 		return false
-	var view: Vector2 = (get_node("Root") as Control).size
+	if _corners.is_sliding(player):
+		return true
 	var origin: Vector2 = _menus_at[player] if _menus_at[player].is_finite() else SeatCornersScript.quarter_origin(player, view)
 	return menu_covers(origin, view, at)
 

@@ -179,6 +179,7 @@ func test_panel_and_menus_slide_to_their_quarter_together_by_whole_pixels() -> v
 		_hud.step_corners()
 		frames += 1
 		var at: Vector2 = _hud.get_radial(1).quarter_at
+		check(not _hud.get_panel(1).visible, "the panel stays hidden under its sliding builder (frame %d)" % frames)
 		check_equal(at, at.round(), "whole pixels (%s)" % at)
 		check(at.distance_to(last) <= SeatCornersScript.SLIDE_MOST + 0.01, "never a jump (%s to %s)" % [last, at])
 		last = at
@@ -207,3 +208,21 @@ func test_a_panel_hides_only_under_its_own_menu() -> void:
 	_tap(1, &"back")
 	_frame()
 	check(panel.visible, "shown again once the builder closes")
+
+
+## Regression (review): a reward menu rolling up and down for a reroll showed the bottom row's panel
+## between; it is measured by its whole laid-out height.
+func test_a_reward_menu_covers_its_panel_by_its_whole_height_while_it_rolls() -> void:
+	_open_reward(2, 1)
+	_frame()
+	for i in 10:
+		_frame()
+	var menu: RewardMenuScript = _hud.get_reward(2)
+	var panel: Control = _hud.get_panel(2)
+	var full := Rect2(menu.position, Vector2(menu.size.x, menu.full_height()))
+	var covered: bool = full.intersects(Rect2(panel.position, panel.size))
+	check_equal(panel.visible, not covered, "hidden only if the whole menu covers it")
+	# Rolled up to nothing (as for a reroll), it still counts its whole height.
+	menu.size = Vector2(menu.size.x, 0.0)
+	_hud.step_corners()
+	check_equal(panel.visible, not covered, "rolled up, the same")

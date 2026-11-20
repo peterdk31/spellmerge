@@ -667,9 +667,7 @@ class Growth:
 				hosts.append(room)
 		if hosts.is_empty():
 			return "every %s template hosting '%s' with %d sockets stands in the biome already." % [rules.biome, rule.kind, sockets]
-		var kind_of: RoomKind = content.kind(rule.kind)
-		var secret: bool = kind_of != null and kind_of.door == RoomKind.DOOR_SECRET
-		var pull: float = style.loop_pull if not (rule.dead_end or rule.stands_deepest() or secret) else 0.0
+		var pull: float = style.loop_pull if not (rule.dead_end or rule.stands_deepest()) else 0.0
 		while not hosts.is_empty():
 			# A style that closes loops weighs every template's placements at once (a loop's corner
 			# is rare, so it is looked for wherever it is); any other takes a template by chance.
@@ -789,10 +787,9 @@ class Growth:
 		var free := PackedByteArray()
 		free.resize(shape.sockets())
 		free.fill(1)
-		# A dead end, the boss's room and a secret room (reached only through its secret: the owner,
-		# 2026-11-20) never take a loop's or an extra entrance's bridge.
-		var of_kind: RoomKind = content.kind(kind)
-		var loops: bool = (rule == null or not (rule.dead_end or rule.stands_deepest())) and not (of_kind != null and of_kind.door == RoomKind.DOOR_SECRET)
+		# A dead end and the boss's room never take a loop's or an extra entrance's bridge (a secret
+		# room is a dead end: the validator, `MapRules.biome_problems`).
+		var loops: bool = rule == null or not (rule.dead_end or rule.stands_deepest())
 		room_free.append(free)
 		room_bridges.append(0)
 		if rule != null:

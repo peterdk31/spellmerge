@@ -755,14 +755,12 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_glyphs.append(glyphs)
 		_glyph_shades.append(glyph_shades)
 	for place in places:
-		if _room[place] != 0:
+		if _room[place] != 0 or pieces == null:
 			continue
-		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
-		var end: int = 0
-		for room in places:
-			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
-				_ends[place * 2 + end] = room
-				end += 1
+		# Its real ends, as Flow put them on its layout (a room merely touching it is none of them:
+		# the review's, 2026-11-20).
+		for end in 2:
+			_ends[place * 2 + end] = pieces.end_room(place, end)
 	# A biome laid is drawn as it stands, every map shut (a new world opens nothing already open).
 	_stage.fill(0)
 	_reopen.fill(0)

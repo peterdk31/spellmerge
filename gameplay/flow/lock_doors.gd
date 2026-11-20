@@ -62,10 +62,10 @@ const KEY_REACH: float = 10.0
 const NO_KEYS: PackedInt32Array = [-1]
 ## How far round a door's mouth its room's lip counts as at that door (as a gather door's).
 const LIP_REACH: float = 24.0
-## How near a floor touch's circle must come to a secret door's mouth to break its rock, in pixels.
+## How near a floor touch's circle must come to a secret door's rock (`rock_of`) to break it, in pixels.
 const TOUCH_REACH: float = 8.0
 
-## Not state: the bus (set by Flow), each door's mouth in the world (laid from the map, `lay`) and,
+## Not state: the bus (set by Flow), each door's mouth and rock in the world (laid from the map, `lay`) and,
 ## by seat, the door its hint was last told (`key_needed_shown`: view only, told again after a restore).
 const DERIVED: Array[StringName] = [&"events", &"_mouths", &"_rocks", &"_needed"]
 

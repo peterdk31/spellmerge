@@ -53,6 +53,10 @@ var _templates: Array[StringName] = []
 var _walkway: PackedByteArray = PackedByteArray()
 var _kinds: Array[RoomKind] = []
 var _types: Array[RewardType] = []
+## By piece number, a bridge's ends as its layout says (`PieceShape.BRIDGE_ENDS_META`: room, facing,
+## room, facing; empty for a room) and where they meet (`BRIDGE_JOINTS_META`).
+var _ends: Array[PackedInt32Array] = []
+var _joints: Array[PackedVector2Array] = []
 ## By place: heard this frame (1) or not; the places touching it (from `_touch_from`, `_touch_count`).
 var _heard: PackedByteArray = PackedByteArray()
 var _touch: PackedInt32Array = PackedInt32Array()
@@ -159,6 +163,8 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_walkway.resize(0)
 		_kinds.clear()
 		_types.clear()
+		_ends.clear()
+		_joints.clear()
 		_followed = NONE
 		_touch_places = -1
 		_world += 1
@@ -173,7 +179,12 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_walkway.append(0)
 		_kinds.append(null)
 		_types.append(null)
+		_ends.append(PackedInt32Array())
+		_joints.append(PackedVector2Array())
 	_templates[number] = room_id
+	if layout_root != null and layout_root.has_meta(PieceShape.BRIDGE_ENDS_META):
+		_ends[number] = PackedInt32Array(layout_root.get_meta(PieceShape.BRIDGE_ENDS_META))
+		_joints[number] = PackedVector2Array(layout_root.get_meta(PieceShape.BRIDGE_JOINTS_META, PackedVector2Array()))
 	var room: RoomBase = _room(room_id)
 	_walkway[number] = 1 if room != null and room.walkway else 0
 	var kind_id: StringName = &""
@@ -292,6 +303,34 @@ func followed() -> int:
 ## The kind of piece `place` (null: none known).
 func kind_of(place: int) -> RoomKind:
 	return _kinds[place] if place >= 0 and place < _kinds.size() else null
+
+
+## The room bridge `place`'s end `end` (0 or 1) meets, as its layout said (-1: none, or no bridge).
+func end_room(place: int, end: int) -> int:
+	var ends: PackedInt32Array = _ends[place] if place >= 0 and place < _ends.size() else PackedInt32Array()
+	return ends[end * 2] if ends.size() == 4 and (end == 0 or end == 1) else -1
+
+
+## The facing (out of its room, `RoomSocket.Facing`) of the room socket bridge `place`'s end `end`
+## meets, and where (world pixels); 0 and the origin for none.
+func end_facing(place: int, end: int) -> int:
+	var ends: PackedInt32Array = _ends[place] if place >= 0 and place < _ends.size() else PackedInt32Array()
+	return ends[end * 2 + 1] if ends.size() == 4 and (end == 0 or end == 1) else 0
+
+
+func end_at(place: int, end: int) -> Vector2:
+	var joints: PackedVector2Array = _joints[place] if place >= 0 and place < _joints.size() else PackedVector2Array()
+	return joints[end] if joints.size() == 2 and (end == 0 or end == 1) else Vector2.ZERO
+
+
+## The secret room bridge `place` leads to (a room whose kind enters by a secret,
+## `KindSymbol.hidden_until_opened`), and the end of it that room is at; -1 for none.
+func secret_end(place: int) -> int:
+	for end in 2:
+		var room: int = end_room(place, end)
+		if room >= 0 and KindSymbolScript.hidden_until_opened(kind_of(room)):
+			return end
+	return -1
 
 
 ## The reward type of piece `place` (null: none, or any).

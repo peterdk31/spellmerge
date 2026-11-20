@@ -34,7 +34,6 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
-const KindSymbolScript := preload("res://gameplay/feel/kind_symbol.gd")
 
 ## Over the bodies and the world's looks, under the labels (22) and the screen's layers.
 const Z: int = 20
@@ -48,6 +47,9 @@ const BLOCK_SIDES: PackedInt32Array = [0, 2, 4, 6, 8]
 const BAND: float = 32.0
 ## A bridge's build when hidden (none of it shown).
 const HIDDEN: int = -1
+## How far out of the room it leaves a hidden bridge's dark begins (pixels past the socket: the
+## room's lip there is held within it, `PieceShape.LANDING`).
+const LANDING: float = PieceShape.LANDING
 
 ## A room's level in `rooms_seen` once it was entered (0 unseen, 1 only shown on the map).
 const ENTERED: int = 2
@@ -66,10 +68,11 @@ var _stage: PackedInt32Array = PackedInt32Array()
 var _seen: PackedByteArray = PackedByteArray()
 var _as_stands: bool = false
 var _textures: Array[ImageTexture] = []
-## By place (bridges only; -1 elsewhere): the room its secret room is (-1: none), the room it leaves
-## from, its build (HIDDEN, or frames since it was found, up to `_built_at`) and its cells' bands.
+## By place (bridges only; -1 elsewhere): the room its secret room is (-1: none), what its dark
+## covers (`_covers`: the bridge's rectangle short of the room it leaves), its build (HIDDEN, or
+## frames since it was found, up to `_built_at`) and its cells' bands.
 var _secret_of: PackedInt32Array = PackedInt32Array()
-var _from_of: PackedInt32Array = PackedInt32Array()
+var _covers: Array[Rect2] = []
 var _build: PackedInt32Array = PackedInt32Array()
 var _built_at: PackedInt32Array = PackedInt32Array()
 var _bands: Array[PackedInt32Array] = []
@@ -134,7 +137,7 @@ func covered_of(place: int) -> Rect2:
 	var stage: int = stage_of(place)
 	if stage >= 0 and BLOCK_SIDES[stage] >= BLOCK:
 		return _rects[place]
-	return _rects[place] if build_of(place) == HIDDEN else Rect2()
+	return _covers[place] if build_of(place) == HIDDEN else Rect2()
 
 
 ## Bridge `place`'s build (a secret room's bridge: HIDDEN, or frames since found, `built_at` once
@@ -152,8 +155,11 @@ func built_at(place: int) -> int:
 func cell_stage_at(place: int, at: Vector2) -> int:
 	if place < 0 or place >= _rects.size() or _secret_of[place] < 0:
 		return 0
-	var cell: Vector2i = Vector2i(((at - _rects[place].position) / float(BLOCK)).floor())
-	var columns: int = ceili(_rects[place].size.x / float(BLOCK))
+	var cover: Rect2 = _covers[place]
+	if not cover.has_point(at):
+		return 0
+	var cell: Vector2i = Vector2i(((at - cover.position) / float(BLOCK)).floor())
+	var columns: int = ceili(cover.size.x / float(BLOCK))
 	var bands: PackedInt32Array = _bands[place]
 	var index: int = cell.y * columns + cell.x
 	return _cell_stage(place, bands[index]) if index >= 0 and index < bands.size() else 0
@@ -245,8 +251,7 @@ func _lay(grid: RoomGrid, places: int) -> void:
 	_stage.resize(places)
 	_secret_of.resize(places)
 	_secret_of.fill(-1)
-	_from_of.resize(places)
-	_from_of.fill(-1)
+	_covers.clear()
 	_build.resize(places)
 	_built_at.resize(places)
 	_built_at.fill(0)
@@ -257,41 +262,46 @@ func _lay(grid: RoomGrid, places: int) -> void:
 		_stage[place] = _wanted(place)
 	for place in places:
 		_bands.append(PackedInt32Array())
+		_covers.append(Rect2())
 		if _room[place] == 0:
 			_lay_secret_bridge(place)
 		_build[place] = _build_wanted(place)
 	queue_redraw()
 
 
-## Bridge `place`, when a secret room stands at an end: that room, the room it leaves from, and each
-## BLOCK px cell's band (its distance from the room it leaves, in BAND steps).
+## Bridge `place`, when a secret room stands at an end (its real ends, as Flow put them on its layout:
+## the room hearing's `secret_end`): that room, what its dark covers (the bridge's rectangle, its
+## edge on the room it leaves pulled back to LANDING px out of that room's socket, so the black never
+## bites into that room's slab or lip round the doorway, and the doorway is the room's lip), and each
+## BLOCK px cell's band (its distance from that socket, along and across, in BAND steps: a corner
+## walkway builds round its turn).
 func _lay_secret_bridge(place: int) -> void:
-	var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
-	var secret: int = -1
-	var from: int = -1
-	for room in _rects.size():
-		if _room[room] == 0 or not grown.intersects(_rects[room]):
-			continue
-		if secret < 0 and KindSymbolScript.hidden_until_opened(pieces.kind_of(room)):
-			secret = room
-		elif from < 0:
-			from = room
-	if secret < 0:
+	var secret_end: int = pieces.secret_end(place) if pieces != null else -1
+	if secret_end < 0:
 		return
-	_secret_of[place] = secret
-	_from_of[place] = from
-	var rect: Rect2 = _rects[place]
-	var columns: int = ceili(rect.size.x / float(BLOCK))
-	var rows: int = ceili(rect.size.y / float(BLOCK))
+	_secret_of[place] = pieces.end_room(place, secret_end)
+	var from: int = 1 - secret_end
+	var at: Vector2 = pieces.end_at(place, from)
+	var cover: Rect2 = _rects[place]
+	match pieces.end_facing(place, from):
+		RoomSocket.Facing.NORTH:
+			cover.end = Vector2(cover.end.x, minf(cover.end.y, at.y - LANDING))
+		RoomSocket.Facing.SOUTH:
+			cover = Rect2(Vector2(cover.position.x, maxf(cover.position.y, at.y + LANDING)), Vector2(cover.size.x, cover.end.y - maxf(cover.position.y, at.y + LANDING)))
+		RoomSocket.Facing.EAST:
+			cover = Rect2(Vector2(maxf(cover.position.x, at.x + LANDING), cover.position.y), Vector2(cover.end.x - maxf(cover.position.x, at.x + LANDING), cover.size.y))
+		RoomSocket.Facing.WEST:
+			cover.end = Vector2(minf(cover.end.x, at.x - LANDING), cover.end.y)
+	_covers[place] = cover
+	var columns: int = ceili(cover.size.x / float(BLOCK))
+	var rows: int = ceili(cover.size.y / float(BLOCK))
 	var bands := PackedInt32Array()
 	bands.resize(columns * rows)
 	var most: int = 0
-	var leaves: Rect2 = _rects[from] if from >= 0 else Rect2(rect.position, Vector2.ZERO)
 	for y in rows:
 		for x in columns:
-			var middle: Vector2 = rect.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * float(BLOCK)
-			var near := Vector2(clampf(middle.x, leaves.position.x, leaves.end.x), clampf(middle.y, leaves.position.y, leaves.end.y))
-			var band: int = floori((absf(middle.x - near.x) + absf(middle.y - near.y)) / BAND)
+			var middle: Vector2 = cover.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * float(BLOCK)
+			var band: int = floori((absf(middle.x - at.x) + absf(middle.y - at.y)) / BAND)
 			bands[y * columns + x] = band
 			most = maxi(most, band)
 	_bands[place] = bands
@@ -316,7 +326,7 @@ func _draw() -> void:
 
 ## A secret room's bridge: whole while hidden, else cell by cell as it builds.
 func _draw_bridge(place: int) -> void:
-	var rect: Rect2 = _rects[place]
+	var rect: Rect2 = _covers[place]
 	if _build[place] == HIDDEN:
 		draw_rect(rect, DARK)
 		return

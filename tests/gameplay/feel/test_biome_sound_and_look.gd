@@ -260,9 +260,13 @@ func test_a_secret_rooms_bridge_is_hidden_until_found_then_builds_out_in_stages(
 		else:
 			other = place
 	check(to_secret >= 0 and other >= 0, "a bridge to the secret room and one to the court")
-	var rect: Rect2 = _grid().place_rect(to_secret)
+	var bridge_rect: Rect2 = _grid().place_rect(to_secret)
+	var west: Vector2 = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.WEST)
+	var rect: Rect2 = dark.covered_of(to_secret)
 	check_equal(dark.build_of(to_secret), UnseenDarkScript.HIDDEN, "not found: hidden")
-	check_equal(dark.covered_of(to_secret), rect, "covered whole in the void's black")
+	# The bridge's rectangle, short of the nave by its landing: the black never bites the nave's lip.
+	check_equal(rect, Rect2(bridge_rect.position, Vector2(west.x - UnseenDarkScript.LANDING - bridge_rect.position.x, bridge_rect.size.y)), "covered in the void's black, from LANDING out of the nave's socket")
+	check(not rect.intersects(_grid().place_rect(0).grow(-UnseenDarkScript.LANDING * 2.0)) and rect.end.x <= west.x - UnseenDarkScript.LANDING, "never over the nave's slab")
 	check_equal(dark.covered_of(other), Rect2(), "another bridge is never dark")
 	var hidden := Snapshot.take(tick.state_areas(), root)
 	# The bridge runs west from the start room: its east end leaves from it, its west end meets the
@@ -295,6 +299,44 @@ func test_a_secret_rooms_bridge_is_hidden_until_found_then_builds_out_in_stages(
 	check(found.restore(tick.state_areas(), root).is_empty(), "restored to after")
 	dark.step(0.0, _grid())
 	check(dark.build_of(to_secret) == dark.built_at(to_secret) and not dark.is_moving(), "whole as it stands, nothing played")
+
+
+## Regression (the review of 2026-11-20): the view found a bridge's rooms by what touched it, so a
+## bridge laid beside a secret room it does not reach was hidden with it, and a secret bridge built
+## from the wrong room. On crypt maps where a secret room abuts another bridge (seeds 73 and 120),
+## a bridge is hidden exactly when one of its own ends is a secret room, and the Y map reads each
+## bridge's own ends.
+func test_only_a_bridge_that_reaches_a_secret_room_is_hidden() -> void:
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	for seed_value: int in [73, 120]:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, registry.run_content(), registry.piece_shapes(&"crypt"), Sim.seeded(seed_value))
+		var fights: Array[RoomFight] = []
+		for room in map.rooms():
+			fights.append(RoomFight.new())
+		input.add_virtual_device(0)
+		check(flow.start_biome(0, map, fights), "seed %d: the biome starts" % seed_value)
+		tick.run(DT)
+		var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+		dark.step(0.0, _grid())
+		var hearing: RoomHearingScript = _hearing()
+		var wrong := PackedStringArray()
+		for bridge in map.bridges():
+			var place: int = map.rooms() + bridge
+			var secret: bool = map.room_kinds[map.end_room(bridge, 0)] == &"secret" or map.room_kinds[map.end_room(bridge, 1)] == &"secret"
+			if (dark.build_of(place) == UnseenDarkScript.HIDDEN) != secret:
+				wrong.append("bridge %d (%s to %s) %s" % [bridge, map.room_kinds[map.end_room(bridge, 0)], map.room_kinds[map.end_room(bridge, 1)], "hidden" if not secret else "shown"])
+			for end in 2:
+				if hearing.end_room(place, end) != map.end_room(bridge, end):
+					wrong.append("bridge %d's end %d heard as room %d, not %d" % [bridge, end, hearing.end_room(place, end), map.end_room(bridge, end)])
+		check_equal(wrong, PackedStringArray(), "seed %d: only the bridges to a secret room hidden, each by its own ends" % seed_value)
+		# The case itself: a bridge touching a secret room it does not reach.
+		var beside: bool = false
+		for bridge in map.bridges():
+			for room in map.rooms():
+				if map.room_kinds[room] == &"secret" and map.end_room(bridge, 0) != room and map.end_room(bridge, 1) != room:
+					beside = beside or flow.biome.bridge_rect(bridge).grow(RoomHearingScript.TOUCH).intersects(flow.biome.room_rect(room))
+		check(beside, "seed %d: a bridge lies beside a secret room it does not reach" % seed_value)
+		flow.stop_run()
 
 
 ## Each stage between covered and lit is a block of whole black pixels round a block's middle,

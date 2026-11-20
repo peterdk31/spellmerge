@@ -749,7 +749,7 @@ func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
 
 
 ## The owner, 2026-11-20: a secret room is reached only through its secret, so no loop or extra
-## entrance ever joins it, even where its line is no dead end.
+## entrance ever joins it: its line must be a dead end (the validator names one that is not).
 func test_no_loop_or_extra_entrance_joins_a_secret_room() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()

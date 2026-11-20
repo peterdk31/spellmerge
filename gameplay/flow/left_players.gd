@@ -7,7 +7,10 @@ extends RefCounted
 ## wizard comes again in the same run (`take`: the seat then holds nothing here, so nothing is given
 ## twice), and forgotten with the run (`clear`). A loadout carries no mana, so each staff's mana is
 ## kept beside it (the owner, 2026-11-19: "a rejoining wizard keeps the mana it left with"), by seat
-## and staff number (`mana_of`, read before `take`; `Inventory.staff_mana`).
+## and staff number (`mana_of`, read before `take`; `Inventory.staff_mana`), and so is what still
+## recharged (the owner, 2026-11-20: the recharge travels with the relic, so a rejoining player keeps
+## it mid-recharge; `recharges_of`, `Inventory.recharges`): as it left, the time away not counted (the
+## relic was in no world then).
 ##
 ## The state is the party's bytes (`PartyLoadout.encode_into`), so a snapshot saves and restores it
 ## as it saves any other bytes; read back strictly (`PartyLoadout.decode_at`).
@@ -18,17 +21,32 @@ var bytes: PackedByteArray = PackedByteArray()
 var mana_seats: PackedInt32Array = PackedInt32Array()
 var mana_numbers: PackedInt32Array = PackedInt32Array()
 var mana_values: PackedFloat64Array = PackedFloat64Array()
+## The kept recharges: each entry's seat, its item's bag and id, the seconds left and the whole
+## cooldown, by the same index, in the order `Inventory.recharges` gave them.
+var recharge_seats: PackedInt32Array = PackedInt32Array()
+var recharge_bags: Array[StringName] = []
+var recharge_ids: Array[StringName] = []
+var recharge_left: PackedFloat64Array = PackedFloat64Array()
+var recharge_whole: PackedFloat64Array = PackedFloat64Array()
 
 
 ## Seat `seat` left holding `loadout` (null: nothing kept for it), its staffs' mana `mana` (by staff
-## number, `Inventory.staff_mana`; a staff not in the loadout is left out).
-func keep(seat: int, loadout: PlayerLoadout, mana: Dictionary = {}) -> void:
+## number, `Inventory.staff_mana`; a staff not in the loadout is left out) and its items' recharges
+## `recharges` (`Inventory.recharges`: [bag, id, left, whole] each).
+func keep(seat: int, loadout: PlayerLoadout, mana: Dictionary = {}, recharges: Array = []) -> void:
 	var party: PartyLoadout = _party()
 	party.put(seat, loadout)
 	_store(party)
 	_forget_mana(seat)
+	_forget_recharges(seat)
 	if loadout == null:
 		return
+	for entry: Array in recharges:
+		recharge_seats.append(seat)
+		recharge_bags.append(StringName(entry[0]))
+		recharge_ids.append(StringName(entry[1]))
+		recharge_left.append(float(entry[2]))
+		recharge_whole.append(float(entry[3]))
 	# In staff-number order, the same on every machine whatever order the dictionary came in.
 	for number: int in loadout.staff_numbers():
 		if mana.has(number):
@@ -46,6 +64,16 @@ func mana_of(seat: int) -> Dictionary:
 	return out
 
 
+## What still recharged of what seat `seat` held as it left (`Inventory.set_recharges`' shape:
+## [bag, id, left, whole] each; empty: none kept). Read before `take`.
+func recharges_of(seat: int) -> Array:
+	var out: Array = []
+	for at in recharge_seats.size():
+		if recharge_seats[at] == seat:
+			out.append([recharge_bags[at], recharge_ids[at], recharge_left[at], recharge_whole[at]])
+	return out
+
+
 ## What seat `seat`'s wizard left with (null: nothing kept), and it is kept no more.
 func take(seat: int) -> PlayerLoadout:
 	var party: PartyLoadout = _party()
@@ -54,6 +82,7 @@ func take(seat: int) -> PlayerLoadout:
 		party.put(seat, null)
 		_store(party)
 	_forget_mana(seat)
+	_forget_recharges(seat)
 	return kept
 
 
@@ -68,6 +97,23 @@ func clear() -> void:
 	mana_seats = PackedInt32Array()
 	mana_numbers = PackedInt32Array()
 	mana_values = PackedFloat64Array()
+	recharge_seats = PackedInt32Array()
+	recharge_bags = []
+	recharge_ids = []
+	recharge_left = PackedFloat64Array()
+	recharge_whole = PackedFloat64Array()
+
+
+func _forget_recharges(seat: int) -> void:
+	var at: int = recharge_seats.size() - 1
+	while at >= 0:
+		if recharge_seats[at] == seat:
+			recharge_seats.remove_at(at)
+			recharge_bags.remove_at(at)
+			recharge_ids.remove_at(at)
+			recharge_left.remove_at(at)
+			recharge_whole.remove_at(at)
+		at -= 1
 
 
 func _forget_mana(seat: int) -> void:

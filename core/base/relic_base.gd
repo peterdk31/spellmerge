@@ -8,15 +8,16 @@ extends ItemContent
 ##
 ## An item's content (`ItemContent`: id, name, description, icon). **An active relic** (the owner,
 ## 2026-11-20) is one with an `active_use` (`use_of`): usable, so it binds to a d-pad arm and is used
-## from there or the inventory. Its use is kept (`ItemUse.consumed` false): the relic stays in the
-## bag with its stat changes, and recharges for its use's `cooldown` (the inventory's
-## `recharge_left`); a use pressed while it recharges is refused.
+## from there or the inventory. Its use is kept (`ItemUse.consumed`, false by default; the checker
+## refuses a relic use that is consumed, `problems`): the relic stays in the bag with its stat
+## changes, and recharges for its use's `cooldown` (above 0: `ItemUse.problems`). The recharge is
+## the relic's own (`ItemStack.recharge_left`): dropped, it keeps recharging on the ground, and
+## whoever takes it takes it mid-recharge; a use pressed while it recharges is refused.
 
 ## Its changes to the holder's run stats, applied in this order.
 @export var stat_changes: Array[StatChange] = []
-## What a use of it does (null: none, a passive relic): an active relic's. **Set its `consumed` to
-## false** (an `ItemUse` is consumed by default, as a potion's drink is) and give it a `cooldown`, or
-## a use takes the relic, its stat changes with it.
+## What a use of it does (null: none, a passive relic): an active relic's. Kept (an `ItemUse` is
+## not consumed unless it says so, and a relic's never is), with a `cooldown` above 0.
 @export var active_use: ItemUse = null
 
 
@@ -25,8 +26,9 @@ func use_of() -> ItemUse:
 	return active_use
 
 
-## What is wrong with it, one line each: no id, an empty change, each change's own, its use's. (No
-## icon or description is asked for yet: the relics themselves come with M3.)
+## What is wrong with it, one line each: no id, an empty change, each change's own, its use's (a
+## consumed one too: a use would take the relic, its stat changes with it). (No icon or description
+## is asked for yet: the relics themselves come with M3.)
 func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = "The relic '%s'" % id
@@ -38,4 +40,6 @@ func problems() -> PackedStringArray:
 		else:
 			found.append_array(change.problems(name))
 	found.append_array(use_problems())
+	if active_use != null and active_use.consumed:
+		found.append("%s (%s) has a consumed use, so a use would take the relic and its stat changes: a relic's use is kept, so set its consumed to false (and give it a cooldown above 0)." % [name, resource_path])
 	return found

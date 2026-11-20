@@ -92,21 +92,54 @@ func test_the_content_validator_checks_each_items_use() -> void:
 	var relic := RelicBase.new()
 	relic.id = &"test_idol"
 	check_equal(relic.problems(), PackedStringArray(), "a passive relic (no use): sound, and not usable")
-	relic.active_use = ItemUse.health(20.0, 0.0)
-	relic.active_use.consumed = false
-	relic.active_use.cooldown = 3.0
+	relic.active_use = ItemUse.kept(20.0, 0.0, 3.0)
 	check_equal(relic.problems(), PackedStringArray(), "an active relic: sound")
 	relic.active_use.cooldown = -1.0
 	check(relic.problems().size() == 1 and relic.problems()[0].contains("negative cooldown"), "a negative cooldown: rejected (%s)" % [relic.problems()])
 	var broken := RelicBase.new()
 	broken.id = &"test_broken_idol"
 	broken.active_use = ItemUse.new()
+	broken.active_use.cooldown = 2.0
 	check(registry.call("add", &"relics", broken), "a broken relic in the registry")
 	var lines: PackedStringArray = registry.call("validate_items")
 	registry.call("remove", &"relics", broken.id)
 	check_equal(lines.size(), 1, "the registry's validator finds it: %s" % [lines])
 	check(lines.size() == 1 and lines[0].contains("test_broken_idol") and lines[0].contains("remove the use"), "naming it and the fix")
-	check(ItemUse.health(1.0, 0.0).consumed and ItemUse.health(1.0, 0.0).cooldown == 0.0, "a drink: consumed, no cooldown")
+	check(ItemUse.drink(1.0, 0.0).consumed and ItemUse.drink(1.0, 0.0).cooldown == 0.0, "a drink: consumed, no cooldown")
+
+
+## A use is kept unless it says otherwise (the owner, 2026-11-20): a relic's is never consumed, and a
+## kept use needs a cooldown above 0; the registry's validator names the relic and the fix.
+func test_a_relic_use_is_kept_and_recharges() -> void:
+	check(not ItemUse.new().consumed, "a use is kept by default")
+	check(not ItemUse.kept(5.0, 0.0, 2.0).consumed, "a kept use: kept")
+	var registry: Node = root.get_node("Registry")
+	var relic := RelicBase.new()
+	relic.id = &"test_default_idol"
+	relic.active_use = ItemUse.new()
+	relic.active_use.heal = 5.0
+	relic.active_use.cooldown = 2.0
+	check(not relic.use_of().consumed, "a relic's use, consumed left unset: kept")
+	check_equal(relic.problems(), PackedStringArray(), "and sound")
+	var cases: Array = [
+		[&"test_consumed_idol", true, 2.0, "consumed use", "set its consumed to false"],
+		[&"test_tireless_idol", false, 0.0, "no cooldown", "cooldown above 0"],
+	]
+	for case: Array in cases:
+		var bad := RelicBase.new()
+		bad.id = case[0]
+		bad.active_use = ItemUse.kept(5.0, 0.0, float(case[2]))
+		bad.active_use.consumed = bool(case[1])
+		check(registry.call("add", &"relics", bad), "%s in the registry" % case[0])
+		var said: PackedStringArray = registry.call("validate_items")
+		registry.call("remove", &"relics", bad.id)
+		check_equal(said.size(), 1, "%s: refused once (%s)" % [case[0], said])
+		check(said.size() == 1 and said[0].contains(String(case[0])) and said[0].contains(String(case[3])) and said[0].contains(String(case[4])), "%s: naming the relic, the fault and the fix: %s" % [case[0], said])
+	var tonic := ItemUse.drink(5.0, 0.0)
+	check_equal(tonic.problems("A drink"), PackedStringArray(), "a consumed use with no cooldown (a potion's): sound")
+	for id: StringName in registry.call("get_ids", &"potions"):
+		var potion := registry.call("get_resource", &"potions", id) as PotionBase
+		check(potion.use_of().consumed, "%s: a potion stays consumed" % id)
 
 
 func test_potions_and_the_coin_are_sound_content() -> void:

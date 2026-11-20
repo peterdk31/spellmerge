@@ -16,7 +16,7 @@ extends ItemContent
 
 ## A drink: its heal and its most health (`ItemUse`).
 func use_of() -> ItemUse:
-	return ItemUse.health(heal, more_most)
+	return ItemUse.drink(heal, more_most)
 
 
 ## True when a drink of it does nothing for a body at `health` of `most` (`ItemUse.wasted_on`).

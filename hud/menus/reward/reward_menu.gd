@@ -338,6 +338,14 @@ func _turn_over() -> void:
 	_settle()
 
 
+## Its room moved to `next` (its seat's quarter sliding, `panels.gd`): while open it moves with it
+## by as much, its cards as they are; closed, it lays out there when it next opens.
+func move_room(next: Rect2) -> void:
+	if visible and room.has_area():
+		position += next.position - room.position
+	room = next
+
+
 ## Lay its cards out in its room and centre it there.
 func _lay_out() -> void:
 	var space: Rect2 = room

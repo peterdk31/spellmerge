@@ -1215,6 +1215,20 @@ func _kind_of_entry(entry: int) -> StringName:
 	return _entries[entry]["kind"]
 
 
+## The top left of the quarter it lays itself out in (view pixels; INF: its own corner's), set by
+## `panels.gd` as its seat's HUD spot moves (`hud/panels/seat_corners.gd`).
+var quarter_at: Vector2 = Vector2.INF
+
+
+## Lay it out in the quarter at `at` from now on (`quarter_at`), at once while it is open: `panels.gd`
+## calls it a frame at a time as the quarter slides by whole pixels.
+func move_quarter(at: Vector2) -> void:
+	quarter_at = at
+	if visible:
+		_place()
+		queue_redraw()
+
+
 # --- Layout -----------------------------------------------------------------------------
 
 func _place() -> void:
@@ -1223,6 +1237,9 @@ func _place() -> void:
 	var right: bool = index % 2 == 1
 	var bottom: bool = index >= 2
 	_quarter = Rect2(Vector2(half.x if right else 0.0, half.y if bottom else 0.0), half)
+	if quarter_at.is_finite():
+		# Its seat's quarter as the HUD has it now (the equal split's panes may move it).
+		_quarter.position = quarter_at
 	# Every quarter as player 1's: the column on the left, the ring on its right (owner, 2026-10-31).
 	var column_x: float = _quarter.position.x + EDGE
 	var top: float = _quarter.position.y + 2.0

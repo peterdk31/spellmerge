@@ -11,6 +11,7 @@ const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 
 const FRAME: float = 1.0 / 60.0
@@ -207,6 +208,46 @@ func test_the_equal_splits_blank_quarter_is_black_and_no_views() -> void:
 	_frames(600)
 	check(not _split.is_drawing(), "together: one picture")
 	check(blank == null or not blank.visible, "and the blank hidden")
+
+
+## The equal split's blank quarter shows the void (the owner, 2026-11-20): in a biome (`void_bounds`)
+## the void view draws under the cells, looking VOID_AWAY past the biome's corner at the world's
+## size, and stops drawing once the blank is gone; outside a biome the blank is the black alone.
+func test_the_blank_quarter_shows_the_void_view_in_a_biome() -> void:
+	_split.camera.set_equal(true)
+	_split.void_bounds = Rect2(-500.0, -500.0, 4000.0, 3500.0)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(3000.0, 0.0))
+	var walker: Node2D = _wizard(3, Vector2(0.0, 2500.0))
+	_frames(200)
+	check_equal(_split.camera.blank_count(), 1, "a blank")
+	var view: SubViewport = _split.void_view()
+	check(view != null, "the void view was made")
+	if view == null:
+		return
+	check_equal(view.render_target_update_mode, SubViewport.UPDATE_ALWAYS, "it draws")
+	check_equal(view.world_2d, root.world_2d, "the same world")
+	var shows: Rect2 = _split.void_rect()
+	var screen: Vector2 = root.get_visible_rect().size
+	check_equal(shows.size, screen, "at the world's own size")
+	check(not shows.intersects(_split.void_bounds), "past the biome (%s)" % shows)
+	check(_split.void_bounds.grow(VoidBackdropScript.GROW).encloses(shows), "inside the void's black")
+	var cell := _split.get_node(^"Views/VoidCell") as TextureRect
+	check(cell.visible, "its rect is shown")
+	var lowest_cell: int = 1 << 30
+	for slot in ScreenViewsScript.VIEWS_MOST:
+		var other := _split.get_node_or_null(NodePath("Views/Cell%d" % slot))
+		if other != null:
+			lowest_cell = mini(lowest_cell, other.get_index())
+	check(cell.get_index() < lowest_cell, "under every view's cell")
+	# The same view again as it splits again (no new one).
+	walker.global_position = Vector2(40.0, 0.0)
+	_wizard_move_all_together()
+	_frames(600)
+	check(not _split.is_drawing(), "together: one picture")
+	check_equal(view.render_target_update_mode, SubViewport.UPDATE_DISABLED, "the void view stops drawing")
+	check_equal(_split.void_rect(), Rect2(), "and shows nothing")
+	_split.void_bounds = Rect2()
 
 
 ## Every seat's wizard moved beside the others.

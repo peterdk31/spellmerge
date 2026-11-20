@@ -239,10 +239,11 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 	var strengths: Array[float] = []
 	while symbols.is_moving():
 		symbols.advance()
-		stages.append(symbols.cleared_of(into_west))
+		if stages.is_empty() or stages[stages.size() - 1] != symbols.cleared_of(into_west):
+			stages.append(symbols.cleared_of(into_west))
 		var light: Marker2D = symbols.light_of(into_west)
 		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
-	check_equal(stages.slice(stages.size() - KindSymbolScript.CLEARED_STAGES), [1, 2, 3, 4, 5] as Array[int], "it steps to the cleared look a stage a frame (%s)" % [stages])
+	check_equal(stages, [1, 2, 3, 4, 5] as Array[int], "it steps to the cleared look a stage at a time, while its sign rises")
 	check(is_equal_approx(strengths[strengths.size() - 1], MouthSymbolsScript.LIGHT_STRENGTH * MouthSymbolsScript.CLEARED_LIGHT), "its light dimmed (%s)" % [strengths])
 	for i in range(1, strengths.size()):
 		check(strengths[i] <= strengths[i - 1] + MouthSymbolsScript.LIGHT_STRENGTH / RoomKind.SYMBOL_SIDE + 0.0001, "and never jumps")
@@ -266,7 +267,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 	while view.is_moving():
 		view.advance()
 		court.append(view.cleared_of(EAST))
-	check_equal(court.slice(court.size() - KindSymbolScript.CLEARED_STAGES), [1, 2, 3, 4, 5] as Array[int], "open, the court's symbol steps to it (%s)" % [court])
+	check_equal(court, [1, 2, 3, 4, 5] as Array[int], "open, the court's symbol steps to it a stage a frame")
 
 
 ## After a restore the cleared look is drawn as it stands, either way, nothing played in.
@@ -439,7 +440,9 @@ func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reope
 	while view.is_moving():
 		view.advance()
 		shades.append(view.shade_of(WEST))
-	check_equal(shades, [1, 2, 3] as Array[int], "entered while the map is open: it comes in a shade a frame")
+	# Its empty fight is cleared as it is entered, so its symbol's cleared look steps on after the shades.
+	check_equal(shades.slice(0, 3), [1, 2, 3] as Array[int], "entered while the map is open: it comes in a shade a frame")
+	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "and, cleared, its symbol stepped to the cleared look")
 	# The screen merges under it: one view of the whole screen, a bigger frame. It closes, then opens again.
 	var frame: Rect2i = view.frame_of(0)
 	var one := ScreenViewsScript.new()

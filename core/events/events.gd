@@ -86,6 +86,8 @@ signal door_vote_requested(player: int, door: int)
 signal effect_slots_changed(slots: int)
 ## Sender: hud. The "Screen shake" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound. Heard by feel, which sets `shake_enabled`.
 signal screen_shake_changed(enabled: bool)
+## Sender: hud. The "Split screen" setting in the pause menu (Settings, Interface) changed, or the saved choice was loaded when the menu was bound: how this machine's screen splits once its players part (`SplitScreenSetting` in core/settings: DYNAMIC, the Voronoi split, or EQUAL, equal panes). Heard by feel, which lays its split views out that way. The view's only: it changes nothing in the game.
+signal split_screen_changed(mode: int)
 ## Sender: hud. The "Damage numbers" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound (props W5). Heard by feel, which shows or hides every actor's damage numbers. The view's only: it changes nothing in the game.
 signal damage_numbers_changed(on: bool)
 ## Sender: hud. The "Max shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: this machine's cap on live shots (`ShotCap` in core/settings). Heard by core/sim (the Tick), which keeps it for the next run (`SessionRules.machine()`, online-ready N11); a run playing changes only by `shot_cap_requested`.

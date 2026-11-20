@@ -528,6 +528,8 @@ var _markers: TeammateMarkersScript = null
 ## The Voronoi split screen (connected biomes CB6, `split_screen.gd`): this machine's wizards in a
 ## view each group once they no longer fit in one picture. Stepped after the party camera.
 var split_screen: SplitScreenScript = null
+## How it splits (`SplitScreenSetting`; `set_split_mode`): the Voronoi split by default.
+var split_mode: int = SplitScreenSetting.DEFAULT
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
 var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
@@ -874,6 +876,7 @@ func _ready() -> void:
 	add_child(marker_layer)
 	split_screen = SplitScreenScript.new()
 	add_child(split_screen)
+	set_split_mode(split_mode)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	marker_layer.add_child(_markers)
@@ -1001,6 +1004,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
+	events.split_screen_changed.connect(set_split_mode)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -2648,6 +2652,14 @@ func set_environment_interaction(on: bool) -> bool:
 
 func _on_screen_shake_changed(enabled: bool) -> void:
 	shake_enabled = enabled
+
+
+## How this machine's screen splits (`SplitScreenSetting`: DYNAMIC, the Voronoi split, or EQUAL,
+## equal panes a player; the pause menu's "Split screen", `split_screen_changed`). View only.
+func set_split_mode(mode: int) -> void:
+	split_mode = SplitScreenSetting.snap(mode)
+	if split_screen != null:
+		split_screen.camera.set_equal(split_mode == SplitScreenSetting.EQUAL)
 
 
 ## Show a flash of the kind `id` (content/flashes) at `at`, aimed along `dir`, in the ramp of

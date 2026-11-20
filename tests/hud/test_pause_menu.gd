@@ -53,6 +53,7 @@ const SIGNAL_OF: Dictionary = {
 	"ShotCap": &"projectile_cap_changed",
 	"TaillessMotes": &"tailless_motes_changed",
 	"ScreenShake": &"screen_shake_changed",
+	"SplitScreen": &"split_screen_changed",
 	"DamageNumbers": &"damage_numbers_changed",
 	"FloorMarks": &"floor_marks_changed",
 	"SpellLight": &"spell_light_changed",
@@ -72,7 +73,7 @@ const TAB_ROWS: Dictionary = {
 	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"],
 	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap"],
 	"Audio": ["MusicVolume", "SoundVolume", "AmbienceVolume", "UiVolume"],
-	"Interface": ["ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"],
+	"Interface": ["ScreenShake", "SplitScreen", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"],
 }
 ## The game's view (project.godot), which every page fits in.
 const VIEW: Vector2 = Vector2(640.0, 360.0)
@@ -1068,6 +1069,44 @@ func test_a_later_menu_tells_feel_a_saved_switch_when_the_hud_binds() -> void:
 	for switch in _switches():
 		_later_menu_after_flipping(switch)
 		check(_heard[switch["row"]] == [not switch["start"]], "%s: feel is told when the Hud binds, got %s" % [switch["row"], _heard[switch["row"]]])
+
+
+# --- Split screen ------------------------------------------------------------------------------
+# "Split screen: Dynamic" (the Voronoi split) by default; accept steps to Equal and back, each sent
+# to feel and saved; a later menu starts with the saved mode and tells feel when the Hud binds.
+
+
+func test_split_screen_says_dynamic_by_default_and_sends_nothing() -> void:
+	_settings()
+	check(_text_of("SplitScreen").ends_with("Split screen: Dynamic"), "Dynamic at the start: %s" % _text_of("SplitScreen"))
+	check((_heard["SplitScreen"] as Array).is_empty(), "nothing is sent at the default")
+
+
+func test_split_screen_steps_to_equal_and_back_saved_and_sent() -> void:
+	_settings()
+	_press(0, "SplitScreen")
+	check(_text_of("SplitScreen").ends_with("Split screen: Equal"), "accept: Equal (%s)" % _text_of("SplitScreen"))
+	check_equal(int(_menu().get("split_screen")), SplitScreenSetting.EQUAL, "the menu holds it")
+	check(_heard["SplitScreen"] == [SplitScreenSetting.EQUAL], "feel is told, got %s" % [_heard["SplitScreen"]])
+	check_equal(int(SaveFile.new(SAVE_PATH).get_setting(SplitScreenSetting.KEY, -1)), SplitScreenSetting.EQUAL, "the save remembers it")
+	_press(0, "SplitScreen")
+	check(_text_of("SplitScreen").ends_with("Split screen: Dynamic"), "accept again: Dynamic")
+	check(_heard["SplitScreen"] == [SplitScreenSetting.EQUAL, SplitScreenSetting.DYNAMIC], "feel is told, got %s" % [_heard["SplitScreen"]])
+	check_equal(int(SaveFile.new(SAVE_PATH).get_setting(SplitScreenSetting.KEY, -1)), SplitScreenSetting.DYNAMIC, "saved")
+
+
+func test_a_later_menu_starts_with_the_saved_split_screen_and_tells_feel() -> void:
+	_settings()
+	_press(0, "SplitScreen")
+	_setup(1)
+	check_equal(int(_menu().get("split_screen")), SplitScreenSetting.EQUAL, "a later menu starts with Equal")
+	check(_heard["SplitScreen"] == [SplitScreenSetting.EQUAL], "and tells feel when the Hud binds, got %s" % [_heard["SplitScreen"]])
+
+
+func test_a_saved_split_screen_feel_does_not_know_loads_as_dynamic() -> void:
+	SaveFile.new(SAVE_PATH).set_setting(SplitScreenSetting.KEY, 7)
+	_setup(1)
+	check_equal(int(_menu().get("split_screen")), SplitScreenSetting.DYNAMIC, "an unknown saved mode: Dynamic")
 
 
 # --- Show FPS ----------------------------------------------------------------------------------

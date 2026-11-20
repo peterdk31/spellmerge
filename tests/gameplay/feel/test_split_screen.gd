@@ -166,3 +166,52 @@ func test_the_divider_is_its_width_in_whole_pixels_wherever_the_line_is() -> voi
 					if from_a == 1 or from_b == 1:
 						row += 1
 				check_equal(row, width, "a line at %.2f (slant %.1f) is %d pixels across" % [middle, slant, width])
+
+
+## The equal split with three seats: each cell's shader is told of the blank quarter as one more
+## other (its divider the view's), and the blank's black is shown under the cells only while there
+## is one; the screen's whole picture: the blank quarter is no cell's pixel (the shader's rule).
+func test_the_equal_splits_blank_quarter_is_black_and_no_views() -> void:
+	_split.camera.set_equal(true)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(3000.0, 0.0))
+	var walker: Node2D = _wizard(3, Vector2(0.0, 2500.0))
+	_frames(200)
+	var laid: ScreenViewsScript = _split.camera.views
+	check_equal(laid.count, 3, "three panes")
+	check_equal(_split.camera.blank_count(), 1, "and a blank")
+	var blank := _split.get_node_or_null(^"Views/Blank") as ColorRect
+	check(blank != null and blank.visible, "the blank's black is shown")
+	if blank != null:
+		check_equal(blank.color, Color.BLACK, "the void's black")
+	var screen: Vector2 = root.get_visible_rect().size
+	var quarter_middle := Vector2(screen.x * 0.25, screen.y * 0.75)
+	for view in laid.count:
+		var others := PackedVector2Array()
+		var widths := PackedFloat32Array()
+		var before: int = 0
+		for other in laid.count:
+			if other != view:
+				if other < view:
+					before |= 1 << others.size()
+				others.append(laid.anchor[other])
+				widths.append(float(_split.camera.divider_between(view, other)))
+		others.append(_split.camera.blank_anchor(0))
+		widths.append(float(_split.camera.blank_divider(view)))
+		check_equal(SplitScreenScript.cell_pixel(quarter_middle, laid.anchor[view], others, widths, before), -1, "view %d does not draw the blank quarter" % view)
+		var material := (_split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(view))) as TextureRect).material as ShaderMaterial
+		check_equal(int(material.get_shader_parameter(&"others")), 3, "view %d's cell knows two views and the blank" % view)
+	# Together again: no blank, nothing black.
+	walker.global_position = Vector2(40.0, 0.0)
+	_wizard_move_all_together()
+	_frames(600)
+	check(not _split.is_drawing(), "together: one picture")
+	check(blank == null or not blank.visible, "and the blank hidden")
+
+
+## Every seat's wizard moved beside the others.
+func _wizard_move_all_together() -> void:
+	for id in ActorsScript.SEATS:
+		var home: int = _table.home_of_seat(id)
+		if home >= 0 and _table.node_of(home) != null:
+			(_table.node_of(home) as Node2D).global_position = Vector2(20.0 * float(id), 0.0)

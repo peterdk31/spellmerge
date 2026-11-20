@@ -152,9 +152,10 @@ func _init() -> void:
 
 
 ## Fill `views`' cells for its `count` views from their anchors (`views.anchor`, screen pixels,
-## at least MIN_GAP apart) on its screen: each the screen cut by the bisector to every other anchor.
-## Nothing is allocated.
-func fill(views: ScreenViewsScript) -> void:
+## at least MIN_GAP apart) on its screen: each the screen cut by the bisector to every other anchor,
+## and to `blank` (a site no view owns, the equal split's empty quarter; Vector2.INF: none), whose
+## own part of the screen is then no view's. Nothing is allocated.
+func fill(views: ScreenViewsScript, blank: Vector2 = Vector2.INF) -> void:
 	var screen: Vector2 = views.screen
 	for i in views.count:
 		_from[0] = Vector2.ZERO
@@ -170,6 +171,8 @@ func fill(views: ScreenViewsScript) -> void:
 			if normal.length_squared() < EPSILON:
 				continue
 			n = _clip_into((own + views.anchor[j]) * 0.5, normal, n)
+		if blank.is_finite() and n > 0 and (blank - own).length_squared() >= EPSILON:
+			n = _clip_into((own + blank) * 0.5, blank - own, n)
 		for k in n:
 			views.set_corner(i, k, _from[k])
 		views.set_corners(i, n)

@@ -346,6 +346,16 @@ func test_the_screen_shake_setting_follows_the_event() -> void:
 	check(feel.shake_enabled, "and on again")
 
 
+func test_the_split_screen_setting_follows_the_event() -> void:
+	check_equal(feel.split_mode, SplitScreenSetting.DYNAMIC, "the Voronoi split by default")
+	check(feel.split_screen != null and not feel.split_screen.camera.equal, "its views laid the Voronoi way")
+	bus.split_screen_changed.emit(SplitScreenSetting.EQUAL)
+	check_equal(feel.split_mode, SplitScreenSetting.EQUAL, "the event sets Equal")
+	check(feel.split_screen.camera.equal, "and the views are laid on equal panes")
+	bus.split_screen_changed.emit(SplitScreenSetting.DYNAMIC)
+	check(not feel.split_screen.camera.equal, "and back")
+
+
 func test_the_effect_slots_setting_sizes_the_batch() -> void:
 	check_equal(feel.effect_slots, EffectSlots.DEFAULT, "the default at the start")
 	_impact(0, &"bolt")

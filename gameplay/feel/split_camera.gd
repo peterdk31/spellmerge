@@ -30,17 +30,19 @@ extends RefCounted
 ##   which grows in a whole pixel a drawn frame (DIVIDER_WIDTH of them) and shrinks out the same
 ##   way once the pictures meet.
 ##
-## - **Equal panes** (the owner, 2026-11-19; `equal`, the "Split screen: Equal" setting,
-##   `SplitScreenSetting`): the same one picture while everyone fits and the same easing, but once
-##   split each seat has a view of its own, laid on its pane (`equal_panes.gd`: halves for two,
-##   quarters for three or four, each seat's on its corner panel's side): its wizard drawn at its
-##   pane's middle and its anchor easing there with its picture (at most PANE_ANCHOR_STEP a frame,
-##   from where its wizard was drawn), so the bisectors between the anchors settle on the panes'
-##   edges. With three seats the
-##   fourth quarter is a blank (`blank_count`, `blank_anchor`): a site no view owns, which moves in
-##   from past its corner of the screen over BLANK_TIME as the screen splits and back out before
-##   the last views merge, so it grows and shrinks from its corner. Close foes are framed inside
-##   the pane. View only, like the rest: the mode is this machine's, never the simulation's.
+## - **Equal panes** (the owner, 2026-11-19 and 2026-11-20; `equal`, the "Split screen: Equal"
+##   setting, `SplitScreenSetting`): the same one picture while everyone fits, the same groups
+##   (wizards close together share a view, with the same JOIN_REACH and LEAVE_REACH, so it does not
+##   flicker at the join distance) and the same easing, but each group's view is laid on its pane
+##   (`equal_panes.gd`: one group the whole screen, two the left and right halves, three or four the
+##   quarters): its wizards' middle drawn at its pane's middle and its anchor easing there with its
+##   picture (at most PANE_ANCHOR_STEP a frame, from where its wizards were drawn), so the bisectors
+##   between the anchors settle on the panes' edges. With three groups the fourth quarter is a blank
+##   (`blank_count`, `blank_anchor`): a site no view owns, which moves in from past its corner of the
+##   screen over BLANK_TIME as the screen splits and back out before the last views merge, so it
+##   grows and shrinks from its corner; `split_screen.gd` shows the void there. Each seat's HUD spot
+##   follows its pane (`corners`, `corners_version`). Close foes are framed inside the pane. View
+##   only, like the rest: the mode is this machine's, never the simulation's.
 ##
 ## A view keeps its slot (0 to VIEWS_MOST - 1) while it lives, so its drawing is the same node
 ## frame to frame (`slot_of`). Nothing is allocated after it is made.
@@ -101,6 +103,11 @@ var split: bool = false
 ## True: equal panes, a view a seat (`SplitScreenSetting.EQUAL`); false: the Voronoi split. Set by
 ## `set_equal`.
 var equal: bool = false
+## By seat: the quarter and side of the screen its HUD sits in (`EqualPanes.corner`'s spots): its
+## pane's while the equal split is laid, its own corner's otherwise. Read only.
+var corners: PackedInt32Array = PackedInt32Array()
+## Counts the changes of `corners` (a reader compares it with the count it last saw).
+var corners_version: int = 0
 
 ## By slot: FREE, LIVE or MERGING; the seats it holds; where it looks (the camera's centre, its
 ## shake left out) and its zoom; its divider's width (whole pixels).
@@ -148,11 +155,20 @@ var _group_slot: PackedInt32Array = PackedInt32Array()
 var _cells: VoronoiCellsScript = VoronoiCellsScript.new()
 ## The foes close to this machine's wizards this frame (null: none).
 var _foes: CloseFoesScript = null
-## The equal split's blank quarter: the seat whose quarter it is (-1: none), how far it has moved in
+## The equal split's blank quarter: which quarter it is (-1: none), how far it has moved in
 ## from its rest (0 out to 1 on its quarter's middle), and where its site is drawn now.
-var _blank_seat: int = -1
+var _blank_quarter: int = -1
+## The group (lowest seat) whose twin the blank is (it shows that group's picture; -1: the void).
+var _blank_owner: int = -1
+## The slot of the view the twin shows (kept while the twin moves out, whatever its group becomes:
+## a regrouping never swaps the twin's picture at once; -1: none).
+var _blank_owner_slot: int = -1
 var _blank_in: float = 0.0
 var _blank_at: Vector2 = Vector2.INF
+## The equal split's panes for this frame's groups.
+var _panes: EqualPanesScript = EqualPanesScript.new()
+## The seats with a body that are not this machine's (a bit a seat): shown on the HUD, in no pane.
+var _elsewhere: int = 0
 
 
 func _init() -> void:
@@ -178,6 +194,9 @@ func _init() -> void:
 	_group_middle.resize(ActorsScript.SEATS)
 	_group_site.resize(ActorsScript.SEATS)
 	_group_slot.resize(ActorsScript.SEATS)
+	corners.resize(ActorsScript.SEATS)
+	for seat in ActorsScript.SEATS:
+		corners[seat] = EqualPanesScript.home_spot(seat)
 
 
 ## Every view gone at once (a new room: the world's camera jumps to it, and splits again from there).
@@ -192,9 +211,12 @@ func reset() -> void:
 		_born[slot] = 0
 	split = false
 	views.count = 0
-	_blank_seat = -1
+	_blank_quarter = -1
+	_blank_owner = -1
+	_blank_owner_slot = -1
 	_blank_in = 0.0
 	_blank_at = Vector2.INF
+	_set_corners(false)
 
 
 ## Equal panes (true) or the Voronoi split (false), from the next drawn frame. A change while split
@@ -209,7 +231,7 @@ func set_equal(on: bool) -> void:
 
 ## The number of blank sites now (0 or 1: the equal split's empty quarter with three seats).
 func blank_count() -> int:
-	return 1 if _blank_seat >= 0 and _blank_in > 0.0 else 0
+	return 1 if _blank_quarter >= 0 and _blank_in > 0.0 else 0
 
 
 ## Where blank site `blank` is drawn now (screen pixels; a site no view owns, so no view draws
@@ -222,7 +244,31 @@ func blank_anchor(_blank: int) -> Vector2:
 ## pixels): twice the view's own, since the shader draws half a line a side and no view draws the
 ## blank's side, so the view draws the whole line; it grows in with the split, shrinks with the merge.
 func blank_divider(view: int) -> int:
+	var owner: int = blank_owner_view()
+	if owner >= 0:
+		# A pair's twin: none toward its own pair (one pane), and toward the others the line it has
+		# with its pair, split the same way (`blank_before`; the twin rect draws its own share).
+		return 0 if view == owner else divider_between(view, owner)
 	return _stage[_slot_of[view]] * 2
+
+
+## True when the line between view `view` and the blank is split as if the blank came first (it is
+## a twin whose owner comes before `view`), as `split_cell.gdshader`'s `before_mask` takes it.
+func blank_before(view: int) -> bool:
+	var owner: int = blank_owner_view()
+	return owner >= 0 and owner < view
+
+
+## The view whose picture the blank shows (its twin, three groups of four players; the owner,
+## 2026-11-20), or -1: the blank is the void.
+func blank_owner_view() -> int:
+	var slot: int = _blank_owner_slot
+	if slot < 0 or blank_count() == 0 or _state[slot] == FREE:
+		return -1
+	for view in views.count:
+		if _slot_of[view] == slot:
+			return view
+	return -1
 
 
 ## The slot of view `view` (0 to `views.count` - 1).
@@ -281,6 +327,7 @@ func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, scree
 			if _state[slot] != FREE:
 				_state[slot] = MERGING
 	_step_blank(delta, screen)
+	_step_corners()
 	_ease(delta, root_centre, root_zoom, limits, screen)
 	_publish(camera.offset, screen)
 
@@ -288,11 +335,13 @@ func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, scree
 ## Each seat's box (its own body and the actor it drives) and its middle, for `seats` (0: all).
 func _find(table: ActorsScript, seats: int) -> void:
 	_present = 0
+	_elsewhere = 0
 	for seat in ActorsScript.SEATS:
-		if seats != 0 and seats & (1 << seat) == 0:
-			continue
 		var box: Rect2 = PartyCameraScript.party_box(table, 1 << seat)
 		if box.size.x < 0.0:
+			continue
+		if seats != 0 and seats & (1 << seat) == 0:
+			_elsewhere |= 1 << seat
 			continue
 		_box[seat] = box
 		_point[seat] = box.get_center()
@@ -328,9 +377,6 @@ func _group() -> void:
 			continue
 		for b in range(a + 1, ActorsScript.SEATS):
 			if _group_of[b] < 0:
-				continue
-			if equal:
-				# Equal panes: a view a seat, never shared while split.
 				continue
 			var reach: float = LEAVE_REACH if _together(a, b) else JOIN_REACH
 			if _point[a].distance_to(_point[b]) < reach:
@@ -389,10 +435,11 @@ func _middle_of(held: int) -> Vector2:
 ## factor (at most SPLIT_ZOOM) until the farthest is SITE_MARGIN from an edge.
 func _lay_sites(screen: Vector2) -> void:
 	if equal:
-		# Equal panes: each seat's at its pane's middle (each group is one seat).
+		# Equal panes: each group's at its pane's middle.
+		_panes.lay(_group_seats, _elsewhere)
 		for seat in ActorsScript.SEATS:
 			if _group_seats[seat] != 0:
-				_group_site[seat] = EqualPanesScript.site_of(seat, _present, screen)
+				_group_site[seat] = _panes.site(seat, screen)
 		return
 	var low := Vector2.INF
 	var high := -Vector2.INF
@@ -578,6 +625,15 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 		var way: Vector2 = _foes.at[i] - _group_middle[group]
 		if way.length_squared() < 1.0:
 			continue
+		if equal and split:
+			# Equal panes: the pane's own edges, exact for every layout (a pair's half beside two
+			# quarters included).
+			var pane: Rect2 = _panes.pane(group, screen)
+			zoom = _fit_along(zoom, way, Vector2.LEFT, site.x - pane.position.x)
+			zoom = _fit_along(zoom, way, Vector2.RIGHT, pane.end.x - site.x)
+			zoom = _fit_along(zoom, way, Vector2.UP, site.y - pane.position.y)
+			zoom = _fit_along(zoom, way, Vector2.DOWN, pane.end.y - site.y)
+			continue
 		# The screen's four edges, then the line half way to each other group's place.
 		zoom = _fit_along(zoom, way, Vector2.LEFT, site.x)
 		zoom = _fit_along(zoom, way, Vector2.RIGHT, screen.x - site.x)
@@ -590,11 +646,6 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 			if apart.length_squared() < 1.0:
 				continue
 			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
-		if equal and split:
-			# The empty quarter's edge, where it settles.
-			var blank: Vector2 = EqualPanesScript.blank_site(_present, screen) - site
-			if blank.is_finite() and blank.length_squared() >= 1.0:
-				zoom = _fit_along(zoom, way, blank.normalized(), blank.length() * 0.5)
 	var widest: float = PartyCameraScript.MIN_ZOOM
 	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
 		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
@@ -613,22 +664,63 @@ static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) 
 ## The equal split's blank quarter moved on: in from its rest while split with three seats, out while
 ## not (or before it moves to another quarter), at most BLANK_STEP_MOST of the way a drawn frame.
 func _step_blank(delta: float, screen: Vector2) -> void:
-	var want: int = EqualPanesScript.blank_seat(_present) if equal and split else -1
+	var want: int = -1
+	var want_owner: int = -1
+	if equal and split:
+		want = _panes.blank_quarter
+		if _panes.twin_group >= 0:
+			want = _panes.twin_quarter
+			want_owner = _panes.twin_group
 	var step: float = minf(maxf(delta, 0.0) / BLANK_TIME, BLANK_STEP_MOST)
-	if want != _blank_seat:
+	if want != _blank_quarter or want_owner != _blank_owner:
+		# Another quarter, or the void turning a pair's twin (or back): out first, then in.
 		_blank_in = maxf(_blank_in - step, 0.0)
 		if _blank_in <= 0.0:
-			_blank_seat = want
+			_blank_quarter = want
+			_blank_owner = want_owner
+			_blank_owner_slot = _group_slot[want_owner] if want_owner >= 0 else -1
 	elif want >= 0:
 		_blank_in = minf(_blank_in + step, 1.0)
-	if _blank_seat < 0:
+	if _blank_quarter < 0:
 		_blank_at = Vector2.INF
 		return
 	# Between its rest and its own quarter's middle, going in, out or turning back, so it never jumps.
-	var rest: Vector2 = EqualPanesScript.blank_rest(_blank_seat, screen)
-	var site: Vector2 = EqualPanesScript.quarter_site(_blank_seat, screen)
+	var rest: Vector2 = EqualPanesScript.blank_rest(_blank_quarter, screen)
+	var site: Vector2 = EqualPanesScript.quarter_site(_blank_quarter, screen)
 	var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)
 	_blank_at = rest.lerp(site, t)
+
+
+## Each seat's HUD spot this frame: its pane's while split on equal panes, else its own corner's.
+func _step_corners() -> void:
+	_set_corners(equal and split)
+
+
+## `corners` the panes' spots (`laid`) or every seat's own corner's, counted when they change.
+func _set_corners(laid: bool) -> void:
+	var changed: bool = false
+	for seat in ActorsScript.SEATS:
+		var spot: int = _panes.corner[seat] if laid else EqualPanesScript.home_spot(seat)
+		if spot != corners[seat]:
+			corners[seat] = spot
+			changed = true
+	if changed:
+		corners_version += 1
+
+
+## The quarter of the equal split's blank now (-1: none).
+func blank_quarter() -> int:
+	return _blank_quarter if blank_count() > 0 else -1
+
+
+## The zoom the live views draw at now (the first's; SPLIT_ZOOM with none), for the void view.
+func view_zoom() -> float:
+	return views.to_screen[0].x.x if views.count > 0 else SPLIT_ZOOM
+
+
+## The equal panes as last laid (for tests).
+func panes() -> EqualPanesScript:
+	return _panes
 
 
 ## The group (lowest seat) live slot `slot` shows, or -1.
@@ -700,7 +792,7 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 		count += 1
 	views.count = count
 	_apart(count)
-	_cells.fill(views, _blank_at if blank_count() > 0 else Vector2.INF)
+	_cells.fill(views, _blank_at if blank_count() > 0 else Vector2.INF, blank_owner_view())
 
 
 ## The seats held by the views merging into live slot `slot`.
@@ -739,7 +831,13 @@ func _anchor_of(slot: int, own: Vector2) -> Vector2:
 ## picture is (its pull this frame, so the cut follows the picture it cuts) and moving at least
 ## ANCHOR_STEP and at most PANE_ANCHOR_STEP a frame.
 func _pane_anchor(slot: int, drawn: Vector2, screen: Vector2) -> Vector2:
-	var site: Vector2 = _group_site[_group_holding(slot)]
+	var group: int = _group_holding(slot)
+	var site: Vector2 = _group_site[group]
+	if slot == _blank_owner_slot and _blank_quarter >= 2:
+		# A pair with a twin: cut as its half's top quarter, eased there as the twin comes in, so the
+		# twin's site and its own cut the half from the others as two quarters do.
+		var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)
+		site = site.lerp(EqualPanesScript.quarter_site(_blank_quarter - 2, screen), t)
 	if not _shown[slot].is_finite():
 		_shown[slot] = drawn.clamp(Vector2.ZERO, screen)
 	var step: float = clampf(_shown[slot].distance_to(site) * _pull[slot], ANCHOR_STEP, PANE_ANCHOR_STEP)

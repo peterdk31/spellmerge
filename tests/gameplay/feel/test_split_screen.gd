@@ -11,6 +11,7 @@ const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 
 const FRAME: float = 1.0 / 60.0
@@ -207,6 +208,119 @@ func test_the_equal_splits_blank_quarter_is_black_and_no_views() -> void:
 	_frames(600)
 	check(not _split.is_drawing(), "together: one picture")
 	check(blank == null or not blank.visible, "and the blank hidden")
+
+
+## The equal split's blank quarter shows the void (the owner, 2026-11-20): in a biome (`void_bounds`)
+## the void view draws under the cells, looking VOID_AWAY past the biome's corner at the world's
+## size, and stops drawing once the blank is gone; outside a biome the blank is the black alone.
+func test_the_blank_quarter_shows_the_void_view_in_a_biome() -> void:
+	_split.camera.set_equal(true)
+	_split.void_bounds = Rect2(-500.0, -500.0, 4000.0, 3500.0)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(3000.0, 0.0))
+	var walker: Node2D = _wizard(3, Vector2(0.0, 2500.0))
+	_frames(200)
+	check_equal(_split.camera.blank_count(), 1, "a blank")
+	var view: SubViewport = _split.void_view()
+	check(view != null, "the void view was made")
+	if view == null:
+		return
+	check_equal(view.render_target_update_mode, SubViewport.UPDATE_ALWAYS, "it draws")
+	check_equal(view.world_2d, root.world_2d, "the same world")
+	var shows: Rect2 = _split.void_rect()
+	var screen: Vector2 = root.get_visible_rect().size
+	var zoom: float = _split.camera.view_zoom()
+	check(shows.size.distance_to((screen * 0.5).floor() / zoom) < 1.0, "the blank quarter's size at the views' zoom (%s)" % shows.size)
+	check(not shows.intersects(_split.void_bounds), "past the biome (%s)" % shows)
+	check(_split.void_bounds.grow(VoidBackdropScript.GROW).encloses(shows), "inside the void's black")
+	var cell := _split.get_node(^"Views/VoidCell") as TextureRect
+	check(cell.visible, "its rect is shown")
+	check_equal(Rect2(cell.position, cell.size), Rect2(Vector2(0.0, (screen * 0.5).floor().y), (screen * 0.5).floor()), "over the blank quarter (P3's, bottom left)")
+	var lowest_cell: int = 1 << 30
+	for slot in ScreenViewsScript.VIEWS_MOST:
+		var other := _split.get_node_or_null(NodePath("Views/Cell%d" % slot))
+		if other != null:
+			lowest_cell = mini(lowest_cell, other.get_index())
+	check(cell.get_index() < lowest_cell, "under every view's cell")
+	# The same view again as it splits again (no new one).
+	walker.global_position = Vector2(40.0, 0.0)
+	_wizard_move_all_together()
+	_frames(600)
+	check(not _split.is_drawing(), "together: one picture")
+	check_equal(view.render_target_update_mode, SubViewport.UPDATE_DISABLED, "the void view stops drawing")
+	check_equal(_split.void_rect(), Rect2(), "and shows nothing")
+	_split.void_bounds = Rect2()
+
+
+## Four players, a pair and two alone (the owner, 2026-11-20): the pair has a half, its bottom
+## quarter its twin, which the twin rect shows with the pair's own view (no void view, no divider).
+func test_a_pairs_twin_quarter_shows_the_pairs_own_picture() -> void:
+	_split.camera.set_equal(true)
+	_split.void_bounds = Rect2(-500.0, -500.0, 4000.0, 3500.0)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(60.0, 0.0))
+	_wizard(2, Vector2(3000.0, 0.0))
+	_wizard(3, Vector2(3000.0, 2500.0))
+	_frames(240)
+	var laid: ScreenViewsScript = _split.camera.views
+	check_equal(laid.count, 3, "three panes")
+	var owner: int = _split.camera.blank_owner_view()
+	check_equal(owner, laid.view_of_seat(0), "the blank is the pair's twin")
+	var twin: TextureRect = _split.twin_cell()
+	check(twin != null and twin.visible, "the twin rect is shown")
+	if twin != null:
+		check_equal(twin.texture, _split.view_in_slot(_split.camera.slot_of(owner)).get_texture(), "with the pair's view")
+		check(twin.get_index() < _split.get_node(^"Views/Cell0").get_index(), "under the cells")
+	check(_split.void_view() == null or _split.void_view().render_target_update_mode == SubViewport.UPDATE_DISABLED, "no void drawn")
+	var material := (_split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(owner))) as TextureRect).material as ShaderMaterial
+	check_equal(int(material.get_shader_parameter(&"others")), 3, "the pair's cell knows the two others and its twin")
+	check_equal(material.get_shader_parameter(&"divider_2"), 0.0, "no divider from the pair to its twin")
+	_split.void_bounds = Rect2()
+
+
+## What the cell rect `rect` draws at screen pixel `p` by its shader's own parameters (-1 not its,
+## 0 its picture, 1 the divider), through `cell_pixel`.
+static func _drawn_by(rect: TextureRect, p: Vector2) -> int:
+	var material := rect.material as ShaderMaterial
+	var others := PackedVector2Array()
+	var widths := PackedFloat32Array()
+	for k in int(material.get_shader_parameter(&"others")):
+		others.append(material.get_shader_parameter(SplitScreenScript.OTHER_UNIFORMS[k]))
+		widths.append(material.get_shader_parameter(SplitScreenScript.DIVIDER_UNIFORMS[k]))
+	return SplitScreenScript.cell_pixel(p, material.get_shader_parameter(&"own"), others, widths, int(material.get_shader_parameter(&"before_mask")))
+
+
+## Regression (review): the pair's half's outer edge stepped by 2 px at its middle row (the single
+## beside the twin drew its whole line on its own side). Now the twin rect is cut as a pane of its
+## own: the divider's columns are the same above and below, every pixel is drawn exactly once.
+func test_a_pairs_half_has_a_straight_edge_beside_its_twin() -> void:
+	_split.camera.set_equal(true)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(60.0, 0.0))
+	_wizard(2, Vector2(3000.0, 0.0))
+	_wizard(3, Vector2(3000.0, 2500.0))
+	_frames(240)
+	var rects: Array[TextureRect] = [_split.twin_cell()]
+	for view in _split.camera.views.count:
+		rects.append(_split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(view))) as TextureRect)
+	var screen: Vector2 = root.get_visible_rect().size
+	var columns: Array[PackedInt32Array] = []
+	for y: float in [screen.y * 0.25 + 0.5, screen.y * 0.75 + 0.5]:
+		var line := PackedInt32Array()
+		for x in range(int(screen.x * 0.5) - 6, int(screen.x * 0.5) + 6):
+			var drawn: int = 0
+			var divider: bool = false
+			for rect in rects:
+				var got: int = _drawn_by(rect, Vector2(float(x) + 0.5, y))
+				if got >= 0:
+					drawn += 1
+					divider = divider or got == 1
+			check_equal(drawn, 1, "pixel (%d, %.1f) drawn by exactly one rect" % [x, y])
+			if divider:
+				line.append(x)
+		columns.append(line)
+	check_equal(columns[0].size(), SplitCameraScript.DIVIDER_WIDTH, "the line is its width beside the pair's top")
+	check_equal(columns[1], columns[0], "and in the same columns beside its twin")
 
 
 ## Every seat's wizard moved beside the others.

@@ -542,6 +542,8 @@ var _markers: TeammateMarkersScript = null
 var split_screen: SplitScreenScript = null
 ## How it splits (`SplitScreenSetting`; `set_split_mode`): the Voronoi split by default.
 var split_mode: int = SplitScreenSetting.DEFAULT
+## The split camera's HUD corners last sent to the HUD (`hud_corners_changed`), by its count.
+var _corners_sent: int = 0
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
 var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
@@ -1089,7 +1091,11 @@ func step(real_delta: float) -> void:
 	party_camera.step(real_delta)
 	if split_screen != null:
 		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+		var grid_now: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
+		split_screen.void_bounds = projectiles.bounds() if grid_now != null and grid_now.places() > 0 else Rect2()
 		split_screen.step(real_delta, _actor_table(), seats_here, world_camera, close_foes)
+		_spectacle.set_void_blank(split_screen.void_rect())
+		_tell_hud_corners()
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
@@ -2690,11 +2696,20 @@ func _on_screen_shake_changed(enabled: bool) -> void:
 
 
 ## How this machine's screen splits (`SplitScreenSetting`: DYNAMIC, the Voronoi split, or EQUAL,
-## equal panes a player; the pause menu's "Split screen", `split_screen_changed`). View only.
+## equal panes; the pause menu's "Split screen", `split_screen_changed`). View only.
 func set_split_mode(mode: int) -> void:
 	split_mode = SplitScreenSetting.snap(mode)
 	if split_screen != null:
 		split_screen.camera.set_equal(split_mode == SplitScreenSetting.EQUAL)
+
+
+## Tell the HUD where each seat's corner panel and menus sit now (`hud_corners_changed`), once a
+## change: the equal split's panes move them (the owner, 2026-11-20). View only.
+func _tell_hud_corners() -> void:
+	if split_screen.camera.corners_version == _corners_sent or events == null:
+		return
+	_corners_sent = split_screen.camera.corners_version
+	events.hud_corners_changed.emit(split_screen.camera.corners)
 
 
 ## Show a flash of the kind `id` (content/flashes) at `at`, aimed along `dir`, in the ramp of

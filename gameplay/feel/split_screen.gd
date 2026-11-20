@@ -23,6 +23,18 @@ extends Node
 ##   share of motes thrown while split) and `light_downscale()` (how much smaller the light buffers
 ##   past the first view's are).
 ##
+## - **The equal split's blank quarter shows the void** (the owner, 2026-11-20): with three panes
+##   the fourth is no view's (`SplitCamera.blank_count`), and over that quarter the void view draws:
+##   one more SubViewport (the quarter's size) sharing the world, looking at a spot of the void
+##   VOID_AWAY past the biome's corner at the views' zoom (`void_bounds`, Feel's; no room, bridge or
+##   view is there), so it shows the void's black and its drifting motes (the blank's part past its
+##   quarter while it moves in or out is the plain black under it)
+## - **A pair's twin** (three groups of four players; the owner, 2026-11-20): when the blank is the
+##   twin of a pair's half (`SplitCamera.blank_owner_view`), the twin rect shows that view's own
+##   texture over the whole screen under the cells, so the blank's part is the pair's picture, no
+##   divider between (nothing more is drawn: the view draws the whole screen anyway) (`void_rect`: Feel has the spectacle give them off there too,
+##   `Spectacle.set_void_blank`). Outside a biome (no bounds) the blank is the plain black.
+##
 ## Every view and cell is made the first time it is needed and kept; nothing is allocated a frame.
 
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
@@ -45,6 +57,9 @@ const DIVIDER_COLOUR := Color(0.05, 0.04, 0.09)
 ## Up to four: three other views and the equal split's blank quarter (or a fourth view merging).
 const OTHER_UNIFORMS: Array[StringName] = [&"other_0", &"other_1", &"other_2", &"other_3"]
 const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divider_2", &"divider_3"]
+## How far past the biome's top left corner (each way, world pixels) the void view looks: inside the
+## void's black (`VoidBackdrop.GROW`) and past any view's limits.
+const VOID_AWAY: float = 1024.0
 
 ## The frame-time budget: which of CB1's fallbacks the split's frames need now.
 var budget: SplitBudgetScript = SplitBudgetScript.new()
@@ -57,6 +72,13 @@ var _layer: CanvasLayer = null
 ## Under the cells, over the whole screen: what the equal split's blank quarter shows (no view
 ## draws there), the void's black. Shown only while there is a blank.
 var _blank: ColorRect = null
+## The bounds of the biome the views are in (Feel's, every frame; empty: none, the blank is black).
+var void_bounds: Rect2 = Rect2()
+## The view of the void the blank quarter shows, and its rect (made the first time).
+var _void_view: SubViewport = null
+var _void_cell: TextureRect = null
+## Under the cells: the picture of the view the blank is the twin of (made the first time).
+var _twin_cell: TextureRect = null
 ## By slot: its view and the rect that shows it (made as needed).
 var _views: Array[SubViewport] = []
 var _cells: Array[TextureRect] = []
@@ -166,6 +188,9 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 	_blank.visible = camera.blank_count() > 0
 	if _blank.visible:
 		_blank.size = screen
+	var owner: int = camera.blank_owner_view() if _blank.visible else -1
+	_show_twin(owner, screen)
+	_show_void(camera.blank_quarter() if _blank.visible and owner < 0 and void_bounds.has_area() else -1, screen)
 	_keep_shown(laid)
 	if laid.is_split():
 		ScreenViewsScript.publish(_root, laid)
@@ -204,17 +229,115 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2) -> vo
 			break
 		material.set_shader_parameter(OTHER_UNIFORMS[others], camera.blank_anchor(blank))
 		material.set_shader_parameter(DIVIDER_UNIFORMS[others], float(camera.blank_divider(view)))
+		if camera.blank_before(view):
+			before |= 1 << others
 		others += 1
 	material.set_shader_parameter(&"others", others)
 	material.set_shader_parameter(&"before_mask", before)
+
+
+## The world rect the void view shows now (empty while it does not draw).
+func void_rect() -> Rect2:
+	if _void_view == null or not _void_cell.visible:
+		return Rect2()
+	var zoom: float = _void_view.canvas_transform.x.x
+	return Rect2(-_void_view.canvas_transform.origin / zoom, Vector2(_void_view.size) / zoom)
+
+
+## The void view (null before it was first needed; for tests).
+func void_view() -> SubViewport:
+	return _void_view
+
+
+## The twin rect showing view `view`'s picture under the cells over the whole screen (-1: hidden).
+func _show_twin(view: int, screen: Vector2) -> void:
+	if view < 0:
+		if _twin_cell != null:
+			_twin_cell.visible = false
+		return
+	var shown: SubViewport = _views[camera.slot_of(view)]
+	if _twin_cell == null:
+		_twin_cell = _new_cell("TwinCell", shown)
+		var made := ShaderMaterial.new()
+		made.shader = CELL_SHADER
+		made.set_shader_parameter(&"divider_colour", DIVIDER_COLOUR)
+		_twin_cell.material = made
+		# Over the blank's black, under every view's cell.
+		_layer.move_child(_twin_cell, _blank.get_index() + 1)
+	var texture: Texture2D = shown.get_texture()
+	if _twin_cell.texture != texture:
+		_twin_cell.texture = texture
+	_twin_cell.size = screen
+	_twin_cell.visible = true
+	# Cut as a pane of its own about the twin's site: none toward its pair, toward the others the
+	# pair's own lines, split as the pair splits them (its share drawn here).
+	var laid: ScreenViewsScript = camera.views
+	var material := _twin_cell.material as ShaderMaterial
+	material.set_shader_parameter(&"screen_size", screen)
+	material.set_shader_parameter(&"own", camera.blank_anchor(0))
+	var others: int = 0
+	var before: int = 0
+	for other in laid.count:
+		if others >= OTHER_UNIFORMS.size():
+			break
+		material.set_shader_parameter(OTHER_UNIFORMS[others], laid.anchor[other])
+		material.set_shader_parameter(DIVIDER_UNIFORMS[others], 0.0 if other == view else float(camera.divider_between(view, other)))
+		if other < view:
+			before |= 1 << others
+		others += 1
+	material.set_shader_parameter(&"others", others)
+	material.set_shader_parameter(&"before_mask", before)
+
+
+## The twin rect (null before it was first needed; for tests).
+func twin_cell() -> TextureRect:
+	return _twin_cell
+
+
+## The void view drawn under the cells over quarter `quarter` of the screen (-1: not drawn),
+## looking VOID_AWAY past the biome's corner at the views' zoom.
+func _show_void(quarter: int, screen: Vector2) -> void:
+	if quarter < 0:
+		if _void_view != null:
+			_void_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+			_void_cell.visible = false
+		return
+	if _void_view == null:
+		_void_view = _new_view("VoidView")
+		_void_cell = _new_cell("VoidCell", _void_view)
+		# Over the blank's black, under every view's cell.
+		_layer.move_child(_void_cell, _blank.get_index() + 1)
+	var half := Vector2i(screen * 0.5)
+	if _void_view.size != half:
+		_void_view.size = half
+	var zoom: float = maxf(camera.view_zoom(), 0.0001)
+	var origin: Vector2 = ((void_bounds.position - Vector2.ONE * VOID_AWAY) * zoom - Vector2(half) * 0.5).round()
+	_void_view.canvas_transform = Transform2D(0.0, Vector2(zoom, zoom), 0.0, -origin)
+	_void_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_void_cell.position = Vector2(float(half.x * (quarter % 2)), float(half.y * (quarter >> 1)))
+	_void_cell.size = Vector2(half)
+	_void_cell.visible = true
 
 
 ## The view and cell of slot `slot`, made the first time.
 func _view(slot: int) -> SubViewport:
 	if _views[slot] != null:
 		return _views[slot]
+	var view: SubViewport = _new_view("View%d" % slot)
+	_views[slot] = view
+	var cell: TextureRect = _new_cell("Cell%d" % slot, view)
+	var material := ShaderMaterial.new()
+	material.shader = CELL_SHADER
+	material.set_shader_parameter(&"divider_colour", DIVIDER_COLOUR)
+	cell.material = material
+	_cells[slot] = cell
+	return view
+
+
+## A view the screen's size sharing the root's world and its pixel settings, drawing only the world.
+func _new_view(named: String) -> SubViewport:
 	var view := SubViewport.new()
-	view.name = "View%d" % slot
+	view.name = named
 	view.world_2d = _root.world_2d
 	view.disable_3d = true
 	view.gui_disable_input = true
@@ -224,22 +347,23 @@ func _view(slot: int) -> SubViewport:
 	view.canvas_item_default_texture_filter = _root.canvas_item_default_texture_filter
 	view.canvas_cull_mask = WORLD_LAYER
 	view.size = Vector2i(_root.get_visible_rect().size)
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(view)
-	_views[slot] = view
+	return view
+
+
+## A rect on the views' layer showing `view` pixel for pixel.
+func _new_cell(named: String, view: SubViewport) -> TextureRect:
 	var cell := TextureRect.new()
-	cell.name = "Cell%d" % slot
+	cell.name = named
 	cell.texture = view.get_texture()
 	cell.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.stretch_mode = TextureRect.STRETCH_SCALE
 	cell.visibility_layer = SCREEN_LAYER
-	var material := ShaderMaterial.new()
-	material.shader = CELL_SHADER
-	material.set_shader_parameter(&"divider_colour", DIVIDER_COLOUR)
-	cell.material = material
+	cell.visible = false
 	_layer.add_child(cell)
-	_cells[slot] = cell
-	return view
+	return cell
 
 
 ## The views draw the world from now on: the root keeps only the screen's layer.
@@ -264,6 +388,8 @@ func _stop() -> void:
 	_root.canvas_cull_mask = _mask_before
 	if _blank != null:
 		_blank.visible = false
+	_show_void(-1, Vector2.ZERO)
+	_show_twin(-1, Vector2.ZERO)
 	if is_inside_tree() and get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.disconnect(_on_node_added)
 	for slot in ScreenViewsScript.VIEWS_MOST:

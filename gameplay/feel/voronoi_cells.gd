@@ -144,18 +144,25 @@ static func camera_centre(wizard: Vector2, cell_middle: Vector2, screen: Vector2
 ## Scratch corners for `fill` (two, clipped from one into the other).
 var _from: PackedVector2Array = PackedVector2Array()
 var _into: PackedVector2Array = PackedVector2Array()
+## Scratch for a twin's owner's cell (`fill`'s `owner`): both parts' corners, and their hull.
+var _hull_in: PackedVector2Array = PackedVector2Array()
+var _hull_out: PackedVector2Array = PackedVector2Array()
 
 
 func _init() -> void:
 	_from.resize(ScreenViewsScript.CORNERS_MOST)
 	_into.resize(ScreenViewsScript.CORNERS_MOST)
+	_hull_in.resize(ScreenViewsScript.CORNERS_MOST * 2)
+	_hull_out.resize(ScreenViewsScript.CORNERS_MOST * 2 + 1)
 
 
 ## Fill `views`' cells for its `count` views from their anchors (`views.anchor`, screen pixels,
 ## at least MIN_GAP apart) on its screen: each the screen cut by the bisector to every other anchor,
 ## and to `blank` (a site no view owns, the equal split's empty quarter; Vector2.INF: none), whose
-## own part of the screen is then no view's. Nothing is allocated.
-func fill(views: ScreenViewsScript, blank: Vector2 = Vector2.INF) -> void:
+## own part of the screen is then no view's, unless view `owner` shows it (the equal split's twin of
+## a pair's pane, which the blank's part shows with the pair's picture): that view's cell is then the
+## hull of its own part and the blank's (the whole half, once they are settled). Nothing is allocated.
+func fill(views: ScreenViewsScript, blank: Vector2 = Vector2.INF, owner: int = -1) -> void:
 	var screen: Vector2 = views.screen
 	for i in views.count:
 		_from[0] = Vector2.ZERO
@@ -173,9 +180,61 @@ func fill(views: ScreenViewsScript, blank: Vector2 = Vector2.INF) -> void:
 			n = _clip_into((own + views.anchor[j]) * 0.5, normal, n)
 		if blank.is_finite() and n > 0 and (blank - own).length_squared() >= EPSILON:
 			n = _clip_into((own + blank) * 0.5, blank - own, n)
+		if i == owner and blank.is_finite():
+			n = _with_blank(views, blank, n)
 		for k in n:
 			views.set_corner(i, k, _from[k])
 		views.set_corners(i, n)
+
+
+## The first `n` of `_from` joined with the blank's own part of the screen (cut by the bisector to
+## every view's anchor): their convex hull, written back into `_from` (at most CORNERS_MOST corners,
+## clockwise on screen as the cells are). Returns how many.
+func _with_blank(views: ScreenViewsScript, blank: Vector2, n: int) -> int:
+	var count: int = 0
+	for k in n:
+		_hull_in[count] = _from[k]
+		count += 1
+	var screen: Vector2 = views.screen
+	_from[0] = Vector2.ZERO
+	_from[1] = Vector2(screen.x, 0.0)
+	_from[2] = screen
+	_from[3] = Vector2(0.0, screen.y)
+	var m: int = 4
+	for j in views.count:
+		if m == 0:
+			break
+		var normal: Vector2 = views.anchor[j] - blank
+		if normal.length_squared() < EPSILON:
+			continue
+		m = _clip_into((blank + views.anchor[j]) * 0.5, normal, m)
+	for k in m:
+		_hull_in[count] = _from[k]
+		count += 1
+	# Sorted by x then y (insertion: a handful of points), then the monotone chain.
+	for a in range(1, count):
+		var p: Vector2 = _hull_in[a]
+		var b: int = a - 1
+		while b >= 0 and (_hull_in[b].x > p.x or (_hull_in[b].x == p.x and _hull_in[b].y > p.y)):
+			_hull_in[b + 1] = _hull_in[b]
+			b -= 1
+		_hull_in[b + 1] = p
+	var h: int = 0
+	for a in count:
+		while h >= 2 and (_hull_out[h - 1] - _hull_out[h - 2]).cross(_hull_in[a] - _hull_out[h - 2]) <= EPSILON:
+			h -= 1
+		_hull_out[h] = _hull_in[a]
+		h += 1
+	var lower: int = h + 1
+	for a in range(count - 2, -1, -1):
+		while h >= lower and (_hull_out[h - 1] - _hull_out[h - 2]).cross(_hull_in[a] - _hull_out[h - 2]) <= EPSILON:
+			h -= 1
+		_hull_out[h] = _hull_in[a]
+		h += 1
+	h = mini(h - 1, ScreenViewsScript.CORNERS_MOST)
+	for k in h:
+		_from[k] = _hull_out[k]
+	return maxi(h, 0)
 
 
 ## `clip` on the scratch corners: the first `n` of `_from` cut to the near side of the line through

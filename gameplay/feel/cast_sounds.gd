@@ -10,10 +10,11 @@ extends RefCounted
 ## sounds, each once (a Triple's three bolts are one bolt's sound), then its infusions' hints, each
 ## once, at most MOST_HINTS, and a staff's hints at most every HINT_EVERY seconds (a spray pouring
 ## every 0.15 s would otherwise hold every voice with its hints, struck again before they ring out).
-## Each card's sound is read from the registry once, then kept: a cast
-## allocates nothing.
+## Each card's sound is read from the registry once, then kept (`cards`, `card_sounds.gd`, shared
+## with Feel's hits and beams): a cast allocates nothing.
 
 const AudioScript := preload("res://core/audio/audio.gd")
+const CardSoundsScript := preload("res://gameplay/feel/card_sounds.gd")
 
 ## The sound of a cast of a carrier card that names none, or of no carrier card.
 const FALLBACK: StringName = &"cast"
@@ -26,19 +27,17 @@ const MOST_HINTS: int = 3
 ## The least seconds between two casts' hints of one staff (a hint's length: a pour's next casts
 ## sound their carrier alone until it has rung out).
 const HINT_EVERY: float = 0.45
-## The registry folder the cards are in.
-const SPELL_FOLDER: StringName = &"spells"
-
-## The Audio service they play on, and the registry the cards are read from (anything with
-## `get_resource(folder, id)`; null: every cast is `FALLBACK` with no hints).
+## The Audio service they play on.
 var audio: AudioScript = null
-var registry: Object = null:
+## The cards' sounds, read once (Feel hands its own, shared with its hits and beams).
+var cards: CardSoundsScript = CardSoundsScript.new()
+## The registry the cards are read from (anything with `get_resource(folder, id)`; null: every cast
+## is `FALLBACK` with no hints): `cards`' registry.
+var registry: Object:
+	get:
+		return cards.registry
 	set(value):
-		registry = value
-		_sound_of.clear()
-
-## Each card's sound by its id (a carrier's cast sound, an infusion's hint; `&""` for none), read once.
-var _sound_of: Dictionary[StringName, StringName] = {}
+		cards.registry = value
 ## The sounds the cast being played has played so far (the first `_played_count`).
 var _played: Array[StringName] = []
 var _played_count: int = 0
@@ -82,13 +81,13 @@ func play(cast: CompiledCast, at: Vector2, volume: float = 0.0, staff: int = -1,
 
 ## The cast sound of the carrier card `card`: its own `cast_sound`, else FALLBACK.
 func carrier_sound(card: StringName) -> StringName:
-	var sound: StringName = _card_sound(card)
+	var sound: StringName = cards.sound_of(card, CardSoundsScript.Use.CAST)
 	return sound if sound != &"" else FALLBACK
 
 
 ## The hint of the infusion card `card` (`&""`: none).
 func hint_sound(card: StringName) -> StringName:
-	return _card_sound(card)
+	return cards.sound_of(card, CardSoundsScript.Use.CAST)
 
 
 ## Plays `sound` unless this cast has played it already or played MOST_SOUNDS; whether it started.
@@ -102,21 +101,3 @@ func _play_once(sound: StringName, at: Vector2, volume: float) -> bool:
 	_played_count += 1
 	return audio.play(sound, at, volume) >= 0
 
-
-## The sound the card `card` names (a carrier's `cast_sound`, an infusion's `cast_hint`), read once.
-func _card_sound(card: StringName) -> StringName:
-	if card == &"":
-		return &""
-	var known: Variant = _sound_of.get(card)
-	if known != null:
-		return known as StringName
-	if registry == null or not registry.has_method(&"get_resource"):
-		return &""
-	var resource: Resource = registry.call(&"get_resource", SPELL_FOLDER, card) as Resource
-	var sound: StringName = &""
-	if resource is CarrierCard:
-		sound = (resource as CarrierCard).cast_sound
-	elif resource is ElementBase:
-		sound = (resource as ElementBase).cast_hint
-	_sound_of[card] = sound
-	return sound

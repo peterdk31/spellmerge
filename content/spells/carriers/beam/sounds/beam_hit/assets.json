@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/beam/sounds/beam_hit/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/beam/sounds/beam_hit/beam_hit.sound.json",
+			"recipe_hash": "sha256:347c1955f4c09037b7e525bb641fe251041e65737055a3465b7895b811fdf344",
+			"audio_hash": "sha256:b93979da2541dd24ba2dd67907141a72466ea54f32b15439a0febed68a94d1b5",
+			"loudness": -40.0,
+			"peak": -19.8
+		},
+		{
+			"path": "content/spells/carriers/beam/sounds/beam_hit/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/beam/sounds/beam_hit/beam_hit.sound.json",
+			"recipe_hash": "sha256:347c1955f4c09037b7e525bb641fe251041e65737055a3465b7895b811fdf344",
+			"audio_hash": "sha256:017a4b2ebf8320362fb1c23a2002fa7899f6461570fc695be70467fbd9b1c277",
+			"loudness": -41.4,
+			"peak": -20.6
+		},
+		{
+			"path": "content/spells/carriers/beam/sounds/beam_hit/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/beam/sounds/beam_hit/beam_hit.sound.json",
+			"recipe_hash": "sha256:347c1955f4c09037b7e525bb641fe251041e65737055a3465b7895b811fdf344",
+			"audio_hash": "sha256:cd08e709149343311bd22cd20eda96e664e7b1191a921c3479fcc989050ef05d",
+			"loudness": -41.3,
+			"peak": -18.9
+		},
+		{
+			"path": "content/spells/carriers/beam/sounds/beam_hit/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/beam/sounds/beam_hit/beam_hit.sound.json",
+			"recipe_hash": "sha256:347c1955f4c09037b7e525bb641fe251041e65737055a3465b7895b811fdf344",
+			"audio_hash": "sha256:75a553db8e1ca52193d8488b5f3efc7fe6e50e2098828ee0c0bd815558556619",
+			"loudness": -41.3,
+			"peak": -20.1
+		}
+	]
+}

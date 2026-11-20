@@ -17,3 +17,4 @@ damage_scale = 1.0
 tint = Color(0.9490, 0.7608, 0.1882, 1)
 look_id = &"gusts"
 cast_hint = &"storm_hint"
+held_hint = &"storm_hum"

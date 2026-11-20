@@ -14,6 +14,8 @@ extends Carrier
 ## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
 const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
+## What `beam_elements` gives for a beam with no spell.
+const NO_ELEMENTS: Array[StringName] = []
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near", &"_gate_outs"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
@@ -1130,6 +1132,13 @@ func beam_infusions(at: int) -> PackedColorArray:
 ## by its card's look (`Spells.look_of`).
 func beam_carrier_card(at: int) -> StringName:
 	return _bm_spell[at].carrier_card_id if _bm_spell[at] != null else &""
+
+
+## Every infusion on live beam `at`, in slot order (`CompiledSpell.element_ids`: element card ids;
+## empty for a plain beam), so Feel sounds each in its hum (`gameplay/feel/beam_sounds.gd`). The
+## spell's own array, read only.
+func beam_elements(at: int) -> Array[StringName]:
+	return _bm_spell[at].element_ids if _bm_spell[at] != null else NO_ELEMENTS
 
 
 ## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.

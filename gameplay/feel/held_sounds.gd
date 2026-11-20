@@ -118,6 +118,16 @@ func held_at(caster: int, id: StringName) -> Vector2:
 	return Vector2.INF
 
 
+## The volume (decibels) the held sound `id` of `caster` plays at now, before its fade (NAN for
+## none; for tests).
+func volume_of(caster: int, id: StringName) -> float:
+	for i in count:
+		if _caster[i] == caster and _id[i] == id:
+			var voice: AudioStreamPlayer2D = audio.held.voice_of(_handle[i])
+			return voice.volume_db if voice != null else NAN
+	return NAN
+
+
 ## Once a frame: a wind-up's sound whose wind-up is over is let go, and an entry whose sound is gone
 ## is dropped.
 func step() -> void:

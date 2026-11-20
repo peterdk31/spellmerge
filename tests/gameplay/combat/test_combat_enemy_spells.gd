@@ -50,7 +50,7 @@ func before_each() -> void:
 	for list: Array in [_hurt, _landed, _reactions, _triggered]:
 		list.clear()
 	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
-	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int) -> void: _landed.append([p, t, a, k]))
+	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int, _card: StringName) -> void: _landed.append([p, t, a, k]))
 	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _reactions.append([p, id, t, tag]))
 	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2, _shot: int) -> void: _triggered.append(id))
 

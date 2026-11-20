@@ -1,0 +1,29 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 2.0,
+	"layers": [
+		{
+			"patch": "void_swell",
+			"pitch": {
+				"from": 70,
+				"to": 66,
+				"curve": "arch"
+			},
+			"index": {
+				"from": 1.2,
+				"to": 1.8,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Void in a beam's hum: a low, hollow swell held on, slowly turning."
+}

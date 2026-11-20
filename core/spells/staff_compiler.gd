@@ -533,6 +533,7 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
+	spell.hit.card = carrier_card.id
 	# A swing's sweep, a slam's shockwave (`burst`), a beam's ray.
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
@@ -581,6 +582,8 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 static func zap_hit(hit: HitProfile) -> HitProfile:
 	var zap: HitProfile = hit.scaled(SpellLimits.ZAP_DAMAGE, SpellLimits.ZAP_DAMAGE)
 	zap.kind = &"ray"
+	# The arc is the zap's, not its carrier's: it sounds as its kind (`HitProfile.card`).
+	zap.card = &""
 	return zap
 
 
@@ -590,6 +593,8 @@ static func zap_hit(hit: HitProfile) -> HitProfile:
 static func blast_hit(hit: HitProfile) -> HitProfile:
 	var blast: HitProfile = hit.copy()
 	blast.kind = &"burst"
+	# The strike is the blast's, not its carrier's: it sounds as its kind (`HitProfile.card`).
+	blast.card = &""
 	return blast
 
 

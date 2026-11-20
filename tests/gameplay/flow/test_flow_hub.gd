@@ -58,7 +58,7 @@ func _on_stone(standing: int, wizards: int, lit: bool) -> void:
 	stone.append(Vector3i(standing, wizards, 1 if lit else 0))
 
 
-func _on_hit_landed(_by: int, _target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int) -> void:
+func _on_hit_landed(_by: int, _target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int, _card: StringName) -> void:
 	hits += 1
 
 

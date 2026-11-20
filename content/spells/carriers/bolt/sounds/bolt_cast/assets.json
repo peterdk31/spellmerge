@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/bolt/sounds/bolt_cast/bolt_cast.sound.json",
-			"recipe_hash": "sha256:0fa0fead181443f54418f76c592a14a76048aa0190a18cec4191032aa044f0e2",
-			"audio_hash": "sha256:ec18b0c704799e985645bae216e74ccf6cf01a3c1eb0c7818f992b72a1071d8f",
-			"loudness": -23.1,
-			"peak": -7.1
+			"recipe_hash": "sha256:0d15ea10dc23cdd45f26eb0c74de99eaa8914bf3e66bb6bf9275a2b4a0eb91cf",
+			"audio_hash": "sha256:024c67225746d5919afbca98389bf3d50707b8b2084bedce93da4855dd956401",
+			"loudness": -33.9,
+			"peak": -15.3
 		},
 		{
 			"path": "content/spells/carriers/bolt/sounds/bolt_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/bolt/sounds/bolt_cast/bolt_cast.sound.json",
-			"recipe_hash": "sha256:0fa0fead181443f54418f76c592a14a76048aa0190a18cec4191032aa044f0e2",
-			"audio_hash": "sha256:ab1f82086b4be71d085e8b5aa69f232b4e8162f0deee2d87f7665aed8feb73e8",
-			"loudness": -22.9,
-			"peak": -8.1
+			"recipe_hash": "sha256:0d15ea10dc23cdd45f26eb0c74de99eaa8914bf3e66bb6bf9275a2b4a0eb91cf",
+			"audio_hash": "sha256:eea3d832847af3011083afe97e061efea1fd23197ff0336993c7d5384eb9f756",
+			"loudness": -33.8,
+			"peak": -15.2
 		},
 		{
 			"path": "content/spells/carriers/bolt/sounds/bolt_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/bolt/sounds/bolt_cast/bolt_cast.sound.json",
-			"recipe_hash": "sha256:0fa0fead181443f54418f76c592a14a76048aa0190a18cec4191032aa044f0e2",
-			"audio_hash": "sha256:6c366e1d38fd6ee4d173dcd3b02ebbe3017f8142ef4dc9f9cc930d937750cb75",
-			"loudness": -22.7,
-			"peak": -6.7
+			"recipe_hash": "sha256:0d15ea10dc23cdd45f26eb0c74de99eaa8914bf3e66bb6bf9275a2b4a0eb91cf",
+			"audio_hash": "sha256:404648d372c67c928957ef483b475388e87728f8d31e7e575c6dc332d1bf274f",
+			"loudness": -34.0,
+			"peak": -15.5
 		},
 		{
 			"path": "content/spells/carriers/bolt/sounds/bolt_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/bolt/sounds/bolt_cast/bolt_cast.sound.json",
-			"recipe_hash": "sha256:0fa0fead181443f54418f76c592a14a76048aa0190a18cec4191032aa044f0e2",
-			"audio_hash": "sha256:5498175e701c8e2c45cf828c1fd582644cec9d7924f40c3bd3ffd73d1fe49b2b",
-			"loudness": -23.3,
-			"peak": -6.9
+			"recipe_hash": "sha256:0d15ea10dc23cdd45f26eb0c74de99eaa8914bf3e66bb6bf9275a2b4a0eb91cf",
+			"audio_hash": "sha256:8f72ff0ce2a372d63fca910ee852f7a9faa94321127f7617c524b1c2e3ab3b75",
+			"loudness": -34.3,
+			"peak": -14.5
 		}
 	]
 }

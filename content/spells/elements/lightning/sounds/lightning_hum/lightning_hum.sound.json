@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 1.5,
+	"layers": [
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 140,
+				"to": 180,
+				"curve": "arch"
+			},
+			"filter": {
+				"type": "band",
+				"from": 700,
+				"q": 0.8
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 300,
+				"q": 0.7
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -10
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Lightning in a beam's hum: a soft, dull fizz of sparks held on (stepped noise through a band at 700 Hz) over a faint low rush. Its gain is -4 so its sparks stay under the peak; it plays under the hum all the same.",
+	"gain": -4
+}

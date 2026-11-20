@@ -52,7 +52,7 @@ func before_each() -> void:
 	_bus.hit_landed.connect(_on_hit)
 
 
-func _on_hit(by: int, target: Node, amount: int, where: Vector2, kind: StringName, _shot: int) -> void:
+func _on_hit(by: int, target: Node, amount: int, where: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
 	_hits += 1
 	_hash = hash([_hash, _step_no, by, _index_of.get(target.get_instance_id(), -99), amount, where, kind])
 

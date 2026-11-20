@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.08,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 301009
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 750,
+				"q": 0.6,
+				"to": 345.0
+			},
+			"length": 0.048,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 900,
+				"to": 387.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.036,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "An atom's speck landing: a faint, light tap of low-passed air and a fine grain, short and quiet (gain -13), as many land at once. It sits 13 dB under the family's level (gain -13): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -13,
+	"fx": {
+		"lowpass": 1200
+	}
+}

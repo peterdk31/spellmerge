@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/lightning/sounds/lightning_hint/lightning_hint.sound.json",
-			"recipe_hash": "sha256:fa20bc2f5fc7367f9a81490435730b200c781a31db235b45b4468568758aa263",
-			"audio_hash": "sha256:69a64642e7914dd66b4f0a122c9470d934db323e49f223692d59310a81c8564b",
-			"loudness": -24.0,
-			"peak": -6.4
+			"recipe_hash": "sha256:b747b8a3d5c7b80b9b50fb6732c9638c00a339d7568043c355fa19626d04bd10",
+			"audio_hash": "sha256:3be6bbbc7c66b7dc435fb8c3c53a8622dc3f992a881421800f56ec013d75bd4a",
+			"loudness": -30.0,
+			"peak": -12.4
 		},
 		{
 			"path": "content/spells/elements/lightning/sounds/lightning_hint/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/lightning/sounds/lightning_hint/lightning_hint.sound.json",
-			"recipe_hash": "sha256:fa20bc2f5fc7367f9a81490435730b200c781a31db235b45b4468568758aa263",
-			"audio_hash": "sha256:ff0283af3429db850f77d0e66dbab501030dcb64ccb390340e29ba6039e5c4c3",
-			"loudness": -24.0,
-			"peak": -6.3
+			"recipe_hash": "sha256:b747b8a3d5c7b80b9b50fb6732c9638c00a339d7568043c355fa19626d04bd10",
+			"audio_hash": "sha256:d8106fb2c7482ad444080fd0ebcd3edb9cc26019458cc001df5d2e573f5f2a60",
+			"loudness": -30.0,
+			"peak": -12.3
 		},
 		{
 			"path": "content/spells/elements/lightning/sounds/lightning_hint/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/lightning/sounds/lightning_hint/lightning_hint.sound.json",
-			"recipe_hash": "sha256:fa20bc2f5fc7367f9a81490435730b200c781a31db235b45b4468568758aa263",
-			"audio_hash": "sha256:ad38d23555ddaef354577eb6f3fce2850f4a80defc9d4c137d57648714c77c87",
-			"loudness": -23.5,
-			"peak": -5.8
+			"recipe_hash": "sha256:b747b8a3d5c7b80b9b50fb6732c9638c00a339d7568043c355fa19626d04bd10",
+			"audio_hash": "sha256:5be91db8421edba7d10d89fc80511ae1b085c0e675c61ced42e7a7ee41809640",
+			"loudness": -29.5,
+			"peak": -11.8
 		},
 		{
 			"path": "content/spells/elements/lightning/sounds/lightning_hint/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/lightning/sounds/lightning_hint/lightning_hint.sound.json",
-			"recipe_hash": "sha256:fa20bc2f5fc7367f9a81490435730b200c781a31db235b45b4468568758aa263",
-			"audio_hash": "sha256:6f3417f9b2753c9f15eaa992d717b2b2c4a61086a5d040a563c061725c7740aa",
-			"loudness": -24.5,
-			"peak": -8.0
+			"recipe_hash": "sha256:b747b8a3d5c7b80b9b50fb6732c9638c00a339d7568043c355fa19626d04bd10",
+			"audio_hash": "sha256:e102ea00989018b4a33bdf1ae3ff9051d56c6282d84bd6a85213e146d12b3d57",
+			"loudness": -30.5,
+			"peak": -14.0
 		}
 	]
 }

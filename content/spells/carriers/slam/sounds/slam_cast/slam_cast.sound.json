@@ -2,68 +2,47 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.4,
+	"seconds": 0.25200000000000006,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 111
+		"time": 0.03,
+		"seed": 211
 	},
 	"layers": [
 		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 220,
-				"to": 520,
-				"q": 2.0,
-				"curve": "arch"
-			},
-			"length": 0.34,
-			"amp": {
-				"attack": 0.04,
-				"shape": "arch",
-				"power": 1.5
-			},
-			"gain": 0
-		},
-		{
 			"source": "sine",
 			"pitch": {
-				"from": 80,
-				"to": 140
+				"from": 180,
+				"to": 80
 			},
-			"length": 0.3,
+			"length": 0.108,
+			"gain": -4,
 			"amp": {
-				"attack": 0.08,
+				"attack": 0.03,
 				"shape": "perc",
-				"power": 1.2
-			},
-			"gain": -16
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 160,
-				"to": 120,
-				"q": 4.0
+				"type": "low",
+				"from": 500,
+				"q": 0.6,
+				"to": 185.0
 			},
-			"length": 0.2,
+			"length": 0.14400000000000002,
+			"gain": -2,
 			"amp": {
-				"attack": 0.02,
+				"attack": 0.03,
 				"shape": "perc",
-				"power": 1.5
-			},
-			"gain": -8
+				"power": 2.0
+			}
 		}
 	],
+	"notes": "A slam's cast: a slow, low heave (a pop falling from 180 to 80 Hz with a slow attack) as the staff comes up; the blow is its own moment. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A slam's cast: the heave before the blow, a heavy low swish rising and falling as the staff comes up and over (the strike itself is the slam's own moment).",
-	"gain": -2
+		"lowpass": 1300
+	}
 }

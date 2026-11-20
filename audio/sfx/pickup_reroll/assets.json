@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
-			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
-			"audio_hash": "sha256:3b37018e404b661ea8e59fe0d2827ed7338fb09380910568bb41e5936109f3e6",
-			"loudness": -20.0,
-			"peak": -7.4
+			"recipe_hash": "sha256:2b31adf327416111d14ecb2e801812e5c2de4b9f1123956bb22469083cb397c6",
+			"audio_hash": "sha256:e47337547004f033a56269664c7cdcd6da474ac67cea98e6ffd8a8f0e7eb5848",
+			"loudness": -26.0,
+			"peak": -13.4
 		},
 		{
 			"path": "audio/sfx/pickup_reroll/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
-			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
-			"audio_hash": "sha256:d023bcabb6dc41cdb0b6cba26afcf457333c1e8d0ff0843ff3e964734543fb30",
-			"loudness": -19.8,
-			"peak": -7.1
+			"recipe_hash": "sha256:2b31adf327416111d14ecb2e801812e5c2de4b9f1123956bb22469083cb397c6",
+			"audio_hash": "sha256:b22f2ca6a4bc4669d0ad7ff6f50587079442178cf5f66d223573ec5537b21681",
+			"loudness": -25.8,
+			"peak": -13.1
 		},
 		{
 			"path": "audio/sfx/pickup_reroll/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
-			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
-			"audio_hash": "sha256:7c954b6d4943123c7d04ae1b91629ed87b6e373b98b641f7eb2e7dc446ef2dd2",
-			"loudness": -20.1,
-			"peak": -7.9
+			"recipe_hash": "sha256:2b31adf327416111d14ecb2e801812e5c2de4b9f1123956bb22469083cb397c6",
+			"audio_hash": "sha256:ffe7fe42f99e7e965b72d6402489794369a9e266498702a68c4d9b906ee8243c",
+			"loudness": -26.1,
+			"peak": -13.9
 		},
 		{
 			"path": "audio/sfx/pickup_reroll/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reroll/pickup_reroll.sound.json",
-			"recipe_hash": "sha256:4b97fc4b88b6a81d6a9d62aa0149718319ec04323056f3a018664e2015d45381",
-			"audio_hash": "sha256:bd1a3f6cc42a5541da271cd758b69c4c79f2dc225a3cc1da40fbaac148fc4262",
-			"loudness": -20.0,
-			"peak": -7.8
+			"recipe_hash": "sha256:2b31adf327416111d14ecb2e801812e5c2de4b9f1123956bb22469083cb397c6",
+			"audio_hash": "sha256:f05aceb14cdebc215dbd4932e5f752a56abca047cedd66b2b9bf7bbdbe8b552f",
+			"loudness": -26.0,
+			"peak": -13.8
 		}
 	]
 }

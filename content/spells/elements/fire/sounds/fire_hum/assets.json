@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/fire/sounds/fire_hum/fire_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/fire/sounds/fire_hum/fire_hum.sound.json",
+			"recipe_hash": "sha256:6f0d7c18fc391eb648aeacb3e4909158a75e61e40f16db1f781dd0985e93b348",
+			"audio_hash": "sha256:65a5dc7e68c9af6b82181830e3bcdd23fdc8a0688ebaa3e23a8d4d72659d9d8d",
+			"loudness": -24.0,
+			"peak": -12.1
+		}
+	]
+}

@@ -1,0 +1,70 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.12000000000000001,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 307004
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6,
+				"to": 414.0
+			},
+			"length": 0.08,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 700,
+				"to": 301.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.06,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 1000,
+				"q": 1.2,
+				"to": 220
+			},
+			"length": 0.07,
+			"gain": -6,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.8
+			}
+		}
+	],
+	"notes": "A pool's touch: a wet snow, with a soft squelch of noise falling from 1 kHz. It sits 10 dB under the family's level (gain -10): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -10,
+	"fx": {
+		"lowpass": 1200
+	}
+}

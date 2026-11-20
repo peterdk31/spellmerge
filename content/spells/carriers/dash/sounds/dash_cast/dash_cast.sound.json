@@ -2,68 +2,47 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.3,
+	"seconds": 0.18200000000000002,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 104
+		"time": 0.03,
+		"seed": 204
 	},
 	"layers": [
 		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 240,
-				"to": 900,
-				"q": 2.0,
-				"curve": "arch"
-			},
-			"length": 0.28,
-			"amp": {
-				"attack": 0.01,
-				"shape": "arch",
-				"power": 1.4
-			},
-			"gain": 0
-		},
-		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 160,
-				"to": 420,
-				"q": 3.0
-			},
-			"length": 0.22,
-			"amp": {
-				"attack": 0.005,
-				"shape": "perc",
-				"power": 1.8
-			},
-			"gain": -4
-		},
-		{
 			"source": "sine",
 			"pitch": {
-				"from": 110,
-				"to": 60
+				"from": 220,
+				"to": 110
 			},
-			"length": 0.08,
+			"length": 0.078,
+			"gain": -4,
 			"amp": {
-				"attack": 0.004,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 600,
+				"q": 0.6,
+				"to": 222.0
 			},
-			"gain": -18
+			"length": 0.10400000000000001,
+			"gain": 0,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			}
 		}
 	],
+	"notes": "A dash's cast: a lower pop (220 to 110 Hz) with more air, longer, as the body sets off. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2000
-	},
-	"notes": "A dash's cast: a quick low rush of air swept up from 240 Hz and down again, the body pushing off; wind, never a whistle.",
-	"gain": -2
+		"lowpass": 1300
+	}
 }

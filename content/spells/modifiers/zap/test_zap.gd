@@ -37,7 +37,7 @@ func _zaps(cards: Array, imps: Array[Vector2], shots: int, apart: float, one_rol
 	var counts: Array[int] = []
 	counts.resize(imps.size())
 	counts.fill(0)
-	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int) -> void:
+	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
 		if kind == &"ray":
 			var n: int = bodies.find(target)
 			if n >= 0:

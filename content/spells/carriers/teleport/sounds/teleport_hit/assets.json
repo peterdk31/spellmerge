@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_hit/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_hit/teleport_hit.sound.json",
+			"recipe_hash": "sha256:e8fb028bb70bb36d21fbd5515f88e174eccc3c2a6d93d66c26ea5ec9483e959b",
+			"audio_hash": "sha256:0664800abf66fb8d8d7db59d11424242a1bc30dceff3c2db801f70fff6e58c11",
+			"loudness": -38.1,
+			"peak": -15.8
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_hit/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_hit/teleport_hit.sound.json",
+			"recipe_hash": "sha256:e8fb028bb70bb36d21fbd5515f88e174eccc3c2a6d93d66c26ea5ec9483e959b",
+			"audio_hash": "sha256:ee0d8792fed8f8e98a0d746bc5476d28eb67540059efb2b9309c3bf5e9e247cf",
+			"loudness": -37.8,
+			"peak": -15.2
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_hit/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_hit/teleport_hit.sound.json",
+			"recipe_hash": "sha256:e8fb028bb70bb36d21fbd5515f88e174eccc3c2a6d93d66c26ea5ec9483e959b",
+			"audio_hash": "sha256:9cd0a0ab9710bcb38250b0f9613418607aed183e872336944ba5a1ae9e9ef17e",
+			"loudness": -38.5,
+			"peak": -17.5
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_hit/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_hit/teleport_hit.sound.json",
+			"recipe_hash": "sha256:e8fb028bb70bb36d21fbd5515f88e174eccc3c2a6d93d66c26ea5ec9483e959b",
+			"audio_hash": "sha256:92155d7c720aa5e2f386b06c8a8f1611c3137b4562322a7015f073b6f7c96a32",
+			"loudness": -37.6,
+			"peak": -16.8
+		}
+	]
+}

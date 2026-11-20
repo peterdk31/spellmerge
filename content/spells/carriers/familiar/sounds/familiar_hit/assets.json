@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_hit/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_hit/familiar_hit.sound.json",
+			"recipe_hash": "sha256:7b3710ff07be42a77be4a35ff061f16e969145d62eabfbc4a67ea12ef8295ca0",
+			"audio_hash": "sha256:2245b51d59a9886f820a7fce8add22f416c4aabeba1ef96c77c9be1888f6c699",
+			"loudness": -37.8,
+			"peak": -16.3
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_hit/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_hit/familiar_hit.sound.json",
+			"recipe_hash": "sha256:7b3710ff07be42a77be4a35ff061f16e969145d62eabfbc4a67ea12ef8295ca0",
+			"audio_hash": "sha256:fe7689c7e7c9c4154b8a42f1a9c0a8927a9318734e67705eb8bb960fc2978e86",
+			"loudness": -37.8,
+			"peak": -16.6
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_hit/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_hit/familiar_hit.sound.json",
+			"recipe_hash": "sha256:7b3710ff07be42a77be4a35ff061f16e969145d62eabfbc4a67ea12ef8295ca0",
+			"audio_hash": "sha256:d4707ab59027e0822a82725acb83c107fbaa428cf88c4081d9e2abe7618ec754",
+			"loudness": -38.5,
+			"peak": -15.1
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_hit/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_hit/familiar_hit.sound.json",
+			"recipe_hash": "sha256:7b3710ff07be42a77be4a35ff061f16e969145d62eabfbc4a67ea12ef8295ca0",
+			"audio_hash": "sha256:f8d98d3d3ce0962f85a2427a7d3862d6226a9cff047e5d42b15d82078b1dba22",
+			"loudness": -37.9,
+			"peak": -17.9
+		}
+	]
+}

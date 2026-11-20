@@ -2,73 +2,67 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.45,
+	"seconds": 0.196,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 116
+		"time": 0.03,
+		"seed": 216
 	},
 	"layers": [
 		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 320,
-				"to": 220,
-				"q": 2.0
-			},
-			"length": 0.4,
-			"amp": {
-				"attack": 0.02,
-				"shape": "perc",
-				"power": 1.2
-			},
-			"gain": 0,
-			"color": "stepped",
+			"source": "sine",
 			"pitch": {
-				"from": 140,
-				"to": 40
+				"from": 150,
+				"to": 90
+			},
+			"length": 0.08399999999999999,
+			"gain": -4,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
 			}
 		},
 		{
-			"source": "sine",
-			"pitch": {
-				"from": 75,
-				"to": 50
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.3,
+			"length": 0.11199999999999999,
+			"gain": -3,
 			"amp": {
-				"attack": 0.02,
+				"attack": 0.008,
 				"shape": "perc",
-				"power": 1.4
-			},
-			"gain": -14,
-			"drive": 2.0
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 200,
-				"to": 150,
-				"q": 4.0
+			"color": "stepped",
+			"pitch": {
+				"from": 450,
+				"to": 200
 			},
-			"length": 0.18,
+			"filter": {
+				"type": "low",
+				"from": 700,
+				"q": 0.6
+			},
+			"length": 0.12,
+			"gain": -6,
 			"amp": {
 				"attack": 0.01,
 				"shape": "perc",
-				"power": 1.6
-			},
-			"gain": -6
+				"power": 2.0
+			}
 		}
 	],
+	"notes": "A wall's cast: a low pop (150 to 90 Hz) with a dull grind of grainy noise, as the stone rises. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A wall's cast: stone grinding up out of the floor, a low rumble of stepped noise thinning out over a deep sine. 4 dB under the family's level (gain -4), which keeps the deep sine's peak under the limit.",
-	"gain": -4
+		"lowpass": 1300
+	}
 }

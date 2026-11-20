@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/storm/sounds/storm_hum/storm_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/storm/sounds/storm_hum/storm_hum.sound.json",
+			"recipe_hash": "sha256:f5e83c28ef7b75568dc50c983877d132d39d5d714a684927694cb734815ea148",
+			"audio_hash": "sha256:894b63718622fb9d6fabf77a3bc16f1820d22d7930664dd8708a6bb9c9313665",
+			"loudness": -24.0,
+			"peak": -11.5
+		}
+	]
+}

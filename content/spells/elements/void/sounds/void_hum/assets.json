@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/void/sounds/void_hum/void_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/void/sounds/void_hum/void_hum.sound.json",
+			"recipe_hash": "sha256:4d8bb1902bd2b68405eab57fac9cdb3877b2f30fbee29e3c606b810dc9ecdb85",
+			"audio_hash": "sha256:7dfbe52312e6ce347a1e92cb124a9e87354e7591fbc72a5ab4e5971fc116fb25",
+			"loudness": -24.0,
+			"peak": -17.5
+		}
+	]
+}

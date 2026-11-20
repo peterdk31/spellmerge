@@ -17,3 +17,4 @@ damage_scale = 1.0
 tint = Color(0.8784, 0.5412, 0.8471, 1)
 look_id = &"pull"
 cast_hint = &"void_hint"
+held_hint = &"void_hum"

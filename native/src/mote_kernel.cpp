@@ -209,6 +209,22 @@ PackedStringArray MoteKernel::check_regions(Object *object) const {
 	if (rows != REGION_ROWS || ask != REGION_PLACE_ASK || cell != REGION_PLACE_CELL || pad != REGION_PAD || most_kinds != REGION_MAX_KINDS) {
 		wrong.push_back("the regions' numbers");
 	}
+	// Its copy of the pool's row (the kernel reads the pool's own, from `configure`).
+	if (_ready) {
+		const int64_t stride = object->get("DRAW_STRIDE");
+		const bool same = stride == _stride && (int64_t)object->get("ROW_VX") == _row_vx &&
+				(int64_t)object->get("ROW_BORN") == _row_born && (int64_t)object->get("ROW_X") == _row_x &&
+				(int64_t)object->get("ROW_VY") == _row_vy && (int64_t)object->get("ROW_VZ") == _row_vz &&
+				(int64_t)object->get("ROW_Y") == _row_y && (int64_t)object->get("ROW_KIND") == _row_kind &&
+				(int64_t)object->get("ROW_LIFE") == _row_life && (int64_t)object->get("ROW_HEIGHT") == _row_height &&
+				(double)object->get("KIND_CODE") == _kind_code && (double)object->get("LIFE_MAX") == _life_max &&
+				(double)object->get("HEIGHT_MAX") == _height_max;
+		if (!same) {
+			wrong.push_back("the regions' row (DRAW_STRIDE, ROW_*, KIND_CODE, LIFE_MAX, HEIGHT_MAX)");
+		}
+	} else {
+		wrong.push_back("the kernel is not configured");
+	}
 	return wrong;
 }
 
@@ -611,9 +627,12 @@ int64_t MoteKernel::region_rows(Object *regions, Object *m, int64_t from, int64_
 			const int64_t oi = old % REGION_ROWS;
 			if (oc < made && oi < fill[oc] && row_of_slot[old] == row) {
 				hold_fold(oc);
-				fold[oi * _stride + _row_life] = 0.0f;
+				float *o = fold + oi * _stride;
+				if ((double)o[_row_born] + (double)o[_row_life] * _life_max > now) {
+					o[_row_life] = 0.0f;
+					dirty[oc] = 1;
+				}
 				live[oc] -= 1;
-				dirty[oc] = 1;
 				row_of_slot[old] = -1;
 			}
 			slot_of[row] = -1;

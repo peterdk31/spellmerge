@@ -30,8 +30,10 @@ extends Node2D
 ## time a mote lands in it). `step` uploads only the chunks written since the last frame, so a
 ## burst of 300 motes uploads one or two chunks (64 KB each), never the whole ring; a chunk whose
 ## motes are all gone (by the longest life each of its bursts could give) is hidden and costs no
-## vertices. **In a biome the motes are drawn by room** (`use_places`, `regions`,
-## `mote_regions.gd`; the performance pass, the owner's decision of 2026-11-20): the ring's chunks
+## vertices.
+##
+## **In a biome the motes are drawn by room** (`use_places`, `regions`, `mote_regions.gd`; the
+## performance pass, the owner's decision of 2026-11-20): the ring's chunks
 ## draw nothing, and `step` copies each row written into a chunk of its room's, boxed to the room,
 ## so a view draws only the rooms it shows. The ring and what writes it are the same either way. Nothing is allocated while playing, past a chunk's first use. A mote costs the CPU
 ## about 2.3 us in a fight (its share of the shot's shed and its row; P1c, docs/DECISIONS.md), so
@@ -983,7 +985,7 @@ func use_places(grid: RoomGrid) -> void:
 				node.visible = false
 	else:
 		for c in _nodes.size():
-			if not _buffers[c].is_empty():
+			if not _buffers[c].is_empty() and _now <= _until[c]:
 				_dirty[c] = 1
 
 
@@ -1002,7 +1004,6 @@ func draw_quad() -> Mesh:
 	return _mesh
 
 
-## Chunks with a batch made, and those drawn now (for tests).
 ## The ring's chunks with rows made; with `regions` on, the rooms' chunks drawn now.
 func chunks_made() -> int:
 	var made: int = 0

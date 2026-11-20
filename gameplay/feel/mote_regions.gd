@@ -38,7 +38,8 @@ const VIEW_ONLY: bool = true
 
 ## Rows in a region's chunk: one batch, uploaded whole when any of its rows is written or folded.
 const ROWS: int = 512
-## Floats in a row and where a row's numbers are (the pool's DRAW_STRIDE and ROW_*).
+## Floats in a row and where a row's numbers are (the pool's DRAW_STRIDE and ROW_*; the native kernel
+## checks them against the pool's, `MoteKernel.check_regions`).
 const DRAW_STRIDE: int = 16
 const ROW_VX: int = 0
 const ROW_BORN: int = 1
@@ -122,10 +123,11 @@ func _init(cap: int, ring_rows: int, parent: Node, material: Material, mesh: Mes
 	_z = z
 
 
-## The most chunks a ring of `cap` rows over `regions` regions has: twice the ring's rows (a chunk is
-## free only once all of its motes are gone) and an open one a region.
+## The most chunks a ring of `cap` rows over `regions` regions (and the crossers') has: twice the
+## ring's rows (a chunk is free only once all of its motes are gone), and two a region (a region's
+## rows among the ring's last `cap` may begin in one chunk and end in another).
 static func most_chunks(cap: int, regions: int) -> int:
-	return 2 * ceili(float(maxi(cap, 1)) / ROWS) + regions + 1
+	return 2 * ceili(float(maxi(cap, 1)) / ROWS) + 2 * (regions + 1)
 
 
 ## Read the places of `grid` (null: none) when they changed. True when they did: every region is
@@ -163,6 +165,9 @@ func hand_out(pool: Object, from: int, count: int, now: float, kernel: Object) -
 		var handed: int
 		if kernel != null:
 			handed = kernel.call(&"region_rows", self, pool, at, count - done, now)
+			# Nothing handed with a chunk free: the kernel refused the call (it says why); here.
+			if handed == 0 and _free_count > 0:
+				handed = _hand(pool, at, count - done, now)
 		else:
 			handed = _hand(pool, at, count - done, now)
 		done += handed
@@ -411,9 +416,12 @@ func _hand(pool: Object, from: int, count: int, now: float) -> int:
 			var oi: int = old % ROWS
 			if oi < _fill[oc] and _row_of_slot[old] == row:
 				var folded: PackedFloat32Array = _buffers[oc]
-				folded[oi * DRAW_STRIDE + ROW_LIFE] = 0.0
+				var o: int = oi * DRAW_STRIDE
+				# A copy whose mote is gone already is drawn as nothing: no upload for it.
+				if float(folded[o + ROW_BORN]) + float(folded[o + ROW_LIFE]) * LIFE_MAX > now:
+					folded[o + ROW_LIFE] = 0.0
+					_dirty[oc] = 1
 				_live[oc] -= 1
-				_dirty[oc] = 1
 				_row_of_slot[old] = -1
 			_slot_of[row] = -1
 		var source: PackedFloat32Array = ring[row / ring_rows]

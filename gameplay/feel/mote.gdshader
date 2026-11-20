@@ -154,7 +154,8 @@ vec3 mote_shade(float source, vec3 c, float s, int shade) {
 }
 
 void vertex() {
-	LIGHT_VIEW_FIND;
+	// The view it is drawn in: read only by a lit-only mote (found below, for those alone).
+	light_view = 0;
 	vec2 vel = MODEL_MATRIX[0].xy;
 	float born = MODEL_MATRIX[1].x;
 	float vz = MODEL_MATRIX[1].y;
@@ -183,6 +184,9 @@ void vertex() {
 	// A lit-only mote with no light to read is not drawn.
 	alive = alive && (light_on || !lit_only);
 	// An unused row has no life: folded away, with none of the work below.
+	if (alive && lit_only) {
+		LIGHT_VIEW_FIND;
+	}
 	if (alive) {
 		vec4 motion = texelFetch(kind_table, ivec2(0, k), 0);
 		vec4 sway = texelFetch(kind_table, ivec2(1, k), 0);

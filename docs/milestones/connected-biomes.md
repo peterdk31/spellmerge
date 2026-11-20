@@ -722,7 +722,7 @@ The numbers are in docs/LOG.md (2026-11-20, "Per-room batches").
   **crossers'** region, boxed to the world (a mote at a mouth or over a bridge's lip, in the void, or
   flung far from near a wall). A chunk is 512 rows, its box its place grown by REACH, drawing only its
   filled rows; the chunks are a pool shared by the regions (made as needed, kept, at most twice the
-  ring's rows plus one a region; with all in use the one ending soonest is taken). **No more motes
+  ring's rows plus two a region; with all in use the one ending soonest is taken). **No more motes
   than the ring holds:** the ring overwrites its oldest row, and that row's copy is folded away as the
   new one is handed out. A chunk is free once its motes are gone by their lives or overwritten. So a
   mote drifting across its room's edge is drawn by its room's chunk (its whole flight is inside the

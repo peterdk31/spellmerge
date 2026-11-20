@@ -386,8 +386,8 @@ func _show_void(quarter: int, screen: Vector2) -> void:
 	var zoom: float = maxf(camera.view_zoom(), 0.0001)
 	var origin: Vector2 = ((void_bounds.position - Vector2.ONE * VOID_AWAY) * zoom - Vector2(half) * 0.5).round()
 	_void_view.canvas_transform = Transform2D(0.0, Vector2(zoom, zoom), 0.0, -origin)
-	# One view more than those drawn (its readers after theirs: the light reads none there, and the
-	# motes cull by what it shows; Feel's spectacle hands the light its box after the views').
+	# One view more than those drawn (its readers' copies after theirs: the light reads none there;
+	# Feel's spectacle tells the light it is drawn, `use_views`).
 	var mask: int = ViewReadersScript.view_mask(mini(camera.views.count, ViewReadersScript.VIEWS_MOST - 1))
 	if _void_view.canvas_cull_mask != mask:
 		_void_view.canvas_cull_mask = mask

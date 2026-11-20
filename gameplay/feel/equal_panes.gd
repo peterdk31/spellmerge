@@ -33,7 +33,7 @@ extends RefCounted
 ## menu open in its panel's quarter, but where two seats share a half (two pairs, or the pair of four
 ## players in three groups) and their panels sit in one quarter, the one at the inner side takes the
 ## half's other quarter, so two players' menus never overlap (a pair of three players in two groups
-## too). A pane of a quarter never holds two seats; a trio's half has three menus for two quarters,
+## too), unless a panel of a seat played on another machine stands there. A pane of a quarter never holds two seats; a trio's half has three menus for two quarters,
 ## and two of them share one.
 ##
 ## Made once, filled by `lay`; nothing allocated after it is made.
@@ -122,7 +122,7 @@ func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 			reserved |= 1 << home_spot(seat)
 	for at in groups:
 		_spots(group_seats[_firsts[at]], quarters[_firsts[at]], reserved)
-		_menus(group_seats[_firsts[at]], quarters[_firsts[at]])
+		_menus(group_seats[_firsts[at]], quarters[_firsts[at]], reserved)
 
 
 ## Group `group`'s pane (lowest seat) on a screen of `screen` pixels; an empty rect for no group.
@@ -301,9 +301,10 @@ func _spots(seats: int, mask: int, reserved: int) -> void:
 
 
 ## The menus' quarters of the seats `seats` in the pane of the quarters `mask`: each its spot's
-## quarter; in a half, a seat at a quarter's inner side whose quarter another of them has the
-## half's other quarter while no one's menus are there.
-func _menus(seats: int, mask: int) -> void:
+## quarter. In a half, when a seat at a quarter's inner side shares that quarter with another of
+## them, its menus take the half's other quarter, if no one's menus are there and no panel of a seat
+## played elsewhere (`reserved`, spots) stands there.
+func _menus(seats: int, mask: int, reserved: int) -> void:
 	var used: int = 0
 	for seat in ActorsScript.SEATS:
 		if seats & (1 << seat) != 0:
@@ -316,7 +317,7 @@ func _menus(seats: int, mask: int) -> void:
 			continue
 		var quarter: int = corner[seat] >> 1
 		var other: int = quarter ^ 2
-		if used & (1 << other) == 0 and _shared(seats, seat, quarter):
+		if used & (1 << other) == 0 and reserved & (3 << (other * 2)) == 0 and _shared(seats, seat, quarter):
 			menus[seat] = other
 			used |= 1 << other
 

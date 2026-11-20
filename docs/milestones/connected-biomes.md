@@ -583,7 +583,7 @@ Built from those answers (gameplay/feel/README.md, "Equal panes"; hud/README.md,
 
 The owner decided after #880: in Equal mode, when two players share a half (two pairs, or the pair of four players in three groups), each player's menus open in their own quarter of that half, top or bottom by the row their corner panel sits in, so two players' builders, inventories and reward menus never overlap. Built (Equal only; Dynamic as it was; nothing in the simulation):
 
-- **The menus' quarter** (`EqualPanes.menus`, gameplay/feel/equal_panes.gd): each seat's is its panel's quarter. The panels keep their rows (answered on #880), so a pair whose panels sit on two rows (P1 and P3) already has a quarter each; a pair on one row (P1 and P2, P3 and P4) has both panels in one quarter, and the one at the inner side (the one moved off its own corner) takes the half's other quarter: P2's menus the bottom left, P3's the top right. The pair of four players in three groups: P2's menus in the twin quarter. A trio in a half (three players' menus, two quarters) still shares one.
+- **The menus' quarter** (`EqualPanes.menus`, gameplay/feel/equal_panes.gd): each seat's is its panel's quarter. The panels keep their rows (answered on #880), so a pair whose panels sit on two rows (P1 and P3) already has a quarter each; a pair on one row (P1 and P2, P3 and P4) has both panels in one quarter, and the one at the inner side (the one moved off its own corner) takes the half's other quarter: P2's menus the bottom left, P3's the top right. The pair of four players in three groups: P2's menus in the twin quarter. Three players with a pair (as the owner's two-pairs case): the moved seat's menus the half's other quarter. Never onto the panel of a seat played on another machine (that pair shares a quarter then). A trio in a half (three players' menus, two quarters) still shares one.
 - **The event:** `hud_corners_changed(corners, menus)`; the HUD (`hud/panels/seat_corners.gd`) slides the menus' quarter by whole pixels with the panel's slide (at least three frames, at most 16 px a frame, a slant too), and the builder, inventory and reward menu follow it (`move_quarter`, `move_room`).
 - **Tests:** `tests/hud/test_shared_half_menus.gd` (both players of a half open their builders, inventories and reward menus at once, for two pairs and the pair of three groups: no overlap, each inside its pane; the slide), `tests/gameplay/feel/test_split_equal.gd` (the quarters for every way of four players in pairs or a pair and two alone, three players with a pair, in play), `tests/core/test_events.gd`. Screenshots: `tests/screenshots/shot_shared_half_menus.gd`.
 
@@ -591,6 +591,7 @@ The owner decided after #880: in Equal mode, when two players share a half (two 
 
 1. **Which of a one-row pair moves:** the seat at the inner side (moved off its own corner) takes the other quarter, so the menus open away from that player's panel. Should the panel move with its menus instead (onto the other row)?
 2. **A trio in a half** (three players close, one apart) has three menus for two quarters; two still share one. Fine?
+3. **The moved seat's panel still hides** while its builder or inventory is open, though its menus are now in the other quarter and cover nothing of it. Keep it shown instead?
 
 ## The d-pad never walks; quick-use bindings (2026-11-20)
 

@@ -255,6 +255,12 @@ func test_two_seats_sharing_a_half_have_their_menus_in_their_own_quarters() -> v
 				check(panes.pane(first, SCREEN).encloses(quarter), "%s: seat %d's menus inside its pane" % [groups, seat])
 				seen |= 1 << panes.menus[seat]
 		check_equal(seen, 0b1111, "%s: every seat's menus a quarter of its own" % [groups])
+	# Regression (review): a menus' quarter never onto the panel of a seat played on another machine.
+	var by_first := PackedInt32Array([0b0011, 0, 0b0100, 0])
+	var remote := EqualPanesScript.new()
+	remote.lay(by_first, 1 << 3)
+	check_equal(remote.corner[0], 3, "P1, P2 right and P3 left, P4 elsewhere: P1's panel the top right's inner side")
+	check_equal(remote.menus[0], 1, "P1's menus stay off P4's panel in the bottom right")
 	# A trio in a half: three menus in two quarters, each inside the half.
 	var trio: EqualPanesScript = _laid([[0, 1, 2], [3]])
 	for seat in 3:

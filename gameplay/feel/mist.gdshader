@@ -57,6 +57,7 @@ const float PART_THIN = 0.92;
 varying vec2 world;
 
 void vertex() {
+	LIGHT_VIEW_FIND;
 	world = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 

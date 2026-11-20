@@ -75,6 +75,56 @@ struct MoteNames {
 
 MoteNames *mote_names = nullptr;
 
+// Every member of the motes' regions (`MoteRegions`, gameplay/feel/mote_regions.gd; the
+// performance pass, 2026-11-20) the hand-out reads and writes, and the pool's members it reads.
+// Checked by `check_fields` on the regions.
+#define MOTE_REGION_FIELDS(X) \
+	X(places, "places", INT) \
+	X(whole, "_whole", PACKED_BYTE_ARRAY) \
+	X(columns, "_columns", INT) \
+	X(lines, "_lines", INT) \
+	X(origin, "_origin", VECTOR2) \
+	X(bounds, "_bounds", PACKED_FLOAT64_ARRAY) \
+	X(slot_of, "_slot_of", PACKED_INT32_ARRAY) \
+	X(row_of_slot, "_row_of_slot", PACKED_INT32_ARRAY) \
+	X(buffers, "_buffers", ARRAY) \
+	X(fill, "_fill", PACKED_INT32_ARRAY) \
+	X(live, "_live", PACKED_INT32_ARRAY) \
+	X(until, "_until", PACKED_FLOAT64_ARRAY) \
+	X(dirty, "_dirty", PACKED_BYTE_ARRAY) \
+	X(region, "_region", PACKED_INT32_ARRAY) \
+	X(open, "_open", PACKED_INT32_ARRAY) \
+	X(free, "_free", PACKED_INT32_ARRAY) \
+	X(free_count, "_free_count", INT) \
+	X(ring_rows, "_ring_rows", INT)
+
+struct RegionNames {
+#define MR_DECLARE(id, gd, type) StringName id;
+	MOTE_REGION_FIELDS(MR_DECLARE)
+#undef MR_DECLARE
+	RegionNames() {
+#define MR_INIT(id, gd, type) id = StringName(gd);
+		MOTE_REGION_FIELDS(MR_INIT)
+#undef MR_INIT
+	}
+};
+
+RegionNames *region_names = nullptr;
+
+const RegionNames &rn() {
+	if (region_names == nullptr) {
+		region_names = new RegionNames();
+	}
+	return *region_names;
+}
+
+// `MoteRegions`' numbers (its constants, here as the kernel's own: `check_regions` compares them).
+constexpr int64_t REGION_ROWS = 512;
+constexpr int64_t REGION_PLACE_ASK = 255;
+constexpr double REGION_PLACE_CELL = 32.0;
+constexpr double REGION_PAD = 24.0;
+constexpr int64_t REGION_MAX_KINDS = 256;
+
 const MoteNames &mn() {
 	if (mote_names == nullptr) {
 		mote_names = new MoteNames();
@@ -112,6 +162,8 @@ MoteKernel::MoteKernel() {
 void MoteKernel::free_names() {
 	delete mote_names;
 	mote_names = nullptr;
+	delete region_names;
+	region_names = nullptr;
 }
 
 bool MoteKernel::configure(const Dictionary &c) {
@@ -141,6 +193,22 @@ PackedStringArray MoteKernel::check_fields(Object *object) const {
 	ERR_FAIL_NULL_V(object, wrong);
 	const MoteNames &k = mn();
 	MOTE_FIELDS(MO_CHECK)
+	return wrong;
+}
+
+PackedStringArray MoteKernel::check_regions(Object *object) const {
+	PackedStringArray wrong;
+	ERR_FAIL_NULL_V(object, wrong);
+	const RegionNames &k = rn();
+	MOTE_REGION_FIELDS(MO_CHECK)
+	const int64_t rows = object->get("ROWS");
+	const int64_t ask = object->get("PLACE_ASK");
+	const double cell = object->get("PLACE_CELL");
+	const double pad = object->get("PAD");
+	const int64_t most_kinds = object->get("MAX_KINDS");
+	if (rows != REGION_ROWS || ask != REGION_PLACE_ASK || cell != REGION_PLACE_CELL || pad != REGION_PAD || most_kinds != REGION_MAX_KINDS) {
+		wrong.push_back("the regions' numbers");
+	}
 	return wrong;
 }
 
@@ -444,9 +512,207 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	return handed;
 }
 
+// `MoteRegions._hand`: the rows of the ring from `from` handed to their regions' chunks, each
+// one's earlier copy folded away; stops at a row whose region needs a chunk while none is free.
+int64_t MoteKernel::region_rows(Object *regions, Object *m, int64_t from, int64_t count, double now) {
+	ERR_FAIL_COND_V(!_ready, 0);
+	ERR_FAIL_NULL_V(regions, 0);
+	ERR_FAIL_NULL_V(m, 0);
+	const RegionNames &r = rn();
+	const MoteNames &k = mn();
+	Arr<PackedByteArray> whole, dirty;
+	Arr<PackedFloat64Array> bounds, until, k_gravity, k_drag, k_bounce, k_wobble;
+	Arr<PackedInt32Array> slot_of, row_of_slot, fill, live, region, open, free;
+	whole.load(regions, r.whole);
+	dirty.load(regions, r.dirty);
+	bounds.load(regions, r.bounds);
+	until.load(regions, r.until);
+	slot_of.load(regions, r.slot_of);
+	row_of_slot.load(regions, r.row_of_slot);
+	fill.load(regions, r.fill);
+	live.load(regions, r.live);
+	region.load(regions, r.region);
+	open.load(regions, r.open);
+	free.load(regions, r.free);
+	k_gravity.load(m, k.k_gravity);
+	k_drag.load(m, k.k_drag);
+	k_bounce.load(m, k.k_bounce);
+	k_wobble.load(m, k.k_wobble);
+	Array chunks = regions->get(r.buffers);
+	Array ring = m->get(k.buffers);
+	const int64_t places = regions->get(r.places);
+	const int64_t columns = regions->get(r.columns);
+	const int64_t lines = regions->get(r.lines);
+	const Vector2 origin = regions->get(r.origin);
+	const int64_t ring_rows = regions->get(r.ring_rows);
+	int64_t free_count = regions->get(r.free_count);
+	const int64_t cap = slot_of.n;
+	const int64_t made = fill.n;
+	const int64_t kinds = k_gravity.n;
+	ERR_FAIL_COND_V(cap <= 0 || ring_rows <= 0 || whole.n < columns * lines || bounds.n < places * 4 || open.n <= places, 0);
+	ERR_FAIL_COND_V(chunks.size() < made || live.n < made || until.n < made || dirty.n < made || region.n < made ||
+					row_of_slot.n < made * REGION_ROWS || free_count > free.n,
+			0);
+	ERR_FAIL_COND_V(k_drag.n < kinds || k_bounce.n < kinds || k_wobble.n < kinds, 0);
+
+	// The chunk written and the one folded in: taken out of the list while written (`ptrw` then
+	// copies the buffer only if the renderer still holds it) and put back after.
+	int64_t into_c = -1, fold_c = -1;
+	PackedFloat32Array into_buf, fold_buf;
+	float *into = nullptr, *fold = nullptr;
+	auto take = [&](int64_t c, int64_t &held, PackedFloat32Array &buf, float *&p) {
+		if (held == c) {
+			return;
+		}
+		if (held >= 0) {
+			chunks[held] = buf;
+		}
+		held = c;
+		buf = chunks[c];
+		chunks[c] = PackedFloat32Array();
+		p = buf.ptrw();
+	};
+	auto put_back = [&]() {
+		if (into_c >= 0) {
+			chunks[into_c] = into_buf;
+		}
+		if (fold_c >= 0) {
+			chunks[fold_c] = fold_buf;
+		}
+		into_c = -1;
+		fold_c = -1;
+	};
+	// One chunk taken out at a time: a chunk wanted by the other cursor is put back first.
+	auto hold_into = [&](int64_t c) {
+		if (fold_c == c) {
+			chunks[fold_c] = fold_buf;
+			fold_c = -1;
+		}
+		take(c, into_c, into_buf, into);
+	};
+	auto hold_fold = [&](int64_t c) {
+		if (into_c == c) {
+			chunks[into_c] = into_buf;
+			into_c = -1;
+		}
+		take(c, fold_c, fold_buf, fold);
+	};
+
+	// The ring's chunk read, as the pool holds it (read only).
+	int64_t ring_c = -1;
+	PackedFloat32Array ring_buf;
+	const float *src = nullptr;
+	int64_t handed = count;
+	for (int64_t n = 0; n < count; n++) {
+		const int64_t row = (from + n) % cap;
+		const int64_t old = slot_of[row];
+		if (old >= 0) {
+			const int64_t oc = old / REGION_ROWS;
+			const int64_t oi = old % REGION_ROWS;
+			if (oc < made && oi < fill[oc] && row_of_slot[old] == row) {
+				hold_fold(oc);
+				fold[oi * _stride + _row_life] = 0.0f;
+				live[oc] -= 1;
+				dirty[oc] = 1;
+				row_of_slot[old] = -1;
+			}
+			slot_of[row] = -1;
+		}
+		const int64_t c_ring = row / ring_rows;
+		if (c_ring != ring_c) {
+			ring_c = c_ring;
+			ring_buf = ring[c_ring];
+			src = ring_buf.ptr();
+		}
+		const int64_t i = (row % ring_rows) * _stride;
+		if (i + _stride > ring_buf.size()) {
+			continue;
+		}
+		const float *row_p = src + i;
+		// `region_of`.
+		const double life = (double)row_p[_row_life] * _life_max;
+		const double born = (double)row_p[_row_born];
+		if (life <= 0.0 || born + life <= now) {
+			continue;
+		}
+		int64_t code = 0;
+		const double x = (double)row_p[_row_x];
+		const double y = (double)row_p[_row_y];
+		const int64_t cx = floori((x - (double)origin.x) / REGION_PLACE_CELL);
+		const int64_t cy = floori((y - (double)origin.y) / REGION_PLACE_CELL);
+		if (cx >= 0 && cx < columns && cy >= 0 && cy < lines) {
+			code = whole[cy * columns + cx];
+			if (code == REGION_PLACE_ASK || code > places) {
+				code = 0;
+			}
+		}
+		if (code > 0) {
+			const int64_t kk = clampi((int64_t)std::round((double)row_p[_row_kind] * _kind_code), 0, REGION_MAX_KINDS - 1);
+			if (kk >= kinds) {
+				code = 0;
+			} else {
+				// `reach_of`, rounded to single precision as its Vector2 is.
+				const double vx = (double)row_p[_row_vx];
+				const double vy = (double)row_p[_row_vy];
+				const double vz = (double)row_p[_row_vz];
+				const double h0 = maxf((double)row_p[_row_height] * _height_max, 0.0);
+				const double drag = k_drag[kk];
+				const double gravity = k_gravity[kk];
+				const double bounce = k_bounce[kk];
+				const double along = drag > 0.0 ? (1.0 - std::exp(-drag * life)) / drag : life;
+				const double spread = std::sqrt(vx * vx + vy * vy) * along + 2.0 * std::abs(k_wobble[kk]) + REGION_PAD;
+				double rise;
+				if (gravity > 0.0) {
+					rise = (h0 + vz * vz / (2.0 * gravity)) * maxf(bounce * bounce, 1.0);
+				} else {
+					rise = h0 + maxf(vz, 0.0) * life - 0.5 * gravity * life * life;
+				}
+				const double rx = (double)(float)spread;
+				const double ry = (double)(float)rise;
+				const double *b = bounds.p + (code - 1) * 4;
+				if (x - rx < b[0] || x + rx > b[2] || y - rx - ry < b[1] || y + rx > b[3]) {
+					code = 0;
+				}
+			}
+		}
+		int64_t c = open[code];
+		if (c < 0 || fill[c] >= REGION_ROWS) {
+			if (free_count == 0) {
+				handed = n;
+				break;
+			}
+			free_count -= 1;
+			c = free[free_count];
+			open[code] = (int32_t)c;
+			region[c] = (int32_t)code;
+			fill[c] = 0;
+			live[c] = 0;
+			until[c] = 0.0;
+		}
+		const int64_t at = fill[c];
+		fill[c] = (int32_t)(at + 1);
+		hold_into(c);
+		float *to = into + at * _stride;
+		for (int64_t f = 0; f < _stride; f++) {
+			to[f] = row_p[f];
+		}
+		const int64_t slot = c * REGION_ROWS + at;
+		slot_of[row] = (int32_t)slot;
+		row_of_slot[slot] = (int32_t)row;
+		live[c] += 1;
+		until[c] = maxf(until[c], (double)row_p[_row_born] + (double)row_p[_row_life] * _life_max);
+		dirty[c] = 1;
+	}
+	put_back();
+	regions->set(r.free_count, free_count);
+	return handed;
+}
+
 void MoteKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("configure", "config"), &MoteKernel::configure);
 	ClassDB::bind_method(D_METHOD("check_fields", "motes"), &MoteKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("key_births", "motes", "given", "count"), &MoteKernel::key_births);
 	ClassDB::bind_method(D_METHOD("give_off", "motes", "given", "count", "has_marks"), &MoteKernel::give_off);
+	ClassDB::bind_method(D_METHOD("check_regions", "regions"), &MoteKernel::check_regions);
+	ClassDB::bind_method(D_METHOD("region_rows", "regions", "motes", "from", "count", "now"), &MoteKernel::region_rows);
 }

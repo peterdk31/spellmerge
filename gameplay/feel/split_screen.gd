@@ -15,7 +15,8 @@ extends Node
 ##   (`split_cell.gdshader`). A view keeps its node while it lives (its slot).
 ## - **Each view draws the world and its own readers of the light:** its canvas cull mask is the
 ##   world's layer and its own (`ViewReaders.view_mask`, by its place in `views()`, which is its light
-##   buffer's), so of each reader (the apply rect, the motes, the mist) it draws its own copy, whose
+##   buffer's), so of each reader (the apply rect, the motes, the mist) the first two views draw the
+##   reader itself (its shader tells them apart) and the third and fourth each its own copy, whose
 ##   material's uniform names its buffer; the void view is one view more, after them (no buffer: no
 ##   light in the void).
 ## - **The root stops drawing the world** while there is a view: its canvas cull mask drops the

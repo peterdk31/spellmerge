@@ -3,9 +3,11 @@ extends Node
 ## run's first fight through the real input path: the crypt's biome (connected biomes CB8), from its
 ## start room over a bridge to the nearest fight (the bots travel, tests/bots/bot.gd). Bots 1-3
 ## fight; bot 4 opens its builder with B (`back`) as the run starts and idles in it the whole run
-## (the full builder, fights included). Bots 1-3 also build: as the run starts each builds a seeded random staff into
-## staff 1 (RB, `BotScript.BUILD_STAFF`) with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
-## play it with their other staffs, so the run is played with built staffs.
+## (the full builder, fights included). Bots 1-3 also build: as the run starts each sets its starting
+## build (`BotScript.build_drawn`, tests/bots/bot_builds.gd: a fighter's strong staff and a dash drawn
+## from the run's dice, and bot 2's mend staff), each staff with `staff_cards_requested` from a bag
+## stocked for it (`BuildsScript.stock`, put back when the node goes), and their brains (the
+## enemies' AI, tests/bots/bot.gd) play what they built.
 ##
 ## It passes only if
 ##  - `room_cleared` is received for a fight room (the start room's, a shop's or a reward room's,
@@ -15,7 +17,7 @@ extends Node
 ##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
 ##    stands still and can be downed; it is not checked for that, and
 ##    a close while it was downed is printed as a note, not a failure, and
-##  - every fighter's build went through (staff 1 holds the cards the bot chose) and no
+##  - every fighter's build went through (each staff holds the cards of the bot's build) and no
 ##    `build_refused` arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
@@ -45,7 +47,7 @@ extends Node
 ## with its failures instead of quitting, and rides no performance probe.
 ##
 ## Reproducibility: the fight is the same, tick by tick, on every start. Each bot's brain is
-## seeded by its slot, each build by BUILD_SEED, and the run's seed (`Sim.run_seed`), which makes
+## seeded by its slot, each build drawn from the run's dice, and the run's seed (`Sim.run_seed`), which makes
 ## the map and every roll of the fight (`Sim.chance`), is dealt from REPLAY_SEED: the node starts
 ## the run by recording it (`Frames.record`, Play recorded), and the replay's seed deals its runs'
 ## seeds (`ReplayTape.next_run_seed`). Frame pacing changes only how many ticks fit in TIME_LIMIT's
@@ -77,12 +79,11 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
+const BuildsScript := preload("res://tests/bots/bot_builds.gd")
 
 const PLAYERS: int = 4
 ## The index of the bot that idles in its builder (bot 4).
 const IDLER: int = 3
-## Bot `i` builds with the seed BUILD_SEED + i, so a failing run can be replayed.
-const BUILD_SEED: int = 2026
 ## The seed of the replay the run is recorded into, which deals the run's seed (see the class doc;
 ## 11: it was 8 for a while, since the crypt's longer treasure line laid seed 11's map with a corner
 ## walkway out of the start room the bots' travel could not cross; they walk every walkway since
@@ -134,6 +135,9 @@ var _run_seed: int = 0
 ## The run played and its scaling, put back when the node goes.
 var _run: RunDefinition = null
 var _run_scaling: RunScaling = null
+## Play's bag before the node stocked it for the bots' builds, put back when the node goes.
+var _bag_had: Array[StringName] = []
+var _bag_stocked: bool = false
 
 
 func _ready() -> void:
@@ -152,6 +156,8 @@ func _ready() -> void:
 		_finish(["the Events, PlayerInput, Frames, Flow and Hud autoloads must exist"])
 		return
 	_play_unscaled(root)
+	_bag_had = BuildsScript.stock(_flow)
+	_bag_stocked = true
 	_events.connect("room_entered", _on_room_entered)
 	_events.connect("room_cleared", _on_room_cleared)
 	_events.connect("player_downed", _on_player_downed)
@@ -202,6 +208,9 @@ func _exit_tree() -> void:
 	if _run != null:
 		_run.scaling = _run_scaling
 		_run = null
+	if _bag_stocked and is_instance_valid(_flow):
+		_bag_stocked = false
+		_flow.set(&"play_bag", _bag_had)
 
 
 ## The run Play starts, with its scaling off until the node goes (see the class doc).
@@ -262,7 +271,7 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
 	_bots[IDLER].open_builder()
 	for index in IDLER:
-		if not _bots[index].build_random(BUILD_SEED + index):
+		if not _bots[index].build_drawn(IDLER):
 			_builds_failed.append("bot %d could not build a spell" % (index + 1))
 
 
@@ -321,8 +330,8 @@ func _check() -> Array[String]:
 	for index in IDLER:
 		var wizard := _flow.call("get_wizard", index) as Actor
 		var bot: BotScript = _bots[index]
-		if wizard != null and not bot.built_cards.is_empty() and wizard.caster.cards_of(BotScript.BUILD_STAFF) != bot.built_cards:
-			failed.append("bot %d: staff 1 is not the staff it built" % (index + 1))
+		if wizard != null and not bot.build.is_empty() and not bot.holds_build(wizard):
+			failed.append("bot %d: its staffs are not the build it drew (%s)" % [index + 1, bot.build["name"]])
 	if not _builder_seen_open:
 		failed.append("the builder of bot %d never opened" % (IDLER + 1))
 	elif _builder_closed_at >= 0.0:
@@ -397,7 +406,7 @@ func _finish(failed: Array[String]) -> void:
 func _built_text() -> String:
 	var parts: Array[String] = []
 	for index in mini(IDLER, _bots.size()):
-		parts.append(str((_bots[index] as BotScript).built_cards))
+		parts.append(str((_bots[index] as BotScript).build.get("name", "none")))
 	return "; ".join(parts)
 
 

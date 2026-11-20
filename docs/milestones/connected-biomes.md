@@ -691,7 +691,7 @@ owner accepts that the split's air then looks as thick as the single picture's):
   overlapping views counted once).
 - **Views named by a uniform:** what reads the light by the screen (the apply rect, the motes, the
   mist) is drawn once a view: the item itself for the first view, a copy a view past it on that
-  view's visibility layer, each naming its light buffer by the instance uniform `light_view_id`
+  view's visibility layer with its view's copy of the material, each naming its light buffer by the uniform `light_view_id`
   (`ViewReaders`); each view's SubViewport draws the world's layer and its own. No transform is
   matched. The equal split's void quarter is one view more, reading no light.
 

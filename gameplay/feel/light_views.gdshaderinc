@@ -5,10 +5,10 @@
 // drawn in. With one picture that is `light_buffer`, the world camera's.
 // While the screen is split each view draws the world again through its own canvas transform, and
 // has a buffer of its own that follows it (`light_buffer` the first view's, then `light_buffer_1`
-// to `light_buffer_3`); the view a reader is drawn in is named by its instance uniform
-// `light_view_id` (0 to 3; the performance pass of 2026-11-20, the owner: named, never matched):
-// each reader is one canvas item a view, each on its view's visibility layer only (`ViewReaders`,
-// gameplay/feel/view_readers.gd), all sharing one material, so nothing is drawn twice.
+// to `light_buffer_3`); the view a reader is drawn in is named by its uniform `light_view_id` (0 to
+// 3; the performance pass of 2026-11-20, the owner: named, never matched): each reader is one canvas
+// item a view, each on its view's visibility layer only and with its view's copy of the material
+// (`ViewReaders`, gameplay/feel/view_readers.gd), so nothing is drawn twice.
 //
 // A shader that includes this reads the light with `view_light(SCREEN_UV)` in its fragment function.
 
@@ -17,7 +17,7 @@ uniform sampler2D light_buffer_1 : hint_default_black, filter_linear, repeat_dis
 uniform sampler2D light_buffer_2 : hint_default_black, filter_linear, repeat_disable;
 uniform sampler2D light_buffer_3 : hint_default_black, filter_linear, repeat_disable;
 // The view this canvas item is drawn in (ViewReaders.VIEW_ID); 0: the one picture or the first view.
-instance uniform int light_view_id = 0;
+uniform int light_view_id = 0;
 
 // The light at `uv` on the screen, from the buffer of the view this is drawn in.
 vec3 view_light(vec2 uv) {

@@ -137,8 +137,10 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 		if copy == null:
 			continue
 		check_equal(copy.visibility_layer, ViewReadersScript.view_layer(1), "on the second view's layer alone")
-		check_equal(int(copy.get_instance_shader_parameter(ViewReadersScript.VIEW_ID)), 1, "naming the second view's buffer")
-		check(copy.material == item.material, "sharing its material")
+		var own := copy.material as ShaderMaterial
+		check(own != null and own != item.material and own.shader == (item.material as ShaderMaterial).shader, "drawn with a material of its own, the same shader")
+		check_equal(int(own.get_shader_parameter(ViewReadersScript.VIEW_ID)), 1, "naming the second view's buffer")
+		check(own.get_shader_parameter(&"light_buffer_1") == (item.material as ShaderMaterial).get_shader_parameter(&"light_buffer_1"), "its other uniforms the item's")
 		check_equal(copy.get_index(), item.get_index() + 1, "drawn just after it")
 		check_equal(copy.z_index, item.z_index, "at its z")
 		check(light.readers.copy_of(item, 2) == null, "no copy for a view not drawn")
@@ -148,6 +150,11 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 	holder.add_child(later)
 	light.use_views(_split.views())
 	check(light.readers.copy_of(later, 1) != null, "a reader come while split gets its copy")
+	# A uniform set on the item's material reaches every view's copy of it.
+	reader.set_shader_parameter(&"sim_time", 12.5)
+	light.follow()
+	check_equal(float((light.readers.copy_of(before, 1).material as ShaderMaterial).get_shader_parameter(&"sim_time")), 12.5, "a uniform set on the item's material reaches the view's")
+	check((light.readers.copy_of(before, 1).material as ShaderMaterial).get_shader_parameter(ViewReadersScript.CULL_BOX) is Vector4, "a reader that culls is told its view's box")
 	before.visible = false
 	light.follow()
 	check(not light.readers.copy_of(before, 1).visible, "a hidden reader's copy is hidden")
@@ -161,12 +168,11 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 	light.use_views([] as Array[Viewport])
 	check_equal(light.view_count(), 0, "one picture again")
 	check(not light.readers.copy_of(light.apply, 1).visible, "the copies are hidden with one picture")
-	check(before.get_instance_shader_parameter(ViewReadersScript.CULL_BOX) is Vector4, "a reader that culls is told its view's box")
 	light.release()
 	# The light switched off: its readers drawn as any of the world's again, culled by no box.
 	root.remove_child(light)
 	check_equal(before.visibility_layer, ViewReadersScript.WORLD_LAYER, "a reader the light let go is on the world's layer again")
-	check_equal(before.get_instance_shader_parameter(ViewReadersScript.CULL_BOX), Vector4.ZERO, "and culls by no box")
+	check_equal(reader.get_shader_parameter(ViewReadersScript.CULL_BOX), Vector4.ZERO, "and culls by no box")
 	# A reader whose material is changed to one the light does not read is let go too.
 	root.add_child(light)
 	light.use_views(_split.views())

@@ -67,10 +67,11 @@ uniform sampler2D ramp_table : filter_nearest;
 uniform sampler2D shape_atlas : filter_nearest;
 // The spell light's buffer (Motes.set_light), for the lit-only kinds; `light_on` false: none.
 #include "res://gameplay/feel/light_views.gdshaderinc"
-// The part of the world the view this is drawn in shows (x0, y0, x1, y1; all 0: none; ViewReaders,
+// The part of the world the view this is drawn in shows (x0, y0, x1, y1; all 0: none; each view's
+// material its own, ViewReaders,
 // the performance pass of 2026-11-20): a mote that cannot reach it is folded away before its flight
 // is worked out, so a view of one room does not work out the motes of the others.
-instance uniform vec4 view_cull_box = vec4(0.0);
+uniform vec4 view_cull_box = vec4(0.0);
 // How far past its flight's reach a mote may still be drawn (px): its shape and glow, its sway
 // round its kind's, the stirs, and a frame of the camera's lag.
 const float CULL_PAD = 48.0;

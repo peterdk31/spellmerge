@@ -56,7 +56,7 @@ extends Node
 ##   follows it (`use_views`: the light buffer the first view's, then one more a view, sharing its
 ##   world, so the lights are drawn once a view). What reads the light by the screen (the apply rect,
 ##   and what `read_by` names: the lit-only motes, the mist) reads its own view's buffer, named by
-##   its view (`light_views.gdshaderinc`'s instance uniform; the owner, 2026-11-20): each canvas item
+##   its view (`light_views.gdshaderinc`'s uniform, a copy of the material a view; the owner, 2026-11-20): each canvas item
 ##   drawn with a reader's material is drawn once a view, a copy a view on that view's layer
 ##   (`readers`, `view_readers.gd`). One material serves every view.
 

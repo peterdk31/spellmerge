@@ -54,8 +54,8 @@ extends ActorController
 ##   uses one item of the shown body's bag that is tagged usable (a potion, an active relic: its
 ##   `ItemContent.use_of`, found in the registry): one is taken and the body is given what its use
 ##   does through Combat (`health_gift_requested`); refused for
-##   none held (NO_ITEM), a thing not tagged usable (NO_USE, `ItemKinds.usable`) and a potion that only heals while the
-##   body is whole (NO_NEED: never wasted).
+##   none held (NO_ITEM), a thing not tagged usable (NO_USE, `ItemKinds.usable`) and a use that only heals while the
+##   body is whole (NO_NEED, `ItemUse.wasted_on`: never wasted).
 ## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the
 ##   inventory menu's d-pad on an item, binds the shown body's quick-use slot (`Inventory.bind_quick`;
 ##   refused as it says), and `quick_use_requested(player, slot)`, a d-pad arm pressed in play, uses

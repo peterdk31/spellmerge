@@ -23,9 +23,10 @@ func wasted_on(health: float, most: float) -> bool:
 	return use_of().wasted_on(health, most)
 
 
-## What is wrong with it, one line each: its item's, and a potion that does nothing.
+## What is wrong with it, one line each: its item's, and a potion that does nothing (said once: a
+## tagged one's use already says it).
 func problems() -> PackedStringArray:
 	var found: PackedStringArray = super.problems()
-	if heal <= 0.0 and more_most <= 0.0:
+	if heal <= 0.0 and more_most <= 0.0 and not usable:
 		found.append("The potion '%s' neither heals nor adds most health." % id)
 	return found

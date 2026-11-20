@@ -178,7 +178,7 @@ static func can(kind: StringName, action: StringName) -> bool:
 
 ## True when the item `id` of `bag` is tagged usable (`ItemContent.usable`; the owner, 2026-11-20):
 ## only such an item is used from the bag or bound to a d-pad arm. An item `registry` has no content
-## of, or whose content has no tag (a staff, a card, a relic), is not.
+## of, or whose content is untagged or can carry no tag (a staff, a card), is not.
 static func usable(bag: StringName, id: StringName, registry: RegistryScript) -> bool:
 	var found := content(kind_in(bag, id), id, registry) as ItemContent
 	return found != null and found.usable

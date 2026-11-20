@@ -20,8 +20,8 @@ extends Node
 ## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
-## runs' (`validate_runs()`), and pushes one warning per problem, so broken spell or run content
-## shows up on the first run.
+## runs' (`validate_runs()`) and the items' (`validate_items()`: an item tagged usable with no use),
+## and pushes one warning per problem, so broken spell, run or item content shows up on the first run.
 ##
 ## Sounds (docs/milestones/sound.md, section 3) are `.ogg` files and `.tres` files (an
 ## `AudioStreamRandomizer` of a sound's baked variants: `<id>.tres` naming `variants/1.ogg` ...)

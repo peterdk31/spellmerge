@@ -90,13 +90,18 @@ func test_a_relic_tagged_usable_binds_and_its_active_use_is_used() -> void:
 	_world.run(1)
 	check_equal(wizard.health.health, 75.0, "its active use healed 25")
 	check_equal(_refused, [] as Array[String], "nothing refused")
-	relic.usable = false
+	check_equal(wizard.inventory.count_of(&"relics", relic.id), 0, "a use takes it, as a potion's does")
+	var quiet := RelicBase.new()
+	quiet.id = &"test_passive_idol"
+	check(_world.registry.add(&"relics", quiet), "an untagged test-only relic")
 	var passive := ItemStack.new()
 	passive.kind = ItemKinds.RELIC
-	passive.id = relic.id
-	check(wizard.inventory.add(passive), "an untagged relic taken")
-	check_equal(wizard.inventory.bind_quick(1, &"relics", relic.id), Inventory.Refusal.NO_USE, "untagged: refused")
+	passive.id = quiet.id
+	check(wizard.inventory.add(passive), "taken")
+	check_equal(wizard.inventory.quick_slot_of(&"relics", quiet.id), Inventory.NO_QUICK, "never auto-bound")
+	check_equal(wizard.inventory.bind_quick(1, &"relics", quiet.id), Inventory.Refusal.NO_USE, "untagged: refused")
 	_world.registry.remove(&"relics", relic.id)
+	_world.registry.remove(&"relics", quiet.id)
 
 
 func test_every_untagged_item_is_refused_for_binding() -> void:

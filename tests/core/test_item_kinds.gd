@@ -98,7 +98,14 @@ func test_the_content_validator_passes_every_item_and_rejects_a_tagged_one_with_
 	check_equal(relic.problems(), PackedStringArray(), "with its active use: sound")
 	relic.usable = false
 	check(relic.problems()[0].contains("not tagged usable"), "a use with no tag is never used: said (%s)" % [relic.problems()])
-	check(registry.call("validate_items") is PackedStringArray, "the validator is the registry's")
+	var broken := RelicBase.new()
+	broken.id = &"test_broken_idol"
+	broken.usable = true
+	check(registry.call("add", &"relics", broken), "a broken relic in the registry")
+	var lines: PackedStringArray = registry.call("validate_items")
+	registry.call("remove", &"relics", broken.id)
+	check_equal(lines.size(), 1, "the registry's validator finds it: %s" % [lines])
+	check(lines.size() == 1 and lines[0].contains("test_broken_idol") and lines[0].contains("clear its usable tag"), "naming it and the fix")
 
 
 func test_potions_and_the_coin_are_sound_content() -> void:

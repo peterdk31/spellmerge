@@ -4,7 +4,7 @@ extends RefCounted
 ## icon, name and description): one answer for every kind, so the Rewards area's choices, a shop's
 ## shelf and the inventory show an item the same way. A card's are Spells' to say (no script
 ## outside core/spells reads a card); a staff's its `StaffBase`'s; any other kind's its content's
-## (`ItemContent`, or a `RelicBase`: `shown_name`, `description`, `icon`), found in the registry
+## (an `ItemContent`, a relic's too: `shown_name`, `description`, `icon`), found in the registry
 ## folders of its row (`ItemKinds.content_of`). Static only; it keeps nothing.
 ##
 ##     var look: Dictionary = ItemLooks.of(ItemKinds.POTION, &"healing", registry, spells)

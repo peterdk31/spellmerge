@@ -11,16 +11,28 @@ extends "res://tests/support/suite.gd"
 ## Each test gets a fresh manager in a 640 x 360 room with an event bus and a table of four wizards
 ## at ids 0-3 and one enemy, `imp` (`before_each`); the manager is stepped by hand.
 ##
-## The last test times the machine (a budget in wall time), so the runner runs this file in a
-## process of its own (`# unit-test-alone`; ci/build/unit_tests.sh, TIMED_TESTS).
+## The last test times the machine (a budget in wall time, in units of a reference workload measured
+## beside it: tests/support/wall_clock.gd), so the runner runs this file in a process of its own
+## (`# unit-test-alone`; ci/build/unit_tests.sh, TIMED_TESTS).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const OrbitShot := preload("res://tests/support/orbit_shot.gd")
+const WallClock := preload("res://tests/support/wall_clock.gd")
 
 const DT: float = 1.0 / 60.0
+## The cost test (`test_many_shots_with_behaviours_stay_cheap`): its steps, its runs (the fastest
+## counts), and what a run usually costs in GDScript references (`WallClock`), with the native
+## kernel on one thread and without it (2026-11-20, a quiet 4-core container: 64-69 and about 108);
+## the limit is COST_SLACK times that, so the manager's own 2x slowdown fails on a machine like that
+## one, loaded or not.
+const COST_STEPS: int = 120
+const COST_RUNS: int = 3
+const COST_USUAL_NATIVE: float = 68.0
+const COST_USUAL_GDSCRIPT: float = 108.0
+const COST_SLACK: float = 1.5
 ## The wall most tests put in a shot's way: x 96..128, y 0..200.
 const WALL: Rect2 = Rect2(96.0, 0.0, 32.0, 200.0)
 ## The caster's place in the return and self-hit tests.
@@ -45,12 +57,9 @@ var pair: Array[Node2D] = []
 
 func before_each() -> void:
 	bus = own(EventsScript.new()) as EventsScript
-	mgr = own(ManagerScript.new()) as ManagerScript
 	table = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	imp = ActorSeats.enemy(table)
-	mgr.actors = table
-	mgr.events = bus
-	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	mgr = _new_manager()
 	hits.clear()
 	expired.clear()
 	blocked.clear()
@@ -58,6 +67,15 @@ func before_each() -> void:
 	bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: expired.append([caster, position, tag, mgr.expired_on_wall]))
 	bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void: hits.append([caster, target, position, tag]))
 	bus.shot_blocked.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: blocked.append([caster, position, tag]))
+
+
+## A fresh manager (owned) in the 640 x 360 room, on this test's table and bus.
+func _new_manager() -> ManagerScript:
+	var made := own(ManagerScript.new()) as ManagerScript
+	made.actors = table
+	made.events = bus
+	made.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	return made
 
 
 func _target(position: Vector2, radius: float = 10.0, layer: int = ManagerScript.LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> Node2D:
@@ -950,7 +968,8 @@ func test_a_fresh_shot_has_no_leftovers_from_its_slots_last_one() -> void:
 # --- The cost ------------------------------------------------------------------------------
 
 
-func test_many_shots_with_behaviours_stay_cheap() -> void:
+## 1,500 shots with every behaviour, round 40 targets between two walls, on `mgr`.
+func _many_shots() -> void:
 	mgr.set_cap(3000)
 	_walls([Rect2(300.0, 0.0, 16.0, 360.0), Rect2(0.0, 0.0, 16.0, 360.0)] as Array[Rect2])
 	for i in 40:
@@ -965,9 +984,28 @@ func test_many_shots_with_behaviours_stay_cheap() -> void:
 			3: mgr.set_linger(slot, 0.4)
 			4: mgr.set_growth(slot, 1.5)
 			5: mgr.set_shield(slot, 1)
-	var started: int = Time.get_ticks_usec()
-	_run(120)
-	var per_step: float = float(Time.get_ticks_usec() - started) / 120.0
-	# The budget (docs/PLAN.md) is a few milliseconds a frame for the whole manager; headless
-	# test machines are slower, so only a gross regression fails.
-	check(per_step < 8000.0, "1,500 shots with behaviours step in %d us" % int(per_step))
+
+
+func test_many_shots_with_behaviours_stay_cheap() -> void:
+	# The same 120 steps of the same scene, each run on a manager of its own set up beforehand, taken
+	# in turn with the GDScript reference (most of a step's time is the manager's GDScript round the
+	# kernel); the fastest of each counts (tests/support/wall_clock.gd).
+	var managers: Array[ManagerScript] = []
+	for run in COST_RUNS:
+		if run > 0:
+			mgr = _new_manager()
+		# On one thread, as the reference runs (a threaded kernel's speed is the core count's).
+		mgr.set_native_threads(1)
+		_many_shots()
+		managers.append(mgr)
+	var next: Array[int] = [0]
+	var timed: WallClock.Timed = WallClock.against(func() -> void:
+		mgr = managers[next[0]]
+		next[0] += 1
+		_run(COST_STEPS), WallClock.gdscript_reference, COST_RUNS)
+	var per_step: float = float(timed.work_usec) / float(COST_STEPS)
+	print("1,500 shots with behaviours (%s, one thread): a step %d us at best, %.2f GDScript references a run (one %d us)" % ["native" if mgr.is_native() else "GDScript", int(per_step), timed.multiple, timed.reference_usec])
+	# The budget (docs/PLAN.md) is a few milliseconds a frame for the whole manager (about 2 ms a
+	# step here). In references, so a loaded or a slow machine slows both alike.
+	var most: float = (COST_USUAL_NATIVE if mgr.is_native() else COST_USUAL_GDSCRIPT) * COST_SLACK
+	check(timed.multiple <= most, "1,500 shots with behaviours step 120 times in %.2f GDScript references, within %.1f (%d us a step)" % [timed.multiple, most, int(per_step)])

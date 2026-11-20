@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "path": "art/grounds/arena_14/arena_14_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The Ossuary niches's floor (connected biomes CB13), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_14/arena_14.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, the light from the upper left, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge). Clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/arena_14/arena_14_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The Ossuary niches's underside (connected biomes CB13), drawn by tools/ground_shape.py from content/rooms/crypt/arena_14/arena_14.shape.json: the slab's rock hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/arena_14/arena_14_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The Ossuary niches's edge glow (connected biomes CB13), drawn at half size by tools/ground_shape.py from content/rooms/crypt/arena_14/arena_14.shape.json: the crypt edge's faint glow along the slab's lip, added over what lies below it."
+    }
+  ]
+}

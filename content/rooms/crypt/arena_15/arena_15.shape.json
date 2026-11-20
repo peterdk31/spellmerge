@@ -1,0 +1,118 @@
+{
+	"about": "The crypt's Cracked font (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark the baptismal font in its middle, cracked and fallen in to a round pit, a ring of eight pillars standing round it under the shaft of light. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_15_ground.tscn and its art from this.",
+	"size": [
+		576,
+		576
+	],
+	"seed": 139,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 25,
+		"pins": [
+			[
+				0,
+				256,
+				40,
+				320
+			],
+			[
+				536,
+				256,
+				576,
+				320
+			],
+			[
+				256,
+				0,
+				320,
+				40
+			],
+			[
+				256,
+				536,
+				320,
+				576
+			]
+		],
+		"bays": [
+			[
+				128,
+				36,
+				20
+			],
+			[
+				448,
+				540,
+				18
+			],
+			[
+				36,
+				448,
+				19
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	},
+	"pits": [
+		{
+			"centre": [
+				288,
+				288
+			],
+			"radii": [
+				40,
+				36
+			],
+			"rough": [
+				[
+					30,
+					0.12
+				],
+				[
+					10,
+					0.05
+				]
+			],
+			"seed": 31
+		}
+	],
+	"cracks": [
+		{
+			"pit": 0,
+			"angle": 0.125,
+			"width": 6,
+			"length": 56,
+			"seed": 5
+		},
+		{
+			"pit": 0,
+			"angle": 0.625,
+			"width": 5,
+			"length": 52,
+			"seed": 8
+		}
+	]
+}

@@ -118,6 +118,7 @@ const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
@@ -130,6 +131,7 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
 const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
 const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
@@ -511,6 +513,9 @@ var _fall_motes: Callable = Callable()
 var _spawn_look: SpawnLook = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
+## The enemies close to each seat's wizards, found once a drawn frame for the party camera and the
+## split views to frame (`close_foes.gd`; the owner, 2026-11-19).
+var close_foes: CloseFoesScript = CloseFoesScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
 ## What dead layered bodies leave: their parts flying apart (boss plan OB8, `remnants.gd`).
@@ -537,6 +542,8 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
 var _unseen: UnseenDarkScript = null
+## The black void under a biome's slabs (`void_backdrop.gd`; the owner, 2026-11-19).
+var _void: VoidBackdropScript = null
 ## Each room's own light tinted by its kind (`room_tints.gd`; CB12b), onto the spell light.
 var _tints: RoomTintsScript = null
 ## What each mouth tells of the room behind it, and the held Y map (connected biomes CB9).
@@ -892,6 +899,9 @@ func _ready() -> void:
 	_locks.registry = registry
 	add_child(_locks)
 	_locks.bind(events)
+	_void = VoidBackdropScript.new()
+	_void.name = "VoidBackdrop"
+	add_child(_void)
 	_unseen = UnseenDarkScript.new()
 	_unseen.name = "UnseenDark"
 	_unseen.pieces = _hearing
@@ -1044,11 +1054,12 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	party_camera.follow(_live_camera())
 	var seats_here: int = _seats_here()
-	party_camera.look(_actor_table(), seats_here)
+	close_foes.find(_actor_table(), projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null)
+	party_camera.look(_actor_table(), seats_here, close_foes)
 	party_camera.step(real_delta)
 	if split_screen != null:
 		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
-		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera, close_foes)
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
@@ -1129,6 +1140,8 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_mouth_symbols.step(real_delta, table, seats_here, grid)
 	if _unseen != null:
 		_unseen.step(real_delta, grid)
+	if _void != null:
+		_void.step(grid, projectiles.bounds() if grid != null else Rect2())
 	if _tints != null:
 		_tints.step(real_delta, grid, _spectacle.light if _spectacle != null else null)
 	if _party_map != null:
@@ -2515,6 +2528,11 @@ func lock_looks() -> LockLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## The black void under a biome's slabs (for tests).
+func void_backdrop() -> VoidBackdropScript:
+	return _void
 
 
 ## Each room's tint by its kind (CB12b; for tests and the screenshots).

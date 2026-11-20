@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ## the world's camera driven by the party camera as in the game.
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
@@ -397,3 +398,73 @@ func test_three_views_where_one_merges_into_another_without_a_jump() -> void:
 			break
 	check_equal(_split.views.count, 2, "merged: two views")
 	check_equal(_split.views.view_of_seat(0), _split.views.view_of_seat(1), "seats 0 and 1 share one")
+
+
+# --- Close foes (the owner, 2026-11-19) ------------------------------------------------------------
+
+## An enemy at `at`.
+func _foe(at: Vector2) -> Node2D:
+	var node := own(Node2D.new()) as Node2D
+	root.add_child(node)
+	node.global_position = at
+	var id: int = _table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_table.set_node(id, node)
+	_bodies.append(node)
+	return node
+
+
+## A view zooms out for the foes close to its own wizards, no further than the widest zoom, eased;
+## the cells still cover the screen and hold their wizards; the other view stays at the split's zoom.
+func test_a_view_zooms_out_for_its_close_foes_and_its_cell_still_holds_its_wizard() -> void:
+	if _rooms.size() < 12:
+		check(false, "the biome's rooms were read")
+		return
+	_wizard(0, _rooms[0])
+	_wizard(1, _rooms[8])
+	var foe: Node2D = _foe(_rooms[0] + Vector2(0.0, CloseFoesScript.REACH - 30.0))
+	var foes := CloseFoesScript.new()
+	var zooms: Array[float] = []
+	for i in 120:
+		foes.find(_table, null)
+		_party.look(_table, 0, foes)
+		_party.step(FRAME)
+		_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
+		var near: int = _split.views.view_of_seat(0)
+		if near >= 0:
+			zooms.append(_split.views.to_screen[near].x.x)
+	var views: ScreenViewsScript = _split.views
+	check_equal(views.count, 2, "split")
+	var near: int = views.view_of_seat(0)
+	var far: int = views.view_of_seat(1)
+	var zoom: float = views.to_screen[near].x.x
+	check(zoom < SplitCameraScript.SPLIT_ZOOM - 0.05, "seat 0's view zoomed out for its foe (%f)" % zoom)
+	check(zoom >= PartyCameraScript.MIN_ZOOM - 0.001, "no further than the widest zoom")
+	check(absf(views.to_screen[far].x.x - SplitCameraScript.SPLIT_ZOOM) < 0.01, "seat 1's view, with no foe near, at the split's zoom")
+	var drawn: Vector2 = views.to_screen[near] * foe.global_position
+	check(views.cell_holds(near, drawn, 0.5), "the foe is drawn in its wizard's cell (%s)" % drawn)
+	_check_cover(views, "with a close foe")
+	_check_own_cells(views, "with a close foe")
+	for i in range(1, zooms.size()):
+		check(absf(zooms[i] - zooms[i - 1]) < 0.05, "the zoom eases, no jump (%f to %f)" % [zooms[i - 1], zooms[i]])
+		if absf(zooms[i] - zooms[i - 1]) >= 0.05:
+			break
+	# A foe far beyond the cell: the zoom stops at the widest.
+	var far_grid := RoomGrid.new()
+	far_grid.size_to(Rect2(_rooms[0] - Vector2(4096.0, 4096.0), Vector2(8192.0, 8192.0)))
+	far_grid.set_sealed(far_grid.add_place(Rect2(_rooms[0] - Vector2(2048.0, 2048.0), Vector2(4096.0, 4096.0))), true)
+	foe.global_position = _rooms[0] + Vector2(0.0, 1800.0)
+	for i in 240:
+		foes.find(_table, far_grid)
+		_party.look(_table, 0, foes)
+		_party.step(FRAME)
+		_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
+	near = _split.views.view_of_seat(0)
+	var limits := Rect2(_camera.limit_left, _camera.limit_top, _camera.limit_right - _camera.limit_left, _camera.limit_bottom - _camera.limit_top)
+	var widest: float = maxf(PartyCameraScript.MIN_ZOOM, maxf(SCREEN.x / limits.size.x, SCREEN.y / limits.size.y))
+	check(near >= 0 and absf(_split.views.to_screen[near].x.x - widest) < 0.01, "a far foe in a sealed fight: the view stops at the widest zoom the limits allow, %f (%f)" % [widest, _split.views.to_screen[near].x.x if near >= 0 else -1.0])
+	check(_split.split, "a foe never merges or splits the views: still split")
+	_check_own_cells(_split.views, "with a far foe")
+	# Narrow limits (a biome one screen tall): the view zooms out no wider than they allow.
+	_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
+	var group: int = 0
+	check(is_equal_approx(_split.zoom_for_foes(group, SCREEN, Rect2(limits.position, Vector2(limits.size.x, SCREEN.y / 0.8))), 0.8), "limits 1/0.8 screens tall: no wider than 0.8")

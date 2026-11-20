@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-19: The camera holds close foes; the void and unseen rooms are black; big doorway signs
+
+Four view changes the owner asked for (docs/milestones/connected-biomes.md, "The view: close foes, the black void, dark rooms, big signs"), all in Feel. The party camera and each Voronoi view now frame the enemies close to their wizards (same room or bridge, and sealed in a fight or within 384 px) as well as the wizards, zoomed out smoothly no further than 0.5, the wizards always kept in and the split's cells still holding them. The void between a biome's slabs is pure black with a sparse drift of motes given off only outside the rooms and bridges, within the motes' limits. A room nobody has entered is covered wholly in that black and opens by shrinking 16 px blocks over four frames. Every doorway's kind sign is three times bigger (21 px), lit by a light spot of its kind's light and kept clear of the room's dark; it rises in by rows as a wizard comes within 320 px and sinks back once none is near. Tests for each; screenshots in `tests/screenshots/shot_view_framing.gd`.
+
 ## 2026-11-19: Reward items, pick 1 of 3, a shop's reroll sign, pickup sounds, RT opens a bag
 
 Five asks of the owner (docs/milestones/connected-biomes.md, "Reward items, pick 1 of 3, a shop's reroll sign"). A cleared room's reward no longer pops up: each present player's offer lies as a small chest in their colours in the room, and their A at it opens the pick; an absent player's still waits (rule 4), and a chest left unopened is lost with its biome. Rewards offer 3 choices. Each shop has a reroll sign: A at it rolls a new shelf for 3, 5, 8, ... coins. Every pickup kind has its own generated sound, heard only from this machine's rooms. RT enters a bag in the inventory.

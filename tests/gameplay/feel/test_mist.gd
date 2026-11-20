@@ -159,6 +159,34 @@ func test_every_crypt_room_and_the_hub_have_a_void_round_them() -> void:
 			check_equal(image.get_pixel(floori(box.get_center().x / cell), floori(box.get_center().y / cell)).g, 0.0, "%s: its pit stays a pit" % id)
 
 
+## Most of the crypt's templates draw their slab's dark as walls out to their rectangle's edge (no
+## open cell or hole at the edge): their void is the walls joined to the edge, and a low wall standing
+## free in the room is still no edge (playtest, 2026-11-20: 11 templates warned on every run and their
+## mist thickened round every pillar).
+func test_a_room_walled_to_its_edge_finds_its_void_in_its_rim() -> void:
+	var walls: Array[Rect2] = [Rect2(0, 0, 320, 32), Rect2(0, 128, 320, 32), Rect2(0, 0, 32, 160), Rect2(288, 0, 32, 160), Rect2(144, 72, 32, 16)]
+	check(MistMaskScript.finds_void(SIZE, walls, [] as Array[Rect2]), "the rim joined to the edge is its void")
+	var image: Image = MistMaskScript.build(SIZE, walls, [] as Array[Rect2], true)
+	var by_edge: Color = _texel(image, Vector2(80, 36))
+	check(_texel(image, Vector2(160, 92)).r > by_edge.r * 2.0, "a low wall standing in the room is no edge: thin over the fight")
+	check(_texel(image, Vector2(160, 80)).r > by_edge.r * 2.0, "nor its own cells")
+	check_equal(_texel(image, Vector2(4, 4)).r, 0.0, "the rim is the edge itself")
+
+
+func test_every_room_with_a_mist_finds_its_void_in_every_mirroring() -> void:
+	var checked: int = 0
+	for item: Resource in registry.get_all(&"rooms"):
+		var room := item as RoomBase
+		if room == null or room.walkway or room.scene == null or room.mist == null:
+			continue
+		var size: Vector2 = room.places().size
+		for mirror in 4:
+			var shape: PieceShape = PieceShape.of_room(room, mirror)
+			check(MistMaskScript.finds_void(size, shape.walls, shape.holes), "%s (mirrored %d): its mist finds the void round its slab" % [room.id, mirror])
+		checked += 1
+	check(checked > CRYPT_ROOMS.size(), "the crypt's rooms with a mist are checked (%d)" % checked)
+
+
 func test_the_mask_of_a_room_open_to_its_edge_measures_from_the_edge() -> void:
 	var image: Image = MistMaskScript.build(SIZE, [] as Array[Rect2], [] as Array[Rect2])
 	check(_texel(image, Vector2(4, 80)).r < _texel(image, Vector2(80, 80)).r, "no walls: the room's own edge is its edge")

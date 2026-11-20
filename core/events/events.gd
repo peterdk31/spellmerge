@@ -582,6 +582,12 @@ signal special_room_opened(room: int, fill: StringName, table: StringName, area:
 ## it says is drawn as it stands, not played in: a machine that joined mid-run learns the map so).
 ## For the view only. Heard by feel (the dark over the unvisited rooms, the held Y map).
 signal rooms_seen(seen: PackedByteArray, again: bool)
+## Sender: flow (the owner, 2026-11-20, #883). The biome's rooms cleared: `cleared[room]` 1 for each
+## room by its number whose fight is over or that had none (`RoomLife.CLEARED`, Flow's state, read
+## here and never kept again), a copy. Sent as a room is cleared; empty as the biome goes; `again`
+## after a restore (drawn as it stands, not played in). For the view only. Heard by feel (the
+## doorway signs' and the held Y map's cleared look, `room_hearing.gd`).
+signal rooms_cleared(cleared: PackedByteArray, again: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it

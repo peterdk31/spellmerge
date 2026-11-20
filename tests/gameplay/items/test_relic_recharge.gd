@@ -11,6 +11,8 @@ const ItemsScript := preload("res://gameplay/items/items.gd")
 const RELICS: StringName = &"relics"
 ## The test-only relic's cooldown, in seconds.
 const COOLDOWN: float = 4.0
+## Ticks the dropped relic lies before it is taken (the fixture's tick is `Fixture.STEP`).
+const ON_GROUND: int = 16
 
 var _world: Fixture
 var _items: ItemsScript
@@ -54,6 +56,11 @@ func _tick(count: int = 1) -> void:
 		_items.step(Fixture.STEP)
 
 
+## Enough ticks for `seconds` to pass, and one more.
+func _ticks_for(seconds: float) -> int:
+	return int(ceilf(seconds / Fixture.STEP)) + 1
+
+
 func _relic_stack() -> ItemStack:
 	var stack := ItemStack.new()
 	stack.kind = ItemKinds.RELIC
@@ -82,7 +89,7 @@ func _lying() -> GroundItem:
 func test_a_dropped_relic_recharges_on_the_ground_and_is_taken_mid_recharge() -> void:
 	var first: Actor = _used_by_seat_0()
 	var second: Actor = _world.wizard(1, Vector2(200, 0))
-	_tick(30)
+	_tick(4)
 	var held_left: float = first.inventory.recharge_left(RELICS, _relic.id)
 	_told.clear()
 	check_equal(first.inventory.drop(RELICS, _relic.id), Inventory.Refusal.NONE, "seat 0 drops it mid-recharge")
@@ -91,9 +98,9 @@ func test_a_dropped_relic_recharges_on_the_ground_and_is_taken_mid_recharge() ->
 	var row: GroundItem = _lying()
 	check_equal(row.stack.recharge_left, held_left, "it lies as recharged as it was held")
 	check_equal(row.stack.recharge_whole, COOLDOWN, "of its whole cooldown")
-	_tick(60)
+	_tick(ON_GROUND)
 	row = _lying()
-	check(absf(row.stack.recharge_left - (held_left - 1.0)) < 0.001, "a second on the ground: a second recharged (%s)" % row.stack.recharge_left)
+	check(absf(row.stack.recharge_left - (held_left - ON_GROUND * Fixture.STEP)) < 0.001, "%d ticks on the ground: as much recharged (%s of %s)" % [ON_GROUND, row.stack.recharge_left, held_left])
 	var ground_left: float = row.stack.recharge_left
 	second.position = row.at
 	_told.clear()
@@ -113,7 +120,7 @@ func test_a_dropped_relic_recharges_on_the_ground_and_is_taken_mid_recharge() ->
 	_tick()
 	check_equal(_refused, [[1, "That is still recharging."]], "seat 1's use refused while it recharges")
 	check_equal(second.health.health, health, "and nothing healed")
-	_tick(int(ceilf(taken_left * 60.0)) + 2)
+	_tick(_ticks_for(taken_left))
 	check_equal(second.inventory.recharge_left(RELICS, _relic.id), 0.0, "recharged in seat 1's bag")
 	_refused.clear()
 	_world.bus.quick_use_requested.emit(1, 0)
@@ -135,7 +142,7 @@ func test_a_ready_relic_dropped_lies_ready_and_two_copies_keep_their_own() -> vo
 	check_equal(wizard.inventory.drop(RELICS, _relic.id), Inventory.Refusal.NONE, "one dropped")
 	check_equal(_lying().stack.recharge_left, COOLDOWN, "the least ready copy is the one let go")
 	check_equal(wizard.inventory.recharge_left(RELICS, _relic.id), 1.0, "the readiest kept")
-	_tick(61)
+	_tick(_ticks_for(1.0))
 	check_equal(wizard.inventory.recharge_left(RELICS, _relic.id), 0.0, "the kept one is ready")
 	check_equal(wizard.inventory.drop(RELICS, _relic.id), Inventory.Refusal.NONE, "and dropped too")
 	var ready_row: GroundItem = null
@@ -168,10 +175,10 @@ func test_what_lies_recharging_is_hashed_and_snapshotted() -> void:
 	check_equal(snapshot.problems.size(), 0, "taken without problems: %s" % [snapshot.problems])
 	var left: float = _lying().stack.recharge_left
 	hashed = SimHash.of(_items)
-	_tick(int(COOLDOWN * 60.0) + 2)
+	_tick(_ticks_for(COOLDOWN))
 	check(not _lying().stack.is_recharging(), "recharged where it lies")
 	check_equal(snapshot.restore(areas, root).size(), 0, "restored without problems")
 	check_equal(_lying().stack.recharge_left, left, "the recharge comes back as it was")
 	check_equal(SimHash.of(_items), hashed, "and the hash")
-	_tick(30)
+	_tick(2)
 	check(_lying().stack.recharge_left < left, "and counts down again")

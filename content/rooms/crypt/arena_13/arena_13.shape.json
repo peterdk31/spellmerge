@@ -1,0 +1,113 @@
+{
+	"about": "The crypt's Collapsed stair (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark a long pit north of the middle where the stair down to the lower vaults fell in, rubble and a fallen column along its lip, four pillars round it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_13_ground.tscn and its art from this.",
+	"size": [
+		768,
+		448
+	],
+	"seed": 131,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 21,
+		"pins": [
+			[
+				0,
+				192,
+				40,
+				256
+			],
+			[
+				728,
+				192,
+				768,
+				256
+			],
+			[
+				352,
+				0,
+				416,
+				40
+			],
+			[
+				352,
+				408,
+				416,
+				448
+			]
+		],
+		"bays": [
+			[
+				160,
+				412,
+				20
+			],
+			[
+				608,
+				36,
+				19
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	},
+	"pits": [
+		{
+			"centre": [
+				384,
+				176
+			],
+			"radii": [
+				76,
+				26
+			],
+			"rough": [
+				[
+					30,
+					0.12
+				],
+				[
+					10,
+					0.05
+				]
+			],
+			"seed": 29
+		}
+	],
+	"cracks": [
+		{
+			"pit": 0,
+			"angle": 0.0,
+			"width": 6,
+			"length": 64,
+			"seed": 4
+		},
+		{
+			"pit": 0,
+			"angle": 0.5,
+			"width": 5,
+			"length": 56,
+			"seed": 9
+		}
+	]
+}

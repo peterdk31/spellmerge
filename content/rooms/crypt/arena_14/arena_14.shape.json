@@ -1,0 +1,78 @@
+{
+	"about": "The crypt's Ossuary niches (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark its north side, a wall of stacked bones along the lip broken by two niches, each heaped with bones and skulls, candles lit before them. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, south) and behind the bone wall by pins. tools/ground_shape.py draws arena_14_ground.tscn and its art from this.",
+	"size": [
+		704,
+		576
+	],
+	"seed": 137,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 23,
+		"pins": [
+			[
+				0,
+				256,
+				40,
+				320
+			],
+			[
+				664,
+				256,
+				704,
+				320
+			],
+			[
+				320,
+				536,
+				384,
+				576
+			],
+			[
+				64,
+				0,
+				640,
+				40
+			]
+		],
+		"bays": [
+			[
+				36,
+				448,
+				20
+			],
+			[
+				668,
+				128,
+				18
+			],
+			[
+				544,
+				540,
+				19
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	}
+}

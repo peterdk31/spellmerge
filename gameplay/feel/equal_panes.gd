@@ -14,7 +14,7 @@ extends RefCounted
 ##   quarter is a blank: no view's, drawn as the void (`blank_quarter`).
 ## - **Three groups of four players** (a pair and two alone; the owner, 2026-11-20): the pair a half,
 ##   the two alone a quarter each of the other half; no void. A bisector cut cannot make that
-##   layout, so the pair's view is cut as its half's top quarter (`cut_site`) and the bottom quarter
+##   layout, so the pair's view is cut as its half's top quarter (`split_camera.gd` eases its anchor to the top quarter's middle) and the bottom quarter
 ##   is its **twin** (`twin_quarter`, `twin_group`): a blank site whose part of the screen shows the
 ##   pair's own picture with no divider between, so the two read as one pane.
 ##
@@ -129,14 +129,6 @@ func pane(group: int, screen: Vector2) -> Rect2:
 ## The middle of group `group`'s pane (where its view draws its wizards and its anchor stands).
 func site(group: int, screen: Vector2) -> Vector2:
 	return pane(group, screen).get_center()
-
-
-## Where group `group`'s view is cut from the others (its anchor's place): its pane's middle, or
-## for the pair with a twin its half's top quarter's middle (the twin's site is the bottom's).
-func cut_site(group: int, screen: Vector2) -> Vector2:
-	if group == twin_group:
-		return quarter_site(twin_quarter - 2, screen)
-	return site(group, screen)
 
 
 ## The middle of the blank quarter, or Vector2.INF (none).

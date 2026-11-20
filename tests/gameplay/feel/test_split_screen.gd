@@ -278,6 +278,51 @@ func test_a_pairs_twin_quarter_shows_the_pairs_own_picture() -> void:
 	_split.void_bounds = Rect2()
 
 
+## What the cell rect `rect` draws at screen pixel `p` by its shader's own parameters (-1 not its,
+## 0 its picture, 1 the divider), through `cell_pixel`.
+static func _drawn_by(rect: TextureRect, p: Vector2) -> int:
+	var material := rect.material as ShaderMaterial
+	var others := PackedVector2Array()
+	var widths := PackedFloat32Array()
+	for k in int(material.get_shader_parameter(&"others")):
+		others.append(material.get_shader_parameter(SplitScreenScript.OTHER_UNIFORMS[k]))
+		widths.append(material.get_shader_parameter(SplitScreenScript.DIVIDER_UNIFORMS[k]))
+	return SplitScreenScript.cell_pixel(p, material.get_shader_parameter(&"own"), others, widths, int(material.get_shader_parameter(&"before_mask")))
+
+
+## Regression (review): the pair's half's outer edge stepped by 2 px at its middle row (the single
+## beside the twin drew its whole line on its own side). Now the twin rect is cut as a pane of its
+## own: the divider's columns are the same above and below, every pixel is drawn exactly once.
+func test_a_pairs_half_has_a_straight_edge_beside_its_twin() -> void:
+	_split.camera.set_equal(true)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(60.0, 0.0))
+	_wizard(2, Vector2(3000.0, 0.0))
+	_wizard(3, Vector2(3000.0, 2500.0))
+	_frames(240)
+	var rects: Array[TextureRect] = [_split.twin_cell()]
+	for view in _split.camera.views.count:
+		rects.append(_split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(view))) as TextureRect)
+	var screen: Vector2 = root.get_visible_rect().size
+	var columns: Array[PackedInt32Array] = []
+	for y: float in [screen.y * 0.25 + 0.5, screen.y * 0.75 + 0.5]:
+		var line := PackedInt32Array()
+		for x in range(int(screen.x * 0.5) - 6, int(screen.x * 0.5) + 6):
+			var drawn: int = 0
+			var divider: bool = false
+			for rect in rects:
+				var got: int = _drawn_by(rect, Vector2(float(x) + 0.5, y))
+				if got >= 0:
+					drawn += 1
+					divider = divider or got == 1
+			check_equal(drawn, 1, "pixel (%d, %.1f) drawn by exactly one rect" % [x, y])
+			if divider:
+				line.append(x)
+		columns.append(line)
+	check_equal(columns[0].size(), SplitCameraScript.DIVIDER_WIDTH, "the line is its width beside the pair's top")
+	check_equal(columns[1], columns[0], "and in the same columns beside its twin")
+
+
 ## Every seat's wizard moved beside the others.
 func _wizard_move_all_together() -> void:
 	for id in ActorsScript.SEATS:

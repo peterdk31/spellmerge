@@ -160,6 +160,9 @@ var _foes: CloseFoesScript = null
 var _blank_quarter: int = -1
 ## The group (lowest seat) whose twin the blank is (it shows that group's picture; -1: the void).
 var _blank_owner: int = -1
+## The slot of the view the twin shows (kept while the twin moves out, whatever its group becomes:
+## a regrouping never swaps the twin's picture at once; -1: none).
+var _blank_owner_slot: int = -1
 var _blank_in: float = 0.0
 var _blank_at: Vector2 = Vector2.INF
 ## The equal split's panes for this frame's groups.
@@ -210,6 +213,7 @@ func reset() -> void:
 	views.count = 0
 	_blank_quarter = -1
 	_blank_owner = -1
+	_blank_owner_slot = -1
 	_blank_in = 0.0
 	_blank_at = Vector2.INF
 	_set_corners(false)
@@ -240,19 +244,26 @@ func blank_anchor(_blank: int) -> Vector2:
 ## pixels): twice the view's own, since the shader draws half a line a side and no view draws the
 ## blank's side, so the view draws the whole line; it grows in with the split, shrinks with the merge.
 func blank_divider(view: int) -> int:
-	if view == blank_owner_view():
-		# Its own twin: one pane, no line between.
-		return 0
+	var owner: int = blank_owner_view()
+	if owner >= 0:
+		# A pair's twin: none toward its own pair (one pane), and toward the others the line it has
+		# with its pair, split the same way (`blank_before`; the twin rect draws its own share).
+		return 0 if view == owner else divider_between(view, owner)
 	return _stage[_slot_of[view]] * 2
+
+
+## True when the line between view `view` and the blank is split as if the blank came first (it is
+## a twin whose owner comes before `view`), as `split_cell.gdshader`'s `before_mask` takes it.
+func blank_before(view: int) -> bool:
+	var owner: int = blank_owner_view()
+	return owner >= 0 and owner < view
 
 
 ## The view whose picture the blank shows (its twin, three groups of four players; the owner,
 ## 2026-11-20), or -1: the blank is the void.
 func blank_owner_view() -> int:
-	if _blank_owner < 0 or blank_count() == 0:
-		return -1
-	var slot: int = _group_slot[_blank_owner] if _group_seats[_blank_owner] != 0 else -1
-	if slot < 0 or _state[slot] != LIVE:
+	var slot: int = _blank_owner_slot
+	if slot < 0 or blank_count() == 0 or _state[slot] == FREE:
 		return -1
 	for view in views.count:
 		if _slot_of[view] == slot:
@@ -614,6 +625,15 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 		var way: Vector2 = _foes.at[i] - _group_middle[group]
 		if way.length_squared() < 1.0:
 			continue
+		if equal and split:
+			# Equal panes: the pane's own edges, exact for every layout (a pair's half beside two
+			# quarters included).
+			var pane: Rect2 = _panes.pane(group, screen)
+			zoom = _fit_along(zoom, way, Vector2.LEFT, site.x - pane.position.x)
+			zoom = _fit_along(zoom, way, Vector2.RIGHT, pane.end.x - site.x)
+			zoom = _fit_along(zoom, way, Vector2.UP, site.y - pane.position.y)
+			zoom = _fit_along(zoom, way, Vector2.DOWN, pane.end.y - site.y)
+			continue
 		# The screen's four edges, then the line half way to each other group's place.
 		zoom = _fit_along(zoom, way, Vector2.LEFT, site.x)
 		zoom = _fit_along(zoom, way, Vector2.RIGHT, screen.x - site.x)
@@ -626,11 +646,6 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 			if apart.length_squared() < 1.0:
 				continue
 			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
-		if equal and split:
-			# The empty quarter's edge, where it settles.
-			var blank: Vector2 = _panes.blank_site(screen) - site
-			if blank.is_finite() and blank.length_squared() >= 1.0:
-				zoom = _fit_along(zoom, way, blank.normalized(), blank.length() * 0.5)
 	var widest: float = PartyCameraScript.MIN_ZOOM
 	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
 		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
@@ -663,6 +678,7 @@ func _step_blank(delta: float, screen: Vector2) -> void:
 		if _blank_in <= 0.0:
 			_blank_quarter = want
 			_blank_owner = want_owner
+			_blank_owner_slot = _group_slot[want_owner] if want_owner >= 0 else -1
 	elif want >= 0:
 		_blank_in = minf(_blank_in + step, 1.0)
 	if _blank_quarter < 0:
@@ -817,7 +833,7 @@ func _anchor_of(slot: int, own: Vector2) -> Vector2:
 func _pane_anchor(slot: int, drawn: Vector2, screen: Vector2) -> Vector2:
 	var group: int = _group_holding(slot)
 	var site: Vector2 = _group_site[group]
-	if group == _blank_owner and _blank_quarter >= 2:
+	if slot == _blank_owner_slot and _blank_quarter >= 2:
 		# A pair with a twin: cut as its half's top quarter, eased there as the twin comes in, so the
 		# twin's site and its own cut the half from the others as two quarters do.
 		var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)

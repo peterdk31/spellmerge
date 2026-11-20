@@ -229,6 +229,8 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2) -> vo
 			break
 		material.set_shader_parameter(OTHER_UNIFORMS[others], camera.blank_anchor(blank))
 		material.set_shader_parameter(DIVIDER_UNIFORMS[others], float(camera.blank_divider(view)))
+		if camera.blank_before(view):
+			before |= 1 << others
 		others += 1
 	material.set_shader_parameter(&"others", others)
 	material.set_shader_parameter(&"before_mask", before)
@@ -256,6 +258,10 @@ func _show_twin(view: int, screen: Vector2) -> void:
 	var shown: SubViewport = _views[camera.slot_of(view)]
 	if _twin_cell == null:
 		_twin_cell = _new_cell("TwinCell", shown)
+		var made := ShaderMaterial.new()
+		made.shader = CELL_SHADER
+		made.set_shader_parameter(&"divider_colour", DIVIDER_COLOUR)
+		_twin_cell.material = made
 		# Over the blank's black, under every view's cell.
 		_layer.move_child(_twin_cell, _blank.get_index() + 1)
 	var texture: Texture2D = shown.get_texture()
@@ -263,6 +269,24 @@ func _show_twin(view: int, screen: Vector2) -> void:
 		_twin_cell.texture = texture
 	_twin_cell.size = screen
 	_twin_cell.visible = true
+	# Cut as a pane of its own about the twin's site: none toward its pair, toward the others the
+	# pair's own lines, split as the pair splits them (its share drawn here).
+	var laid: ScreenViewsScript = camera.views
+	var material := _twin_cell.material as ShaderMaterial
+	material.set_shader_parameter(&"screen_size", screen)
+	material.set_shader_parameter(&"own", camera.blank_anchor(0))
+	var others: int = 0
+	var before: int = 0
+	for other in laid.count:
+		if others >= OTHER_UNIFORMS.size():
+			break
+		material.set_shader_parameter(OTHER_UNIFORMS[others], laid.anchor[other])
+		material.set_shader_parameter(DIVIDER_UNIFORMS[others], 0.0 if other == view else float(camera.divider_between(view, other)))
+		if other < view:
+			before |= 1 << others
+		others += 1
+	material.set_shader_parameter(&"others", others)
+	material.set_shader_parameter(&"before_mask", before)
 
 
 ## The twin rect (null before it was first needed; for tests).

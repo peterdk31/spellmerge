@@ -248,7 +248,6 @@ func test_three_and_four_panes_are_quarters_with_a_blank_for_three() -> void:
 	check_equal(pair.blank_quarter, -1, "no void")
 	check_equal(pair.twin_group, 0, "the pair has a twin")
 	check_equal(pair.twin_quarter, 2, "its half's bottom quarter")
-	check_equal(pair.cut_site(0, SCREEN), QUARTERS[0].get_center(), "the pair is cut as its top quarter")
 	check_equal(pair.site(0, SCREEN), LEFT.get_center(), "and drawn at its half's middle")
 	check_equal(pair.corner, PackedInt32Array([0, 1, 2, 6]), "P2's panel at the top left quarter's inner side, P3's in its quarter")
 	var three_alone: EqualPanesScript = _laid([[0], [1], [2]])
@@ -585,3 +584,28 @@ func test_a_moved_panel_keeps_off_the_corner_of_a_seat_played_elsewhere() -> voi
 		_split.step(FRAME, _table, 0b0101, _camera, SCREEN)
 	check_equal(_split.views.count, 2, "only this machine's seats split it")
 	check_equal(_split.corners[2], 7, "in play too: P3's panel keeps off P4's corner")
+
+
+## Regression (review): the twin is kept by its view's slot, so when its pair's lowest seat changes
+## (a third joins the pair: two halves) the twin keeps the pair's picture while it moves out.
+func test_the_twin_keeps_its_pairs_picture_while_it_moves_out_after_a_regroup() -> void:
+	if not _ready_rooms():
+		return
+	var lone: Node2D = _wizard(0, _rooms[0])
+	_wizard(1, _rooms[11])
+	_wizard(2, _rooms[11] + Vector2(60.0, 0.0))
+	_wizard(3, _rooms[6])
+	_frames(300)
+	var owner: int = _split.blank_owner_view()
+	check(owner >= 0, "the pair P2 and P3 has a twin")
+	lone.global_position = _rooms[11] + Vector2(30.0, 40.0)
+	var frames_out: int = 0
+	for frame in 300:
+		_frame()
+		if _split.blank_count() == 0:
+			break
+		frames_out += 1
+		check(_split.blank_owner_view() >= 0, "while it moves out the twin shows its pair's picture (frame %d)" % frame)
+		if _split.blank_owner_view() < 0:
+			return
+	check(frames_out >= 3, "it moved out over frames (%d)" % frames_out)

@@ -8,7 +8,8 @@
 # ci/build/unit_tests.sh (batches, fixed frames, shards, the timed tests run again alone if they fail
 # among the others). Needs the pinned Godot
 # in build/godot (run ci/build/build.sh --quick once). `jobs` defaults to the cores. Logs and
-# each run's time: build/logs/ptest/ (unit-results.txt has one line per run).
+# each run's time: build/logs/ptest/ (unit-results.txt has one line per run). A failure is printed
+# with why (tools/ptest_failures.py).
 set -u
 cd "$(dirname "$0")/.."
 JOBS="${1:-$(nproc)}"
@@ -26,7 +27,10 @@ mkdir -p "$LOG/data/_import"
 XDG_DATA_HOME="$LOG/data/_import" "$GODOT" --headless --path . --import >"$LOG/_import.txt" 2>&1
 status=0
 GODOT="$GODOT" TEST_JOBS="$JOBS" ci/build/unit_tests.sh "$LOG" "$LOG/data" "$FILTER" || status=1
-if grep '^FAIL' "$LOG/unit-results.txt"; then
+if grep -q '^FAIL' "$LOG/unit-results.txt"; then
+  # Each failure with the lines of its log that say why (a batch's note, the failed checks, errors):
+  # the logs go with the machine, so a flaky failure is only explained by what is printed here.
+  python3 tools/ptest_failures.py "$LOG/unit-results.txt" || grep '^FAIL' "$LOG/unit-results.txt"
   exit 1
 fi
 ((status == 0)) && echo "no failures"

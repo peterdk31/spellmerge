@@ -78,9 +78,7 @@ const COOLDOWN: float = 2.0
 func _active_relic() -> RelicBase:
 	var relic := RelicBase.new()
 	relic.id = &"test_active_idol"
-	relic.active_use = ItemUse.health(25.0, 0.0)
-	relic.active_use.consumed = false
-	relic.active_use.cooldown = COOLDOWN
+	relic.active_use = ItemUse.kept(25.0, 0.0, COOLDOWN)
 	check_equal(relic.problems(), PackedStringArray(), "a sound active relic")
 	check(_world.registry.add(&"relics", relic), "a test-only relic")
 	return relic
@@ -109,6 +107,7 @@ func test_an_active_relic_is_kept_and_recharges_between_uses() -> void:
 	_take_relic(wizard, relic.id)
 	check_equal([wizard.inventory.quick_bag(0), wizard.inventory.quick_id(0)], [&"relics", relic.id], "auto-bound up")
 	_world.hurt(wizard, 80)
+	var before_use: int = recharges.size()
 	_press(0)
 	check_equal(wizard.health.health, 45.0, "its active use healed 25")
 	check_equal(_refused, [] as Array[String], "nothing refused")
@@ -118,10 +117,11 @@ func test_an_active_relic_is_kept_and_recharges_between_uses() -> void:
 	_press(0)
 	check_equal(_refused, ["That is still recharging."] as Array[String], "pressed again while recharging: refused with a hint")
 	check_equal(wizard.health.health, 45.0, "and nothing healed")
-	var told: int = recharges.size()
+	# Counted from the use's own start (the recharge runs on through the hurt's hit-stop: sim time).
+	var told: int = before_use + 1
 	_world.run(int(COOLDOWN * 60.0) + 2)
 	check_equal(wizard.inventory.recharge_left(&"relics", relic.id), 0.0, "recharged after its cooldown")
-	check_equal(recharges.size() - told, Inventory.RECHARGE_STEPS, "told at each sixteenth and once ready: %d" % (recharges.size() - told))
+	check_equal(recharges.size() - told, ItemStack.RECHARGE_STEPS, "told at each sixteenth and once ready: %d" % (recharges.size() - told))
 	check_equal((recharges.back() as Array).slice(0, 2), [relic.id, false], "the HUD told: ready")
 	_press(0)
 	check_equal(wizard.health.health, 70.0, "used again across its cooldown: healed again")

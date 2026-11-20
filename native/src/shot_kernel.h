@@ -61,6 +61,8 @@ public:
 	double threat_scan(Object *manager, const Vector2 &point, double radius, int64_t team, int64_t own, double horizon);
 	int64_t threat_fill(Object *manager, double horizon);
 	double threat_query(Object *manager, const Vector2 &point, double radius, int64_t team, int64_t own, double horizon);
+	// `shot_places`: which places hold a shot, from the room grid's whole squares (asks handed back).
+	int64_t shot_places(Object *manager, int64_t from);
 
 protected:
 	static void _bind_methods();

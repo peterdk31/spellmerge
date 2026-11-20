@@ -66,7 +66,12 @@ static func blank_seat(present: int) -> int:
 ## The middle of the blank quarter with three seats `present`, or Vector2.INF (none).
 static func blank_site(present: int, screen: Vector2) -> Vector2:
 	var seat: int = blank_seat(present)
-	return _quarter(seat, screen).get_center() if seat >= 0 else Vector2.INF
+	return quarter_site(seat, screen) if seat >= 0 else Vector2.INF
+
+
+## The middle of seat `seat`'s quarter of the screen (where a blank of that quarter settles).
+static func quarter_site(seat: int, screen: Vector2) -> Vector2:
+	return _quarter(seat, screen).get_center()
 
 
 ## Where a blank's site rests while it is not shown: past its quarter's corner of the screen, so far

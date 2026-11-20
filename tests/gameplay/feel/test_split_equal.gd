@@ -303,14 +303,24 @@ func test_with_three_the_blank_grows_in_from_its_corner_and_is_gone_before_the_m
 	check(_split.blank_anchor(0).distance_to(quarter_middle) < 0.5, "settled on its quarter")
 	# Walk back: the blank moves out before the panes are gone.
 	frames = 0
-	var had_blank_while_split: bool = false
+	var out_frames: int = 0
+	var last_out: float = 0.0
+	var corner_step: float = 0.0
 	while _split.views.count > 0 and frames < 4000:
 		walker.global_position += (_rooms[5] + Vector2(0.0, 30.0) - walker.global_position).limit_length(8.0)
 		_frame()
 		frames += 1
 		if _split.views.count > 0 and _split.blank_count() > 0:
-			had_blank_while_split = true
-	check(had_blank_while_split, "the blank was there while merging")
+			var out: float = _split.blank_anchor(0).distance_to(quarter_middle)
+			check(out >= last_out - 0.001, "moving out, the blank only goes farther")
+			if out - last_out > 0.001:
+				out_frames += 1
+				corner_step = maxf(corner_step, out - last_out)
+			last_out = out
+	# Regression: it once jumped to its rest at once, its quarter taken by the panes in one frame.
+	check(out_frames >= 3, "the blank moved out over at least three frames (%d)" % out_frames)
+	var whole_way: float = EqualPanesScript.blank_rest(3, SCREEN).distance_to(quarter_middle)
+	check(corner_step < whole_way * 0.5, "never most of the way in one frame (%.1f of %.1f px)" % [corner_step, whole_way])
 	check_equal(_split.views.count, 0, "together again: one picture")
 	check_equal(_split.blank_count(), 0, "and no blank")
 

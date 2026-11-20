@@ -35,7 +35,8 @@ extends RefCounted
 ##   split each seat has a view of its own, laid on its pane (`equal_panes.gd`: halves for two,
 ##   quarters for three or four, each seat's on its corner panel's side): its wizard drawn at its
 ##   pane's middle and its anchor easing there with its picture (at most PANE_ANCHOR_STEP a frame,
-##   from where its wizard was drawn), so the bisectors between the anchors settle on the panes' edges. With three seats the
+##   from where its wizard was drawn), so the bisectors between the anchors settle on the panes'
+##   edges. With three seats the
 ##   fourth quarter is a blank (`blank_count`, `blank_anchor`): a site no view owns, which moves in
 ##   from past its corner of the screen over BLANK_TIME as the screen splits and back out before
 ##   the last views merge, so it grows and shrinks from its corner. Close foes are framed inside
@@ -80,12 +81,13 @@ const SHRINK_FROM: float = 1.0
 ## the picture it split from gently rather than at the party camera's full pull.
 const EASE_IN: float = 0.4
 ## How long the equal split's blank quarter takes to move in from past its corner, or back out (real
-## seconds), and the most of that way it moves in one drawn frame (Smooth: at least three frames).
+## seconds).
 const BLANK_TIME: float = 0.4
+## The most of that way it moves in one drawn frame (Smooth: at least three frames).
+const BLANK_STEP_MOST: float = 1.0 / 3.0
 ## The most an equal pane's anchor moves a drawn frame on its way to its pane's middle (screen
 ## pixels; it eases with its picture, at least ANCHOR_STEP).
 const PANE_ANCHOR_STEP: float = 12.0
-const BLANK_STEP_MOST: float = 1.0 / 3.0
 
 ## A slot: free, a live view (its group's), or a view merging into another.
 const FREE: int = 0
@@ -216,10 +218,11 @@ func blank_anchor(_blank: int) -> Vector2:
 	return _blank_at
 
 
-## The divider's width between view `view` and the blank (whole pixels): the view's own, so it
-## grows in with the split and shrinks out with the merge.
+## The width the cell shader is told for the divider between view `view` and the blank (whole
+## pixels): twice the view's own, since the shader draws half a line a side and no view draws the
+## blank's side, so the view draws the whole line; it grows in with the split, shrinks with the merge.
 func blank_divider(view: int) -> int:
-	return _stage[_slot_of[view]]
+	return _stage[_slot_of[view]] * 2
 
 
 ## The slot of view `view` (0 to `views.count` - 1).
@@ -621,10 +624,9 @@ func _step_blank(delta: float, screen: Vector2) -> void:
 	if _blank_seat < 0:
 		_blank_at = Vector2.INF
 		return
+	# Between its rest and its own quarter's middle, going in, out or turning back, so it never jumps.
 	var rest: Vector2 = EqualPanesScript.blank_rest(_blank_seat, screen)
-	var site: Vector2 = EqualPanesScript.blank_site(_present, screen) if want == _blank_seat else rest
-	if not site.is_finite():
-		site = rest
+	var site: Vector2 = EqualPanesScript.quarter_site(_blank_seat, screen)
 	var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)
 	_blank_at = rest.lerp(site, t)
 

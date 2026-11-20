@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AimTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/aim_tuning.gd" id="1_aim"]
+
+[resource]
+script = ExtResource("1_aim")
+start_lead = 0.3
+start_error = 3.0
+sharp_level = 1.5
+elite_sharpness = 0.5
+lead_scale = 1.0
+error_scale = 1.0

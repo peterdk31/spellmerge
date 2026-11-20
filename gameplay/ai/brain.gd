@@ -89,8 +89,10 @@ const REST_BASE: float = 0.6
 ## Rests are whole sixteenths of a second, so they read the same on every frame rate and a test's
 ## fixed step meets them exactly.
 const TIME_GRAIN: float = 0.0625
-## The widest aim error (radians), at accuracy 0.
+## The widest aim error (radians), at accuracy 0 (before an enemy's `AimTuning`).
 const AIM_ERROR: float = deg_to_rad(14.0)
+## The enemies' aim tuning (`AimTuning`: depth, elites and the global knobs), a balance file.
+const AIM_TUNING: AimTuning = preload("res://content/enemies/profiles/aim_tuning.tres")
 ## Dodging: shots within this many pixels of its hurt circle, arriving within the horizon, count;
 ## one arriving sooner than URGENT_TIME makes the dodge urgent.
 const DODGE_MARGIN: float = 6.0
@@ -127,13 +129,15 @@ const GROUND_MARGIN: float = 12.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover", &"aim_tuning"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor", &"_turn_to"]
 
 ## The actor it drives, the profile it plays by and Entities (its team board; null: none).
 var actor: Actor = null
 var profile: AIProfile = null
+## How an enemy's aim is tuned (`AimTuning`; tests set their own, otherwise `AIM_TUNING`).
+var aim_tuning: AimTuning = AIM_TUNING
 var entities: EntitiesScript = null
 ## The team board (gameplay/ai/team_board.gd), or null: staggered fire, calls, and where its
 ## teammates stand and how hurt they are (it reports itself at each decision).
@@ -1000,7 +1004,7 @@ func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) ->
 	recover_time = rest_for(at)
 	state = State.WINDUP
 	_state_left = windup
-	_aim_error = (_roll() * 2.0 - 1.0) * (1.0 - profile.accuracy) * AIM_ERROR
+	_aim_error = (_roll() * 2.0 - 1.0) * aim_error_most()
 	_locked_aim = _aim_for(_chosen_sense, now, _aim_error)
 	intent.aim = _locked_aim
 	intent.press(at)
@@ -1200,12 +1204,40 @@ func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
 	var aimed_actor: Actor = aimed as Actor
 	if aimed_actor != null:
 		point += aimed_actor.body_offset - actor.body_offset
-	if sense != null and sense.speed > 0.0 and profile.lead > 0.0:
+	var lead: float = aim_lead()
+	if sense != null and sense.speed > 0.0 and lead > 0.0:
 		if aimed_actor != null:
-			point += aimed_actor.velocity * (point.length() / sense.speed) * profile.lead
+			point += aimed_actor.velocity * (point.length() / sense.speed) * lead
 	if point == Vector2.ZERO:
 		point = actor.aim
 	return DMath.rotated(point.normalized(), error)
+
+
+## How sharp its aim is, 0-1 (`AimTuning.sharpness`: its room's level, an elite nearer 1); 1 for a
+## brain that does not `warns()` (a test bot, an AI possessing a wizard), whose aim is not tuned.
+func aim_sharpness() -> float:
+	if not warns() or aim_tuning == null:
+		return 1.0
+	if actor == null:
+		return aim_tuning.sharpness(1.0, false)
+	return aim_tuning.sharpness(actor.room_level, actor.is_elite())
+
+
+## How far it aims ahead of a moving target, 0-1: its profile's `lead`, tuned (`AimTuning.lead_for`)
+## for an enemy.
+func aim_lead() -> float:
+	if not warns() or aim_tuning == null:
+		return profile.lead
+	return aim_tuning.lead_for(profile.lead, aim_sharpness())
+
+
+## Its widest aim error (radians, either side): `AIM_ERROR` × (1 − its profile's `accuracy`), tuned
+## (`AimTuning.error_for`) for an enemy.
+func aim_error_most() -> float:
+	var most: float = (1.0 - profile.accuracy) * AIM_ERROR
+	if not warns() or aim_tuning == null:
+		return most
+	return minf(most * aim_tuning.error_for(aim_sharpness()), PI)
 
 
 ## A staff whose next cast moves the caster and can leave now, or -1.

@@ -152,7 +152,7 @@ func test_aim_error_and_lead() -> void:
 		fx.run(imp, 1)
 		if brain.state == AIBrain.State.WINDUP:
 			off = maxf(off, absf(imp.aim.angle()))
-	check(off > 0.001 and off <= AIBrain.AIM_ERROR + 0.001, "a sloppy aim is off, within the widest error: %.3f" % off)
+	check(off > 0.001 and off <= brain.aim_error_most() + 0.001, "a sloppy aim is off, within the widest error: %.3f" % off)
 	fx.free_all()
 	fx = Fixture.new(root)
 	fx.players[0].position = Vector2(200.0, 0.0)
@@ -160,6 +160,8 @@ func test_aim_error_and_lead() -> void:
 	var leading: AIProfile = _profile()
 	leading.lead = 1.0
 	var ahead: Actor = _enemy([["fire", "bolt"]], Vector2.ZERO, leading)
+	# As deep as its aim is sharp (`AimTuning`; tests/gameplay/ai/test_ai_aim.gd tunes it).
+	ahead.room_level = AIBrain.AIM_TUNING.sharp_level
 	fx.run(ahead, 1)
 	check(ahead.aim.y > 0.2, "it aims ahead of a wizard walking down: %s" % ahead.aim)
 

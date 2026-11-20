@@ -229,11 +229,13 @@ func test_the_blank_quarter_shows_the_void_view_in_a_biome() -> void:
 	check_equal(view.world_2d, root.world_2d, "the same world")
 	var shows: Rect2 = _split.void_rect()
 	var screen: Vector2 = root.get_visible_rect().size
-	check_equal(shows.size, screen, "at the world's own size")
+	var zoom: float = _split.camera.view_zoom()
+	check(shows.size.distance_to((screen * 0.5).floor() / zoom) < 1.0, "the blank quarter's size at the views' zoom (%s)" % shows.size)
 	check(not shows.intersects(_split.void_bounds), "past the biome (%s)" % shows)
 	check(_split.void_bounds.grow(VoidBackdropScript.GROW).encloses(shows), "inside the void's black")
 	var cell := _split.get_node(^"Views/VoidCell") as TextureRect
 	check(cell.visible, "its rect is shown")
+	check_equal(Rect2(cell.position, cell.size), Rect2(Vector2(0.0, (screen * 0.5).floor().y), (screen * 0.5).floor()), "over the blank quarter (P3's, bottom left)")
 	var lowest_cell: int = 1 << 30
 	for slot in ScreenViewsScript.VIEWS_MOST:
 		var other := _split.get_node_or_null(NodePath("Views/Cell%d" % slot))

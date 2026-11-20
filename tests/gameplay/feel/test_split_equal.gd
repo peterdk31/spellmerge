@@ -531,3 +531,26 @@ func test_p1_and_p3_are_left_and_right_in_play_and_p3s_panel_moves_right() -> vo
 	_split.reset()
 	check_equal(_split.corners[2], 4, "a reset: P3's HUD home")
 	check(_split.corners_version != seen, "and the change is counted, for the HUD to hear")
+
+
+## Regression (review): a moved panel landed on the corner panel of a seat played on another machine
+## (it has a body, so a panel, but no pane here).
+func test_a_moved_panel_keeps_off_the_corner_of_a_seat_played_elsewhere() -> void:
+	var stacked := PackedInt32Array([1 << 0, 0, 1 << 2, 0])
+	var panes := EqualPanesScript.new()
+	panes.lay(stacked, 1 << 3)
+	check(panes.corner[2] != 6, "P1 and P3 here, P4 elsewhere: P3's panel not on P4's corner (%d)" % panes.corner[2])
+	check(RIGHT.encloses(EqualPanesScript.quarter_rect(panes.corner[2] >> 1, SCREEN)), "and still in its right half")
+	panes.lay(stacked)
+	check_equal(panes.corner[2], 6, "P4 nowhere: the bottom right corner")
+	if not _ready_rooms():
+		return
+	_wizard(0, _rooms[0])
+	_wizard(2, _rooms[11])
+	_wizard(3, _rooms[6])
+	for frame in 240:
+		_party.look(_table, 0b0101)
+		_party.step(FRAME)
+		_split.step(FRAME, _table, 0b0101, _camera, SCREEN)
+	check_equal(_split.views.count, 2, "only this machine's seats split it")
+	check(_split.corners[2] != 6 and _split.corners[2] >= 2, "in play too: P3's panel keeps off P4's corner, in the right half (%d)" % _split.corners[2])

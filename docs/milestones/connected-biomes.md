@@ -575,8 +575,8 @@ Built from those answers (gameplay/feel/README.md, "Equal panes"; hud/README.md,
 
 ### Open questions for the owner
 
-1. Four players in three groups (a pair and two alone): the pair shares one quarter, as asked (quarters for three groups), its second panel at the quarter's inner side; their two builders or inventories open at once would share that quarter. Alternative: give the pair a half and the two alone the other half's quarters (no void quarter then). Keep quarters?
-2. Online, a seat played on another machine has no pane here, so its corner panel stays on its own corner even when a seat of this machine moves onto that spot (e.g. P1 and P3 here, P4 elsewhere: P3's panel slides onto P4's corner). Rare; should a moved panel avoid the corners of seats played elsewhere?
+1. Four players in three groups (a pair and two alone): the pair shares one quarter, as asked (quarters for three groups), its second panel at the quarter's inner side; their two builders or inventories open at once would share that quarter (so would a trio's third seat in a half). Alternative: give the pair a half and the two alone the other half's quarters (no void quarter then). Keep quarters?
+2. Four players in two pairs (P1+P2, P3+P4): each seat takes a quarter of its own in its half (so menus never overlap), which moves P2's panel to the bottom left and P3's to the top right, crossing. The alternative keeps each row (the quarter's inner side) but makes the pair share a quarter for their menus. Keep?
 
 ## Answered by the owner (2026-11-18)
 

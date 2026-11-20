@@ -162,6 +162,8 @@ var _blank_in: float = 0.0
 var _blank_at: Vector2 = Vector2.INF
 ## The equal split's panes for this frame's groups.
 var _panes: EqualPanesScript = EqualPanesScript.new()
+## The seats with a body that are not this machine's (a bit a seat): shown on the HUD, in no pane.
+var _elsewhere: int = 0
 
 
 func _init() -> void:
@@ -302,11 +304,13 @@ func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, scree
 ## Each seat's box (its own body and the actor it drives) and its middle, for `seats` (0: all).
 func _find(table: ActorsScript, seats: int) -> void:
 	_present = 0
+	_elsewhere = 0
 	for seat in ActorsScript.SEATS:
-		if seats != 0 and seats & (1 << seat) == 0:
-			continue
 		var box: Rect2 = PartyCameraScript.party_box(table, 1 << seat)
 		if box.size.x < 0.0:
+			continue
+		if seats != 0 and seats & (1 << seat) == 0:
+			_elsewhere |= 1 << seat
 			continue
 		_box[seat] = box
 		_point[seat] = box.get_center()
@@ -401,7 +405,7 @@ func _middle_of(held: int) -> Vector2:
 func _lay_sites(screen: Vector2) -> void:
 	if equal:
 		# Equal panes: each group's at its pane's middle.
-		_panes.lay(_group_seats)
+		_panes.lay(_group_seats, _elsewhere)
 		for seat in ActorsScript.SEATS:
 			if _group_seats[seat] != 0:
 				_group_site[seat] = _panes.site(seat, screen)
@@ -658,6 +662,16 @@ func _set_corners(laid: bool) -> void:
 			changed = true
 	if changed:
 		corners_version += 1
+
+
+## The quarter of the equal split's blank now (-1: none).
+func blank_quarter() -> int:
+	return _blank_quarter if blank_count() > 0 else -1
+
+
+## The zoom the live views draw at now (the first's; SPLIT_ZOOM with none), for the void view.
+func view_zoom() -> float:
+	return views.to_screen[0].x.x if views.count > 0 else SPLIT_ZOOM
 
 
 ## The equal panes as last laid (for tests).

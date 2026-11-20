@@ -55,14 +55,6 @@ func set_spots(corners: PackedInt32Array) -> void:
 			_sliding[seat] = 1
 
 
-## Every seat back on its own corner at once (a new run, the main menu).
-func reset() -> void:
-	for seat in SEATS:
-		spots[seat] = home_spot(seat)
-		_sliding[seat] = 0
-		_placed[seat] = 0
-
-
 ## A frame on: seat `seat`'s panel of `panel_size` on a view of `view` pixels moves on toward its
 ## spot (slid, or on it), and its quarter with it.
 func step(seat: int, view: Vector2, panel_size: Vector2) -> void:

@@ -581,7 +581,9 @@ func reward_room(player: int) -> Rect2:
 	var quarter: Vector2 = (view * 0.5).floor()
 	# Its seat's quarter now (its own corner's, or its pane's on the equal split: `_corners`).
 	var origin: Vector2 = _corners.quarter_at(player) if _menus_at[player].is_finite() else SeatCornersScript.quarter_origin(player, view)
-	var top: float = REWARD_CORNER_BAND if origin.y < quarter.y * 0.5 else 0.0
+	# The panels' band at the top row's top, none at the bottom row's, in between while sliding (so
+	# an open menu moves with its quarter, never jumping by the band).
+	var top: float = roundf(REWARD_CORNER_BAND * (1.0 - clampf(origin.y / maxf(quarter.y, 1.0), 0.0, 1.0)))
 	return Rect2(origin + Vector2(0.0, top), quarter - Vector2(0.0, REWARD_CORNER_BAND))
 
 

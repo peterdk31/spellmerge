@@ -24,10 +24,11 @@ extends Node
 ##   past the first view's are).
 ##
 ## - **The equal split's blank quarter shows the void** (the owner, 2026-11-20): with three panes
-##   the fourth is no view's (`SplitCamera.blank_count`), and there the void view draws: one more
-##   SubViewport sharing the world, looking at a spot of the void VOID_AWAY past the biome's corner
-##   (`void_bounds`, Feel's; no room, bridge or view is there), so it shows the void's black and its
-##   drifting motes (`void_rect`: Feel has the spectacle give them off there too,
+##   the fourth is no view's (`SplitCamera.blank_count`), and over that quarter the void view draws:
+##   one more SubViewport (the quarter's size) sharing the world, looking at a spot of the void
+##   VOID_AWAY past the biome's corner at the views' zoom (`void_bounds`, Feel's; no room, bridge or
+##   view is there), so it shows the void's black and its drifting motes (the blank's part past its
+##   quarter while it moves in or out is the plain black under it) (`void_rect`: Feel has the spectacle give them off there too,
 ##   `Spectacle.set_void_blank`). Outside a biome (no bounds) the blank is the plain black.
 ##
 ## Every view and cell is made the first time it is needed and kept; nothing is allocated a frame.
@@ -181,7 +182,7 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 	_blank.visible = camera.blank_count() > 0
 	if _blank.visible:
 		_blank.size = screen
-	_show_void(_blank.visible and void_bounds.has_area(), screen)
+	_show_void(camera.blank_quarter() if _blank.visible and void_bounds.has_area() else -1, screen)
 	_keep_shown(laid)
 	if laid.is_split():
 		ScreenViewsScript.publish(_root, laid)
@@ -229,7 +230,8 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2) -> vo
 func void_rect() -> Rect2:
 	if _void_view == null or not _void_cell.visible:
 		return Rect2()
-	return Rect2(-_void_view.canvas_transform.origin, Vector2(_void_view.size))
+	var zoom: float = _void_view.canvas_transform.x.x
+	return Rect2(-_void_view.canvas_transform.origin / zoom, Vector2(_void_view.size) / zoom)
 
 
 ## The void view (null before it was first needed; for tests).
@@ -237,10 +239,10 @@ func void_view() -> SubViewport:
 	return _void_view
 
 
-## The void view drawn under the cells (`on`), over the whole screen, looking VOID_AWAY past the
-## biome's corner at the world's own size; or not drawn.
-func _show_void(on: bool, screen: Vector2) -> void:
-	if not on:
+## The void view drawn under the cells over quarter `quarter` of the screen (-1: not drawn),
+## looking VOID_AWAY past the biome's corner at the views' zoom.
+func _show_void(quarter: int, screen: Vector2) -> void:
+	if quarter < 0:
 		if _void_view != null:
 			_void_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 			_void_cell.visible = false
@@ -250,13 +252,15 @@ func _show_void(on: bool, screen: Vector2) -> void:
 		_void_cell = _new_cell("VoidCell", _void_view)
 		# Over the blank's black, under every view's cell.
 		_layer.move_child(_void_cell, _blank.get_index() + 1)
-	var size := Vector2i(screen)
-	if _void_view.size != size:
-		_void_view.size = size
-	var corner: Vector2 = (void_bounds.position - Vector2.ONE * VOID_AWAY - screen * 0.5).round()
-	_void_view.canvas_transform = Transform2D(0.0, Vector2.ONE, 0.0, -corner)
+	var half := Vector2i(screen * 0.5)
+	if _void_view.size != half:
+		_void_view.size = half
+	var zoom: float = maxf(camera.view_zoom(), 0.0001)
+	var origin: Vector2 = ((void_bounds.position - Vector2.ONE * VOID_AWAY) * zoom - Vector2(half) * 0.5).round()
+	_void_view.canvas_transform = Transform2D(0.0, Vector2(zoom, zoom), 0.0, -origin)
 	_void_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_void_cell.size = screen
+	_void_cell.position = Vector2(float(half.x * (quarter % 2)), float(half.y * (quarter >> 1)))
+	_void_cell.size = Vector2(half)
 	_void_cell.visible = true
 
 
@@ -329,7 +333,7 @@ func _stop() -> void:
 	_root.canvas_cull_mask = _mask_before
 	if _blank != null:
 		_blank.visible = false
-	_show_void(false, Vector2.ZERO)
+	_show_void(-1, Vector2.ZERO)
 	if is_inside_tree() and get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.disconnect(_on_node_added)
 	for slot in ScreenViewsScript.VIEWS_MOST:

@@ -19,7 +19,8 @@ extends RefCounted
 ## at its outer side (P1 top left, P2 top right, P3 bottom left, P4 bottom right). Laid on panes,
 ## each seat takes a spot inside its own group's pane: its own corner if that is in the pane, else
 ## a free quarter of its row, else any free quarter, else a quarter's inner side, so no two panels
-## stand on one spot and each stays inside its pane (`hud_corners_changed`; the HUD moves them,
+## stand on one spot (nor on the corner of a seat with a body but no pane here, `elsewhere`: a seat
+## played on another machine) and each stays inside its pane (`hud_corners_changed`; the HUD moves them,
 ## hud/panels/seat_corners.gd). A spot is `quarter * 2 + inner` (inner 1 for the inner side).
 ##
 ## Made once, filled by `lay`; nothing allocated after it is made.
@@ -58,8 +59,9 @@ static func home_spot(seat: int) -> int:
 
 
 ## Lay the panes for the groups `group_seats` (by group's lowest seat: the seats it holds, a bit a
-## seat; 0 for a seat that leads no group), and each seat's HUD spot.
-func lay(group_seats: PackedInt32Array) -> void:
+## seat; 0 for a seat that leads no group), and each seat's HUD spot, keeping off the own corners of
+## the seats `elsewhere` (a bit a seat: shown on the HUD, in no pane here).
+func lay(group_seats: PackedInt32Array, elsewhere: int = 0) -> void:
 	groups = 0
 	blank_quarter = -1
 	for seat in ActorsScript.SEATS:
@@ -88,8 +90,12 @@ func lay(group_seats: PackedInt32Array) -> void:
 		for quarter in 4:
 			if used & (1 << quarter) == 0:
 				blank_quarter = quarter
+	var reserved: int = 0
+	for seat in ActorsScript.SEATS:
+		if elsewhere & (1 << seat) != 0:
+			reserved |= 1 << home_spot(seat)
 	for at in groups:
-		_spots(group_seats[_firsts[at]], quarters[_firsts[at]])
+		_spots(group_seats[_firsts[at]], quarters[_firsts[at]], reserved)
 
 
 ## Group `group`'s pane (lowest seat) on a screen of `screen` pixels; an empty rect for no group.
@@ -195,9 +201,9 @@ func _lay_quarters(group_seats: PackedInt32Array) -> void:
 		quarters[_firsts[at]] = 1 << ((best >> (at * 2)) & 3)
 
 
-## The spots of the seats `seats` inside the pane of the quarters `mask`.
-func _spots(seats: int, mask: int) -> void:
-	var taken: int = 0
+## The spots of the seats `seats` inside the pane of the quarters `mask`, none in `reserved`.
+func _spots(seats: int, mask: int, reserved: int) -> void:
+	var taken: int = reserved
 	var left: int = 0
 	for seat in ActorsScript.SEATS:
 		if seats & (1 << seat) == 0:

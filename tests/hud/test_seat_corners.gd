@@ -102,3 +102,21 @@ func test_the_hud_moves_p3s_panel_and_menus_into_the_right_half_and_back() -> vo
 		hud.step_corners()
 	check_equal(panel.position, home, "back on its own corner")
 	check_equal(hud.get_radial(2).quarter_at, SeatCornersScript.quarter_origin(2, view), "its builder too")
+
+
+## Regression (review): the reward menu's room jumped back by the panels' band (32 px) as its quarter
+## slid from the bottom row to the top.
+func test_the_reward_room_slides_with_its_quarter_never_jumping() -> void:
+	var made: Array = _make_hud([0, 1, 2])
+	var hud: HudScript = made[0]
+	var bus: EventsScript = made[1]
+	hud.step_corners()
+	var last: Rect2 = hud.reward_room(2)
+	bus.hud_corners_changed.emit(PackedInt32Array([0, 2, 1, 6]))
+	for i in 60:
+		hud.step_corners()
+		var room: Rect2 = hud.reward_room(2)
+		check(room.position.distance_to(last.position) <= SeatCornersScript.SLIDE_MOST + 0.01, "the room moves no more than a slide's step (%s to %s)" % [last.position, room.position])
+		check(room.position.y <= last.position.y + 0.01, "always up, never back")
+		last = room
+	check_equal(last.position.y, 32.0, "it ends under the top band")

@@ -6,10 +6,11 @@
   tools/ptest_failures.py <logs dir>/unit-results.txt
 
 For every FAIL line of the results (ci/build/unit_tests.sh: "FAIL <seconds> <test> <K/N or -> <log>")
-it prints the test and the lines of its log that say why: the runner's note on a file that failed
-in its batch and passed alone ("UNIT RUNNER:", with the exit code of a crash or a timeout), the
-suite's "TEST FAILED:" lines and the engine's "ERROR:" lines, at most LINES of them, or the log's
-last lines when none says. The logs are gone with the machine that ran them (a cloud session's
+it prints the test and the lines of its log that say why: the runner's notes ("UNIT RUNNER:": a file
+that failed only in its batch, with the exit code of a crash or a timeout, or one run alone because
+its batch failed), the suite's "TEST FAILED:" lines, the engine's "ERROR:" lines with the "at:" line
+that places each, and a crash's signal ("handle_crash:"), at most LINES of them, or the log's last
+lines when none says. The logs are gone with the machine that ran them (a cloud session's
 container), so a flaky failure is only explained if this reaches the report. Standard library only.
 """
 
@@ -19,16 +20,24 @@ import re
 import sys
 from pathlib import Path
 
-## The most reason lines shown for one file, and the last lines shown when none is a reason.
+# The most reason lines shown for one file, and the last lines shown when none is a reason.
 LINES = 12
 TAIL = 5
-REASON = re.compile(r"^(UNIT RUNNER:|TEST FAILED:|(SCRIPT )?ERROR:)")
+REASON = re.compile(r"^(UNIT RUNNER:|TEST FAILED:|(SCRIPT )?ERROR:|handle_crash:)")
+ERROR = re.compile(r"^(SCRIPT )?ERROR:")
+# The line after an error that says where it was ("   at: func (res://file.gd:12)").
+PLACE = re.compile(r"^\s+at: ")
 
 
 def reasons(log_text: str) -> list[str]:
     """The lines of a test's log that say why it failed (see the module's docs)."""
     lines = log_text.splitlines()
-    found = [line for line in lines if REASON.match(line)]
+    found: list[str] = []
+    for at, line in enumerate(lines):
+        if REASON.match(line):
+            found.append(line)
+            if ERROR.match(line) and at + 1 < len(lines) and PLACE.match(lines[at + 1]):
+                found.append(lines[at + 1].rstrip())
     if not found:
         return [line for line in lines if line.strip()][-TAIL:]
     # The runner's note is last in a log but says the most: show it first.

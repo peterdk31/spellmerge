@@ -23,6 +23,10 @@ var _intent: ActorIntent
 ## "failed in its batch": its log was gone with the machine that ran it).
 var _trace: PackedStringArray = PackedStringArray()
 var _traced: String = ""
+## The most lines a trace keeps (a brain that changed its mind every step would make a message of
+## tens of kilobytes); the rest are counted.
+const TRACE_LINES: int = 24
+var _untraced: int = 0
 
 
 func before_each() -> void:
@@ -46,6 +50,7 @@ func _drive(profile: AIProfile, steps: int) -> int:
 	_brain.setup(_world.players[0], profile, 4111)
 	_trace.clear()
 	_traced = ""
+	_untraced = 0
 	var run: int = 0
 	var longest: int = 0
 	var bot: Actor = _world.players[0]
@@ -65,6 +70,7 @@ func _revive_steps(profile: AIProfile, steps: int) -> int:
 	_brain.setup(_world.players[0], profile, 4111)
 	_trace.clear()
 	_traced = ""
+	_untraced = 0
 	var chosen: int = 0
 	var bot: Actor = _world.players[0]
 	for i in steps:
@@ -86,12 +92,16 @@ func _note(step: int) -> void:
 	if now == _traced:
 		return
 	_traced = now
+	if _trace.size() >= TRACE_LINES:
+		_untraced += 1
+		return
 	_trace.append("step %d: %s at %s, health %.2f" % [step, now, _world.players[0].position, _brain.health_fraction])
 
 
 ## The last drive's trace, for a failed check's message.
 func _why() -> String:
-	return "; what it did: " + ("; ".join(_trace) if not _trace.is_empty() else "nothing")
+	var more: String = "; and %d changes more" % _untraced if _untraced > 0 else ""
+	return "; what it did: " + ("; ".join(_trace) if not _trace.is_empty() else "nothing") + more
 
 
 func test_it_stands_well_inside_the_revive_range() -> void:

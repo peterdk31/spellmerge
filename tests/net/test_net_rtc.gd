@@ -329,14 +329,18 @@ func test_a_code_made_before_the_address_from_outside_came_says_so_when_no_link_
 	host.clock = clock
 	client.clock = clock
 	check_equal(_t(host.offer()), "", "the host begins")
-	for i in 200:
-		host.poll()
-		if host.code() != "":
-			break
-		# The code's time passes at once: only the description is waited for.
-		now[0] += NetRtc.GATHER_MS
-		OS.delay_msec(2)
+	# This machine's own address is found on real time (WebRTC's threads; slower on a busy machine):
+	# waited for, or the code's time would run out with none and the code fail (NO_ADDRESS; a
+	# flake under load, 2026-11-20). The STUN answer still never comes.
+	check(_wait([host] as Array[NetRtc], func() -> bool: return host.gathered() > 0), "this machine's own address is found (%s)" % _t(host.problem()))
+	# Then the code's time passes at once.
+	now[0] += NetRtc.GATHER_MS
+	host.poll()
 	check(host.code() != "", "its code is made at the latest GATHER_MS after its description, the STUN server unheard (%s)" % _t(host.problem()))
+	if host.code() == "":
+		host.close()
+		client.close()
+		return
 	# Neither learns where the other is: no handshake is begun that the going would cut short.
 	check_equal(_t(client.take(_unreachable(host.code()))), "", "the client takes it")
 	check(_wait([host, client] as Array[NetRtc], func() -> bool: return client.code() != ""), "the client's code is made")

@@ -129,6 +129,13 @@ func code() -> String:
 	return _code
 
 
+## How many of this machine's candidates (its addresses) were gathered so far, in its code or for
+## it. A test that runs the code's time out on a clock of its own waits for one first: WebRTC finds
+## them on real time, and a code made with none fails (NO_ADDRESS).
+func gathered() -> int:
+	return _mine.mids.size()
+
+
 func poll() -> void:
 	if _peer == null or _problem != null or _link != null:
 		return

@@ -34,6 +34,24 @@ class Reasons(unittest.TestCase):
     def test_a_script_error_is_a_reason(self) -> None:
         self.assertEqual(pf.reasons("x\nSCRIPT ERROR: Invalid call\ny"), ["SCRIPT ERROR: Invalid call"])
 
+    def test_an_error_keeps_the_line_that_places_it(self) -> None:
+        log = "\n".join([
+            "SCRIPT ERROR: Out of bounds get index '0'",
+            "          at: _unreachable (res://tests/net/test_net_rtc.gd:407)",
+            "          GDScript backtrace (most recent call first):",
+            "ERROR: no place",
+            "next",
+        ])
+        self.assertEqual(pf.reasons(log), [
+            "SCRIPT ERROR: Out of bounds get index '0'",
+            "          at: _unreachable (res://tests/net/test_net_rtc.gd:407)",
+            "ERROR: no place",
+        ])
+
+    def test_a_crash_signal_is_a_reason(self) -> None:
+        log = "SUITE START: x\nhandle_crash: Program crashed with signal 11\n[1] /lib/libc.so.6\n"
+        self.assertEqual(pf.reasons(log), ["handle_crash: Program crashed with signal 11"])
+
     def test_with_no_reason_line_the_last_lines_are_shown(self) -> None:
         log = "\n".join(f"line {n}" for n in range(20)) + "\n\n"
         self.assertEqual(pf.reasons(log), [f"line {n}" for n in range(15, 20)])

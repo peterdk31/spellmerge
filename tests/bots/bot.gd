@@ -95,9 +95,10 @@ const CRAWL_SHY: float = 64.0
 ## hurt circle and a bolt's width, with a margin).
 const MATE_CLEAR: float = 16.0
 ## How near a foe's body may be to a heal's line of fire, out to the heal's whole reach (a heal that
-## misses flies on), before it holds the heal (pixels: a body's hurt circle, a bolt's width and the
-## aim's error, with a margin).
-const FOE_CLEAR: float = 24.0
+## misses flies on), before it holds the heal (pixels: a body's hurt circle, a bolt's width, the
+## aim's error and a foe's step while the bolt flies; at 24 the 4-bot playtests of 2026-11-20 healed
+## a foe a few times a run, at 40 none).
+const FOE_CLEAR: float = 40.0
 ## How near the caster a foe's body holds a heal whichever way it is aimed (pixels: a shot leaves at
 ## the staff's tip, ahead of the body, and a foe pressed against the caster is hit as it leaves; a
 ## bone husk on top of the mender took a heal in the playtest of 2026-11-20).

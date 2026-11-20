@@ -106,9 +106,26 @@ func test_each_build_has_the_staffs_its_bot_plays() -> void:
 		check(second.harms() and not second.heals and not second.moves_caster, "%s: RT hurts" % build["name"])
 
 
-func test_only_the_mender_takes_a_rack_staff_and_it_lies_in_the_hub() -> void:
-	for build: Dictionary in BuildsScript.FIGHTERS:
-		check(BuildsScript.rack_of(build) == null, "%s takes no rack staff" % build["name"])
+## The owner, 2026-11-20, on #891: bots take only the rack's normal staffs, never a dev staff or
+## the Wild star; each a different one, and each an attack that hurts.
+func test_the_bots_take_only_normal_rack_staffs() -> void:
+	var taken: Dictionary = {}
+	for seat in 4:
+		var rack: StaffItem = BuildsScript.rack_of(BuildsScript.pick(Sim.seeded(7), seat, 4))
+		if rack == null:
+			continue
+		check(not taken.has(rack.id), "P%d takes a staff no other bot takes (%s)" % [seat + 1, rack.id])
+		taken[rack.id] = true
+		check(rack.staff.cooldown > 0.0 and rack.staff.max_mana <= 100.0, "%s is a fair staff, never the dev staff" % rack.id)
+		check(rack.id != &"wild_star", "never the Wild star")
+		var compiled: CompiledStaff = root.get_node("Spells").call("compile_staff", rack.cards, rack.staff) as CompiledStaff
+		if seat != BuildsScript.MEND_SEAT:
+			check(compiled != null and not compiled.is_empty() and compiled.casts[0].sense.harms(), "%s hurts" % rack.id)
+	check_equal(taken.size(), 3, "P1, P2 (the mender) and P3 take one; P4 none")
+	check(BuildsScript.rack_of(BuildsScript.pick(Sim.seeded(7), 3, 4)) == null, "P4 takes none")
+
+
+func test_the_menders_rack_staff_lies_in_the_hub() -> void:
 	var rack: StaffItem = BuildsScript.rack_of(BuildsScript.MENDER)
 	check(rack != null and rack.problems().is_empty(), "the mender's rack staff is a valid premade staff")
 	# The owner, 2026-11-20, on #891: bots never take a dev staff or the Wild star.
@@ -189,10 +206,14 @@ func _built_pair() -> Array:
 	if first == null or mender == null or _bots.size() < 2:
 		check(false, "the run started with two bots' wizards")
 		return []
-	# The mender's rack staff on its free hand (LB), as the hub's rack gives it (Play has no rack).
-	check(mender.inventory.put_on_hand(BuildsScript.RACK_STAFF.stack(), mender.inventory.free_hand()), "the mender holds its rack staff")
 	for bot in _bots:
-		check(bot.build_drawn(2), "P%d draws its build" % (bot.player + 1))
+		check(bot.draw(2), "P%d draws its build" % (bot.player + 1))
+		# Its rack staff on its free hand (LB), as the hub's rack gives it (Play has no rack).
+		var rack: StaffItem = BuildsScript.rack_of(bot.build)
+		var wizard := _flow.call("get_wizard", bot.player) as Actor
+		if rack != null:
+			check(wizard.inventory.put_on_hand(rack.stack(), wizard.inventory.free_hand()), "P%d holds its rack staff" % (bot.player + 1))
+		check(bot.send_build(), "P%d sets its build" % (bot.player + 1))
 	await commands_applied()
 	await physics_frame
 	return [first, mender]

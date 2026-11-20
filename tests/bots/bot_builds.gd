@@ -17,7 +17,8 @@ extends RefCounted
 ##   with RB (it taps whichever staff's next cast moves its caster) and fights with RT. Each bot's is
 ##   drawn from the run's dice (`Sim.chance_int`, purpose PURPOSE, its seat the key, its one roll the
 ##   counter 0; the hub's run, where it is set): the same replay seed, the same builds, on every
-##   machine and every replay. They take no rack staff.
+##   machine and every replay. P1 and P3 also take a normal rack staff (`FIGHTER_RACKS`: the Frost
+##   seeker and the Twin bolt), used as it lies on LB, a third attack.
 ## - **The mender** (`MENDER`): in a team of two or more, the bot at MEND_SEAT carries three staffs
 ##   (the owner, on #886 and 2026-11-20: heal, dash and attack): the mend on RB (mend on a plain
 ##   bolt, which stops at the first body it hits: a mend heals whatever it hits, friend or foe,
@@ -56,6 +57,14 @@ const START_HANDS: int = FlowScript.START_HANDS
 ## starter's numbers), used as it is: its attack. Bots take only the rack's normal staffs, never a
 ## dev staff or the Wild star (the owner, 2026-11-20, on #891).
 const RACK_STAFF: StaffItem = preload("res://content/items/staffs/firebolt/firebolt.tres")
+## The rack staff a fighter takes, by seat (none past the list, nor at the mender's seat): the
+## rack's other two normal staffs, each used as it lies on LB (a third attack: the sweep and the
+## playtests of 2026-11-20 lost fewer fights with them).
+const FIGHTER_RACKS: Array[StaffItem] = [
+	preload("res://content/items/staffs/frost_seeker/frost_seeker.tres"),
+	null,
+	preload("res://content/items/staffs/twin_bolt/twin_bolt.tres"),
+]
 ## The mender's build: the heal on RB, the dash on RT, and the rack's Firebolt on LB as it is (a
 ## hand past the build's list keeps its cards).
 const MENDER: Dictionary = {"name": "mender", "rack": RACK_STAFF, "staffs": [[&"mend", &"overcharge", &"faster", &"bolt"], [&"dash"]]}
@@ -69,10 +78,17 @@ static func mends(seat: int, team: int) -> bool:
 static func pick(sim: Sim, seat: int, team: int) -> Dictionary:
 	if mends(seat, team):
 		return MENDER
-	return FIGHTERS[sim.chance_int(PURPOSE, seat, 0, FIGHTERS.size())]
+	var drawn: Dictionary = FIGHTERS[sim.chance_int(PURPOSE, seat, 0, FIGHTERS.size())]
+	var rack: StaffItem = FIGHTER_RACKS[seat] if seat >= 0 and seat < FIGHTER_RACKS.size() else null
+	if rack == null:
+		return drawn
+	var out: Dictionary = drawn.duplicate()
+	out["rack"] = rack
+	return out
 
 
-## Every build in the table: the fighters' and the mender's.
+## Every build in the table: the fighters' and the mender's (a fighter's as drawn, before its seat's
+## rack staff).
 static func all() -> Array[Dictionary]:
 	var out: Array[Dictionary] = FIGHTERS.duplicate()
 	out.append(MENDER)

@@ -126,13 +126,19 @@ func test_an_enemy_standing_takes_the_level_on_its_health() -> void:
 	events.emit_signal("run_room_scaled", 1.5)
 	var harder: Actor = _stand(IMP)
 	check_equal(harder.stat_scale, 1.5, "in a room 1.5 times harder: scaled so")
-	check_equal(harder.room_level, 1.5, "and its room's level kept, which its aim sharpens by")
+	check_equal(harder.room_level, 1.0, "its aim's depth level is not the room's scale")
 	check_equal(plain.room_level, 1.0, "out of a run's room, level 1")
 	check(is_equal_approx(harder.health.max_health, IMP.max_health * 1.5), "its health 1.5 times its data's: %s" % harder.health.max_health)
 	check_equal(harder.health.health, harder.health.max_health, "and full")
 	check_equal(plain.health.max_health, IMP.max_health, "a body already standing keeps what it stood with")
 	events.emit_signal("enemy_standing", own(Node.new()))
 	check_equal(_level(), 1.5, "a node that is no actor is let be")
+	events.emit_signal("run_room_leveled", 1.25)
+	events.emit_signal("run_room_leveled", NAN)
+	events.emit_signal("run_room_scaled", 1.8)
+	var deeper: Actor = _stand(IMP)
+	check_equal(deeper.room_level, 1.25, "it takes the room's depth level (`run_room_leveled`), which its aim sharpens by")
+	check_equal(deeper.stat_scale, 1.8, "and its health the room's scale")
 
 
 func test_the_level_is_state_and_a_run_s_start_renews_it() -> void:
@@ -187,3 +193,8 @@ func test_each_room_s_enemies_stand_at_its_scale() -> void:
 	check(is_equal_approx(_level(), 1.2), "the level is the room's")
 	_check_enemies_at(1.2, "the room")
 	check(told.is_empty(), "the room's scale is never the setting's level")
+	# Their aim by its depth alone (the owner, 2026-11-19): the start room's level with one player.
+	check(is_equal_approx(map.level_of(0), 1.0), "the room's depth level leaves the players out: %s" % map.level_of(0))
+	check(is_equal_approx(flow.life.fights[0].level, 1.0), "its fight's depth level")
+	for enemy: Actor in flow.get(&"_enemies"):
+		check(is_equal_approx(enemy.room_level, 1.0), "%s aims by its depth, not the two players: %s" % [enemy.data.id, enemy.room_level])

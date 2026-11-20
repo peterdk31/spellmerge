@@ -263,10 +263,12 @@ static func _start_alone(definition: RunDefinition, rules: MapRules, content: Ru
 static func _fill(map: BiomeMap, definition: RunDefinition, rules: MapRules, content: RunContent, players: int, dice: MapDice) -> void:
 	for room in map.rooms():
 		var filled: Array = _fill_one(map, room, definition, rules, content, players, dice)
-		map.fill_room(room, filled[0], filled[1], filled[2])
+		map.fill_room(room, filled[0], filled[1], filled[2], filled[3])
 
 
-## Room `room`'s fill as step 6 rolls it: [its scale, its enemies, their elite cards].
+## Room `room`'s fill as step 6 rolls it: [its scale, its enemies, their elite cards, its depth's
+## level: its scale with one player, which an enemy's aim sharpens by (`AimTuning`; the owner,
+## 2026-11-19: depth only, never the players)].
 static func _fill_one(map: BiomeMap, room: int, definition: RunDefinition, rules: MapRules, content: RunContent, players: int, dice: MapDice) -> Array:
 	var depth: int = map.depths[room]
 	var scale: float = definition.biome_room_scale(rules, depth, players)
@@ -287,7 +289,7 @@ static func _fill_one(map: BiomeMap, room: int, definition: RunDefinition, rules
 	if elites > 0 and not rules.elite_cards.is_empty():
 		for at in enemies.size():
 			cards.append(rules.elite_cards[dice.below(Step.FILL, rules.elite_cards.size())] if at < elites else &"")
-	return [scale, enemies, cards]
+	return [scale, enemies, cards, definition.biome_room_scale(rules, depth, 1)]
 
 
 # --- A room reroll (the owner, 2026-11-19) ----------------------------------------------------
@@ -374,7 +376,7 @@ static func reroll_room(definition: RunDefinition, content: RunContent, shapes: 
 		return null
 	var picked: BiomeMap = found[dice.below(Step.PLACE, found.size())] as BiomeMap
 	var filled: Array = _fill_one(picked, room, definition, rules, content, players, dice)
-	picked.refill_room(room, filled[0], filled[1], filled[2])
+	picked.refill_room(room, filled[0], filled[1], filled[2], filled[3])
 	# A reward room's type is rolled again (the owner, 2026-11-19), any other kind's is none.
 	var picked_kind: RoomKind = content.kind(picked.room_kinds[room])
 	var type: RewardType = RewardType.new()

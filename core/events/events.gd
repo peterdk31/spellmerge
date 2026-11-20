@@ -467,6 +467,10 @@ signal run_room_rerolled(room: int, map: RefCounted, group: int, refill_at: int,
 ## stands (two fights at once each stand at their own). Heard by difficulty, which scales every enemy
 ## and boss that stands then (`enemy_standing`).
 signal run_room_scaled(scale: float)
+## Sender: flow. The depth level of the room whose enemy is about to stand (`BiomeMap.level_of`: its
+## scale with one player, by its depth only; the owner, 2026-11-19), sent with `run_room_scaled`.
+## Heard by difficulty, which keeps it on each enemy (`Actor.room_level`) for its aim (`AimTuning`).
+signal run_room_leveled(level: float)
 ## Sender: run (connected biomes CB10, "Run stats"). The run's own changes of the run stats
 ## (`RunStats`: its definition's rule changes of the `RUN_STAT` target whose flags the run's
 ## unlocks hold, in order; empty for none), as a run begins (`run_begun`), before its rooms' fights
@@ -652,7 +656,7 @@ signal item_refused(player: int, item: int)
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty setting's level changed to `level` (M3; 1 at normal), which the
 ## enemies' skill follows (enemy AI AI10). Not the room's scale (`run_room_scaled`), which sharpens
-## an enemy's aim through its `Actor.room_level` (`AimTuning`). Not sent yet.
+## nothing either: an enemy's aim follows the room's depth level (`run_room_leveled`). Not sent yet.
 signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------

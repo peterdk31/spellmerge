@@ -210,6 +210,27 @@ func test_each_room_is_filled_by_its_kind_and_scaled_by_its_depth_and_players() 
 	check_equal(map_four.room_templates, map_one.room_templates, "the same rooms for any number of players")
 
 
+## An enemy's aim sharpens by depth only (the owner, 2026-11-19): each room's depth level is its
+## scale with one player, the same for one player as for four, while the scale itself grows.
+func test_the_depth_level_is_the_same_for_any_number_of_players() -> void:
+	var definition: RunDefinition = MadeUpBiome.run()
+	var rules: MapRules = definition.biomes[0]
+	var map_one: BiomeMap = _map(definition, 3, 1)
+	var map_four: BiomeMap = _map(definition, 3, 4)
+	check_equal(map_one.room_levels.size(), map_one.rooms(), "every room has its depth level")
+	check_equal(map_four.room_levels, map_one.room_levels, "one player or four: the same depth levels")
+	check(map_four.room_scales != map_one.room_scales, "while four players scale the rooms more")
+	var deeper: bool = false
+	for room in map_one.rooms():
+		check(absf(map_one.level_of(room) - definition.biome_room_scale(rules, map_one.depths[room], 1)) < 0.0001, "room %d: its scale with one player" % room)
+		deeper = deeper or map_one.level_of(room) > map_one.level_of(0)
+	check(deeper, "a deeper room has a higher level")
+	check(map_one.copy().same_as(map_one), "a copy keeps the levels")
+	var other: BiomeMap = map_one.copy()
+	other.room_levels[0] += 1.0
+	check(not other.same_as(map_one), "and they are compared")
+
+
 func _enemy(id: StringName) -> EnemyBase:
 	for enemy: EnemyBase in _biome.content.enemies:
 		if enemy.id == id:

@@ -180,8 +180,8 @@ var data: EnemyBase = null
 ## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Its other
 ## numbers are its `stats` (boss plan OB7), which a room's scale may change later as a relic does.
 var stat_scale: float = 1.0
-## The level of the room it stood in (the room's scale, set by difficulty with `stat_scale`, an
-## elite's without its extra health; 1 out of a run of rooms): how sharp an enemy's AI aims
+## The depth level of the room it stood in (its scale with one player, by depth only, set by
+## difficulty with `stat_scale`; 1 out of a run of rooms): how sharp an enemy's AI aims
 ## (`AimTuning`, enemy aim 2026-11-19).
 var room_level: float = 1.0
 ## An elite's card (connected biomes CB11, decision 24; empty: no elite): set by Flow before the

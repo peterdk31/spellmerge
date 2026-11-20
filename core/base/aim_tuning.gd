@@ -6,8 +6,8 @@ extends Resource
 ## and `accuracy` (its aim error: up to `AIBrain.AIM_ERROR` × (1 − accuracy) radians either side, drawn
 ## once a cast, seeded); this scales both:
 ##
-## - by **depth** (the room's level, `Actor.room_level`: the run's per-depth scaling, connected
-##   biomes CB5, set by Difficulty as the enemy stands): at level 1 (a biome's start room, or out of
+## - by **depth** (the room's depth level, `Actor.room_level`: the run's per-depth scaling alone, its
+##   scale with one player, connected biomes CB5, set by Difficulty as the enemy stands): at level 1 (a biome's start room, or out of
 ##   a run) an enemy leads by `start_lead` of its profile's lead and errs `start_error` times its
 ##   profile's error; at `sharp_level` or deeper, as its profile says; in between, a straight line.
 ## - for an **elite** (connected biomes CB11): `elite_sharpness` more of the way to sharp.
@@ -15,7 +15,7 @@ extends Resource
 ##
 ## Only an enemy's aim is tuned (a brain that `warns()`): a test bot aims as its profile says. An
 ## enemy's AI possessing a wizard reads the wizard's body (level 1, no elite): its sloppiest. The
-## level is the room's scale, depth times the players (`RunScaling`), so more players sharpen it too.
+## level is by depth only (the owner, 2026-11-19): more players never make an enemy aim better.
 ## Pure numbers, the same on every machine.
 
 ## The lead at level 1, a share of the profile's (1: no change with depth).

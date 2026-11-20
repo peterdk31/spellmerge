@@ -16,7 +16,7 @@ extends RefCounted
 ## - **The mender** (`MENDER`): in a team of two or more, the bot at MEND_SEAT carries a mend staff
 ##   on RB (mend on a plain bolt, which stops at the first body it hits: a mend heals whatever it
 ##   hits, friend or foe, content/spells/elements/mend, so a shot that ends at the first body is the
-##   one a bot can aim at a teammate) and a dash on RT. Its brain heals the most hurt
+##   one a bot can aim at a teammate) and a fighter's bolt on RT. Its brain heals the most hurt
 ##   teammate it reaches along a clear line (the AI's `heal ally` behaviour, gameplay/ai/
 ##   behaviours/heal_ally.gd), and the bot holds the heal while a foe stands near its line of fire
 ##   (`bot.gd`, `foe_in_line`): it never aims a heal at a foe.
@@ -38,12 +38,13 @@ const FIGHTERS: Array[Dictionary] = [
 	{"name": "lance", "staffs": [[&"dash"], [&"faster", &"overcharge", &"bolt"]]},
 	{"name": "beam", "staffs": [[&"dash"], [&"beam"]]},
 ]
-## The mender's build: the heal on RB, a dash on RT. The owner allowed bots a third staff (on #886:
-## heal, dash and attack), but in Play a wizard holds only the two starter staffs (`Flow.START_HANDS`,
-## and Play's start takes no loadout along); a third comes only from the hub's rack or one found in a
-## run. Within those rules the mender carries heal and dash (the owner's other choice), and fights
-## with its dash (it hurts what it runs through) while no teammate needs a heal.
-const MENDER: Dictionary = {"name": "mender", "staffs": [[&"mend", &"overcharge", &"faster", &"bolt"], [&"dash"]]}
+## The mender's build: the heal on RB, a fighter's bolt on RT. The owner allowed bots a third staff
+## (on #886: heal, dash and attack), but in Play a wizard holds only the two starter staffs
+## (`Flow.START_HANDS`; Play's start takes no loadout along), and a third comes only from the hub's
+## rack or one found in a run. Heal and dash, the owner's other choice, lost 11 of the sweep's 60
+## seeds against heal and attack's 2 (2026-11-20), so the mender keeps its attack until the owner
+## chooses (heal and dash, or runs started from the hub with a rack staff).
+const MENDER: Dictionary = {"name": "mender", "staffs": [[&"mend", &"overcharge", &"faster", &"bolt"], [&"homing", &"bigger", &"bolt"]]}
 
 
 ## True when the bot at `seat` mends, in a team of `team` bots that fight.

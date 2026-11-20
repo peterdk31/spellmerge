@@ -74,7 +74,7 @@ func test_every_build_is_valid_by_the_card_rules() -> void:
 
 
 ## What the brain reads of each build: the fighters dash on RB and hurt on RT; the mender heals on
-## RB, hurting nobody, and dashes on RT.
+## RB, hurting nobody, and hurts on RT.
 func test_each_build_has_the_staffs_its_bot_plays() -> void:
 	for build: Dictionary in BuildsScript.all():
 		var first: CastSense = _compiled(BuildsScript.cards_of(build, 0), 0).casts[0].sense
@@ -84,10 +84,7 @@ func test_each_build_has_the_staffs_its_bot_plays() -> void:
 			check(first.reach > 0.0, "and is aimed (it reaches a teammate along a line)")
 		else:
 			check(first.moves_caster, "%s: RB dashes" % build["name"])
-		if build == BuildsScript.MENDER:
-			check(second.moves_caster, "the mender's RT dashes")
-		else:
-			check(second.harms() and not second.heals, "%s: RT hurts" % build["name"])
+		check(second.harms() and not second.heals and not second.moves_caster, "%s: RT hurts" % build["name"])
 
 
 func test_the_bag_builds_every_build() -> void:
@@ -222,8 +219,8 @@ func test_the_mend_bot_holds_its_heal_with_a_foe_in_its_line() -> void:
 				heals |= 1 << at
 			elif sense.harms():
 				hurts |= 1 << at
-	check(heals != 0 and hurts != 0, "the mender holds a heal and a dash (which hurts what it runs through)")
-	check_equal(bot.held_heal(heals | hurts), hurts, "a held heal keeps the other staff")
+	check(heals != 0 and hurts != 0, "the mender holds a heal and a staff that hurts")
+	check_equal(bot.held_heal(heals | hurts), hurts, "a held heal keeps the staff that hurts")
 	check(bot.heal_reach() > 0.0, "its heal reaches out")
 	check(not bot.foe_in_line(mender, Vector2.RIGHT, bot.heal_reach()), "no foe in the start room's line")
 	# A teammate is no foe: P1 straight ahead does not hold the heal.

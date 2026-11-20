@@ -9,4 +9,5 @@ id = &"small_healing"
 display_name = "Small Healing Potion"
 description = "Drink it from your inventory to heal 15 health."
 icon = ExtResource("2_icon")
+usable = true
 heal = 15.0

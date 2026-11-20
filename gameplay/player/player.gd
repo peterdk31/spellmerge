@@ -53,7 +53,7 @@ extends ActorController
 ##   refusal is `inventory_refused` with its words. `bag_use_requested` (the owner, 2026-11-19)
 ##   drinks one potion of the shown body's potions bag (`PotionBase`, found in the registry): one is
 ##   taken and the body is given what it does through Combat (`health_gift_requested`); refused for
-##   none held (NO_ITEM), a thing that is not drunk (NO_USE) and a potion that only heals while the
+##   none held (NO_ITEM), a thing not tagged usable (NO_USE, `ItemKinds.usable`) and a potion that only heals while the
 ##   body is whole (NO_NEED: never wasted).
 ## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the
 ##   inventory menu's d-pad on an item, binds the shown body's quick-use slot (`Inventory.bind_quick`;
@@ -729,7 +729,7 @@ func _use_item(bag: StringName, id: StringName) -> void:
 		_refuse_inventory(NO_ITEM)
 		return
 	var potion := ItemLooks.content_of(kind, id, registry) as PotionBase
-	if not ItemKinds.can(kind, ItemKinds.USE) or potion == null:
+	if not ItemKinds.usable(bag, id, registry) or potion == null:
 		_refuse_inventory(NO_USE)
 		return
 	if shown_body.health == null or potion.wasted_on(shown_body.health.health, shown_body.health.max_health):

@@ -40,10 +40,4 @@ static func of(kind: StringName, id: StringName, registry: RegistryScript, spell
 ## The content `kind` `id` is (the first of its row's folders that has it and is of its class), or
 ## null.
 static func content_of(kind: StringName, id: StringName, registry: RegistryScript) -> Resource:
-	if registry == null or id == &"":
-		return null
-	for folder: StringName in ItemKinds.content_of(kind):
-		var found: Resource = registry.get_resource(folder, id)
-		if found != null and ItemKinds.is_content(kind, found):
-			return found
-	return null
+	return ItemKinds.content(kind, id, registry)

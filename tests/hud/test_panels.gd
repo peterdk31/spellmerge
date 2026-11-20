@@ -17,6 +17,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
 const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
+const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
 ## preloading it here makes the autoload's own load fail at start (cyclic resource).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
@@ -156,7 +157,9 @@ func test_the_panel_is_small() -> void:
 	panel.set_stats(64, 100)
 	await process_frame
 	var wanted: Vector2 = panel.get_combined_minimum_size()
-	check(wanted.y <= 20.0, "with no staffs the panel is one thin line and its small number, got %s" % wanted)
+	# With no staffs: one thin line and its small number, over the empty quick-use cross that always
+	# shows (the owner, 2026-11-20).
+	check(wanted.y <= 20.0 + QuickCrossScript.SIDE, "with no staffs the panel is one thin line and its small number over the cross, got %s" % wanted)
 	check(wanted.x <= 104.0, "and narrow, got %s" % wanted)
 	check(panel.find_child("ManaBar", true, false) == null and panel.find_child("ManaValue", true, false) == null, "no panel-wide mana bar: each staff row has its own line")
 
@@ -182,7 +185,8 @@ func test_a_staffs_mana_shows_on_its_own_row() -> void:
 	panel.set_staff_plan(2, {"cards": [&"bolt"], "casts": [{"slots": PackedInt32Array([0])}]}, icons)
 	await process_frame
 	var line: MeterLineScript = panel.staff_row(2).mana_line()
-	check(line.size.x >= 40.0, "the line runs under the cards, got %s" % line.size)
+	# The quick-use cross always beside the rows (the owner, 2026-11-20) leaves a one-card row the rest.
+	check(line.size.x >= 24.0, "the line runs under the cards, got %s" % line.size)
 	check(line.position.y >= panel.staff_row(2).BOX_HEIGHT, "under the cards' frames")
 	check(not line.visible, "no line before the staff's mana is told")
 	panel.set_staff_mana(2, 30.0, 120.0)

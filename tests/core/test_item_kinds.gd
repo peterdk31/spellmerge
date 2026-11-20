@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## The questions every row answers.
 const KEYS: Array[String] = ["bag", "stacks", "content", "type", "actions", "premade"]
 ## What can be done with one held, every action a row may name.
-const ACTIONS: Array[StringName] = [ItemKinds.DROP, ItemKinds.DROP_ONE, ItemKinds.HAND, ItemKinds.USE]
+const ACTIONS: Array[StringName] = [ItemKinds.DROP, ItemKinds.DROP_ONE, ItemKinds.HAND]
 
 
 func test_every_row_answers_every_question() -> void:
@@ -59,7 +59,10 @@ func test_the_owners_kinds() -> void:
 	check(ItemKinds.stacks(ItemKinds.COIN) and ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, dropped")
 	for kind: StringName in ItemKinds.kinds():
 		check(ItemKinds.can(kind, ItemKinds.DROP) or ItemKinds.can(kind, ItemKinds.DROP_ONE), "everything is droppable: %s" % kind)
-	check(ItemKinds.can(ItemKinds.POTION, ItemKinds.USE), "a potion is used (drunk)")
+	var registry: Node = root.get_node("Registry")
+	check(ItemKinds.usable(&"potions", &"healing", registry), "a potion is used (drunk): tagged usable")
+	check(not ItemKinds.usable(&"currency", CoinBase.ID, registry), "coins are not tagged")
+	check(not ItemKinds.usable(&"potions", &"no_such_potion", registry) and not ItemKinds.usable(&"potions", &"healing", null), "nothing known, nothing usable")
 	check(not ItemKinds.stacks(ItemKinds.STAFF) and not ItemKinds.stacks(ItemKinds.RELIC), "staffs and relics do not")
 	check(ItemKinds.can(ItemKinds.STAFF, ItemKinds.HAND) and not ItemKinds.can(ItemKinds.CARD, ItemKinds.HAND), "only a staff goes on a hand")
 	check(ItemKinds.can(ItemKinds.CARD, ItemKinds.DROP_ONE), "a card drops one at a time")

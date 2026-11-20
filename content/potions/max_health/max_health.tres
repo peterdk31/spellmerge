@@ -9,4 +9,5 @@ id = &"max_health"
 display_name = "Max Health Potion"
 description = "Drink it from your inventory: your most health grows by 10, healed too."
 icon = ExtResource("2_icon")
+usable = true
 more_most = 10.0

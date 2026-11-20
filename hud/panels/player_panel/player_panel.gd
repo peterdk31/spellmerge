@@ -25,8 +25,8 @@ extends PanelContainer
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
 ## Beside the staff rows, the seat's four quick-use slots (`set_quick`; `hud/widgets/quick_cross.gd`, a
-## small d-pad cross with each bound item's icon and count, the owner's of 2026-11-20): it takes room
-## only while something is bound, growing and shrinking by whole steps (Smooth).
+## small d-pad cross with each bound item's icon and count, the owner's of 2026-11-20): it always
+## shows, its arms empty cells before anything is bound (the owner, 2026-11-20).
 ##
 ## While the player has a menu open the staff rows hide: the builder shows the staffs, and the
 ## radial builder's column takes the space under the panel.
@@ -127,7 +127,6 @@ func _ready() -> void:
 	_quick.name = "QuickCross"
 	_quick.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_lower.add_child(_quick)
-	_quick.shown_changed.connect(_refresh_rows)
 	_held_note = Label.new()
 	_held_note.name = "JoinHeld"
 	_held_note.visible = false
@@ -384,9 +383,9 @@ func _refresh_rows() -> void:
 	for staff in STAFF_COUNT:
 		_rows[staff].visible = _has_cards[staff] and not _menu_open
 	_staffs.visible = not _menu_open and _has_cards.has(true)
-	# The cross shows only while it takes room (it says so itself), so an empty one adds no gap;
-	# while a menu is open the whole row hides with the staff rows.
-	_lower.visible = _staffs.visible or (_quick.cross_stage() > 0 and not _menu_open)
+	# The cross always shows, an empty one too; while a menu is open the whole row hides with the
+	# staff rows.
+	_lower.visible = not _menu_open
 	_quick.modulate.a = 0.0 if _menu_open else 1.0
 
 

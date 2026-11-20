@@ -58,12 +58,14 @@ extends ActorComponent
 ##
 ## - **Quick-use slots** (the owner, 2026-11-20): one per d-pad arm (QUICK_SLOTS: 0 up, 1 right, 2
 ##   down, 3 left), each bound to a usable item by its bag and id or to nothing (`quick_bag`,
-##   `quick_id`). `bind_quick(slot, bag, id)` binds one it holds a copy of and can use
-##   (`ItemKinds.USE`; refused NO_ITEM, NO_USE): bound on another slot already, it moves; bound on
-##   this slot already, it is let go (as a hand's button takes its staff off). A binding names the
-##   item, not a copy: with none left it stays (the HUD greys it) and is full again as one is taken.
+##   `quick_id`, `quick_slot_of`). **Only an item tagged usable binds** (`ItemContent.usable`,
+##   `ItemKinds.usable`; the owner, 2026-11-20): `bind_quick(slot, bag, id)` binds one it holds a copy
+##   of (refused NO_USE, NO_ITEM): bound on another slot already, it moves (with none left too);
+##   bound on this slot already, it is let go (as a hand's button takes its staff off). A binding
+##   names the item, not a copy: with none left it stays (the HUD greys it, on the panel and on the
+##   inventory's ring) and is full again as one is taken.
 ##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
-##   and a usable item taken (`add`) that no slot is bound to fills the first slot bound to nothing**
+##   and an item tagged usable taken (`add`) that no slot is bound to fills the first slot bound to nothing**
 ##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
@@ -72,6 +74,8 @@ extends ActorComponent
 
 ## Why a change was refused (NONE: it was made).
 enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP, NO_USE }
+
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -85,6 +89,8 @@ const HANDS: int = Caster.MAX_STAFFS
 const DEV_COPIES: int = 20
 ## The quick-use slots, one per d-pad arm (0 up, 1 right, 2 down, 3 left).
 const QUICK_SLOTS: int = 4
+## No quick-use slot (`quick_slot_of`).
+const NO_QUICK: int = -1
 
 ## The contents of bag `bag` changed (`stacks_in`, `count_of`, `copies`).
 signal bag_changed(bag: StringName)
@@ -200,7 +206,7 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 	for slot in QUICK_SLOTS:
 		var bag: StringName = loadout.quick_bag(slot)
 		var id: StringName = loadout.quick_id(slot)
-		var bound: bool = _bags.has(bag) and ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE)
+		var bound: bool = _bags.has(bag) and ItemKinds.usable(bag, id, registry as RegistryScript)
 		_quick_bags[slot] = bag if bound else &""
 		_quick_ids[slot] = id if bound else &""
 	for bag: StringName in loadout.bags():
@@ -376,17 +382,16 @@ func add(stack: ItemStack) -> bool:
 	_say_bag(bag)
 	for number in numbered:
 		_say_staff(number)
-	_bind_if_free(bag, stack.id, stack.kind)
+	_bind_if_free(bag, stack.id)
 	return true
 
 
 ## A usable item just taken that no quick-use slot is bound to fills the first slot bound to nothing.
-func _bind_if_free(bag: StringName, id: StringName, kind: StringName) -> void:
-	if not ItemKinds.can(kind, ItemKinds.USE):
+func _bind_if_free(bag: StringName, id: StringName) -> void:
+	if not ItemKinds.usable(bag, id, _registry()):
 		return
-	for slot in QUICK_SLOTS:
-		if _quick_bags[slot] == bag and _quick_ids[slot] == id:
-			return
+	if quick_slot_of(bag, id) != NO_QUICK:
+		return
 	for slot in QUICK_SLOTS:
 		if _quick_ids[slot] == &"":
 			_set_quick(slot, bag, id)
@@ -475,29 +480,45 @@ func quick_bag(slot: int) -> StringName:
 	return _quick_bags[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
 
 
+## The quick-use slot `id` of `bag` is bound to, NO_QUICK for none.
+func quick_slot_of(bag: StringName, id: StringName) -> int:
+	for slot in QUICK_SLOTS:
+		if id != &"" and _quick_bags[slot] == bag and _quick_ids[slot] == id:
+			return slot
+	return NO_QUICK
+
+
 ## The id of the item quick-use slot `slot` is bound to (`&""`: none, or no such slot).
 func quick_id(slot: int) -> StringName:
 	return _quick_ids[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
 
 
 ## Bind quick-use slot `slot` to `id` of `bag`, as the class doc says (`&""` lets the slot go).
-## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item it holds none of (NO_ITEM)
-## and one that is never used (NO_USE).
+## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item not tagged usable (NO_USE,
+## `ItemKinds.usable`) and one it holds none of (NO_ITEM), unless that one is bound on another slot
+## already: a binding with none left moves as any does (the owner, 2026-11-20: the inventory lists it
+## greyed, to let go or bind again).
 func bind_quick(slot: int, bag: StringName, id: StringName) -> Refusal:
 	if slot < 0 or slot >= QUICK_SLOTS:
 		return Refusal.NO_SLOT
 	if id == &"" or (_quick_bags[slot] == bag and _quick_ids[slot] == id):
 		_set_quick(slot, &"", &"")
 		return Refusal.NONE
-	if not ItemKinds.can(ItemKinds.kind_in(bag, id), ItemKinds.USE):
+	if not ItemKinds.usable(bag, id, _registry()):
 		return Refusal.NO_USE
-	if count_of(bag, id) < 1:
+	if count_of(bag, id) < 1 and quick_slot_of(bag, id) == NO_QUICK:
 		return Refusal.NO_ITEM
 	for other in QUICK_SLOTS:
 		if other != slot and _quick_bags[other] == bag and _quick_ids[other] == id:
 			_set_quick(other, &"", &"")
 	_set_quick(slot, bag, id)
 	return Refusal.NONE
+
+
+## The content registry (the autoload; `ItemKinds.usable` reads an item's tag from it), or null
+## outside the tree: then nothing is usable.
+func _registry() -> RegistryScript:
+	return get_node_or_null(^"/root/Registry") as RegistryScript if is_inside_tree() else null
 
 
 func _set_quick(slot: int, bag: StringName, id: StringName) -> void:

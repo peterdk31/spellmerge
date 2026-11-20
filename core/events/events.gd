@@ -86,7 +86,7 @@ signal map_teleport_requested(player: int, room: int)
 signal map_pick_changed(player: int, room: int)
 ## Sender: hud (the inventory menu's d-pad on an item; the owner, 2026-11-20). `player` asked to bind
 ## their quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) to `id` of `bag` (a usable
-## item, `ItemKinds.USE`): bound on another slot already, it moves; bound there already (or `id`
+## item, tagged so: `ItemKinds.usable`): bound on another slot already, it moves (with none left too); bound there already (or `id`
 ## `&""`), the slot is let go. `body` as `staff_change_requested`'s. A command: heard by player at the
 ## next tick's start, which binds it (`quick_bound`) or says `inventory_refused`.
 signal quick_bind_requested(player: int, slot: int, bag: StringName, id: StringName, body: int)

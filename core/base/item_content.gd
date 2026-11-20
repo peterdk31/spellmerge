@@ -2,7 +2,7 @@ class_name ItemContent
 extends Resource
 ## What a simple item is as content (the owner, 2026-11-19: every reward is an inventory item): an
 ## id, a name, what it says it does and its icon, all a reward's card or a bag shows of it
-## (`ItemLooks`). A potion (`PotionBase`) and the coin (`CoinBase`) are one; each kind's folder and
+## (`ItemLooks`), and whether it is used (`usable`). A potion (`PotionBase`) and the coin (`CoinBase`) are one; each kind's folder and
 ## class are its row of `ItemKinds.RULES`. Read-only content.
 
 ## Unique name, also its folder's; the registry finds it by this.
@@ -13,6 +13,12 @@ extends Resource
 @export_multiline var description: String = ""
 ## Its icon (16 by 16, drawn 2x on a reward's card).
 @export var icon: Texture2D = null
+## Tagged usable (the owner, 2026-11-20: "only usable items can be bound to the D-pad"): it is used
+## from the bag (the inventory's A, `bag_use_requested`) and can be bound to a d-pad arm
+## (`Inventory.bind_quick`, auto-bound as it is taken). Only a tagged item is; nothing infers it
+## from the kind (`ItemKinds.usable`). The potions are, today: a new item becomes bindable by this
+## tag alone, its use the player controller's (`tests/gameplay/player/test_usable_items.gd` uses every tagged one).
+@export var usable: bool = false
 
 
 ## Its name for people: `display_name`, else its id in words.

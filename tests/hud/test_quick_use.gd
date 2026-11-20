@@ -3,7 +3,9 @@ extends "res://tests/support/suite.gd"
 ## bound to a usable item"): in the inventory's potions ring a d-pad arm binds the potion pointed at
 ## (its arm's glyph beside it, "Bind" on the hint row), again lets it go; in play the arm drinks one
 ## (a command), the corner panel's cross shows each bound item's icon and count, greyed with none
-## left and full again as one is taken; while the Y map is held the d-pad moves the teleport pick and
+## left and full again as one is taken (the cross always shows, its arms empty cells before anything
+## is bound; a bound item with none left stays on the inventory's ring, greyed with 0, to let go or
+## bind again; the owner, 2026-11-20); while the Y map is held the d-pad moves the teleport pick and
 ## drinks nothing, and A teleports. The wizard is real (the real registry and spell runtime).
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -139,7 +141,7 @@ func test_in_play_an_arm_drinks_one_and_the_panel_shows_it() -> void:
 	_frame()
 	var cross: QuickCrossScript = _cross()
 	check(cross.is_bound(2) and not cross.is_bound(0), "the panel's cross: down bound, up not")
-	check_equal([cross.stage_of(2), cross.count_of(2), cross.cross_stage()], [QuickCrossScript.FULL, 1, QuickCrossScript.CROSS_STAGES], "its icon and its count, the cross in")
+	check_equal([cross.stage_of(2), cross.count_of(2)], [QuickCrossScript.FULL, 1], "its icon and its count")
 	check_equal(cross.stage_of(0), QuickCrossScript.FRAMED, "an unbound arm an empty cell")
 	_world.hurt(_wizard, 50)
 	_tap(&"quick_down")
@@ -156,25 +158,30 @@ func test_in_play_an_arm_drinks_one_and_the_panel_shows_it() -> void:
 	_wizard.inventory.bind_quick(2, POTIONS, &"healing")
 	for _step in 12:
 		_frame()
-	check_equal(cross.cross_stage(), 0, "nothing bound: the cross goes")
-	check_equal(cross.custom_minimum_size, Vector2.ZERO, "and takes no room")
+	check(cross.visible and cross.stage_of(2) == QuickCrossScript.FRAMED, "nothing bound: the cross stays, the arm an empty cell")
+	check_equal(cross.custom_minimum_size, Vector2(QuickCrossScript.SIDE, QuickCrossScript.SIDE), "and keeps its room")
 
 
-func test_the_cross_steps_in_never_jumps() -> void:
+func test_a_slot_steps_in_and_out_never_jumps() -> void:
 	var cross := QuickCrossScript.new()
 	own(cross)
+	check(cross.visible, "shown before anything is bound")
+	check_equal(cross.custom_minimum_size, Vector2(QuickCrossScript.SIDE, QuickCrossScript.SIDE), "its whole room from the start")
+	for slot in QuickCrossScript.SLOTS:
+		check_equal(cross.stage_of(slot), QuickCrossScript.FRAMED, "arm %d an empty cell" % slot)
 	cross.set_slot(1, PlaceholderTexture2D.new(), 3)
-	var widths: Array[float] = []
 	var stages: Array[int] = []
 	while cross.is_moving():
 		cross.advance()
-		widths.append(cross.custom_minimum_size.x)
 		stages.append(cross.stage_of(1))
-	check(widths.size() >= QuickCrossScript.CROSS_STAGES, "it grows in steps: %s" % [widths])
-	check_equal(widths[0], float(QuickCrossScript.SIDE / QuickCrossScript.CROSS_STAGES), "a third first")
-	check_equal(stages.filter(func(stage: int) -> bool: return stage > 0).size() >= QuickCrossScript.SLOT_STAGES, true, "the slot through its looks: %s" % [stages])
-	for at in widths.size():
-		check(widths[at] == floorf(widths[at]), "whole pixels")
+	check_equal(stages.slice(0, 5), [1, 2, 3, 4, 5] as Array[int], "bound: from its empty cell through the shadow and the shades to its icon: %s" % [stages])
+	cross.set_slot(1, null, 0)
+	stages.clear()
+	while cross.is_moving():
+		cross.advance()
+		stages.append(cross.stage_of(1))
+	check_equal(stages.slice(0, 4), [4, 3, 2, 1] as Array[int], "let go: back to its empty cell a shade a frame")
+	check_equal(cross.custom_minimum_size, Vector2(QuickCrossScript.SIDE, QuickCrossScript.SIDE), "the room never changes")
 
 
 func test_greying_and_filling_again_pass_the_shades_between() -> void:
@@ -197,7 +204,7 @@ func test_greying_and_filling_again_pass_the_shades_between() -> void:
 	check_equal(stages.slice(0, 3), [3, 4, 5] as Array[int], "refilled: back through the shades")
 
 
-func test_an_empty_cross_is_hidden_and_adds_no_gap() -> void:
+func test_an_empty_cross_always_shows_beside_the_staffs() -> void:
 	var panel: Control = _hud.get_panel(0)
 	var plan: Dictionary = {"cards": [&"bolt"], "casts": [{"slots": PackedInt32Array([0])}]}
 	var icons: Array[Texture2D] = [null]
@@ -205,10 +212,51 @@ func test_an_empty_cross_is_hidden_and_adds_no_gap() -> void:
 	panel.set("visible", true)
 	await process_frame
 	var cross: QuickCrossScript = _cross()
-	check(not cross.visible, "nothing bound: the cross is hidden")
+	check(cross.is_visible_in_tree(), "nothing bound: the cross shows (the owner, 2026-11-20)")
+	for slot in QuickCrossScript.SLOTS:
+		check(not cross.is_bound(slot) and cross.stage_of(slot) == QuickCrossScript.FRAMED, "arm %d drawn empty" % slot)
 	var staffs := panel.find_child("Staffs", true, false) as Control
-	var lower := panel.find_child("Lower", true, false) as Control
-	check_equal(staffs.size.x, lower.size.x, "the staff rows take the whole row: no gap for an empty cross")
+	check_equal(cross.size, Vector2(QuickCrossScript.SIDE, QuickCrossScript.SIDE), "its whole size")
+	check(cross.position.x >= staffs.position.x + staffs.size.x, "on the staff rows' right")
+	check(panel.get_combined_minimum_size().x <= 160.0, "and the panel fits a quarter pane: %s" % panel.get_combined_minimum_size())
+
+
+func test_a_bound_potion_with_none_left_stays_greyed_on_the_ring() -> void:
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1)), "one healing potion")
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"vigor", 1)), "one vigor potion")
+	_world.hurt(_wizard, 50)
+	_frame()
+	var inventory: InventoryScript = _open_potions()
+	_point(inventory, &"healing")
+	_tap(&"accept")
+	var shades: Array[int] = []
+	for _step in 8:
+		_frame()
+		shades.append(inventory.shade_of(&"healing"))
+	check_equal(_wizard.inventory.count_of(POTIONS, &"healing"), 0, "drunk from the ring: none left")
+	var at: int = inventory.entry_of("item", &"healing")
+	check(at != InventoryScript.NONE, "bound up, it stays on the ring")
+	check_equal(int(inventory.entries()[at]["count"]), 0, "with its count 0")
+	var seen: Array[int] = []
+	for shade in shades:
+		if seen.is_empty() or seen.back() != shade:
+			seen.append(shade)
+	check_equal(seen, [1, 2, 3] as Array[int], "it greys a shade a frame from its icon (Smooth), never at once: %s" % [shades])
+	_point(inventory, &"healing")
+	check_equal([inventory.hint_verbs()[0], inventory.hint_verbs()[4]], ["Use", "Bind"], "the hint row")
+	var live: Array[bool] = inventory.menu().hint_live()
+	check_equal([live[0], live[1], live[4]], [false, false, true], "none left: Use and Drop dimmed, Bind lit")
+	_tap(&"quick_down")
+	_frame()
+	_frame()
+	check_equal([_wizard.inventory.quick_id(0), _wizard.inventory.quick_id(2)], [&"", &"healing"], "bound down from the ring with none left: it moved")
+	check(inventory.entry_of("item", &"healing") != InventoryScript.NONE, "still on the ring")
+	_tap(&"quick_down")
+	_frame()
+	_frame()
+	check_equal(_wizard.inventory.quick_id(2), &"", "on its own arm again: let go")
+	check_equal(inventory.entry_of("item", &"healing"), InventoryScript.NONE, "let go, it leaves the ring")
+	check(inventory.entry_of("item", &"vigor") != InventoryScript.NONE, "the vigor potion held stays")
 
 
 func test_on_the_held_map_the_dpad_moves_the_pick_and_drinks_nothing() -> void:

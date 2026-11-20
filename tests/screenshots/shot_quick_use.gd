@@ -4,9 +4,12 @@ extends "res://tests/support/screenshot.gd"
 ## In the hub (the dev staffs, tests/support/dev_hub.gd), four players on virtual pads, each wizard with
 ## a six-slot staff of six cards on RB and potions: the inventory's potions ring with the healing
 ## potion pointed at, bound to the d-pad's up by a press (its glyph beside it, "Bind" on the hint row;
-## quick_inventory_bind); every corner panel with its d-pad cross beside six-slot staff rows: up the
-## healing potions, right the max health potion, left the small healing potions with none left
-## (greyed, 0), down bound to nothing (quick_panels), and P1's panel cropped 4x (quick_panel_p1).
+## quick_inventory_bind), then the small healing potion pointed at, bound left with none left: still on
+## the ring, greyed with 0 (quick_ring_none_left); every corner panel with its d-pad cross beside
+## six-slot staff rows: up the healing potions, right the max health potion, left the small healing
+## potions with none left (greyed, 0), down bound to nothing; P2's cross with nothing bound, every arm
+## an empty cell (the cross always shows, the owner's of 2026-11-20) (quick_panels), and P1's and
+## P2's panels cropped 4x (quick_panel_p1, quick_panel_empty).
 ## Then, on the split test map (tests/support/biome_maps.gd) played by the keyboard, P1 holding M
 ## (Y on a pad) in the antechamber, the map open with its legend along the frame's foot: the d-pad's
 ## glyph ("1-4" on the keyboard) "Move teleport target" and F (A) "Teleport" (quick_map_legend).
@@ -50,6 +53,9 @@ func take() -> void:
 		# Taken, each potion filled a free arm (the owner, 2026-11-20); laid out by hand here.
 		for slot in Inventory.QUICK_SLOTS:
 			inventory.bind_quick(slot, POTIONS, &"")
+		if index == 1:
+			# P2 binds nothing: the empty cross.
+			continue
 		inventory.bind_quick(1, POTIONS, &"max_health")
 		inventory.bind_quick(3, POTIONS, &"small_healing")
 		inventory.take(POTIONS, &"small_healing", 1)
@@ -73,6 +79,9 @@ func take() -> void:
 		fail("the d-pad's up did not bind the healing potion")
 		return
 	await shot("quick_inventory_bind")
+	await _point(menu, "item", &"small_healing")
+	await settle(10)
+	await shot("quick_ring_none_left")
 	_input.call("send_virtual_aim", 0, Vector2.ZERO)
 	tap(0, &"inventory")
 	await settle(30)
@@ -80,6 +89,8 @@ func take() -> void:
 	var panel := _hud.call("get_panel", 0) as Control
 	var image: Image = await grab()
 	save_crop(image, panel.get_global_rect().get_center(), "quick_panel_p1", Vector2i(64, 36))
+	var empty := _hud.call("get_panel", 1) as Control
+	save_crop(image, empty.get_global_rect().get_center(), "quick_panel_empty", Vector2i(64, 36))
 	flow.call("stop_run")
 	await settle(10)
 	for index in 4:

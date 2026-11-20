@@ -691,11 +691,9 @@ owner accepts that the split's air then looks as thick as the single picture's):
   ground cover's batches take their room's box. The floor marks have a layer a place (each the size
   of its place, masked to the floor its place holds, a stamp drawn into each layer it reaches), so a
   wide biome's marks are no longer cut at 4,096 px and only rooms with new stamps render. The motes
-  are one ring written in time order (a chunk holds every fight's motes), so they are not cut into
-  rooms: instead each view's copy of the motes' batches (below) is told the box of the world its
-  view draws and the vertex stage folds away a mote that cannot reach it before working out its
-  flight (`Motes.may_reach` its line on the CPU, held to every flight by a test); the one picture's
-  root draws them culled by its own box too.
+  are one ring written in time order (a chunk holds every fight's motes), so #890 culled them per
+  view in their shader instead; since the owner's follow-up of 2026-11-20 they too are drawn by room
+  ("Motes by room, readers shared by two views" below).
 - **Per-view culling:** the mote sources, the room's and each kind's air, the void's air and the
   bodies' shadows work near each view's own box (`ViewBoxes`, `ScreenViews.view_world_box`), not the
   box round every view; the air over the views is as thick as over one picture (a point over two
@@ -704,7 +702,43 @@ owner accepts that the split's air then looks as thick as the single picture's):
   mist) is drawn once a view: the item itself for the first view, a copy a view past it on that
   view's visibility layer with its view's copy of the material, each naming its light buffer by the uniform `light_view_id`
   (`ViewReaders`); each view's SubViewport draws the world's layer and its own. No transform is
-  matched. The equal split's void quarter is one view more, reading no light.
+  matched. The equal split's void quarter is one view more, reading no light. (Since the owner's
+  follow-up, the first two views share the readers: below.)
 
 The numbers are in docs/LOG.md (2026-11-20, "Per-room batches").
+
+### Motes by room, readers shared by two views (the owner's decision of 2026-11-20, after #890)
+
+#890 left two questions; the owner answered both on 2026-11-20:
+
+- **The motes in per-room chunks**, in place of #890's cull in their vertex shader
+  (`gameplay/feel/mote_regions.gd`, the pool's `regions`). The ring, its rows and everything that
+  writes them are unchanged (the trails' births in `MoteKernel` still match the GDScript to the bit).
+  While the room grid has places, the ring's chunks draw nothing; at each step every row written
+  since the last is copied into a chunk of its **region**: the place whose 32 px square its ground
+  point at birth lies wholly in, when the box of everywhere its flight can be drawn (`reach_of`: its
+  speed times the most its drag lets it glide in its life, its sway twice, 24 px for its shape, glow
+  and the stirs; up, its height's highest) lies inside the place grown by 96 px (`REACH`); else the
+  **crossers'** region, boxed to the world (a mote at a mouth or over a bridge's lip, in the void, or
+  flung far from near a wall). A chunk is 512 rows, its box its place grown by REACH, drawing only its
+  filled rows; the chunks are a pool shared by the regions (made as needed, kept, at most twice the
+  ring's rows plus two a region; with all in use the one ending soonest is taken). **No more motes
+  than the ring holds:** the ring overwrites its oldest row, and that row's copy is folded away as the
+  new one is handed out. A chunk is free once its motes are gone by their lives or overwritten. So a
+  mote drifting across its room's edge is drawn by its room's chunk (its whole flight is inside the
+  box) or by the crossers'. The hand-out runs in the native kernel (`MoteKernel.region_rows`), to the
+  bit as in GDScript. Outside a biome the ring draws as before.
+- **Light reader copies only from the third view on:** the first two views draw each reader (the
+  apply rect, the motes' chunks, the mist) itself, on the first views' visibility layer, and its
+  shader picks the nearer of the two views by the canvas transform it is drawn through and the
+  viewport's size (`CANVAS_MATRIX`, `SCREEN_MATRIX`; each view's handed to the reader's material
+  every frame). Two views drawn through one transform at one size draw one picture, whose light
+  either buffer holds. The third and fourth views keep #890's copies, named by `light_view_id`.
+- Tests: `tests/gameplay/feel/test_mote_regions.gd` (each room's motes in a chunk boxed to it, every
+  flight of the game's kinds inside its room's box, the crossers, an overwritten row folded away, a
+  chunk freed and used again, the ring with no places, native against GDScript byte for byte),
+  `test_split_screen.gd` (1 to 4 views, Dynamic and Equal: each view draws one of each reader and
+  reads its own buffer, by `ViewReaders.view_of`, the shader's lines; copies only for views 3 and
+  4). Screenshots: `tests/screenshots/shot_mote_regions.gd`. The numbers are in docs/LOG.md
+  (2026-11-20, "Motes by room").
 

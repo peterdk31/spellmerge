@@ -40,6 +40,9 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //
 // `mote_flight` is `Motes.flight` line for line.
 //
+// In a biome a batch holds one room's motes and is boxed to the room (`MoteRegions`,
+// gameplay/feel/mote_regions.gd): a view culls the rooms it does not show, so nothing is culled here.
+//
 // A lit-only kind (docs/milestones/atmosphere.md, B: a room's dust in the air) reads the spell
 // light's light buffer (`light_buffer`, the same view smaller, as light_apply.gdshader reads it)
 // under each of its pixels: below the first of `lit_steps` it is not drawn (the dark), above each
@@ -67,14 +70,6 @@ uniform sampler2D ramp_table : filter_nearest;
 uniform sampler2D shape_atlas : filter_nearest;
 // The spell light's buffer (Motes.set_light), for the lit-only kinds; `light_on` false: none.
 #include "res://gameplay/feel/light_views.gdshaderinc"
-// The part of the world the view this is drawn in shows (x0, y0, x1, y1; all 0: none; each view's
-// material its own, ViewReaders,
-// the performance pass of 2026-11-20): a mote that cannot reach it is folded away before its flight
-// is worked out, so a view of one room does not work out the motes of the others.
-uniform vec4 view_cull_box = vec4(0.0);
-// How far past its flight's reach a mote may still be drawn (px): its shape and glow, its sway
-// round its kind's, the stirs, and a frame of the camera's lag.
-const float CULL_PAD = 48.0;
 uniform bool light_on = false;
 // The light's brightest channel from which a lit-only mote shows in its shadow, base, light and
 // white-hot shade (`SpellLight.lit_steps`, from the apply rect's own steps; Motes.DEFAULT_LIT_STEPS
@@ -159,6 +154,8 @@ vec3 mote_shade(float source, vec3 c, float s, int shade) {
 }
 
 void vertex() {
+	// The view it is drawn in: read only by a lit-only mote (found below, for those alone).
+	light_view = 0;
 	vec2 vel = MODEL_MATRIX[0].xy;
 	float born = MODEL_MATRIX[1].x;
 	float vz = MODEL_MATRIX[1].y;
@@ -186,19 +183,10 @@ void vertex() {
 	bool lit_only = light_of.x > 0.5;
 	// A lit-only mote with no light to read is not drawn.
 	alive = alive && (light_on || !lit_only);
-	// Nor one that cannot reach the part of the world this view shows (`mote_flight`'s bounds: along
-	// the floor at most its speed times its age, and its sway's twice; up at most its first height
-	// and its rise, or a bounce's, or a gravity that lifts it; drawn that far above its ground).
-	if (alive && view_cull_box.z > view_cull_box.x) {
-		vec4 cull_motion = texelFetch(kind_table, ivec2(0, k), 0);
-		vec4 cull_sway = texelFetch(kind_table, ivec2(1, k), 0);
-		float spread = length(vel) * t + 2.0 * abs(cull_sway.x) + CULL_PAD;
-		float g = cull_motion.x;
-		float rise = h0 + abs(vz) * t + (g > 0.0 ? vz * vz / (2.0 * g) : -0.5 * g * t * t);
-		alive = from.x + spread >= view_cull_box.x && from.x - spread <= view_cull_box.z
-				&& from.y + spread >= view_cull_box.y && from.y - spread - rise <= view_cull_box.w;
-	}
 	// An unused row has no life: folded away, with none of the work below.
+	if (alive && lit_only) {
+		LIGHT_VIEW_FIND;
+	}
 	if (alive) {
 		vec4 motion = texelFetch(kind_table, ivec2(0, k), 0);
 		vec4 sway = texelFetch(kind_table, ivec2(1, k), 0);

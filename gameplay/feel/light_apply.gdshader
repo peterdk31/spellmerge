@@ -95,6 +95,7 @@ float gain_of(float most) {
 }
 
 void vertex() {
+	LIGHT_VIEW_FIND;
 	world_at = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 

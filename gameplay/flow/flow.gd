@@ -2150,7 +2150,7 @@ func _rebuild_biome() -> void:
 		gates.lay(biome, projectiles.grid())
 		locks.lay(biome, projectiles.grid())
 	gates.tell_all(_wizards, life)
-	locks.tell_all()
+	locks.tell_all(true)
 	teleports.forget()
 	_tell_seen(true)
 	_tell_cleared(true)

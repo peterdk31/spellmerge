@@ -31,7 +31,8 @@ extends RefCounted
 ##   circle within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
 ##   element) and each key lying (`key_shown`) as it changes; -1 when every one is forgotten (the biome
-##   left, a restore: told again by `tell_all`). The HUD is told, by seat, the shut key door its body
+##   left, a restore: told again by `tell_all`), and the rooms opened (`rooms_opened`: as one opens,
+##   empty as the biome goes, `again` after a restore; a treasure room's done look). The HUD is told, by seat, the shut key door its body
 ##   stands at with no key (`key_needed_shown`), and reads a body's keys from its bag (`bag_changed`).
 ##   Never read back by the simulation.
 
@@ -180,6 +181,7 @@ func clear() -> void:
 	_mouths.clear()
 	if had:
 		_forget(false)
+		_tell_opened(false)
 
 
 ## How many doors there are.
@@ -340,6 +342,7 @@ func open(room: int, grid: RoomGrid) -> void:
 		if grid != null:
 			grid.shut_mouth(mouth_of(door), false)
 		_tell_door(door)
+	_tell_opened(false)
 
 
 ## After a snapshot was restored: the view forgets every door, rock and key, to draw each as it
@@ -348,12 +351,20 @@ func rebuild_derived() -> void:
 	_forget(true)
 
 
-## Tell the view every door, rock and key as they stand now (the biome laid; after a restore).
-func tell_all() -> void:
+## Tell the view every door, rock and key as they stand now, and the rooms opened (the biome laid;
+## after a restore, `again`).
+func tell_all(again: bool = false) -> void:
 	for door in doors():
 		_tell_door(door)
 	for key in key_drops.size():
 		_tell_key(key)
+	_tell_opened(again)
+
+
+## The rooms opened told to the view (`rooms_opened`, a copy of `opened`; the owner, 2026-11-20).
+func _tell_opened(again: bool) -> void:
+	if events != null:
+		events.rooms_opened.emit(opened.duplicate(), again)
 
 
 ## The view's number of door `door`: key doors and secret rocks are each counted on their own.

@@ -24,10 +24,15 @@ extends RefCounted
 ## from FIRST_ROOM) and a room's kind from the layout's `RoomKind.LAYOUT_META`, else the first kind its
 ## template hosts; a reward room's type (`RewardType`, the owner's ask of 2026-11-19) from the layout's
 ## `RewardType.LAYOUT_META` (none: any), for the mouths' signs and the held map; and which rooms
-## are cleared (`rooms_cleared`, Flow's state as told; the owner, 2026-11-20), for their cleared look.
+## are cleared (`rooms_cleared`, Flow's state as told; the owner, 2026-11-20), for their cleared look;
+## and (the owner, 2026-11-20, after #884) which are opened (`rooms_opened`, Flow's), which fountains
+## were used (`fountain_changed`, Rewards') and which rooms still hold a reward to take
+## (`rooms_rewards_left`, Rewards'), so a room is done (`is_done`) by its kind's rule
+## (`KindSymbol.done_by`).
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const KindSymbolScript := preload("res://gameplay/feel/kind_symbol.gd")
 
 ## Where the rooms and kinds are in the registry.
 const ROOM_FOLDER: StringName = &"rooms"
@@ -65,12 +70,21 @@ var _world: int = 0
 ## `again` (after a restore): the looks that play the cleared look in draw it as it stands then.
 var _cleared: PackedByteArray = PackedByteArray()
 var _cleared_again: int = 0
+## By room number, as told last: opened (1; `rooms_opened`, Flow's), its fountain used (1;
+## `fountain_changed`, Rewards': drawn on at all), a reward still to take there (1;
+## `rooms_rewards_left`, Rewards'). Each sender tells its own afresh (a world gone, a restore).
+var _opened: PackedByteArray = PackedByteArray()
+var _used: PackedByteArray = PackedByteArray()
+var _left: PackedByteArray = PackedByteArray()
 
 
 func bind(events: EventsScript) -> void:
 	if events != null:
 		events.room_built.connect(_on_room_built)
 		events.rooms_cleared.connect(_on_rooms_cleared)
+		events.rooms_opened.connect(_on_rooms_opened)
+		events.rooms_rewards_left.connect(_on_rooms_rewards_left)
+		events.fountain_changed.connect(_on_fountain_changed)
 
 
 func _on_rooms_cleared(cleared: PackedByteArray, again: bool) -> void:
@@ -79,12 +93,55 @@ func _on_rooms_cleared(cleared: PackedByteArray, again: bool) -> void:
 		_cleared_again += 1
 
 
+func _on_rooms_opened(opened: PackedByteArray, again: bool) -> void:
+	_opened = opened
+	if again:
+		_cleared_again += 1
+
+
+func _on_rooms_rewards_left(left: PackedByteArray, again: bool) -> void:
+	_left = left
+	if again:
+		_cleared_again += 1
+
+
+## A fountain's pool as it stands (room -1: every one forgotten): used once it holds less than its
+## most (a restore says every pool again after -1, with the rooms cleared told again).
+func _on_fountain_changed(room: int, _area: Rect2, left: float, most: float) -> void:
+	if room < 0:
+		_used = PackedByteArray()
+		return
+	if _used.size() <= room:
+		_used.resize(room + 1)
+	_used[room] = 1 if left < most else 0
+
+
 ## True when room `room` is cleared (as Flow told it last).
 func is_cleared(room: int) -> bool:
-	return room >= 0 and room < _cleared.size() and _cleared[room] != 0
+	return _has(_cleared, room)
 
 
-## How many times the rooms cleared were told again after a restore (it changes with each).
+## True when room `room` is done, by its kind's rule (`KindSymbol.done_by`): cleared, opened, its
+## fountain used, or (a reward room) entered with no reward left to take in it.
+func is_done(room: int) -> bool:
+	match KindSymbolScript.done_by(kind_of(room)):
+		KindSymbolScript.DONE_CLEARED:
+			return _has(_cleared, room)
+		KindSymbolScript.DONE_OPENED:
+			return _has(_opened, room)
+		KindSymbolScript.DONE_USED:
+			return _has(_used, room)
+		KindSymbolScript.DONE_TAKEN:
+			return _has(_cleared, room) and not _has(_left, room)
+	return false
+
+
+static func _has(rooms: PackedByteArray, room: int) -> bool:
+	return room >= 0 and room < rooms.size() and rooms[room] != 0
+
+
+## How many times the rooms done were told again after a restore (`rooms_cleared`, `rooms_opened`,
+## `rooms_rewards_left`; it changes with each): the looks draw the cleared look as it stands then.
 func cleared_again() -> int:
 	return _cleared_again
 
@@ -102,6 +159,7 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		# A new world's rooms are none of them cleared until Flow says so (an old biome's never carry
 		# over by number: a restore into the hub or a row run tells no empty map).
 		_cleared = PackedByteArray()
+		_opened = PackedByteArray()
 	if number < 0:
 		return
 	while _templates.size() <= number:

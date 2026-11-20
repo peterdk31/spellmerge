@@ -208,10 +208,17 @@ func test_the_cleared_look_dims_the_symbol_and_draws_a_check_in_stages() -> void
 		var step: Vector2i = (KindSymbolScript.CHECK[index] - KindSymbolScript.CHECK[index - 1]).abs()
 		check(step.x <= 1 and step.y <= 1, "the check is one stroke, a pixel beside the last")
 	check(Palette.shades_of(&"leaf").has(KindSymbolScript.CHECK_COLOUR), "the check in a palette colour")
-	for id: StringName in [&"fight", &"challenge", &"boss"]:
-		check(KindSymbolScript.shows_cleared(registry.call(&"get_resource", &"room_kinds", id) as RoomKind), "a %s room shows it cleared" % id)
-	for id: StringName in [&"start", &"reward", &"shop", &"treasure", &"fountain", &"secret"]:
-		check(not KindSymbolScript.shows_cleared(registry.call(&"get_resource", &"room_kinds", id) as RoomKind), "a %s room tells nothing by it" % id)
+	# What makes each kind done (the owner, 2026-11-20, #883 and after #884; never a shop).
+	var rules: Dictionary = {
+		&"fight": KindSymbolScript.DONE_CLEARED, &"challenge": KindSymbolScript.DONE_CLEARED, &"boss": KindSymbolScript.DONE_CLEARED,
+		&"treasure": KindSymbolScript.DONE_OPENED, &"fountain": KindSymbolScript.DONE_USED, &"reward": KindSymbolScript.DONE_TAKEN,
+		&"secret": KindSymbolScript.DONE_NEVER, &"start": KindSymbolScript.DONE_NEVER, &"shop": KindSymbolScript.DONE_NEVER,
+	}
+	for id: StringName in rules:
+		var kind: RoomKind = registry.call(&"get_resource", &"room_kinds", id) as RoomKind
+		check_equal(KindSymbolScript.done_by(kind), int(rules[id]), "a %s room's done rule" % id)
+		check_equal(KindSymbolScript.shows_done(kind), int(rules[id]) != KindSymbolScript.DONE_NEVER, "a %s room shows it done or not" % id)
+	check_equal(KindSymbolScript.done_by(null), KindSymbolScript.DONE_NEVER, "no kind: never")
 
 
 ## A fight room cleared: every doorway sign into it steps to the cleared look a stage a frame, its
@@ -226,6 +233,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 	for mouth in symbols.count():
 		check_equal(symbols.cleared_of(mouth), 0, "mouth %d: nothing cleared yet" % mouth)
 	check(not _hearing().is_cleared(WEST), "the antechamber not cleared")
+	check(not _hearing().is_done(WEST), "nor done")
 	_into(map, WEST, RoomSocket.Facing.EAST)
 	check(_hearing().is_cleared(WEST), "its empty fight cleared as entered, told to the view")
 	check(not _hearing().is_cleared(EAST), "the court not")
@@ -308,6 +316,162 @@ func test_a_restore_draws_the_cleared_look_as_it_stands() -> void:
 	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "cleared as it stands at once, on an open map too")
 	flow.stop_run()
 	check(not _hearing().is_cleared(WEST), "the biome gone, nothing cleared")
+
+
+## The room hearing tells each kind done by its own rule (the owner, 2026-11-20, after #884), from
+## what each sender told: a fight cleared (Flow's `rooms_cleared`), a treasure room opened (Flow's
+## `rooms_opened`), a fountain used (Rewards' `fountain_changed`: drawn on at all), a reward room
+## entered with no reward left in it (Rewards' `rooms_rewards_left`); a shop never. Each told
+## `again` changes `cleared_again`, so the looks draw it as it stands.
+func test_the_room_hearing_tells_each_kind_done_by_its_own_rule() -> void:
+	var bus := own(EventsScript.new()) as EventsScript
+	var hearing := RoomHearingScript.new()
+	hearing.registry = registry
+	hearing.bind(bus)
+	var kinds: Array[StringName] = [&"start", &"fight", &"treasure", &"fountain", &"reward", &"shop"]
+	for number in kinds.size():
+		var layout := own(Node.new()) as Node
+		layout.set_meta(RoomKind.LAYOUT_META, String(kinds[number]))
+		bus.room_built.emit(&"", number, layout)
+	for room in kinds.size():
+		check(not hearing.is_done(room), "%s: nothing done yet" % kinds[room])
+	# Every room cleared (a reward room and a shop are cleared as they are entered).
+	var all := PackedByteArray([1, 1, 1, 1, 1, 1])
+	bus.rooms_cleared.emit(all, false)
+	bus.rooms_rewards_left.emit(PackedByteArray([0, 1, 0, 0, 1]), false)
+	check(hearing.is_done(1), "the fight: cleared")
+	check(not hearing.is_done(2), "the treasure room: not opened yet")
+	check(not hearing.is_done(3), "the fountain: not used yet")
+	check(not hearing.is_done(4), "the reward room: entered, its reward still lying there")
+	check(not hearing.is_done(0) and not hearing.is_done(5), "the start room and the shop never")
+	bus.rooms_opened.emit(PackedByteArray([0, 0, 1]), false)
+	check(hearing.is_done(2), "the treasure room: opened")
+	bus.fountain_changed.emit(3, Rect2(), 120.0, 120.0)
+	check(not hearing.is_done(3), "the fountain filled, nobody drew on it")
+	bus.fountain_changed.emit(3, Rect2(), 100.0, 120.0)
+	check(hearing.is_done(3), "drawn on: used")
+	bus.fountain_changed.emit(-1, Rect2(), 0.0, 0.0)
+	check(not hearing.is_done(3), "every fountain forgotten: not, until told again")
+	bus.fountain_changed.emit(3, Rect2(), 0.0, 120.0)
+	check(hearing.is_done(3), "told again, dry: used")
+	bus.rooms_rewards_left.emit(PackedByteArray([0, 1]), false)
+	check(hearing.is_done(4), "its reward taken: the reward room done (a shorter list holds none past its end)")
+	bus.rooms_cleared.emit(PackedByteArray(), false)
+	check(not hearing.is_done(4), "not entered (nothing cleared): a reward room is not done")
+	var again: int = hearing.cleared_again()
+	bus.rooms_opened.emit(PackedByteArray([0, 0, 1]), true)
+	check_equal(hearing.cleared_again(), again + 1, "told the rooms opened again: drawn as they stand")
+	bus.rooms_rewards_left.emit(PackedByteArray(), true)
+	check_equal(hearing.cleared_again(), again + 2, "and the rewards left")
+	bus.room_built.emit(&"", EventsScript.FIRST_ROOM, null)
+	check(not hearing.is_done(2), "a new world: nothing opened")
+
+
+## A treasure room once opened (the owner, 2026-11-20, after #884): every doorway sign into it and
+## its map symbol step to the done look; the room past it does not.
+func test_a_treasure_rooms_signs_show_it_done_once_opened() -> void:
+	var map: BiomeMap = _start_kinds(1, &"treasure", &"boss")
+	var symbols: MouthSymbolsScript = _laid_symbols()
+	var key_at: Vector2 = flow.locks.key_at[0]
+	check(not _hearing().is_done(WEST), "shut: not done")
+	check_equal(_done_stages(symbols, WEST), [] as Array[int], "nothing changes while it is shut")
+	_wizard(0).global_position = key_at
+	tick.run(DT)
+	_wizard(0).global_position = BiomeMaps.socket_point(registry, map, WEST, RoomSocket.Facing.EAST) + RoomSocket.way(RoomSocket.Facing.EAST) * 40.0
+	tick.run(DT)
+	tick.run(DT)
+	check(flow.locks.is_open(WEST), "the key opened it")
+	check(_hearing().is_done(WEST), "opened: done, before anyone went in")
+	check_equal(_done_stages(symbols, WEST), [1, 2, 3, 4, 5, 6, 7] as Array[int], "its sign steps to the done look a stage a frame")
+	_check_only_done(symbols, WEST)
+
+
+## A fountain once used (the owner, 2026-11-20, after #884): drawn on at all by a hurt wizard.
+func test_a_fountains_signs_show_it_done_once_used() -> void:
+	var map: BiomeMap = _start_kinds(1, &"fountain", &"fight")
+	var symbols: MouthSymbolsScript = _laid_symbols()
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	check(not _hearing().is_done(WEST), "entered, its pool full: not used")
+	check_equal(_done_stages(symbols, WEST), [] as Array[int], "its sign unchanged")
+	var wizard: Actor = _wizard(0)
+	wizard.health.health = wizard.health.max_health * 0.5
+	wizard.global_position = flow.biome.room_rect(WEST).get_center()
+	tick.run(DT)
+	tick.run(DT)
+	check(_hearing().is_done(WEST), "a hurt wizard drew on it: used")
+	check_equal(_done_stages(symbols, WEST), [1, 2, 3, 4, 5, 6, 7] as Array[int], "its sign steps to the done look a stage a frame")
+	_check_only_done(symbols, WEST)
+
+
+## A reward room once its rewards are taken (the owner, 2026-11-20, after #884): entering is not
+## enough while a present player's item lies there; taken, the signs step to the done look. A player
+## who was away finds its offer waiting anywhere (rule 4), and it keeps nothing in the room.
+func test_a_reward_rooms_signs_show_it_done_once_its_rewards_are_taken() -> void:
+	var map: BiomeMap = _start_kinds(2, &"fight", &"reward")
+	var symbols: MouthSymbolsScript = _laid_symbols()
+	_into(map, EAST, RoomSocket.Facing.WEST)
+	tick.run(DT)
+	check(_hearing().is_cleared(EAST), "entered: cleared")
+	check(not _hearing().is_done(EAST), "its reward lies there: not done")
+	check_equal(_done_stages(symbols, EAST), [] as Array[int], "its sign unchanged")
+	var mine: Array = root.get_node("Rewards").call(&"waiting_of", 0)
+	check(mine.size() == 1 and bool((mine[0] as Dictionary)["lying"]), "seat 0's item lies in the room")
+	events.call(&"apply_command", &"reward_pick_requested", [0, int((mine[0] as Dictionary)["offer"]), 0])
+	check(_hearing().is_done(EAST), "taken: done, though seat 1's offer still waits elsewhere")
+	check_equal((root.get_node("Rewards").call(&"waiting_of", 1) as Array).size(), 1, "seat 1's offer waits")
+	check_equal(_done_stages(symbols, EAST), [1, 2, 3, 4, 5, 6, 7] as Array[int], "its sign steps to the done look a stage a frame")
+	_check_only_done(symbols, EAST)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check_equal(view.cleared_of(EAST), KindSymbolScript.CLEARED_STAGES, "the map's symbol shows it done")
+
+
+## The split map with the antechamber of kind `west` and the court of `east`, `players` seats.
+func _start_kinds(players: int, west: StringName, east: StringName) -> BiomeMap:
+	var map: BiomeMap = BiomeMaps.split(registry)
+	map.room_kinds[WEST] = west
+	map.room_kinds[EAST] = east
+	for seat in players:
+		input.add_virtual_device(seat)
+	var fights: Array[RoomFight] = [RoomFight.new(), RoomFight.new(), RoomFight.new()]
+	check(flow.start_biome(0, map, fights), "the biome starts")
+	tick.run(DT)
+	return map
+
+
+## The doorway signs laid for the world as it stands.
+func _laid_symbols() -> MouthSymbolsScript:
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	return symbols
+
+
+## The done look's stages a sign into `room` steps through, a frame at a time, until still.
+func _done_stages(symbols: MouthSymbolsScript, room: int) -> Array[int]:
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var into: int = -1
+	for mouth in mouths.mouths():
+		if mouths.room_of(mouth) == room:
+			into = mouth
+	symbols.step(0.0, actors, 1, _grid())
+	var stages: Array[int] = []
+	var frames: int = 0
+	while symbols.is_moving() and frames < 60:
+		symbols.advance()
+		frames += 1
+		var stage: int = symbols.cleared_of(into)
+		if stage != (stages.back() if not stages.is_empty() else 0):
+			stages.append(stage)
+	return stages
+
+
+## Every sign into `room` shows the whole done look and every other none.
+func _check_only_done(symbols: MouthSymbolsScript, room: int) -> void:
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	for mouth in symbols.count():
+		check_equal(symbols.cleared_of(mouth), KindSymbolScript.CLEARED_STAGES if mouths.room_of(mouth) == room else 0, "mouth %d into room %d" % [mouth, mouths.room_of(mouth)])
 
 
 ## A new world never shows an old biome's rooms cleared by number, even when nothing told the view

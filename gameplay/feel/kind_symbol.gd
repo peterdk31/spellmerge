@@ -5,8 +5,9 @@ extends RefCounted
 ## box): at `rows` 1 only its top row shows, at its foot, so a symbol comes in and goes by rows, never
 ## at once (docs/STYLE.md, "Smooth"). Nothing is allocated.
 ##
-## **The cleared look** (the owner, 2026-11-20, #883): a fight's, a challenge's or a boss's room
-## once cleared (`shows_cleared`) tells it calmly: its symbol dimmed to its shadow and a check
+## **The cleared look** (the owner, 2026-11-20, #883), the "done" look: a fight's, a challenge's or a
+## boss's room once cleared, and (the owner, 2026-11-20, after #884) a treasure room once opened, a
+## fountain once used and a reward room once its rewards are taken (`done_by`), tells it calmly: its symbol dimmed to its shadow and a check
 ## (CHECK, in CHECK_COLOUR, with a dark edge) across it. It comes in by CLEARED_STAGES, a stage a
 ## frame (`draw`'s `cleared`): the lit pixels step down to the base (DIM_LIT), the base to the shadow
 ## (DIM_BASE), the lit pixels on to the shadow (DIM_ALL), and the check is drawn a pixel a stage along
@@ -30,11 +31,37 @@ const DIM_BASE: int = 2
 const DIM_ALL: int = 3
 
 
-## True when a room of `kind` shows the cleared look once cleared: one with a fight (enemies,
-## elites, a boss). The rest (the start, a reward room, a shop) are cleared as they are entered and
-## tell nothing by it.
-static func shows_cleared(kind: RoomKind) -> bool:
-	return kind != null and (kind.fills_with_enemies() or kind.fill == RoomKind.FILL_BOSS)
+## What makes a room of a kind done (`done_by`): nothing (it never shows the cleared look), its clear
+## (a fight's), its door opened (a treasure room's key door), its fountain used (drawn on at all), its
+## rewards taken (every reward item that lay in it opened).
+const DONE_NEVER: int = 0
+const DONE_CLEARED: int = 1
+const DONE_OPENED: int = 2
+const DONE_USED: int = 3
+const DONE_TAKEN: int = 4
+
+
+## What makes a room of `kind` done, for its cleared look (the owner, 2026-11-20): a room with a fight
+## (enemies, elites, a boss) once cleared; a key door's room (a treasure room) once opened; a
+## fountain once used; a room of no fill and no door that rewards its entering (a reward room) once
+## its rewards are taken. The rest (the start, a secret room, a shop: the owner's "not shops") never.
+static func done_by(kind: RoomKind) -> int:
+	if kind == null:
+		return DONE_NEVER
+	if kind.fills_with_enemies() or kind.fill == RoomKind.FILL_BOSS:
+		return DONE_CLEARED
+	if kind.door == RoomKind.DOOR_KEY:
+		return DONE_OPENED
+	if kind.fill == RoomKind.FILL_FOUNTAIN:
+		return DONE_USED
+	if kind.fill == RoomKind.FILL_NONE and kind.door == RoomKind.DOOR_NONE and kind.rewards != &"":
+		return DONE_TAKEN
+	return DONE_NEVER
+
+
+## True when a room of `kind` shows the cleared look once done (`done_by`).
+static func shows_done(kind: RoomKind) -> bool:
+	return done_by(kind) != DONE_NEVER
 
 
 ## The shades a kind's symbol is drawn in (shadow, base, light): its light's, else the spark's.

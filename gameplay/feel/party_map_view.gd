@@ -35,8 +35,9 @@ extends CanvasLayer
 ## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
 ## pixels; nothing fades.
 ##
-## **A cleared room** (the owner, 2026-11-20, #883): a room with a fight (`KindSymbol.shows_cleared`)
-## that is cleared (Feel's room hearing, `rooms_cleared`) shows its symbol in the calm cleared look
+## **A cleared room** (the owner, 2026-11-20, #883): a room that is done (Feel's room hearing,
+## `is_done`: a fight's cleared, a treasure room opened, a fountain used, a reward room's rewards
+## taken; `KindSymbol.done_by`, never a shop) shows its symbol in the calm cleared look
 ## (`kind_symbol.gd`: dimmed, a check across it), as its doorway signs do; on an open map it steps in a
 ## stage a frame at FPS, with every map shut (or told again after a restore) drawn as it stands.
 ##
@@ -133,9 +134,9 @@ var _pick_stage: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By place: the stone's shade drawn (0 none, 1 shadow, 2 base, 3 light) and its symbol's rows shown.
 var _shade: PackedInt32Array = PackedInt32Array()
 var _symbol_rows: PackedInt32Array = PackedInt32Array()
-## By place: a room whose kind shows the cleared look (1), and that look's stage drawn; the room
+## By place: a room whose kind shows the cleared look once done (1), and that look's stage drawn; the room
 ## hearing's `cleared_again` read last.
-var _fights: PackedByteArray = PackedByteArray()
+var _tells_done: PackedByteArray = PackedByteArray()
 var _cleared: PackedInt32Array = PackedInt32Array()
 var _read_again: int = 0
 ## The wizards' places and colours this frame (world pixels; INF: none), by seat.
@@ -457,7 +458,7 @@ func _rows_wanted(place: int) -> int:
 
 
 func _cleared_wanted(place: int) -> int:
-	if _fights[place] == 0 or pieces == null or not pieces.is_cleared(place):
+	if _tells_done[place] == 0 or pieces == null or not pieces.is_done(place):
 		return 0
 	return KindSymbolScript.CLEARED_STAGES
 
@@ -675,7 +676,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_sensed_stale = true
 	_shade.resize(places)
 	_symbol_rows.resize(places)
-	_fights.resize(places)
+	_tells_done.resize(places)
 	_cleared.resize(places)
 	_cleared.fill(0)
 	_read_again = pieces.cleared_again() if pieces != null else 0
@@ -690,7 +691,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_floors.append(floor_of(grid, place))
 		var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
 		_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
-		_fights[place] = 1 if KindSymbolScript.shows_cleared(kind) else 0
+		_tells_done[place] = 1 if KindSymbolScript.shows_done(kind) else 0
 		_symbols.append(kind.symbol_pixels() if kind != null else PackedByteArray())
 		_symbol_shades.append(KindSymbolScript.shades_of(kind))
 		var type: RewardType = pieces.type_of(place) if kind != null else null

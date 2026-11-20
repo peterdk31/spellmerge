@@ -18,8 +18,10 @@ extends Node2D
 ## on its bridge, but not from inside the room it leads into, and sinks out the same way once none is
 ## (the owner, 2026-11-19); its light dims and brightens with its rows.
 ##
-## **Cleared** (the owner, 2026-11-20, #883): once the room a mouth leads into is cleared (Feel's room
-## hearing, `rooms_cleared`) and its kind has a fight (`KindSymbol.shows_cleared`), its sign steps to
+## **Cleared** (the owner, 2026-11-20, #883): once the room a mouth leads into is done (Feel's room
+## hearing, `is_done`: a fight's cleared, `rooms_cleared`; and since the owner's of 2026-11-20 after
+## #884, a treasure room opened, a fountain used, a reward room's rewards taken: `KindSymbol.done_by`;
+## never a shop), its sign steps to
 ## the calm cleared look (`kind_symbol.gd`: the symbol dimmed to its shadow, a check drawn across it along its
 ## stroke), a stage a frame at FPS through `KindSymbol.CLEARED_STAGES`, and its light dims with it
 ## (to CLEARED_LIGHT of its own); on every mouth into that room.
@@ -65,8 +67,8 @@ var _middle: PackedVector2Array = PackedVector2Array()
 ## By mouth: the walkway (place) it lies on.
 var _walkway: PackedInt32Array = PackedInt32Array()
 var _rows: PackedInt32Array = PackedInt32Array()
-## By mouth: whether its room's kind shows the cleared look (1), and the cleared look's stage drawn.
-var _fights: PackedByteArray = PackedByteArray()
+## By mouth: whether its room's kind shows the cleared look once done (1), and the cleared look's stage drawn.
+var _tells_done: PackedByteArray = PackedByteArray()
 var _cleared: PackedInt32Array = PackedInt32Array()
 ## The room hearing's `cleared_again` as read last (a change: the rooms cleared drawn as they stand).
 var _read_again: int = 0
@@ -178,7 +180,7 @@ func _wanted(mouth: int) -> int:
 
 
 func _cleared_wanted(mouth: int) -> int:
-	if _fights[mouth] == 0 or pieces == null or not pieces.is_cleared(mouths.room_of(mouth)):
+	if _tells_done[mouth] == 0 or pieces == null or not pieces.is_done(mouths.room_of(mouth)):
 		return 0
 	return KindSymbolScript.CLEARED_STAGES
 
@@ -238,14 +240,14 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	_walkway.resize(found)
 	_rows.resize(found)
 	_near.resize(found)
-	_fights.resize(found)
+	_tells_done.resize(found)
 	_cleared.resize(found)
 	_read_again = pieces.cleared_again() if pieces != null else 0
 	for mouth in found:
 		var room: int = mouths.room_of(mouth)
 		var kind: RoomKind = pieces.kind_of(room) if pieces != null else null
 		_pixels.append(kind.symbol_pixels() if kind != null else PackedByteArray())
-		_fights[mouth] = 1 if KindSymbolScript.shows_cleared(kind) else 0
+		_tells_done[mouth] = 1 if KindSymbolScript.shows_done(kind) else 0
 		_shades.append(KindSymbolScript.shades_of(kind))
 		var area: Rect2i = mouths.area_of(mouth)
 		var middle: Vector2 = Rect2(area).get_center()

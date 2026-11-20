@@ -18,8 +18,14 @@ extends Node2D
 ## on its bridge, but not from inside the room it leads into, and sinks out the same way once none is
 ## (the owner, 2026-11-19); its light dims and brightens with its rows.
 ##
-## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) is drawn as it stands. Whole
-## pixels; nothing fades.
+## **Cleared** (the owner, 2026-11-20, #883): once the room a mouth leads into is cleared (Feel's room
+## hearing, `rooms_cleared`) and its kind has a fight (`KindSymbol.shows_cleared`), its sign steps to
+## the calm cleared look (`kind_symbol.gd`: the symbol dimmed to its shadow, a check drawn across it along its
+## stroke), a stage a frame at FPS through `KindSymbol.CLEARED_STAGES`, and its light dims with it
+## (to CLEARED_LIGHT of its own); on every mouth into that room.
+##
+## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) and the rooms cleared told again
+## after a restore are drawn as they stand. Whole pixels; nothing fades.
 ##
 ## A child of Feel, top level (world space), over the mouths' looks and under the bodies. Feel steps it
 ## once a frame (`step`).
@@ -43,6 +49,8 @@ const GAP: int = 4
 ## A sign's light: how far it reaches and how bright it is at its middle (`LightSpot`).
 const LIGHT_REACH: float = 56.0
 const LIGHT_STRENGTH: float = 0.6
+## A cleared room's sign's light, a share of LIGHT_STRENGTH (reached by the cleared look's stages).
+const CLEARED_LIGHT: float = 0.5
 
 ## The pieces (Feel's room hearing: each room's kind) and the mouths (Feel's mouth looks).
 var pieces: RoomHearingScript = null
@@ -57,6 +65,11 @@ var _middle: PackedVector2Array = PackedVector2Array()
 ## By mouth: the walkway (place) it lies on.
 var _walkway: PackedInt32Array = PackedInt32Array()
 var _rows: PackedInt32Array = PackedInt32Array()
+## By mouth: whether its room's kind shows the cleared look (1), and the cleared look's stage drawn.
+var _fights: PackedByteArray = PackedByteArray()
+var _cleared: PackedInt32Array = PackedInt32Array()
+## The room hearing's `cleared_again` as read last (a change: the rooms cleared drawn as they stand).
+var _read_again: int = 0
 ## By mouth: its reward type's glyphs (each an Array[PackedByteArray] and an
 ## Array[PackedColorArray]; empty: none), their first's corner and whether they run in a row.
 var _glyph_pixels: Array = []
@@ -89,6 +102,11 @@ func rows_of(mouth: int) -> int:
 	return _rows[mouth] if mouth >= 0 and mouth < _rows.size() else -1
 
 
+## Mouth `mouth`'s cleared look's stage (0 none ... `KindSymbol.CLEARED_STAGES`; for tests).
+func cleared_of(mouth: int) -> int:
+	return _cleared[mouth] if mouth >= 0 and mouth < _cleared.size() else 0
+
+
 func corner_of(mouth: int) -> Vector2:
 	return _at[mouth] if mouth >= 0 and mouth < _at.size() else Vector2.INF
 
@@ -119,6 +137,10 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 		_read(grid, found, world_now, table, seats_here)
 	if _rows.is_empty():
 		return
+	var again: int = pieces.cleared_again() if pieces != null else 0
+	if again != _read_again:
+		_read_again = again
+		_settle_cleared()
 	_see(table, seats_here, grid)
 	if not is_moving():
 		_clock = 0.0
@@ -133,7 +155,7 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 ## True while a symbol still rises or sinks.
 func is_moving() -> bool:
 	for mouth in _rows.size():
-		if _rows[mouth] != _wanted(mouth):
+		if _rows[mouth] != _wanted(mouth) or _cleared[mouth] != _cleared_wanted(mouth):
 			return true
 	return false
 
@@ -142,8 +164,10 @@ func is_moving() -> bool:
 func advance() -> void:
 	for mouth in _rows.size():
 		var was: int = _rows[mouth]
+		var was_cleared: int = _cleared[mouth]
 		_rows[mouth] += signi(_wanted(mouth) - _rows[mouth])
-		if _rows[mouth] != was:
+		_cleared[mouth] += signi(_cleared_wanted(mouth) - _cleared[mouth])
+		if _rows[mouth] != was or _cleared[mouth] != was_cleared:
 			# Its light dims and brightens with its rows (made again only while a sign moves).
 			_light(mouth)
 	queue_redraw()
@@ -151,6 +175,22 @@ func advance() -> void:
 
 func _wanted(mouth: int) -> int:
 	return RoomKind.SYMBOL_SIDE if _near[mouth] != 0 and not _pixels[mouth].is_empty() else 0
+
+
+func _cleared_wanted(mouth: int) -> int:
+	if _fights[mouth] == 0 or pieces == null or not pieces.is_cleared(mouths.room_of(mouth)):
+		return 0
+	return KindSymbolScript.CLEARED_STAGES
+
+
+## Every mouth's cleared look as it stands (a restore's rooms cleared, told again), its light with it.
+func _settle_cleared() -> void:
+	for mouth in _cleared.size():
+		var wanted: int = _cleared_wanted(mouth)
+		if _cleared[mouth] != wanted:
+			_cleared[mouth] = wanted
+			_light(mouth)
+	queue_redraw()
 
 
 ## Whether one of this machine's wizards stands within SHOW_REACH of each mouth or on its bridge, and
@@ -198,10 +238,14 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	_walkway.resize(found)
 	_rows.resize(found)
 	_near.resize(found)
+	_fights.resize(found)
+	_cleared.resize(found)
+	_read_again = pieces.cleared_again() if pieces != null else 0
 	for mouth in found:
 		var room: int = mouths.room_of(mouth)
 		var kind: RoomKind = pieces.kind_of(room) if pieces != null else null
 		_pixels.append(kind.symbol_pixels() if kind != null else PackedByteArray())
+		_fights[mouth] = 1 if KindSymbolScript.shows_cleared(kind) else 0
 		_shades.append(KindSymbolScript.shades_of(kind))
 		var area: Rect2i = mouths.area_of(mouth)
 		var middle: Vector2 = Rect2(area).get_center()
@@ -221,6 +265,7 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	_see(table, seats_here, grid)
 	for mouth in found:
 		_rows[mouth] = _wanted(mouth)
+		_cleared[mouth] = _cleared_wanted(mouth)
 	for light in _lights:
 		if light != null:
 			light.queue_free()
@@ -233,8 +278,8 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 
 ## The light spot on mouth `mouth`'s sign made again in its kind's light, as bright as the share of
 ## its rows shown (none when it tells nothing or shows no row), so a sign rising or sinking
-## brightens or dims its light by its rows (Smooth). Made only as a world is read or a sign
-## moves, never in a still frame.
+## brightens or dims its light by its rows (Smooth), and dimmed toward CLEARED_LIGHT by its cleared
+## look's stage. Made only as a world is read or a sign moves, never in a still frame.
 func _light(mouth: int) -> void:
 	if _lights[mouth] != null:
 		_lights[mouth].queue_free()
@@ -244,9 +289,15 @@ func _light(mouth: int) -> void:
 	var light := Marker2D.new()
 	light.name = "SignLight%d" % mouth
 	light.position = _at[mouth] + Vector2.ONE * (RoomKind.SYMBOL_SIDE * SCALE * 0.5)
-	LightSpot.mark(light, LIGHT_REACH, LIGHT_STRENGTH * float(_rows[mouth]) / float(RoomKind.SYMBOL_SIDE), 0.0, _shades[mouth][1])
+	LightSpot.mark(light, LIGHT_REACH, light_strength(_rows[mouth], _cleared[mouth]), 0.0, _shades[mouth][1])
 	_lights[mouth] = light
 	add_child(light)
+
+
+## A sign's light's strength with `rows` of its rows shown and its cleared look at stage `cleared`.
+static func light_strength(rows: int, cleared: int) -> float:
+	var dim: float = lerpf(1.0, CLEARED_LIGHT, float(cleared) / float(KindSymbolScript.CLEARED_STAGES))
+	return LIGHT_STRENGTH * dim * float(rows) / float(RoomKind.SYMBOL_SIDE)
 
 
 ## The light spot on mouth `mouth`'s sign (null: none; for tests).
@@ -285,6 +336,6 @@ static func glyphs_beside(symbol: Vector2, across: bool) -> Vector2:
 func _draw() -> void:
 	for mouth in _rows.size():
 		if _rows[mouth] > 0:
-			KindSymbolScript.draw(self, _pixels[mouth], _shades[mouth], _at[mouth], _rows[mouth], SCALE)
+			KindSymbolScript.draw(self, _pixels[mouth], _shades[mouth], _at[mouth], _rows[mouth], SCALE, RoomKind.SYMBOL_SIDE, _cleared[mouth])
 			# Each a typed array as made in `_read` (nothing allocated here).
 			RewardGlyphsScript.draw(self, _glyph_pixels[mouth], _glyph_shades[mouth], _glyph_at[mouth], _glyph_across[mouth] != 0, _rows[mouth], SCALE)

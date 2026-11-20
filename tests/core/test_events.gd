@@ -180,6 +180,7 @@ const EVENTS: Dictionary = {
 	&"room_rewards_due": [["room", TYPE_INT], ["table", TYPE_STRING_NAME], ["type", TYPE_PACKED_STRING_ARRAY], ["spots", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"special_room_opened": [["room", TYPE_INT], ["fill", TYPE_STRING_NAME], ["table", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["spots", TYPE_PACKED_VECTOR2_ARRAY], ["board", TYPE_VECTOR2]],
 	&"rooms_seen": [["seen", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
+	&"rooms_cleared": [["cleared", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
 	&"loading_finished": [],
@@ -219,7 +220,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

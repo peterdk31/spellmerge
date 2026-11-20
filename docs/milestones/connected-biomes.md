@@ -611,6 +611,14 @@ The owner decided on 2026-11-20 (on #876's map teleport): **the D-pad never walk
 4. **The cross shows only while something is bound**; an empty cross could instead always show, as a hint that the d-pad can be bound.
 5. **A greyed slot (none left) can only be let go by binding another item over it** or refilled by a pickup: an item with none left is not on the inventory's ring to press its arm on. Should the inventory show bound items with 0 too, so they can be let go?
 
+## Cleared doorway signs, a finer reveal (2026-11-20)
+
+The owner decided on 2026-11-20 (#883, the playtest polish pass); view only, the simulation keeping no new state:
+
+- **A cleared room's doorway sign shows it** (`gameplay/feel/kind_symbol.gd`, `mouth_symbols.gd`, `party_map_view.gd`): once a room with a fight (a fight, a challenge or a boss: `KindSymbol.shows_cleared`) is cleared, every sign on a mouth into it and its symbol on the Y map change to a calm cleared look: the symbol's lit pixels down to its base and its base down to its shadow, and a small check in the leaf's light (5 pixels, with its dark edge) over its lower right. Smooth: 5 stages a frame at 12 fps (the lit pixels dim at the first, the base at the second, the check drawn a pixel a stage along its stroke), the symbol keeping its own shape; the sign's light dims with it to half. The map steps it while open and draws it as it stands while shut. The rooms cleared are Flow's state (`RoomLife.CLEARED`): Flow tells them in a new event, `rooms_cleared(cleared, again)` (as a room is cleared, empty as the biome goes, `again` after a restore, when they are drawn as they stand), heard by Feel's room hearing (`is_cleared`); nothing new is kept in the simulation.
+- **The unseen room's reveal is finer and quicker** (`unseen_dark.gd`): 8 px blocks in place of 16, shrinking 8, 6, 4, 2, none at 24 fps in place of 12, so a room opens in about 0.17 s (`reveal_seconds()`), still a stage a frame in whole pixels and 3 frames between covered and lit; mid-way it no longer reads as a hard grid of black lines. The stages are tiled textures made once, as before: nothing is allocated a frame.
+- **Tests:** `tests/gameplay/feel/test_party_map_view.gd` (the cleared look's stages, shades and check; a cleared room's signs and map symbol stepping to it, its light dimming, the rest unchanged; a restore drawing it as it stands, either way), `test_biome_sound_and_look.gd` (the reveal's block, its duration and its stages over real frames), `tests/core/test_events.gd`. Screenshots: `tests/screenshots/shot_cleared_signs.gd`.
+
 ## Answered by the owner (2026-11-18)
 
 1. The plan: approved as written.

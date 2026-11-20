@@ -264,6 +264,31 @@ func test_a_dark_stage_is_a_shrinking_block_of_whole_black_pixels() -> void:
 	check(UnseenDarkScript.BLOCK_SIDES.size() - 2 >= 3, "at least 3 frames between covered and lit")
 
 
+## Fine and quick (the owner, 2026-11-20, #883): 8 px blocks, opening over `reveal_seconds()` of real
+## frames, still a stage a frame of FPS (stepped, never a fade).
+func test_the_reveal_is_fine_and_quick_and_stepped() -> void:
+	check_equal(UnseenDarkScript.BLOCK, 8, "8 px blocks")
+	check(32 % UnseenDarkScript.BLOCK == 0, "a whole number of them on the 32 px grid")
+	check(UnseenDarkScript.reveal_seconds() <= 0.2, "quick: %.3f s" % UnseenDarkScript.reveal_seconds())
+	for stage in UnseenDarkScript.BLOCK_SIDES.size():
+		check(UnseenDarkScript.BLOCK_SIDES[stage] % 2 == 0, "stage %d's square sits whole at the block's middle" % stage)
+	var map: BiomeMap = _start(1)
+	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+	dark.step(0.0, _grid())
+	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
+	tick.run(DT)
+	var frame: float = 1.0 / 60.0
+	var stages: Array[int] = [dark.stage_of(1)]
+	var frames: int = 0
+	while dark.stage_of(1) > 0 and frames < 120:
+		dark.step(frame, _grid())
+		frames += 1
+		if dark.stage_of(1) != stages[stages.size() - 1]:
+			stages.append(dark.stage_of(1))
+	check_equal(stages, [4, 3, 2, 1, 0] as Array[int], "a stage at a time")
+	check(absf(frames * frame - UnseenDarkScript.reveal_seconds()) <= frame * 1.5, "open in %d frames, about %.3f s" % [frames, UnseenDarkScript.reveal_seconds()])
+
+
 ## The void between a biome's slabs is pure black under everything, over the biome and past it; its
 ## motes drift only outside the places; outside a biome there is neither.
 func test_the_void_is_black_with_motes_outside_the_rooms() -> void:

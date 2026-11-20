@@ -81,6 +81,16 @@ func set_flag(room: int, flag: int, on: bool) -> void:
 	flags[room] = (flags[room] | flag) if on else (flags[room] & ~flag)
 
 
+## Each room's CLEARED flag as bytes (1 cleared), by room number: what the view is told
+## (`rooms_cleared`), read from the flags and kept nowhere.
+func cleared_rooms() -> PackedByteArray:
+	var cleared := PackedByteArray()
+	cleared.resize(flags.size())
+	for room in flags.size():
+		cleared[room] = 1 if (flags[room] & CLEARED) != 0 else 0
+	return cleared
+
+
 ## True while place `place` is awake (a place out of the biome: always).
 func is_awake(place: int) -> bool:
 	return place < 0 or place >= awake.size() or awake[place] != 0

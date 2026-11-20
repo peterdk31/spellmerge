@@ -9,8 +9,10 @@ extends Node2D
 ## stand, never played in. An unvisited room's place is covered whole in the void's black
 ## (`VoidBackdrop.COLOUR`): nothing in it shows, so it is one with the void round it. Once visited it
 ## opens by **shrinking blocks** (docs/STYLE.md, "Smooth"): the place is cut into BLOCK px squares,
-## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 16, 12, 8, 4,
-## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. A
+## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 8, 6, 4, 2,
+## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. Fine
+## and quick (the owner, 2026-11-20, #883: 16 px blocks at 12 fps read as a hard grid of black lines
+## mid-way): 8 px blocks over `reveal_seconds()`, still 3 frames between covered and lit. A
 ## stage is a tiled texture made once (the solid stage a plain rectangle); it lines up with the
 ## world's pixels, as every place stands on the 32 px grid.
 ##
@@ -24,11 +26,12 @@ const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 ## Over the bodies and the world's looks, under the labels (22) and the screen's layers.
 const Z: int = 20
 ## Frames a second it lightens at.
-const FPS: float = 12.0
+const FPS: float = 24.0
 ## The side of the blocks a room's dark opens by (pixels; a whole number of them on the 32 px grid).
-const BLOCK: int = 16
+const BLOCK: int = 8
 ## Each stage's black square at a block's middle, from lit (0) to unvisited (the last: BLOCK, solid).
-const BLOCK_SIDES: PackedInt32Array = [0, 4, 8, 12, 16]
+const BLOCK_SIDES: PackedInt32Array = [0, 2, 4, 6, 8]
+
 ## A room's level in `rooms_seen` once it was entered (0 unseen, 1 only shown on the map).
 const ENTERED: int = 2
 ## The dark: the void's black.
@@ -58,6 +61,11 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	for stage in BLOCK_SIDES.size():
 		_textures.append(block_texture(BLOCK_SIDES[stage]))
+
+
+## How long a room's dark takes to open, from covered to lit (seconds): a stage a frame at FPS.
+static func reveal_seconds() -> float:
+	return float(BLOCK_SIDES.size() - 1) / FPS
 
 
 func bind(events: EventsScript) -> void:

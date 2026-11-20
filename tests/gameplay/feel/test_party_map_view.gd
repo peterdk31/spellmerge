@@ -181,6 +181,121 @@ func test_a_mouth_tells_the_kind_behind_it_big_and_lit_rising_as_a_wizard_comes_
 	check(map != null, "the map")
 
 
+## The cleared look (the owner, 2026-11-20, #883): stepped, whole shades of the symbol's own
+## palette, the check drawn a pixel a stage, and only for a kind with a fight.
+func test_the_cleared_look_dims_the_symbol_and_draws_a_check_in_stages() -> void:
+	check(KindSymbolScript.CLEARED_STAGES >= 3, "at least 3 frames between the two looks")
+	var shades: PackedColorArray = KindSymbolScript.shades_of(registry.call(&"get_resource", &"room_kinds", &"fight") as RoomKind)
+	check_equal(KindSymbolScript.colour_of(RoomKind.SYMBOL_LIT, shades, 0), shades[2], "uncleared: lit pixels in the light")
+	check_equal(KindSymbolScript.colour_of(RoomKind.SYMBOL_BASE, shades, 0), shades[1], "and the base in the base")
+	var last_lit: Color = shades[2]
+	var last_base: Color = shades[1]
+	for stage in range(1, KindSymbolScript.CLEARED_STAGES + 1):
+		var lit: Color = KindSymbolScript.colour_of(RoomKind.SYMBOL_LIT, shades, stage)
+		var base: Color = KindSymbolScript.colour_of(RoomKind.SYMBOL_BASE, shades, stage)
+		check(shades.has(lit) and shades.has(base), "stage %d: the symbol's own shades, nothing blended" % stage)
+		check(shades.find(last_lit) - shades.find(lit) <= 1 and shades.find(last_base) - shades.find(base) <= 1, "stage %d dims a shade at most" % stage)
+		check_equal(KindSymbolScript.check_shown(stage) - KindSymbolScript.check_shown(stage - 1), 1, "stage %d draws one more pixel of the check" % stage)
+		last_lit = lit
+		last_base = base
+	check_equal(last_lit, shades[1], "cleared: lit pixels in the base")
+	check_equal(last_base, shades[0], "the base in the shadow")
+	check_equal(KindSymbolScript.check_shown(KindSymbolScript.CLEARED_STAGES), KindSymbolScript.CHECK.size(), "the whole check at the end")
+	for pixel: Vector2i in KindSymbolScript.CHECK:
+		check(pixel.x >= 0 and pixel.x < RoomKind.SYMBOL_SIDE and pixel.y >= 0 and pixel.y < RoomKind.SYMBOL_SIDE, "the check is inside the symbol's box")
+	for index in range(1, KindSymbolScript.CHECK.size()):
+		var step: Vector2i = (KindSymbolScript.CHECK[index] - KindSymbolScript.CHECK[index - 1]).abs()
+		check(step.x <= 1 and step.y <= 1, "the check is one stroke, a pixel beside the last")
+	check(Palette.shades_of(&"leaf").has(KindSymbolScript.CHECK_COLOUR), "the check in a palette colour")
+	for id: StringName in [&"fight", &"challenge", &"boss"]:
+		check(KindSymbolScript.shows_cleared(registry.call(&"get_resource", &"room_kinds", id) as RoomKind), "a %s room shows it cleared" % id)
+	for id: StringName in [&"start", &"reward", &"shop", &"treasure", &"fountain", &"secret"]:
+		check(not KindSymbolScript.shows_cleared(registry.call(&"get_resource", &"room_kinds", id) as RoomKind), "a %s room tells nothing by it" % id)
+
+
+## A fight room cleared: every doorway sign into it steps to the cleared look a stage a frame, its
+## light dimming with it, and the map's symbol shows it; the rooms not cleared keep their look.
+func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void:
+	var map: BiomeMap = _start(1)
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	for mouth in symbols.count():
+		check_equal(symbols.cleared_of(mouth), 0, "mouth %d: nothing cleared yet" % mouth)
+	check(not _hearing().is_cleared(WEST), "the antechamber not cleared")
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	check(_hearing().is_cleared(WEST), "its empty fight cleared as entered, told to the view")
+	check(not _hearing().is_cleared(EAST), "the court not")
+	# Back on its bridge, so its sign shows while it changes.
+	var into_west: int = -1
+	for mouth in mouths.mouths():
+		if mouths.room_of(mouth) == WEST:
+			into_west = mouth
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	var stages: Array[int] = []
+	var strengths: Array[float] = []
+	while symbols.is_moving():
+		symbols.advance()
+		stages.append(symbols.cleared_of(into_west))
+		var light: Marker2D = symbols.light_of(into_west)
+		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
+	check_equal(stages.slice(stages.size() - KindSymbolScript.CLEARED_STAGES), [1, 2, 3, 4, 5] as Array[int], "it steps to the cleared look a stage a frame (%s)" % [stages])
+	check(is_equal_approx(strengths[strengths.size() - 1], MouthSymbolsScript.LIGHT_STRENGTH * MouthSymbolsScript.CLEARED_LIGHT), "its light dimmed (%s)" % [strengths])
+	for i in range(1, strengths.size()):
+		check(strengths[i] <= strengths[i - 1] + MouthSymbolsScript.LIGHT_STRENGTH / RoomKind.SYMBOL_SIDE + 0.0001, "and never jumps")
+	for mouth in symbols.count():
+		var room: int = mouths.room_of(mouth)
+		check_equal(symbols.cleared_of(mouth), KindSymbolScript.CLEARED_STAGES if room == WEST else 0, "mouth %d into room %d" % [mouth, room])
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "the shut map has the antechamber cleared as it stands")
+	check_equal(view.cleared_of(EAST), 0, "the court not")
+	check_equal(view.cleared_of(0), 0, "the start room tells nothing by it")
+	# On an open map, the court cleared steps in a stage a frame.
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), _two_views())
+	_into(map, EAST, RoomSocket.Facing.WEST)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	var court: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		court.append(view.cleared_of(EAST))
+	check_equal(court.slice(court.size() - KindSymbolScript.CLEARED_STAGES), [1, 2, 3, 4, 5] as Array[int], "open, the court's symbol steps to it (%s)" % [court])
+
+
+## After a restore the cleared look is drawn as it stands, either way, nothing played in.
+func test_a_restore_draws_the_cleared_look_as_it_stands() -> void:
+	var map: BiomeMap = _start(1)
+	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	var before := Snapshot.take(tick.state_areas(), root)
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	var after := Snapshot.take(tick.state_areas(), root)
+	check(before.restore(tick.state_areas(), root).is_empty(), "back to before the clear")
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(not _hearing().is_cleared(WEST), "told: not cleared")
+	for mouth in symbols.count():
+		check_equal(symbols.cleared_of(mouth), 0, "mouth %d as it stands" % mouth)
+	check(after.restore(tick.state_areas(), root).is_empty(), "into the cleared one")
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	for mouth in symbols.count():
+		check_equal(symbols.cleared_of(mouth), KindSymbolScript.CLEARED_STAGES if mouths.room_of(mouth) == WEST else 0, "mouth %d as it stands" % mouth)
+	check_equal(view.cleared_of(WEST), KindSymbolScript.CLEARED_STAGES, "the map too")
+	flow.stop_run()
+	check(not _hearing().is_cleared(WEST), "the biome gone, nothing cleared")
+
+
 func test_the_y_map_opens_over_frames_inside_its_own_players_view_only() -> void:
 	var map: BiomeMap = _start(2)
 	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript

@@ -1626,6 +1626,7 @@ func _clear_run() -> void:
 	if party_map.rooms() > 0:
 		party_map.clear()
 		_tell_seen(false)
+		_tell_cleared(false)
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
@@ -2040,6 +2041,7 @@ func _clear_biome_room(room: int) -> void:
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 	var kind: RoomKind = _kind_of(room)
+	_tell_cleared(false)
 	if events != null:
 		events.room_cleared.emit(biome.map.room_templates[room], room)
 		if kind != null and kind.rewards != &"":
@@ -2151,6 +2153,7 @@ func _rebuild_biome() -> void:
 	locks.tell_all()
 	teleports.forget()
 	_tell_seen(true)
+	_tell_cleared(true)
 
 
 ## The party's map told to the view (`rooms_seen`; connected biomes CB9): as a room is seen, and
@@ -2158,3 +2161,10 @@ func _rebuild_biome() -> void:
 func _tell_seen(again: bool) -> void:
 	if events != null:
 		events.rooms_seen.emit(party_map.seen.duplicate(), again)
+
+
+## The rooms cleared told to the view (`rooms_cleared`; the owner, 2026-11-20): as a room is
+## cleared, empty as the biome goes (its life cleared already), and `again` after a restore.
+func _tell_cleared(again: bool) -> void:
+	if events != null:
+		events.rooms_cleared.emit(life.cleared_rooms(), again)

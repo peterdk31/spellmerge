@@ -210,6 +210,7 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
+const DrawRegionsScript := preload("res://core/projectiles/draw_regions.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 
@@ -681,7 +682,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"_draw_regions"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -1046,6 +1047,10 @@ var _mirrors: Array[MultiMesh] = []
 ## The view of each watched batch's still shots (`watch_body`, `still_shots_drawn`), by batch: null
 ## for one not watched.
 var _still_views: Array[StillShotView] = []
+## While the room grid has places (a biome), each batch's rows drawn by the room they are in, a
+## batch a room under the batch's node, so a view draws only the rooms it shows (`draw_regions.gd`;
+## the performance pass, 2026-11-20).
+var _draw_regions: DrawRegionsScript = DrawRegionsScript.new()
 ## The first batches' nodes by name: the hat ramps' bolts and runes, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
@@ -1362,7 +1367,8 @@ func native_constants() -> Dictionary:
 	var mix: int = HitBatch.SPELL_MIX
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
 			"SPELL_MIX_HIGH": (mix >> 32) & 0xFFFFFFFF, "SPELL_MIX_LOW": mix & 0xFFFFFFFF,
-			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD})
+			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD,
+			"REGION_SPAN_MOST": DrawRegionsScript.SPAN_MOST})
 	return constants
 
 
@@ -5475,15 +5481,20 @@ func update_draw(fraction: float = -1.0) -> void:
 	_end_count = 0
 	_end_wanted = 0.0
 	tail_births = spark_birth_count
+	# In a biome each batch's shots are drawn by the room they are in (`_draw_regions`); the batch's
+	# own node draws none of them then, and its light and still views take them whole as before.
+	var by_room: bool = _draw_regions.fit(_room_grid)
 	for batch in _batch_total:
 		var out: int = _draw_out[DRAW_OUT_FIRST + batch]
 		var multimesh: MultiMesh = _nodes[batch].multimesh
 		var mirror: MultiMesh = _mirrors[batch] if batch < _mirrors.size() else null
 		if mirror != null and mirror.instance_count != multimesh.instance_count:
 			mirror.instance_count = multimesh.instance_count
+		var rows: PackedFloat32Array = PackedFloat32Array()
 		if out > 0:
-			var rows: PackedFloat32Array = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
-			multimesh.buffer = rows
+			rows = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
+			if not by_room:
+				multimesh.buffer = rows
 			if mirror != null:
 				mirror.buffer = rows
 			if batch < _still_views.size() and _still_views[batch] != null:
@@ -5491,7 +5502,9 @@ func update_draw(fraction: float = -1.0) -> void:
 				view.open(rows, out, sim_time)
 				still_shots_drawn.emit(view)
 				view.close()
-		multimesh.visible_instance_count = out
+		if by_room:
+			_draw_regions.draw(batch, _nodes[batch], rows, out, _kernel)
+		multimesh.visible_instance_count = 0 if by_room else out
 		if mirror != null:
 			mirror.visible_instance_count = out
 	var shots_out: int = _draw_out[DRAW_SHOTS]

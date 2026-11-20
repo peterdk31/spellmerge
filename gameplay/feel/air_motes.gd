@@ -17,6 +17,7 @@ extends RefCounted
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 
 ## The longest frame it gives off for (s): a frame after a stall gives off no more.
 const LONGEST_FRAME: float = 0.1
@@ -45,6 +46,8 @@ var _warned: bool = false
 ## Motes given off, all told, and the box round where they left from (for tests).
 var given: int = 0
 var given_box: Rect2 = Rect2()
+## `give_off`'s one box, as views (kept: nothing is made a frame).
+var _one: ViewBoxesScript = ViewBoxesScript.new()
 
 
 ## Air whose colours are rows of `table` (the spectacle's, shared with the motes).
@@ -91,13 +94,22 @@ static func area_of(view: Rect2, bounds: Rect2) -> Rect2:
 ## from a point in none of its places (the void between a biome's slabs, `void_air`): a point inside
 ## one is drawn again up to OUTSIDE_TRIES times, then that mote is not given off.
 func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null) -> void:
+	_one.set_one(view)
+	give_off_in(now, pool, _one, bounds, share, outside)
+
+
+## As `give_off`, over each of the views' boxes `seen` (each within VIEW_MARGIN, in `bounds`; none:
+## all of `bounds`) at the rate for the floor they cover together, a part two views both show
+## counted once (`ViewBoxes.pick`): split, each view's air is as thick as one picture's (the owner,
+## 2026-11-20), and nothing is given off over the rooms and the void between the views.
+func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
 	if look == null or pool == null:
 		_owed = 0.0
 		return
-	var area: Rect2 = area_of(view, bounds)
-	if not area.has_area():
+	var area: float = bounds.get_area() if seen.is_empty() else seen.total_area(VIEW_MARGIN, bounds)
+	if area <= 0.0:
 		_owed = 0.0
 		return
 	var k: int = pool.kind_index(look.kind)
@@ -108,24 +120,34 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: 
 		return
 	var life: Vector2 = pool.kinds()[k].life
 	var most: float = float(pool.cap()) * share / maxf((life.x + life.y) * 0.5, 0.05)
-	_owed += minf(look.rate * area.get_area() / RoomBase.AIR_AREA, most) * dt
+	_owed += minf(look.rate * area / RoomBase.AIR_AREA, most) * dt
 	if _table.writes != _written:
 		_resolve()
 	var height: float = look.height if look.height > 0.0 else -1.0
 	while _owed >= 1.0:
 		_owed -= 1.0
-		var at := Vector2(area.position.x + _rng.randf() * area.size.x, area.position.y + _rng.randf() * area.size.y)
+		var at: Vector2 = _point(seen, bounds)
 		if outside != null:
 			var tries: int = 1
-			while outside.place_at(at) != RoomGrid.NO_PLACE and tries < OUTSIDE_TRIES:
-				at = Vector2(area.position.x + _rng.randf() * area.size.x, area.position.y + _rng.randf() * area.size.y)
+			while at.is_finite() and outside.place_at(at) != RoomGrid.NO_PLACE and tries < OUTSIDE_TRIES:
+				at = _point(seen, bounds)
 				tries += 1
-			if outside.place_at(at) != RoomGrid.NO_PLACE:
+			if at.is_finite() and outside.place_at(at) != RoomGrid.NO_PLACE:
 				continue
+		if not at.is_finite():
+			continue
 		var ramp: int = sources[_rng.randi() % sources.size()]
 		pool.throw_part(k, at, look.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 		given_box = given_box.expand(at) if given > 0 else Rect2(at, Vector2.ZERO)
 		given += 1
+
+
+## A point to give a mote off from: in the views' boxes `seen` (INF: one in an earlier box's part,
+## counted there), or with none anywhere in `bounds`.
+func _point(seen: ViewBoxesScript, bounds: Rect2) -> Vector2:
+	if seen.is_empty():
+		return Vector2(bounds.position.x + _rng.randf() * bounds.size.x, bounds.position.y + _rng.randf() * bounds.size.y)
+	return seen.pick(_rng, VIEW_MARGIN, bounds)
 
 
 ## Its ramps' rows in the table, asked for again (each kept, or written again where its row went to

@@ -157,15 +157,31 @@ func view_showing(world: Vector2, margin: float = 0.0) -> int:
 ## The box round the parts of the world the views show (world pixels): each cell's corners taken
 ## back into the world. Empty with no view.
 func world_box() -> Rect2:
+	var out := Rect2()
+	var found: bool = false
+	for view in count:
+		if cell_counts[view] == 0:
+			continue
+		var box: Rect2 = view_world_box(view)
+		out = out.merge(box) if found else box
+		found = true
+	return out
+
+
+## The box round the part of the world view `view` shows (world pixels): its cell's corners taken
+## back into the world (each view's own, for what works near what is seen: the performance pass,
+## 2026-11-20). Empty for no cell.
+func view_world_box(view: int) -> Rect2:
+	if view < 0 or view >= count:
+		return Rect2()
 	var low := Vector2.INF
 	var high := -Vector2.INF
-	for view in count:
-		var back: Transform2D = to_screen[view].affine_inverse()
-		var base: int = view * CORNERS_MOST
-		for i in cell_counts[view]:
-			var at: Vector2 = back * cell_points[base + i]
-			low = low.min(at)
-			high = high.max(at)
+	var back: Transform2D = to_screen[view].affine_inverse()
+	var base: int = view * CORNERS_MOST
+	for i in cell_counts[view]:
+		var at: Vector2 = back * cell_points[base + i]
+		low = low.min(at)
+		high = high.max(at)
 	if low.x > high.x:
 		return Rect2()
 	return Rect2(low, high - low)

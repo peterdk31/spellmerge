@@ -24,6 +24,7 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
@@ -139,6 +140,9 @@ var _split_downscale: int = SpellLightScript.DOWNSCALE
 var tailless_motes: int = TaillessMotes.DEFAULT
 ## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
 var marks: MarksScript = null
+## `view_boxes`' boxes, and the light's readers' (`_reader_boxes`; kept: nothing is made a frame).
+var _view_boxes: ViewBoxesScript = ViewBoxesScript.new()
+var _readers_seen: ViewBoxesScript = ViewBoxesScript.new()
 var floor_marks: bool = FloorMarks.default_on()
 ## Spell light (null with the setting off, or with no projectile manager), and the setting.
 var light: SpellLightScript = null
@@ -360,13 +364,15 @@ func step(now: float, table: ActorsScript = null) -> void:
 	else:
 		jets.clear()
 	_drawn_motes()
-	var view: Rect2 = view_rect()
-	source_motes.give_off(now, pool if motes_on() else null, view, _standing)
+	# Each view's own part of the world (the performance pass, 2026-11-20): split, what gives off near
+	# what is seen, and the shadows, work by each view's box, not by one box round them all.
+	var seen: ViewBoxesScript = view_boxes()
+	source_motes.give_off_in(now, pool if motes_on() else null, seen, _standing)
 	var air_pool: MotesScript = pool if motes_on() and light != null and ambient_particles else null
-	air.give_off(now, air_pool, view, projectiles.bounds() if projectiles != null else Rect2())
+	air.give_off_in(now, air_pool, seen, projectiles.bounds() if projectiles != null else Rect2())
 	kind_air.lay(projectiles.grid() if projectiles != null else null)
-	kind_air.give_off(now, air_pool, view)
-	_give_off_void(now, view)
+	kind_air.give_off_in(now, air_pool, seen)
+	_give_off_void(now, seen)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
@@ -390,7 +396,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.begin_lights()
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
-		shadows.step(table, now, view, blockers)
+		shadows.step_in(table, now, seen, blockers)
 	if mist != null:
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	for later: MistScript in room_mists:
@@ -997,7 +1003,7 @@ func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int 
 	_split_views = views
 	_split_downscale = extra_downscale
 	if light != null:
-		light.use_views(views, extra_downscale)
+		light.use_views(views, extra_downscale, _reader_boxes(views))
 
 
 ## The "Tailless motes" dev setting: the motes may write `TaillessMotes.frame_rows_of(births)`
@@ -1059,7 +1065,7 @@ func _make_light(on: bool) -> void:
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
 		add_child(light)
-		light.use_views(_split_views, _split_downscale)
+		light.use_views(_split_views, _split_downscale, _reader_boxes(_split_views))
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
 	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own
@@ -1224,11 +1230,11 @@ func _free_faded() -> void:
 
 ## The void's motes owed since the last frame (`void_air`), over `view` outside the grid's places;
 ## none outside a biome (a grid with no places).
-func _give_off_void(now: float, view: Rect2) -> void:
+func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
 	var void_pool: MotesScript = pool if motes_on() and ambient_particles and in_biome else null
-	void_air.give_off(now, void_pool, view, Rect2(), VOID_SHARE, grid if in_biome else null)
+	void_air.give_off_in(now, void_pool, seen, Rect2(), VOID_SHARE, grid if in_biome else null)
 	void_blank_air.give_off(now, void_pool if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_SHARE, grid if in_biome else null)
 
 
@@ -1274,8 +1280,39 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 		light.light_beam(i, path, points, player, look, core, fade, intensity, reach)
 
 
-## The part of the world on screen now (empty outside a tree): what the mote sources give off
-## near.
+## What each view shows for the light's readers that cull (the motes): with one picture the
+## picture's box (`view_boxes`); split, box `k` what view `k` of `views` draws (its canvas transform
+## over its size), then the equal split's void quarter's when it shows (its own view, after them).
+func _reader_boxes(views: Array[Viewport]) -> ViewBoxesScript:
+	if views.is_empty():
+		return view_boxes()
+	_readers_seen.count = 0
+	for view in views:
+		var drawn := Rect2()
+		if is_instance_valid(view):
+			drawn = view.canvas_transform.affine_inverse() * Rect2(Vector2.ZERO, view.get_visible_rect().size)
+		_readers_seen.add(drawn)
+	if views.size() > 1 and _void_blank.has_area():
+		_readers_seen.add(_void_blank)
+	return _readers_seen
+
+
+## The parts of the world on screen now, a box a view (none outside a tree): what the mote sources,
+## the air and the shadows work near. Kept: read it this frame, never change it.
+func view_boxes() -> ViewBoxesScript:
+	var view: Viewport = get_viewport() if is_inside_tree() else null
+	if view == null:
+		_view_boxes.set_one(Rect2())
+		return _view_boxes
+	var split: ScreenViews = ScreenViews.on(view)
+	if split != null and split.is_split():
+		_view_boxes.set_views(split)
+	else:
+		_view_boxes.set_one(view.get_canvas_transform().affine_inverse() * view.get_visible_rect())
+	return _view_boxes
+
+
+## The part of the world on screen now (empty outside a tree): the box round every view's.
 func view_rect() -> Rect2:
 	var view: Viewport = get_viewport() if is_inside_tree() else null
 	if view == null:
@@ -1403,8 +1440,10 @@ func _fit_marks(room_id: StringName, number: int = EventsScript.FIRST_ROOM) -> v
 		return
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
-	# Its holes are masked as its walls are (hub rework HR-H2): no mark is laid over a hole.
-	marks.enter(bounds, projectiles.grid().wall_image(true) if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
+	# Its holes are masked as its walls are (hub rework HR-H2): no mark is laid over a hole. A
+	# biome's places each have a layer of their own (the performance pass, 2026-11-20).
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	marks.enter_places(bounds, grid.wall_image(true) if grid != null else null, ProjectileManagerScript.WALL_CELL, grid)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
 
 

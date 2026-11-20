@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The Mirror Tempest (content/items/staffs/mirror_tempest), a premade build on the hub's rack: a
-## lightning and a frost beam eight ways at once, each fired backward too and echoed, three times
-## over. Its data is sound, every card it names is a card, and its build wastes none of them.
+## fan of three lightning beams and a fan of three frost beams at once, each fan fired backward too
+## and echoed, three times over. Its data is sound, every card it names is a card, and its build
+## wastes none of them.
 const SpellsScript := preload("res://core/spells/spells.gd")
 const MIRROR_TEMPEST: StaffItem = preload("res://content/items/staffs/mirror_tempest/mirror_tempest.tres")
 

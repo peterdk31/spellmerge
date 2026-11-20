@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The Meteor Monsoon (content/items/staffs/meteor_monsoon), a premade build on the hub's rack:
-## three novas of blasting fire, frost and lightning bolts falling from the sky at once, three times
-## over. Its data is sound, every card it names is a card, and its build wastes none of them.
+## three novas of blasting bolts falling from the sky at once, big fire ones, frost and lightning,
+## three times over. Its data is sound, every card it names is a card, and its build wastes none of
+## them.
 const SpellsScript := preload("res://core/spells/spells.gd")
 const METEOR_MONSOON: StaffItem = preload("res://content/items/staffs/meteor_monsoon/meteor_monsoon.tres")
 

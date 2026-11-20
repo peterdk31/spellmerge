@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The Rune Minefield (content/items/staffs/rune_minefield), a premade build on the hub's rack:
-## three runes scattered at random, each throwing a nova of fire, frost or lightning atoms every 0.5
-## s while it waits. Its data is sound, every card it names is a card, and its build wastes none of
-## them.
+## three runes thrown down round its caster's feet in random directions, each throwing a nova of
+## fire, frost or lightning atoms every 0.5 s while it waits. Its data is sound, every card it names
+## is a card, and its build wastes none of them.
 const SpellsScript := preload("res://core/spells/spells.gd")
 const RUNE_MINEFIELD: StaffItem = preload("res://content/items/staffs/rune_minefield/rune_minefield.tres")
 

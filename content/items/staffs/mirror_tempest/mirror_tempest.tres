@@ -8,4 +8,4 @@ script = ExtResource("1_item")
 id = &"mirror_tempest"
 display_name = "Mirror Tempest"
 staff = ExtResource("2_dev")
-cards = Array[StringName]([&"burst", &"double", &"echo", &"mirror", &"nova", &"lightning", &"beam", &"echo", &"mirror", &"nova", &"frost", &"beam"])
+cards = Array[StringName]([&"burst", &"double", &"echo", &"mirror", &"split", &"lightning", &"beam", &"echo", &"mirror", &"split", &"frost", &"beam"])

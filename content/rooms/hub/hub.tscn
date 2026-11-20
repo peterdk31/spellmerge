@@ -176,32 +176,32 @@ script = ExtResource("16_item_stand_in")
 item = ExtResource("30_thunderclap_gauntlet")
 
 [node name="StarfallEngine" type="Node2D" parent="Items"]
-position = Vector2(608, 912)
+position = Vector2(416, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("31_starfall_engine")
 
 [node name="GravityWell" type="Node2D" parent="Items"]
-position = Vector2(672, 912)
+position = Vector2(480, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("32_gravity_well")
 
 [node name="CascadeOfCascades" type="Node2D" parent="Items"]
-position = Vector2(736, 912)
+position = Vector2(544, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("33_cascade_of_cascades")
 
 [node name="RuneMinefield" type="Node2D" parent="Items"]
-position = Vector2(800, 912)
+position = Vector2(608, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("34_rune_minefield")
 
 [node name="MirrorTempest" type="Node2D" parent="Items"]
-position = Vector2(864, 912)
+position = Vector2(672, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("35_mirror_tempest")
 
 [node name="MeteorMonsoon" type="Node2D" parent="Items"]
-position = Vector2(928, 912)
+position = Vector2(736, 896)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("36_meteor_monsoon")
 

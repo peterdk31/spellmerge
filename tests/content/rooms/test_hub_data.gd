@@ -308,11 +308,12 @@ func test_joiners_arrive_beside_the_altar() -> void:
 ## The rack (items I6): the Wild star, and under it one row of the premade builds RACK_STEP apart,
 ## the two showcase builds of crypt rework CR-S at its ends, and under that a second row of the
 ## builds added on 2026-11-20 (RACK_ROW_2), RACK_STEP below the first and starting half a step in,
-## and a third row (RACK_ROW_3) RACK_STEP below that, three steps in (right of the crack under the
-## first row's start), each on open floor: a body taking one stands clear of every hole, the stone, the altar and the yard.
+## and a third row (RACK_ROW_3) under the first row's start, RACK_ROW_3_DROP below the second (a
+## full step would put it on the south coast), each on open floor: a body taking one stands clear of every hole, the stone, the altar and the yard.
 const RACK_STEP: float = 64.0
 const RACK_ROW: Array[StringName] = [&"patient_sentry", &"glacier_engine", &"hammer_of_the_faithless", &"corpse_bloom", &"death_from_every_sky", &"the_mutiny", &"frostfire_cascade"]
 const RACK_ROW_2: Array[StringName] = [&"prism_crown", &"choir_of_wisps", &"meteor_orchard", &"maelstrom_heart", &"hall_of_mirrors", &"thunderclap_gauntlet"]
+const RACK_ROW_3_DROP: float = 48.0
 const RACK_ROW_3: Array[StringName] = [&"starfall_engine", &"gravity_well", &"cascade_of_cascades", &"rune_minefield", &"mirror_tempest", &"meteor_monsoon"]
 
 
@@ -351,8 +352,9 @@ func test_the_rack_is_three_rows_on_open_floor() -> void:
 		check_equal(row_2[0] - row[0], Vector2(RACK_STEP * 0.5, RACK_STEP), "the second row starts a step under the first, half a step in")
 	check_equal(ids_3, RACK_ROW_3, "the third row's builds lie in one row, in this order")
 	_check_row(ids_3, row_3)
-	if not row.is_empty() and not row_3.is_empty():
-		check_equal(row_3[0] - row[0], Vector2(RACK_STEP * 3.0, RACK_STEP * 2.0), "the third row starts two steps under the first, three steps in")
+	if not row.is_empty() and not row_2.is_empty() and not row_3.is_empty():
+		check_equal(row_3[0].x, row[0].x, "the third row starts under the first's start")
+		check_equal(row_3[0].y - row_2[0].y, RACK_ROW_3_DROP, "the third row lies RACK_ROW_3_DROP under the second")
 
 
 ## Each of `ids`, lying at `row` (in the same order), RACK_STEP right of the one before it.

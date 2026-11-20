@@ -18,12 +18,12 @@ Premade items (items I6, [docs/milestones/items.md](../../docs/milestones/items.
   - `hall_of_mirrors`, the Hall of Mirrors: three volleys of split frost bolts, fired forward and backward and echoed; each that hits closes a ring of five zapping lightning bolts in on where it hit.
   - `thunderclap_gauntlet`, the Thunderclap Gauntlet: a lightning swing and a storm slam together; the swing's hits throw a nova of chaining lightning atoms, the slam's call a big fire bolt down from the sky.
 - **The third row** (2026-11-20), six even crazier builds on the `dev` staff, under the second row, each with its own test (no card wasted, one cast):
-  - `starfall_engine`, the Starfall Engine: A big slow void bolt circles its caster and every 0.5 s drops a nova of fire bolts from the sky; each fire bolt, as it ends, closes five chaining lightning beams in on where it ended.
-  - `gravity_well`, the Gravity Well: A huge, slow, growing void and storm bolt that drags foes toward its path and every 0.5 s throws a nova of weaving fire atoms and closes five zapping lightning bolts in on itself.
-  - `cascade_of_cascades`, the Cascade of Cascades: A split frost, fire and lightning bolt at once, each of whose three shots throws a nova of atoms as it ends.
-  - `rune_minefield`, the Rune Minefield: Three runes scattered at random, each throwing a nova of fire, frost or lightning atoms every 0.5 s while it waits.
-  - `mirror_tempest`, the Mirror Tempest: A lightning and a frost beam eight ways at once, each fired backward too and echoed, three times over.
-  - `meteor_monsoon`, the Meteor Monsoon: Three novas of blasting fire, frost and lightning bolts falling from the sky at once, three times over.
+  - `starfall_engine`, the Starfall Engine: a big slow void bolt circles its caster and every 0.5 s drops a nova of fire bolts from the sky; each fire bolt, as it ends, closes five chaining lightning beams in on where it ended.
+  - `gravity_well`, the Gravity Well: a huge, slow, growing void and storm bolt that drags foes toward its path and every 0.5 s throws a nova of weaving fire atoms and closes five zapping lightning bolts in on itself.
+  - `cascade_of_cascades`, the Cascade of Cascades: a split frost, a split fire and a split lightning bolt at once; each of their nine shots throws a nova of atoms as it ends.
+  - `rune_minefield`, the Rune Minefield: three runes thrown down round its caster's feet in random directions, each throwing a nova of fire, frost or lightning atoms every 0.5 s while it waits.
+  - `mirror_tempest`, the Mirror Tempest: a fan of three lightning beams and a fan of three frost beams at once, each fan fired backward too and echoed, three times over.
+  - `meteor_monsoon`, the Meteor Monsoon: three novas of blasting bolts falling from the sky at once, big fire ones, frost and lightning, three times over.
 - **The showcase builds** (crypt rework CR-S, 2026-11-16: the owner's "Move the staffs to the hub", the sandbox's two start builds), on the `dev` staff too, at the ends of the rack's first row, each with its own test (no card wasted):
   - `frostfire_cascade`, the Frostfire Cascade: the most shots. A fire nova of bolts split three times (216 shots) whose every shot, as it ends, fires a frost nova of bolts split three times (216 each): far past the projectile cap, which it holds for a few seconds. The hub storm benchmark casts it (tests/benchmark/hub_storm.gd), and the replay tests' scripted player takes it (tests/support/replay_run.gd).
   - `patient_sentry`, the Patient Sentry: a decoy turret. Every 0.5 s it fires a homing fire, frost and lightning bolt (the lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova of bolts.

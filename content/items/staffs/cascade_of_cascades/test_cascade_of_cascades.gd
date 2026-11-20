@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The Cascade of Cascades (content/items/staffs/cascade_of_cascades), a premade build on the hub's
-## rack: a split frost, fire and lightning bolt at once, each of whose three shots throws a nova of
-## atoms as it ends. Its data is sound, every card it names is a card, and its build wastes none of
-## them.
+## rack: a split frost, a split fire and a split lightning bolt at once; each of their nine shots
+## throws a nova of atoms as it ends. Its data is sound, every card it names is a card, and its
+## build wastes none of them.
 const SpellsScript := preload("res://core/spells/spells.gd")
 const CASCADE_OF_CASCADES: StaffItem = preload("res://content/items/staffs/cascade_of_cascades/cascade_of_cascades.tres")
 

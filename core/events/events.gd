@@ -86,7 +86,7 @@ signal map_teleport_requested(player: int, room: int)
 signal map_pick_changed(player: int, room: int)
 ## Sender: hud (the inventory menu's d-pad on an item; the owner, 2026-11-20). `player` asked to bind
 ## their quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) to `id` of `bag` (a usable
-## item, tagged so: `ItemKinds.usable`): bound on another slot already, it moves (with none left too); bound there already (or `id`
+## item with a use: `ItemKinds.usable`): bound on another slot already, it moves (with none left too); bound there already (or `id`
 ## `&""`), the slot is let go. `body` as `staff_change_requested`'s. A command: heard by player at the
 ## next tick's start, which binds it (`quick_bound`) or says `inventory_refused`.
 signal quick_bind_requested(player: int, slot: int, bag: StringName, id: StringName, body: int)
@@ -297,6 +297,11 @@ signal owned_staff_changed(player: int, staff: int, plan: Dictionary)
 signal hands_changed(player: int, hands: PackedInt32Array)
 ## Sender: player. What quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) of the body `player` shows is bound to: `id` of `bag` (`&""`: nothing). Sent for every slot when the body is announced (after `inventory_announced`) and whenever one changes; how many are left is `bag_changed`'s. Heard by hud (the corner panel's d-pad, the inventory menu).
 signal quick_bound(player: int, slot: int, bag: StringName, id: StringName)
+## Sender: player (the owner, 2026-11-20). `id` of `bag` of the body `player` shows recharges after a
+## use (an active relic's cooldown, `ItemUse.cooldown`): `left` seconds of its `whole` cooldown, as it
+## starts, after `inventory_announced`, and 0 as it is ready again. Heard by the HUD (the corner
+## panel's cross and the inventory's ring show the fill; between, they count it down themselves).
+signal item_recharging(player: int, bag: StringName, id: StringName, left: float, whole: float)
 ## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by nobody now: Feel sounds every actor's cast on `cast_left` instead.

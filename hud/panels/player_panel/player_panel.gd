@@ -268,6 +268,11 @@ func set_quick(slot: int, icon: Texture2D, count: int, at_once: bool = false) ->
 	_quick.set_slot(slot, icon, count, at_once)
 
 
+## Quick-use slot `slot`'s item recharges for `left` more seconds of its `whole` cooldown (0: ready).
+func set_quick_recharge(slot: int, left: float, whole: float) -> void:
+	_quick.set_recharge(slot, left, whole)
+
+
 ## The quick-use cross (for tests and screenshots).
 func quick_cross() -> QuickCrossScript:
 	return _quick

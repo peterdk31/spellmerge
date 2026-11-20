@@ -693,6 +693,8 @@ func step(delta: float) -> void:
 			_land()
 			if _dying:
 				return
+	if inventory != null and inventory.is_recharging():
+		inventory.step(delta)
 	if phases != null:
 		phases.step(delta)
 	if possessed_by != null:

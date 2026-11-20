@@ -16,7 +16,7 @@ extends Control
 ##   X drops it on the ground.
 ## - **Cards:** the kinds the bag holds, then (A or RT) a kind's cards with their counts; X drops one.
 ## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
-##   A uses the one pointed at where it is tagged usable (`ItemKinds.usable`; a potion is drunk:
+##   A uses the one pointed at where it has a use (`ItemKinds.usable`; a potion is drunk:
 ##   `bag_use_requested`, the owner's of 2026-11-19) and X drops one where its kind can be dropped
 ##   (`ItemKinds.can`). A d-pad arm (`quick_*`; 1-4 on the keyboard) binds the usable item pointed
 ##   at to that arm's quick-use slot, as a hand's button puts a staff on a hand
@@ -25,7 +25,9 @@ extends Control
 ##   hint row says "Bind". **An item bound with none left stays on the ring** (the owner,
 ##   2026-11-20), after the ones held, its icon greyed and its count 0, so it can be let go or bound
 ##   to another arm there; it leaves the ring as it is let go. Its icon greys and fills again through
-##   GREY_STAGES shades (Smooth).
+##   GREY_STAGES shades (Smooth). An item recharging after a use (an active relic's cooldown,
+##   `item_recharging`) has a shutter over its icon sinking a whole row at a time (`RechargeShutter`),
+##   and Use is dimmed until it is ready.
 ## - **The column:** the HP bar, then the four hands, each its button's glyph, its staff's head and
 ##   numbers (`NUMBERS`), and while a staff is pointed at an arrow beside each number of every other
 ##   hand's staff: up or down as the pointed staff's number is higher or lower, green where that is
@@ -51,6 +53,7 @@ const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
 const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
+const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
 
 const NONE: int = -1
 const PLAYER_COUNT: int = 4
@@ -186,6 +189,11 @@ var _shade_clock: float = 0.0
 ## remembered): an item that runs out (bound, so kept on the ring with 0), or is gone a moment as its
 ## binding moves, keeps its place instead of jumping to the end (Smooth).
 var _item_order: Array[StringName] = []
+## Items recharging after a use (`item_recharging`: an active relic's cooldown): "bag/id" -> [seconds
+## left, whole cooldown, when told (msec)]; drawn as a shutter over the item's icon.
+var _charges: Dictionary = {}
+## The shutter rows drawn last, by "bag/id", so the ring redraws only as a row changes.
+var _charge_rows: Dictionary = {}
 
 
 func _ready() -> void:
@@ -229,6 +237,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_events.owned_staff_changed.connect(_on_owned_staff_changed)
 		_events.hands_changed.connect(_on_hands_changed)
 		_events.quick_bound.connect(_on_quick_bound)
+		_events.item_recharging.connect(_on_item_recharging)
 		_events.inventory_refused.connect(_on_inventory_refused)
 		_events.player_stats_changed.connect(_on_stats_changed)
 	if _ui_focus != null:
@@ -398,6 +407,7 @@ func step(delta: float) -> void:
 		_note_left -= delta
 		_dirty = true
 	_step_shades(delta)
+	_step_charges()
 	if _menu.pointed_for(_clock) < POP_TIME:
 		_dirty = true
 	if _dirty:
@@ -595,6 +605,7 @@ func drop_pointed() -> void:
 func _on_inventory_announced(player: int, body: int) -> void:
 	if player != index:
 		return
+	_charges.clear()
 	_mirror.clear(body)
 	_refill()
 
@@ -749,7 +760,7 @@ func _refresh_hints() -> void:
 	if _layer == Layer.ITEMS:
 		first = USE_VERB
 		var held: bool = entry.has("item") and int(entry["count"]) > 0
-		can_enter = held and _item_usable(entry)
+		can_enter = held and _item_usable(entry) and recharge_of(entry["item"]).x <= 0.0
 		can_drop = held and (_item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE))
 	var can_bind: bool = _layer == Layer.ITEMS and _item_usable(entry)
 	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB, BIND_VERB]
@@ -1013,7 +1024,10 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 		var item_icon: Texture2D = _look(data["item"])["icon"] as Texture2D
 		if item_icon != null and size >= SMALL_ICON:
 			var side: float = minf(ICON_SIZE, rect.size.x - 2.0)
-			draw_texture_rect(item_icon, Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side)), false, shade_tint(int(_shade.get(data["item"], 0))))
+			var icon_rect := Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side))
+			draw_texture_rect(item_icon, icon_rect, false, shade_tint(int(_shade.get(data["item"], 0))))
+			var charge: Vector2 = recharge_of(data["item"])
+			RechargeShutter.draw(self, icon_rect, charge.x, charge.y)
 	var none_left: bool = data.has("item") and int(data["count"]) == 0
 	if data.has("count") and (int(data["count"]) > 1 or none_left) and not data.has("kind"):
 		var number: String = str(int(data["count"]))
@@ -1053,7 +1067,7 @@ func _content() -> RegistryScript:
 	return _registry
 
 
-## True when the item entry `entry` of the bag entered is tagged usable (`ItemKinds.usable`): A uses
+## True when the item entry `entry` of the bag entered has a use (`ItemKinds.usable`): A uses
 ## it, a d-pad arm binds it.
 func _item_usable(entry: Dictionary) -> bool:
 	return entry.has("item") and ItemKinds.usable(_bag, StringName(entry["item"]), _content())
@@ -1072,6 +1086,38 @@ func _shade_wanted(entry: Dictionary) -> int:
 ## Item `id`'s shade drawn on the ring (0 its icon ... GREY_STAGES greyed; for tests).
 func shade_of(id: StringName) -> int:
 	return int(_shade.get(id, 0))
+
+
+func _on_item_recharging(player: int, bag: StringName, id: StringName, left: float, whole: float) -> void:
+	if player != index:
+		return
+	var key: String = "%s/%s" % [bag, id]
+	if left > 0.0:
+		_charges[key] = [left, whole, Time.get_ticks_msec()]
+	else:
+		_charges.erase(key)
+	_dirty = true
+
+
+## The seconds `id` of the bag entered still recharges (0: ready), and its whole cooldown.
+func recharge_of(id: StringName) -> Vector2:
+	var told: Array = _charges.get("%s/%s" % [_bag, id], [])
+	if told.is_empty():
+		return Vector2.ZERO
+	var left: float = float(told[0]) - float(Time.get_ticks_msec() - int(told[2])) / 1000.0
+	return Vector2(maxf(left, 0.0), float(told[1]))
+
+
+## The ring redrawn as a recharging item's shutter loses a row (Smooth: whole rows, `RechargeShutter`).
+func _step_charges() -> void:
+	if _charges.is_empty() or _layer != Layer.ITEMS:
+		return
+	for entry: Dictionary in _entries:
+		var charge: Vector2 = recharge_of(entry["item"])
+		var shut: int = RechargeShutter.rows(charge.x, charge.y, int(ICON_SIZE))
+		if int(_charge_rows.get(entry["item"], 0)) != shut:
+			_charge_rows[entry["item"]] = shut
+			_dirty = true
 
 
 ## `ids` in the order the ring has shown them, each new one remembered after them in its own order.

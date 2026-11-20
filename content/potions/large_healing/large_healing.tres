@@ -9,5 +9,4 @@ id = &"large_healing"
 display_name = "Large Healing Potion"
 description = "Drink it from your inventory to heal 60 health."
 icon = ExtResource("2_icon")
-usable = true
 heal = 60.0

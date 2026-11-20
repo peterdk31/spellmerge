@@ -9,6 +9,5 @@ id = &"vigor"
 display_name = "Vigor Potion"
 description = "Drink it from your inventory: your most health grows by 5, and you heal 20."
 icon = ExtResource("2_icon")
-usable = true
 heal = 20.0
 more_most = 5.0

@@ -336,3 +336,29 @@ func test_the_cross_fits_beside_six_slot_staffs_in_an_equal_pane() -> void:
 	check(with.x - without.x <= QuickCrossScript.SIDE + 3.0, "and only its own width: %s, %s" % [without, with])
 	# The smallest Equal pane (#875, gameplay/feel/equal_panes.gd): a quarter of the 640 × 360 screen.
 	check(with.x <= 160.0 and with.y <= 90.0, "the panel fits a quarter pane's corner: %s" % with)
+
+
+func test_a_recharging_item_shows_a_shutter_sinking_by_whole_rows() -> void:
+	var cross := QuickCrossScript.new()
+	own(cross)
+	cross.set_slot(0, PlaceholderTexture2D.new(), 1, true)
+	cross.set_recharge(0, 2.0, 2.0)
+	check_equal(cross.recharge_rows(0), QuickCrossScript.ICON, "just used: the icon shut")
+	var rows: Array[int] = []
+	for _frame in 140:
+		cross.count_down(1.0 / 60.0)
+		if rows.is_empty() or rows.back() != cross.recharge_rows(0):
+			rows.append(cross.recharge_rows(0))
+	check_equal(rows, [8, 7, 6, 5, 4, 3, 2, 1, 0] as Array[int], "it sinks a whole row at a time, never a jump (Smooth): %s" % [rows])
+	check(not cross.is_moving(), "and rests once ready")
+
+
+func test_the_panel_hears_a_recharge_for_the_slot_bound_to_it() -> void:
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1)), "a potion, auto-bound up")
+	_frame()
+	_bus.item_recharging.emit(0, POTIONS, &"healing", 1.0, 2.0)
+	var cross: QuickCrossScript = _cross()
+	check_equal(cross.recharge_rows(0), 4, "half its cooldown left: half the icon shut")
+	check_equal(cross.recharge_rows(1), 0, "another arm untouched")
+	_bus.item_recharging.emit(0, POTIONS, &"healing", 0.0, 2.0)
+	check_equal(cross.recharge_rows(0), 0, "ready: open")

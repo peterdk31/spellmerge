@@ -9,7 +9,7 @@ extends RefCounted
 ## - `content`: the registry folders its ids are found in (core/registry), and `type`: the class a
 ##   resource there must be to be one of it (`is_content`).
 ## - `actions`: what can be done with one held (`can`). Whether one is used is not a kind's: its
-##   content is tagged `usable` (`usable`).
+##   content has a use (`usable`, `use_of`).
 ## - `premade`: the registry folders its premade items are found in (`premade_of`: the hub's rack,
 ##   a `StaffItem`; items I6), apart from its content.
 ## - `ids` (only for a kind that shares its bag with another, the currency's coins, keys and rerolls): the ids
@@ -41,7 +41,7 @@ const HAND: StringName = &"hand"
 ## One row a kind (see the class doc). A premade staff (`StaffItem`, `items`) is a staff of the
 ## `wizard` folder with its cards, so a stack's id is always its content's. A relic is a
 ## `RelicBase` (connected biomes CB10: its run stat changes, `RunStats`; no relic file exists yet).
-## A potion is a `PotionBase` (content/potions), drunk from the bag (tagged `usable`, not by its
+## A potion is a `PotionBase` (content/potions), drunk from the bag (its content has a use, not its
 ## row: `usable`; the player controller's `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
 ## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one); a key is a
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
@@ -171,17 +171,23 @@ static func kind_of(resource: Resource) -> StringName:
 
 
 ## True when one held of `kind` can be `action`ed (DROP, DROP_ONE, HAND). Whether one is used is
-## its own content's tag, never its kind's (`usable`).
+## whether its own content has a use, never its kind's (`usable`).
 static func can(kind: StringName, action: StringName) -> bool:
 	return (_row(kind).get("actions", []) as Array).has(action)
 
 
-## True when the item `id` of `bag` is tagged usable (`ItemContent.usable`; the owner, 2026-11-20):
-## only such an item is used from the bag or bound to a d-pad arm. An item `registry` has no content
-## of, or whose content is untagged or can carry no tag (a staff, a card), is not.
+## True when the item `id` of `bag` is usable: it has a use (`ItemContent.use_of`, an `ItemUse`; the
+## owner, 2026-11-20: usable exactly when it has a use). Only such an item is used from the bag or
+## bound to a d-pad arm. An item `registry` has no content of, one with no use (a coin, a passive
+## relic) or of a kind that has none (a staff, a card), is not.
 static func usable(bag: StringName, id: StringName, registry: RegistryScript) -> bool:
+	return use_of(bag, id, registry) != null
+
+
+## The use of the item `id` of `bag` (`ItemContent.use_of`), or null for none.
+static func use_of(bag: StringName, id: StringName, registry: RegistryScript) -> ItemUse:
 	var found := content(kind_in(bag, id), id, registry) as ItemContent
-	return found != null and found.usable
+	return found.use_of() if found != null else null
 
 
 ## The content `kind` `id` is (the first of its row's folders that has it and is of its class), or

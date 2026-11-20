@@ -1,7 +1,8 @@
 class_name Inventory
 extends ActorComponent
 ## The inventory (items I3, docs/milestones/items.md, "The model"): the things an actor holds, in
-## bags, and which of its staffs is on which hand. A component of the actor kit, never stepped; the
+## bags, and which of its staffs is on which hand. A component of the actor kit, stepped by its body only
+## while an item recharges (`step`, `recharge_left`: an active relic's cooldown); the
 ## wizard has one in its scene (`content/wizard/base/wizard.tscn`), and every other actor is given
 ## one by its actor (items I8: an enemy's or a prop's staffs on its hands, its bags empty). Hands are
 ## its Caster's: a body with no Caster has none (`free_hand`), so whatever it takes goes in a bag.
@@ -58,14 +59,14 @@ extends ActorComponent
 ##
 ## - **Quick-use slots** (the owner, 2026-11-20): one per d-pad arm (QUICK_SLOTS: 0 up, 1 right, 2
 ##   down, 3 left), each bound to a usable item by its bag and id or to nothing (`quick_bag`,
-##   `quick_id`, `quick_slot_of`). **Only an item tagged usable binds** (`ItemContent.usable`,
+##   `quick_id`, `quick_slot_of`). **Only an item with a use binds** (`ItemContent.use_of`,
 ##   `ItemKinds.usable`; the owner, 2026-11-20): `bind_quick(slot, bag, id)` binds one it holds a copy
 ##   of (refused NO_USE, NO_ITEM): bound on another slot already, it moves (with none left too);
 ##   bound on this slot already, it is let go (as a hand's button takes its staff off). A binding
 ##   names the item, not a copy: with none left it stays (the HUD greys it, on the panel and on the
 ##   inventory's ring) and is full again as one is taken.
 ##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
-##   and an item tagged usable taken (`add`) that no slot is bound to fills the first slot bound to nothing**
+##   and an item with a use taken (`add`) that no slot is bound to fills the first slot bound to nothing**
 ##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
@@ -77,8 +78,8 @@ enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_D
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
-## Not state: the content registry it reads an item's usable tag from (a service).
-const DERIVED: Array[StringName] = [&"registry"]
+## Not state: the content registry it reads an item's use from (a service), and a step's scratch.
+const DERIVED: Array[StringName] = [&"registry", &"_recharged"]
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -103,6 +104,8 @@ signal staff_changed(number: int)
 signal hands_changed()
 ## What quick-use slot `slot` is bound to changed (`quick_bag`, `quick_id`).
 signal quick_changed(slot: int)
+## An item it holds began to recharge, or is ready again (`recharge_left`).
+signal recharge_changed(bag: StringName, id: StringName)
 
 ## By bag (each of `ItemKinds.BAGS`): its stacks, in the order they came.
 var _bags: Dictionary = {}
@@ -130,6 +133,12 @@ var _carried_kept: int = 0
 ## By quick-use slot: the bag and the id of the item bound to it (`&""`: none).
 var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
 var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
+## Items recharging after a use (the owner, 2026-11-20: an active relic recharges for its use's
+## cooldown): by `_recharge_key(bag, id)`, the seconds left, counted down by `step` with the tick's
+## delta. State: hashed and snapshotted.
+var _recharge: Dictionary = {}
+## Scratch: the keys done recharging in a step.
+var _recharged: Array[StringName] = []
 ## The content registry (`ItemKinds.usable` reads an item's tag from it): set by its body's controller
 ## (`PlayerController`) or `take_loadout`; null: the registry autoload.
 var registry: RegistryScript = null
@@ -502,7 +511,7 @@ func quick_id(slot: int) -> StringName:
 
 
 ## Bind quick-use slot `slot` to `id` of `bag`, as the class doc says (`&""` lets the slot go).
-## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item not tagged usable (NO_USE,
+## Refused, and nothing changes, for a slot it has not (NO_SLOT), an item with no use (NO_USE,
 ## `ItemKinds.usable`) and one it holds none of (NO_ITEM), unless that one is bound on another slot
 ## already: a binding with none left moves as any does (the owner, 2026-11-20: the inventory lists it
 ## greyed, to let go or bind again).
@@ -885,6 +894,54 @@ func _on_hand(stack: ItemStack, hand: int) -> void:
 
 ## As its actor's scene and data made it (props W2, `ActorComponent.at_rest`): nothing it holds
 ## changed since its start, so an untouched body's state hash sums it up with the body.
+# --- Recharging -------------------------------------------------------------------------
+
+## The seconds before `id` of `bag` can be used again (0: ready).
+func recharge_left(bag: StringName, id: StringName) -> float:
+	return float(_recharge.get(_recharge_key(bag, id), 0.0))
+
+
+## `id` of `bag` recharges for `seconds` (its use's cooldown; nothing for none).
+func start_recharge(bag: StringName, id: StringName, seconds: float) -> void:
+	if seconds <= 0.0:
+		return
+	_recharge[_recharge_key(bag, id)] = seconds
+	_edited = true
+	recharge_changed.emit(bag, id)
+
+
+## True while anything recharges (its body steps it then: `step`).
+func is_recharging() -> bool:
+	return not _recharge.is_empty()
+
+
+## Every item recharging: [bag, id, seconds left] each, in the order they began.
+func recharging() -> Array:
+	var out: Array = []
+	for key: StringName in _recharge:
+		var parts: PackedStringArray = String(key).split("/", true, 1)
+		out.append([StringName(parts[0]), StringName(parts[1]), float(_recharge[key])])
+	return out
+
+
+## Count every recharge down by `delta` (its body's step, the tick's delta); one done is ready again.
+func step(delta: float) -> void:
+	_recharged.clear()
+	for key: StringName in _recharge:
+		var left: float = float(_recharge[key]) - delta
+		_recharge[key] = left
+		if left <= 0.0:
+			_recharged.append(key)
+	for key: StringName in _recharged:
+		_recharge.erase(key)
+		var parts: PackedStringArray = String(key).split("/", true, 1)
+		recharge_changed.emit(StringName(parts[0]), StringName(parts[1]))
+
+
+static func _recharge_key(bag: StringName, id: StringName) -> StringName:
+	return StringName("%s/%s" % [bag, id])
+
+
 func at_rest() -> bool:
 	return not _edited
 

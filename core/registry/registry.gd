@@ -20,7 +20,7 @@ extends Node
 ## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
-## runs' (`validate_runs()`) and the items' (`validate_items()`: an item tagged usable with no use),
+## runs' (`validate_runs()`) and the items' (`validate_items()`: each item's use),
 ## and pushes one warning per problem, so broken spell, run or item content shows up on the first run.
 ##
 ## Sounds (docs/milestones/sound.md, section 3) are `.ogg` files and `.tres` files (an
@@ -307,8 +307,8 @@ func validate_runs() -> PackedStringArray:
 
 
 ## The problems with the items (`ItemContent.problems`, the potions, coins, keys, rerolls and
-## relics, each kind's folders by `ItemKinds`): an item tagged usable with no use is one (the
-## owner, 2026-11-20), named with its fix. Empty when all is well.
+## relics, each kind's folders by `ItemKinds`): its use is checked (`ItemUse.problems`: it does
+## something, its cooldown is 0 or more), named with its fix. Empty when all is well.
 func validate_items() -> PackedStringArray:
 	var found := PackedStringArray()
 	for kind: StringName in ItemKinds.kinds():

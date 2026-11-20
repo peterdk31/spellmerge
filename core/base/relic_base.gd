@@ -6,14 +6,15 @@ extends ItemContent
 ## of stat changes (`stat_changes`), which `RunStats` applies for the player holding it, after the
 ## run's rule changes. A relic that changes how cards behave brings its own code with M3.
 ##
-## An item's content (`ItemContent`: id, name, description, icon), so it can be **tagged usable**
-## (the owner, 2026-11-20: an active relic bound to the d-pad and used from there): with `usable`
-## set, its `active_use` is what a use does (`use_of`), as a potion's drink is; a use takes it, as it
-## takes a potion (the player controller's `_use_item`).
+## An item's content (`ItemContent`: id, name, description, icon). **An active relic** (the owner,
+## 2026-11-20) is one with an `active_use` (`use_of`): usable, so it binds to a d-pad arm and is used
+## from there or the inventory. Its use is kept (`ItemUse.consumed` false): the relic stays in the
+## bag with its stat changes, and recharges for its use's `cooldown` (the inventory's
+## `recharge_left`); a use pressed while it recharges is refused.
 
 ## Its changes to the holder's run stats, applied in this order.
 @export var stat_changes: Array[StatChange] = []
-## What a use of it does, for a relic tagged `usable` (null: none; a passive relic).
+## What a use of it does (null: none, a passive relic): an active relic's, kept with a cooldown.
 @export var active_use: ItemUse = null
 
 

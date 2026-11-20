@@ -10,7 +10,7 @@ Passive items found during runs. Some add a small bonus; the best change how spe
 
 - A relic is one folder holding a `.tres` resource on the relic base class (arrives in M3), an optional `.gd` for new behaviour and an icon. Validators for missing or out-of-range values arrive with the base class.
 - Content is discovered by folder through `core/registry`; no central list to edit.
-- **An active relic** (the owner, 2026-11-20): a relic (`RelicBase`, an `ItemContent`) tagged `usable` with an `active_use` (`ItemUse`: its heal and most health added) is bound to a d-pad arm and used from there or the inventory, as a potion is; a use takes it. A tagged relic with no use is rejected by the content validator (`Registry.validate_items`).
+- **An active relic** (the owner, 2026-11-20): a relic (`RelicBase`, an `ItemContent`) with an `active_use` (`ItemUse`: its heal and most health added, `consumed` false, its `cooldown` in seconds) is usable: it binds to a d-pad arm and is used from there or the inventory. A use keeps it (its stat changes stay) and it recharges for its cooldown, a use pressed meanwhile refused ("That is still recharging."); the corner panel's cross and the inventory's ring show the recharge as a shutter sinking a whole row at a time. The content validator checks the use (`Registry.validate_items`).
 - A relic reacts to `core/` events and changes behaviour through the hooks `core/` provides. It never calls spells, enemies or other areas directly.
 - Relics are owned per player (index 0–3). Rewards are rolled per player and never wait for anyone.
 - It must be understandable from its description alone. Original name and text only.

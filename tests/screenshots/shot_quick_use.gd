@@ -9,7 +9,9 @@ extends "res://tests/support/screenshot.gd"
 ## six-slot staff rows: up the healing potions, right the max health potion, left the small healing
 ## potions with none left (greyed, 0), down bound to nothing; P2's cross with nothing bound, every arm
 ## an empty cell (the cross always shows, the owner's of 2026-11-20) (quick_panels), and P1's and
-## P2's panels cropped 4x (quick_panel_p1, quick_panel_empty).
+## P2's panels cropped 4x (quick_panel_p1, quick_panel_empty). Then P3 uses a shot-only active
+## relic bound down (it borrows the vigor potion's icon: no relic has art yet) and its panel is
+## cropped 4x while it recharges, the shutter part way down its icon (quick_relic_recharging).
 ## Then, on the split test map (tests/support/biome_maps.gd) played by the keyboard, P1 holding M
 ## (Y on a pad) in the antechamber, the map open with its legend along the frame's foot: the d-pad's
 ## glyph ("1-4" on the keyboard) "Move teleport target" and F (A) "Teleport" (quick_map_legend).
@@ -91,12 +93,42 @@ func take() -> void:
 	save_crop(image, panel.get_global_rect().get_center(), "quick_panel_p1", Vector2i(64, 36))
 	var empty := _hud.call("get_panel", 1) as Control
 	save_crop(image, empty.get_global_rect().get_center(), "quick_panel_empty", Vector2i(64, 36))
+	await _relic_recharging(flow, registry)
 	flow.call("stop_run")
 	await settle(10)
 	for index in 4:
 		_input.call("leave", index)
 	await settle(4)
 	await _map_legend(flow, registry)
+
+
+## P3 uses a shot-only active relic bound down: kept, recharging for 4 s, shot a second in.
+func _relic_recharging(flow: Node, registry: Node) -> void:
+	var relic := RelicBase.new()
+	relic.id = &"shot_active_idol"
+	relic.display_name = "Idol"
+	relic.icon = load("res://content/potions/vigor/icon.svg") as Texture2D
+	relic.active_use = ItemUse.health(10.0, 0.0)
+	relic.active_use.consumed = false
+	relic.active_use.cooldown = 4.0
+	var added: bool = registry.call("add", &"relics", relic)
+	var wizard := flow.call("get_wizard", 2) as Actor
+	var stack := ItemStack.new()
+	stack.kind = ItemKinds.RELIC
+	stack.id = relic.id
+	var taken: bool = wizard.inventory.add(stack)
+	# Taken, it fills the one free arm, down (the owner's auto-bind).
+	wizard.health.health = wizard.health.max_health * 0.5
+	await settle(10)
+	tap(2, &"quick_down")
+	await settle(60)
+	if wizard.inventory.recharge_left(&"relics", relic.id) <= 0.0:
+		fail("P3's relic did not start recharging (added %s, taken %s, down bound to %s)" % [added, taken, wizard.inventory.quick_id(2)])
+		return
+	var panel := _hud.call("get_panel", 2) as Control
+	var image: Image = await grab()
+	save_crop(image, panel.get_global_rect().get_center(), "quick_relic_recharging", Vector2i(64, 36))
+	registry.call("remove", &"relics", relic.id)
 
 
 ## The keyboard's P1 holding M on the split test map.

@@ -14,10 +14,13 @@ extends Control
 ## nothing, to its shadow for one with none left (greying and filling again through the shades
 ## between); its icon goes out the same way before another comes in. A count that changes nods its
 ## cell up a pixel (more) or dips it (fewer) through NOD's poses. Whole pixels, never a fade or a
-## blur.
+## blur. A slot whose item recharges (an active relic's cooldown: `set_recharge`) has a shutter over
+## its icon that sinks a whole row at a time as the seconds count down (`RechargeShutter`).
 ##
 ## Display only: no input, no simulation state; it processes only while something steps and
 ## allocates nothing a frame.
+
+const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
 
 const SLOTS: int = 4
 ## A cell's side (an 8-pixel icon in a 1-pixel frame) and where each slot's cell sits in the cross
@@ -62,6 +65,9 @@ var _drawn_count: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _nod: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _nod_way: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _clock: float = 0.0
+## By slot: the seconds its item still recharges (counted down here) and its whole cooldown.
+var _charge_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _charge_whole: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 
 func _init() -> void:
@@ -76,6 +82,9 @@ func _init() -> void:
 func set_slot(slot: int, icon: Texture2D, count: int, at_once: bool = false) -> void:
 	if slot < 0 or slot >= SLOTS:
 		return
+	if icon != _icon[slot]:
+		# Another item: its own recharge, if any, is told next.
+		_charge_left[slot] = 0.0
 	_icon[slot] = icon
 	_count[slot] = maxi(count, 0)
 	if at_once:
@@ -85,6 +94,21 @@ func set_slot(slot: int, icon: Texture2D, count: int, at_once: bool = false) -> 
 		_nod[slot] = 0
 	set_process(is_moving())
 	queue_redraw()
+
+
+## Slot `slot`'s item recharges for `left` more seconds of its `whole` cooldown (0: ready).
+func set_recharge(slot: int, left: float, whole: float) -> void:
+	if slot < 0 or slot >= SLOTS:
+		return
+	_charge_left[slot] = maxf(left, 0.0)
+	_charge_whole[slot] = whole
+	set_process(is_moving())
+	queue_redraw()
+
+
+## The shutter rows over slot `slot`'s icon (0: ready; for tests).
+func recharge_rows(slot: int) -> int:
+	return RechargeShutter.rows(_charge_left[slot], _charge_whole[slot], ICON)
 
 
 ## Slot `slot`'s stage (FRAMED ... FULL; for tests), its count drawn and whether it is bound.
@@ -103,6 +127,8 @@ func is_bound(slot: int) -> bool:
 ## True while a stage still steps.
 func is_moving() -> bool:
 	for slot in SLOTS:
+		if _charge_left[slot] > 0.0:
+			return true
 		if _stage[slot] != _wanted(slot) or _drawn_icon[slot] != _icon[slot] or _drawn_count[slot] != _count[slot] or _nod[slot] != 0:
 			return true
 	return false
@@ -134,6 +160,7 @@ func advance() -> void:
 
 
 func _process(delta: float) -> void:
+	count_down(delta)
 	_clock += delta
 	while _clock >= 1.0 / FPS:
 		_clock -= 1.0 / FPS
@@ -141,6 +168,17 @@ func _process(delta: float) -> void:
 	if not is_moving():
 		_clock = 0.0
 		set_process(false)
+
+
+## Count every recharge down by `delta` seconds; redrawn as a shutter row changes (tests call it).
+func count_down(delta: float) -> void:
+	for slot in SLOTS:
+		if _charge_left[slot] <= 0.0:
+			continue
+		var before: int = recharge_rows(slot)
+		_charge_left[slot] = maxf(_charge_left[slot] - delta, 0.0)
+		if recharge_rows(slot) != before:
+			queue_redraw()
 
 
 func _wanted(slot: int) -> int:
@@ -174,6 +212,7 @@ func _draw_slot(slot: int) -> void:
 		# Shadow, the shades between, full: whole steps of the tint, never a fade of the icon.
 		var tint: Color = GREY.lerp(Color.WHITE, float(stage - SHADOW) / float(FULL - SHADOW))
 		draw_texture_rect(_drawn_icon[slot], Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), false, tint)
+		RechargeShutter.draw(self, Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), _charge_left[slot], _charge_whole[slot])
 		_draw_count(cell, _drawn_count[slot], TEXT if _drawn_count[slot] > 0 else DIM)
 
 

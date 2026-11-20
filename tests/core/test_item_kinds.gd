@@ -60,8 +60,8 @@ func test_the_owners_kinds() -> void:
 	for kind: StringName in ItemKinds.kinds():
 		check(ItemKinds.can(kind, ItemKinds.DROP) or ItemKinds.can(kind, ItemKinds.DROP_ONE), "everything is droppable: %s" % kind)
 	var registry: Node = root.get_node("Registry")
-	check(ItemKinds.usable(&"potions", &"healing", registry), "a potion is used (drunk): tagged usable")
-	check(not ItemKinds.usable(&"currency", CoinBase.ID, registry), "coins are not tagged")
+	check(ItemKinds.usable(&"potions", &"healing", registry), "a potion is used (drunk): it has a use")
+	check(not ItemKinds.usable(&"currency", CoinBase.ID, registry), "coins have none")
 	check(not ItemKinds.usable(&"potions", &"no_such_potion", registry) and not ItemKinds.usable(&"potions", &"healing", null), "nothing known, nothing usable")
 	check(not ItemKinds.stacks(ItemKinds.STAFF) and not ItemKinds.stacks(ItemKinds.RELIC), "staffs and relics do not")
 	check(ItemKinds.can(ItemKinds.STAFF, ItemKinds.HAND) and not ItemKinds.can(ItemKinds.CARD, ItemKinds.HAND), "only a staff goes on a hand")
@@ -81,31 +81,32 @@ func test_every_content_folder_named_is_there_and_holds_its_kind() -> void:
 				check(found > 0, "%s: the registry finds some under %s (%d)" % [kind, folder, found])
 
 
-func test_the_content_validator_passes_every_item_and_rejects_a_tagged_one_with_no_use() -> void:
+func test_the_content_validator_checks_each_items_use() -> void:
 	var registry: Node = root.get_node("Registry")
 	check_equal(registry.call("validate_items"), PackedStringArray(), "every item is sound")
 	var bare := PotionBase.new()
 	bare.id = &"test_empty_flask"
-	bare.usable = true
 	var said: PackedStringArray = bare.use_problems()
-	check_equal(said.size(), 1, "a tagged potion that neither heals nor adds health: rejected")
-	check(said[0].contains("test_empty_flask") and said[0].contains("tagged usable but has no use") and said[0].contains("clear its usable tag"), "naming the item and the fix: %s" % [said])
+	check_equal(said.size(), 1, "a potion that neither heals nor adds health: its use does nothing")
+	check(said[0].contains("test_empty_flask") and said[0].contains("does nothing") and said[0].contains("give it a heal"), "naming the item and the fix: %s" % [said])
 	var relic := RelicBase.new()
 	relic.id = &"test_idol"
-	relic.usable = true
-	check(relic.problems()[0].contains("test_idol"), "a tagged relic with no active use: rejected (%s)" % [relic.problems()])
+	check_equal(relic.problems(), PackedStringArray(), "a passive relic (no use): sound, and not usable")
 	relic.active_use = ItemUse.health(20.0, 0.0)
-	check_equal(relic.problems(), PackedStringArray(), "with its active use: sound")
-	relic.usable = false
-	check(relic.problems()[0].contains("not tagged usable"), "a use with no tag is never used: said (%s)" % [relic.problems()])
+	relic.active_use.consumed = false
+	relic.active_use.cooldown = 3.0
+	check_equal(relic.problems(), PackedStringArray(), "an active relic: sound")
+	relic.active_use.cooldown = -1.0
+	check(relic.problems().size() == 1 and relic.problems()[0].contains("negative cooldown"), "a negative cooldown: rejected (%s)" % [relic.problems()])
 	var broken := RelicBase.new()
 	broken.id = &"test_broken_idol"
-	broken.usable = true
+	broken.active_use = ItemUse.new()
 	check(registry.call("add", &"relics", broken), "a broken relic in the registry")
 	var lines: PackedStringArray = registry.call("validate_items")
 	registry.call("remove", &"relics", broken.id)
 	check_equal(lines.size(), 1, "the registry's validator finds it: %s" % [lines])
-	check(lines.size() == 1 and lines[0].contains("test_broken_idol") and lines[0].contains("clear its usable tag"), "naming it and the fix")
+	check(lines.size() == 1 and lines[0].contains("test_broken_idol") and lines[0].contains("remove the use"), "naming it and the fix")
+	check(ItemUse.health(1.0, 0.0).consumed and ItemUse.health(1.0, 0.0).cooldown == 0.0, "a drink: consumed, no cooldown")
 
 
 func test_potions_and_the_coin_are_sound_content() -> void:

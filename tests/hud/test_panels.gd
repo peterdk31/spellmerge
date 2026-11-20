@@ -17,6 +17,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
 const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
+const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
 ## preloading it here makes the autoload's own load fail at start (cyclic resource).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
@@ -156,7 +157,9 @@ func test_the_panel_is_small() -> void:
 	panel.set_stats(64, 100)
 	await process_frame
 	var wanted: Vector2 = panel.get_combined_minimum_size()
-	check(wanted.y <= 20.0, "with no staffs the panel is one thin line and its small number, got %s" % wanted)
+	# With no staffs: one thin line and its small number, over the empty quick-use cross that always
+	# shows (the owner, 2026-11-20).
+	check(wanted.y <= 20.0 + QuickCrossScript.SIDE, "with no staffs the panel is one thin line and its small number over the cross, got %s" % wanted)
 	check(wanted.x <= 104.0, "and narrow, got %s" % wanted)
 	check(panel.find_child("ManaBar", true, false) == null and panel.find_child("ManaValue", true, false) == null, "no panel-wide mana bar: each staff row has its own line")
 
@@ -583,8 +586,7 @@ func _panel_source() -> String:
 	source = source.replace("events.quick_use_requested.emit(player, slot)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/quick_slots.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/map_legend.gd")
-	# The cross's own signal to its panel (that it takes room now) is no event.
-	source += FileAccess.get_file_as_string("res://hud/widgets/quick_cross.gd").replace("shown_changed.emit()", "")
+	source += FileAccess.get_file_as_string("res://hud/widgets/quick_cross.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/item_hints.gd")
 	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")

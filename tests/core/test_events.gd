@@ -104,6 +104,7 @@ const EVENTS: Dictionary = {
 	&"owned_staff_changed": [["player", TYPE_INT], ["staff", TYPE_INT], ["plan", TYPE_DICTIONARY]],
 	&"hands_changed": [["player", TYPE_INT], ["hands", TYPE_PACKED_INT32_ARRAY]],
 	&"quick_bound": [["player", TYPE_INT], ["slot", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME]],
+	&"item_recharging": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["left", TYPE_FLOAT], ["whole", TYPE_FLOAT]],
 	&"reaction_triggered": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
 	&"discharge_arc": [["caster", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
 	&"damage_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],

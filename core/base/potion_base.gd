@@ -5,7 +5,8 @@ extends ItemContent
 ## controller, gameplay/player). Nothing happens until it is drunk: then its wizard gains
 ## `more_most` most health (and as much health) and is healed `heal`, through Combat
 ## (`health_gift_requested`). One folder each, `content/potions/<id>/`, found by the registry under
-## `potions`.
+## `potions`. Its use (`use_of`: a drink, consumed, no cooldown) is its own two numbers, so every
+## potion is usable.
 
 ## The health a drink heals.
 @export_range(0.0, 999.0) var heal: float = 0.0
@@ -13,15 +14,16 @@ extends ItemContent
 @export_range(0.0, 999.0) var more_most: float = 0.0
 
 
-## True when a drink of it does nothing for a body at `health` of `most`: it only heals, and the
-## body is whole (so a drink is refused, not wasted).
+## A drink: its heal and its most health (`ItemUse`).
+func use_of() -> ItemUse:
+	return ItemUse.health(heal, more_most)
+
+
+## True when a drink of it does nothing for a body at `health` of `most` (`ItemUse.wasted_on`).
 func wasted_on(health: float, most: float) -> bool:
-	return more_most <= 0.0 and health >= most
+	return use_of().wasted_on(health, most)
 
 
-## What is wrong with it, one line each: its item's, and a potion that does nothing.
+## What is wrong with it, one line each: its item's (a potion that does nothing: its use's).
 func problems() -> PackedStringArray:
-	var found: PackedStringArray = super.problems()
-	if heal <= 0.0 and more_most <= 0.0:
-		found.append("The potion '%s' neither heals nor adds most health." % id)
-	return found
+	return super.problems()

@@ -230,7 +230,8 @@ func test_a_split_screen_with_two_views_in_different_rooms_tints_each_by_its_roo
 	light.use_views(views)
 	_step_tints(FRAME)
 	var apply := light.apply.material as ShaderMaterial
-	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 2, "two views, one apply pass")
+	var second: CanvasItem = light.readers.copy_of(light.apply, 1)
+	check(second != null and (second.material as ShaderMaterial).get_shader_parameter(&"tint_count") == apply.get_shader_parameter(&"tint_count"), "two views, the second's apply material given the first's tints")
 	check_equal(int(apply.get_shader_parameter(&"tint_count")), 2, "which tints by the world, whichever view draws it")
 	var tints: RoomTintsScript = _tints()
 	var at_0: Vector2 = (flow.get_wizard(0) as Node2D).global_position

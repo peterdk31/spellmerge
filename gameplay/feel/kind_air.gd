@@ -19,6 +19,7 @@ const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 
 ## The most of the motes' ring every kind's air together may hold at once: half the room's air's.
 const SHARE: float = AirMotesScript.RING_SHARE * 0.5
@@ -32,6 +33,8 @@ var _places: PackedInt32Array = PackedInt32Array()
 var _rects: Array[Rect2] = []
 var _laid_places: int = -1
 var _laid_world: int = -1
+## `give_off`'s one box, as views (kept: nothing is made a frame).
+var _one: ViewBoxesScript = ViewBoxesScript.new()
 
 
 ## Air whose colours are rows of `table` (the spectacle's, shared with the motes).
@@ -72,13 +75,19 @@ func lay(grid: RoomGrid) -> void:
 ## none: the particles, the light or the ambient particles are off), each over its own room within
 ## `view` (the world's part on screen; empty: all of each room).
 func give_off(now: float, pool: MotesScript, view: Rect2) -> void:
+	_one.set_one(view)
+	give_off_in(now, pool, _one)
+
+
+## As `give_off`, each room within the views' boxes `seen` (each view's own; none: all of each room).
+func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript) -> void:
 	var near: int = 0
 	for i in _airs.size():
-		if AirMotesScript.area_of(view, _rects[i]).has_area():
+		if seen.is_empty() or seen.total_area(AirMotesScript.VIEW_MARGIN, _rects[i]) > 0.0:
 			near += 1
 	var share: float = SHARE / float(maxi(near, 1))
 	for i in _airs.size():
-		_airs[i].give_off(now, pool, view, _rects[i], share)
+		_airs[i].give_off_in(now, pool, seen, _rects[i], share)
 
 
 ## The rooms with air motes, and room `i`'s place, rectangle and air (for tests).

@@ -63,6 +63,8 @@ const NativeScript := preload("res://core/native/native.gd")
 
 ## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
 const CHUNK: int = 1024
+## How far past its flight's reach a mote may still be drawn (px; `mote.gdshader`'s, `may_reach`).
+const CULL_PAD: float = 48.0
 ## Floats in a row: the transform (8), the colour (4) and the custom data (4).
 const DRAW_STRIDE: int = 16
 ## Where a row's numbers are (mote.gdshader's header says where it reads each): the velocity
@@ -1065,6 +1067,18 @@ func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int,
 	var phase: float = seed * 6.2832
 	ground.x += kind.wobble * (sin(tm * kind.wobble_rate + phase) - sin(phase))
 	return Vector3(ground.x, ground.y, maxf(h, 0.0))
+
+
+## Whether a mote of kind `k` thrown from `from` (`flight`'s numbers) may be drawn in `box` (a
+## view's part of the world) at age `t`: `mote.gdshader`'s cull (its CULL_PAD, CULL_PAD here), line
+## for line. A mote it says no to is folded away in that view before its flight is worked out; a
+## test holds every flight to it.
+func may_reach(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int, box: Rect2) -> bool:
+	var kind: MoteKind = _kinds[k]
+	var spread: float = vel.length() * t + 2.0 * absf(kind.wobble) + CULL_PAD
+	var g: float = kind.gravity
+	var rise: float = h0 + absf(vz) * t + (vz * vz / (2.0 * g) if g > 0.0 else -0.5 * g * t * t)
+	return from.x + spread >= box.position.x and from.x - spread <= box.end.x and from.y + spread >= box.position.y and from.y - spread - rise <= box.end.y
 
 
 func _kind_of(buffer: PackedFloat32Array, i: int) -> int:

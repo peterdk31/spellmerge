@@ -18,6 +18,7 @@ const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
@@ -344,12 +345,13 @@ func test_the_blank_quarters_void_gets_its_own_drifting_motes() -> void:
 	check(not blank.intersects(bounds), "the void view looks past the biome")
 	check(bounds.grow(VoidBackdropScript.GROW).encloses(blank), "inside the void's black")
 	air.given = 0
+	var no_view := ViewBoxesScript.new()
 	for i in 120:
-		spectacle.call(&"_give_off_void", float(i) * 0.1, Rect2())
+		spectacle.call(&"_give_off_void", float(i) * 0.1, no_view)
 	check_equal(air.given, 0, "no blank: no motes there")
 	spectacle.call(&"set_void_blank", blank)
 	for i in 120:
-		spectacle.call(&"_give_off_void", 20.0 + float(i) * 0.1, Rect2())
+		spectacle.call(&"_give_off_void", 20.0 + float(i) * 0.1, no_view)
 	check(air.given > 0, "a blank: its void drifts with motes (%d)" % air.given)
 	check(blank.grow(AirMotesScript.VIEW_MARGIN + 1.0).encloses(air.given_box), "given off over the void view (%s)" % air.given_box)
 	spectacle.call(&"set_void_blank", Rect2())

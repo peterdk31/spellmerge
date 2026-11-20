@@ -658,3 +658,48 @@ func test_a_mote_written_over_before_it_rests_leaves_no_mark() -> void:
 		small.burst(1, Vector2(400.0, 150.0), Vector2.RIGHT, 250, ember.speed, ember.spread, ember.up, ember.life, 2, Color.WHITE, ember.height)
 	small.step(t)
 	check_equal(_stamped_over_time(layer).size(), 0, "none of the written-over chips leaves a speck")
+
+
+## A biome (the performance pass, 2026-11-20): a layer a place of the grid, each its place's size
+## however wide the world (no 4,096 px cap), a view drawing only the rooms it shows; a stamp across a
+## mouth is drawn into both rooms' layers, each masked to the floor its own place holds.
+func test_a_biome_has_a_layer_a_room() -> void:
+	var marks: MarksScript = own(MarksScript.new(-1, [_kind(&"scorch")] as Array[MarkKind])) as MarksScript
+	root.add_child(marks)
+	var world := Rect2(-64.0, -64.0, 9000.0, 1200.0)
+	var grid := RoomGrid.new()
+	grid.size_to(world)
+	grid.add_place(Rect2(0.0, 0.0, 640.0, 384.0))
+	grid.add_place(Rect2(704.0, 0.0, 640.0, 384.0))
+	grid.add_place(Rect2(624.0, 160.0, 96.0, 64.0), true)
+	grid.add_place(Rect2(8000.0, 640.0, 640.0, 384.0))
+	marks.enter_places(world, grid.wall_image(true), 8.0, grid)
+	check_equal(marks.layer_count(), 4, "a layer a place")
+	for k in 4:
+		check(marks.layer_rect(k).encloses(grid.place_rect(k)), "layer %d covers its place (%s)" % [k, marks.layer_rect(k)])
+		check(marks.layer_rect(k).size.x <= grid.place_rect(k).size.x + 8.0, "and no more than a square past it")
+		check_equal(marks.layer_sprite(k).position, marks.layer_rect(k).position, "shown at its corner")
+	check(marks.layer_rect(3).end.x > float(MarksScript.MAX_SIDE), "a room past 4,096 px has its marks")
+	check_equal(marks.texture_bytes(), (640 * 384 * 3 + 96 * 64) * 4, "the rooms' texels only, not the world's")
+	# A scorch on the mouth reaches both rooms and the bridge; one far off only its own room.
+	marks.stamp(0, Vector2(672.0, 192.0), 40.0, 0.0, 0, Color.WHITE)
+	marks.stamp(0, Vector2(8300.0, 800.0), 10.0, 0.0, 0, Color.WHITE)
+	marks.step()
+	check_equal([marks.layer_drawn(0), marks.layer_drawn(1), marks.layer_drawn(2), marks.layer_drawn(3)], [1, 1, 1, 1], "the mouth's scorch in three layers, the far one in its own")
+	check_equal(marks.layer_viewport(3).render_target_update_mode, SubViewport.UPDATE_ONCE, "each layer with a stamp renders")
+	marks.step()
+	marks.stamp(0, Vector2(100.0, 100.0), 10.0, 0.0, 0, Color.WHITE)
+	marks.step()
+	check_equal([marks.layer_drawn(0), marks.layer_viewport(1).render_target_update_mode], [1, SubViewport.UPDATE_DISABLED], "a stamp in one room renders that room's layer alone")
+	# Each layer masks the floor its place does not hold: the bridge's square over the room's lip.
+	var mask: Image = (marks.layer_material(0).get_shader_parameter(&"floor_mask") as Texture2D).get_image()
+	var cell: float = 8.0
+	var corner: Vector2 = marks.layer_rect(0).position
+	var at_room: Vector2i = Vector2i(((Vector2(100.0, 100.0) - corner) / cell).floor())
+	var at_bridge: Vector2i = Vector2i(((Vector2(636.0, 192.0) - corner) / cell).floor())
+	check(mask.get_pixelv(at_room).r < 0.5, "the room's own floor takes marks")
+	check_equal(grid.place_at(Vector2(636.0, 192.0)), 2, "the bridge holds its lip over the room")
+	check(mask.get_pixelv(at_bridge).r > 0.5, "so the room's layer leaves it to the bridge's")
+	marks.enter(BOUNDS, null, 8.0)
+	check_equal(marks.layer_count(), 1, "a room of its own again: one layer")
+	check_equal(marks.layer_size(), Vector2i(704, 448), "its bounds'")

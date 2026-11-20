@@ -12,7 +12,8 @@ extends Node2D
 ## (`show_state`); a view made with the bus (a test's) hears the first room's itself. A restore into
 ## the room shown sends nothing and needs nothing: the tufts are still the room's.
 ##
-## **One batch a kind** (made by `Batches.multimesh()`, so never culled), its rows the tufts of every
+## **One batch a kind** (made by `Batches.multimesh()`; its box its room's, `Batches.box_of`, so a view
+## that does not show the room never draws it), its rows the tufts of every
 ## cell of that kind, scattered by `CoverTufts` (the editor's preview draws the same ones), drawn by
 ## `cover.gdshader` with the kind's sheet. The node is at the floor marks' z (`RoomBase.FLOOR_Z + 1`)
 ## and before the marks' layer in Feel's tree, so the marks lie over the cover and every body (z 0)
@@ -72,6 +73,8 @@ const BODIES: int = 32
 ## How near a body bends a tuft, and how far a tuft right at a body leans at its tip, in pixels.
 const BEND_REACH: float = 14.0
 const BEND_PIXELS: float = 4.0
+## How far past a tuft's frame and bend a batch's box reaches (px): its sway and its frame's pixels.
+const BOX_PAD: float = 8.0
 ## Where a body's feet reach from its position, in pixels: it walks every covered cell these points
 ## lie in, the row just in front of it too, whose tufts stand over the trail (GC9: a one-cell
 ## trail was hidden by them in dense grass).
@@ -570,6 +573,9 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	batch.multimesh.instance_count = row
 	if row > 0:
 		batch.multimesh.buffer = rows
+	# Its tufts stand only in its room, so a view that does not show the room never draws them (the
+	# performance pass, 2026-11-20): its box is the room's, grown by a tuft's frame and its bend.
+	batch.multimesh.custom_aabb = BatchesScript.box_of(Rect2(layout.origin, layout.size), float(maxi(kind.frame_size.x, kind.frame_size.y)) + BEND_PIXELS + BOX_PAD)
 	batch.visible = true
 	_rows[index] = rows
 	return batch

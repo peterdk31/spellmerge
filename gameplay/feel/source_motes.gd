@@ -22,6 +22,7 @@ const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MotePlaces := preload("res://gameplay/feel/mote_places.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 
 ## The longest frame it gives off for (s): a frame after a stall gives off no more.
 const LONGEST_FRAME: float = 0.1
@@ -61,6 +62,8 @@ var _table: RampTableScript = null
 var _tree: SceneTree = null
 var _rng := RandomNumberGenerator.new()
 var _last: float = -1.0
+## `give_off`'s one box, as views (kept: nothing is made a frame).
+var _one: ViewBoxesScript = ViewBoxesScript.new()
 ## The lit pixels and colours of a texture's frame, read once: {[texture, rect]: ...}.
 var _art_pixels: Dictionary = {}
 var _art_colours: Dictionary = {}
@@ -164,6 +167,13 @@ func remove(node: Node) -> void:
 ## the particles are off), from the sources within VIEW_MARGIN of `view` (the world's part on
 ## screen; an empty one: everywhere); a standing mask's motes are placed in `stand` (null: none).
 func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: PlacedMotesScript = null) -> void:
+	_one.set_one(view)
+	give_off_in(now, pool, _one, stand)
+
+
+## As `give_off`, from the sources within VIEW_MARGIN of any of the views' boxes `seen` (each view's
+## own, not one box round them all; none: everywhere).
+func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, stand: PlacedMotesScript = null) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
 	if not _pending.is_empty():
@@ -174,13 +184,12 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: Place
 			if node != null and node.is_inside_tree():
 				read(node)
 	var standing: bool = stand != null and stand.begin(pool, now)
-	var near: Rect2 = view.grow(VIEW_MARGIN) if view.has_area() else Rect2()
 	for source in _sources:
 		if source.born < 0.0:
 			source.born = now
 		if source.follow and not _follow(source):
 			continue
-		if pool == null or (near.has_area() and not near.intersects(Rect2(source.bounds.position + source.moved, source.bounds.size))):
+		if pool == null or (not seen.is_empty() and not seen.intersects(Rect2(source.bounds.position + source.moved, source.bounds.size), VIEW_MARGIN)):
 			source.owed = 0.0
 			continue
 		var since: float = now - source.born

@@ -30,6 +30,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const SHADER: Shader = preload("res://gameplay/feel/body_shadow.gdshader")
 
 ## Floats a row holds (a 2D MultiMesh row with colours and custom data; the light rows' too).
@@ -65,6 +66,8 @@ const LIGHT_CELL: float = 64.0
 ## every body, as before the squares.
 const LIGHT_CELLS_MOST: int = 65536
 
+## `step`'s one box, as views (kept: nothing is made a frame).
+var _one: ViewBoxesScript = ViewBoxesScript.new()
 ## How many shadows are drawn. Read only.
 var count: int = 0
 ## Each actor's cast as drawn (px, before rounding), and the step it last had a shadow in and whose
@@ -248,13 +251,19 @@ func add_lights(rows: PackedFloat32Array, n: int, strength_at: int, owners: Pack
 ## table; null: none) within the view `view` (empty: anywhere) gets its shadow, cast from this
 ## frame's lights, blocked by `blockers` (null: nothing blocks).
 func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersScript) -> void:
+	_one.set_one(view)
+	step_in(table, now, _one, blockers)
+
+
+## As `step`, for the bodies within VIEW_MARGIN of any of the views' boxes `seen` (each view's own,
+## not one box round them all; none: anywhere).
+func step_in(table: ActorsScript, now: float, seen: ViewBoxesScript, blockers: LightBlockersScript) -> void:
 	var delta: float = clampf(now - _last, 0.0, 0.25) if _last >= 0.0 else 0.0
 	_last = now
 	var most: float = LENGTH * delta / EASE_SECONDS
 	# The layer's share (see `share`): the casts in the upper half, the contact shapes in the lower.
 	var cast_share: float = clampf(share * 2.0 - 1.0, 0.0, 1.0)
 	var size_share: float = clampf(share * 2.0, 0.0, 1.0)
-	var near: Rect2 = view.grow(VIEW_MARGIN)
 	for k in _light_count:
 		var span: float = _light_reach[k] + _light_at[k].distance_to(_light_from[k])
 		_light_near[k] = blockers.near(_light_at[k], span) if blockers != null and blockers.count > 0 else 0
@@ -273,7 +282,7 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 		if body == null or body.mover == null or body.footprint == null or not body.is_inside_tree() or body.is_queued_for_deletion() or not body.is_visible_in_tree():
 			continue
 		var feet: Vector2 = body.global_position + Vector2(0.0, DROP)
-		if view.has_area() and not near.has_point(feet):
+		if not seen.is_empty() and not seen.has_point(feet, VIEW_MARGIN):
 			continue
 		var key: int = table.key_of(id)
 		var want: Vector2 = _cast_from(feet, id, blockers)

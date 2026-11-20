@@ -33,6 +33,11 @@ const NO_PLAYER: int = -1
 ## what a listener keeps of the world (decoys, revives, the camera, the ground's items) starts over
 ## then, and only then. ALL_ROOMS: every room of the world at once (`room_left` as the world goes).
 const FIRST_ROOM: int = 0
+## `item_picked_up`'s kind for a reward item's offer taken (not an `ItemKinds` kind: the reward item
+## on the floor, gameplay/rewards).
+const PICKUP_REWARD: StringName = &"reward"
+## `shelf_changed`'s and `shelf_near_changed`'s view kind for a shop's reroll sign (not an item kind).
+const SHELF_SIGN: StringName = &"shelf_sign"
 const ALL_ROOMS: int = -1
 ## The kinds of number `damage_number_shown` tells (props W5): a hit, a heal, and a hit that took
 ## nothing (an invincible actor). Its sender and its listener both name them from here.
@@ -537,15 +542,18 @@ signal room_cleared(room_id: StringName, room: int)
 ## however its foes left it (the owner, 2026-11-19: a possessed foe killed elsewhere too). Sent right
 ## after `room_cleared`, once a room. `type`: the room's reward type (`RewardType.to_row`: item kind,
 ## card kind, element; empty names for any), a reward room's decided as its biome was made (the
-## owner's ask of 2026-11-19), every other room's any. Heard by rewards.
-signal room_rewards_due(room: int, table: StringName, type: PackedStringArray)
+## owner's ask of 2026-11-19), every other room's any. `spots`: where each seat's reward item lies
+## (by seat, world pixels, on clear ground apart from the room's things; the owner's ask of
+## 2026-11-19: a reward is an item in the room, opened with A at it). Heard by rewards.
+signal room_rewards_due(room: int, table: StringName, type: PackedStringArray, spots: PackedVector2Array)
 ## Sender: flow (connected biomes CB11, decisions 19 and 20). The biome's room `room` of a special
 ## fill (`RoomKind.FILL_SHOP`, `FILL_FOUNTAIN`) was entered for the first time: `table` the shop's
 ## shelf table (`RoomKind.shelf`; empty for a fountain), `area` the fountain's pool in world pixels
 ## (its template's zone `fountain`, else round the room's middle), `spots` where a shop's items lie
-## (its zones `shelf`, in order, else spots round its middle). Sent once a room, never by a restore.
-## Heard by rewards, which stocks the shelf and fills the pool.
-signal special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array)
+## (its zones `shelf`, in order, else spots round its middle), `board` where a shop's reroll sign
+## stands (its zone `shelf_sign`, else under its shelf; the owner's ask of 2026-11-19). Sent once a
+## room, never by a restore. Heard by rewards, which stocks the shelf and fills the pool.
+signal special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array, board: Vector2)
 ## Sender: flow (connected biomes CB9). The party's map of the biome: `seen[room]` for each room by
 ## its number (0 unseen, 1 shown on the map but never entered, 2 entered; `PartyMap`), a copy. Sent as
 ## a biome starts and whenever a room is seen; empty as the biome goes; `again` after a restore (what
@@ -692,6 +700,12 @@ signal rewards_waiting_changed(player: int, offers: Array[Dictionary])
 ## (`lying`), or is gone from there (taken, or the world went). After a snapshot is restored, said
 ## again for every coin (and gone for those no longer lying). Heard by feel (the coins' look).
 signal coin_changed(coin: int, at: Vector2, lying: bool)
+## Sender: rewards (a coin walked over, a shelf item bought, a reward taken), items (a ground item
+## taken) and flow (a key taken; the owner's ask of 2026-11-19). The actor `actor` picked up an item
+## of kind `kind` (an `ItemKinds` kind, or `PICKUP_REWARD` for a reward item's offer taken) and id
+## `id` at `at` (world pixels). For the view only: heard by feel (each kind's pickup sound, from the
+## rooms this machine's wizards are in, CB12's Ears).
+signal item_picked_up(actor: int, kind: StringName, id: StringName, at: Vector2)
 ## Sender: rewards (connected biomes CB11, decision 19). Shop item `item` (numbered once a run) lies on
 ## its shelf at `at` (`lying`), `choice` what it is (an item, as a reward choice's view: `kind`, `id`,
 ## `count`, `name`, `icon`, `description`) and `price` its price in coins (the run's own `price_scale`; a buyer's relics may
@@ -701,8 +715,20 @@ signal shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, lyi
 ## Sender: rewards. The shop item in reach of seat `player`'s own standing wizard now is `item`,
 ## lying at `at`, `view` what it is (`shelf_changed`'s choice, with its `price` for this player), or
 ## none (-1, an empty view). Sent when it changes, at a run's start (-1) and after a snapshot is
-## restored. Heard by hud (the hint; A buys it, `shelf_buy_requested`).
+## restored. Heard by hud (the hint; A buys it, `shelf_buy_requested`). A shop's reroll sign is one
+## of its shelf's things, numbered with its items (the owner's ask of 2026-11-19): its view's `kind`
+## is `SHELF_SIGN`, its `price` the next reroll's, and A at it rerolls the shelf.
 signal shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
+## Sender: rewards (the owner's ask of 2026-11-19). Seat `player`'s reward offer `offer` lies as an
+## item at `at` (world pixels) in the room whose clear rolled it (`lying`), or lies there no more
+## (picked, or the world went: it waits on the player's corner panel then). After a snapshot is
+## restored, said again for every one (and gone for those no longer lying). For the view only.
+## Heard by feel (the reward item's look).
+signal reward_item_changed(player: int, offer: int, at: Vector2, lying: bool)
+## Sender: rewards. Seat `player`'s own reward item in reach of the standing body it drives is offer
+## `offer`, lying at `at`, or none (-1). Sent when it changes, at a run's start (-1) and after a
+## snapshot is restored. Heard by hud (the hint; A opens that offer's reward menu).
+signal reward_near_changed(player: int, offer: int, at: Vector2)
 ## Sender: rewards. `player` asked to buy shop item `item` and could not: too few coins in their own
 ## coin stack (their wizard's currency bag), or no room for it. Nothing changed. Heard by hud (the hint's red shake).
 signal shelf_refused(player: int, item: int)

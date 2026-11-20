@@ -8,6 +8,9 @@ extends Node2D
 ## - **A fountain:** a stone basin round its pool, the water in it a band of the water's shades whose
 ##   height follows the healing left, a ripple running along its top while any is left.
 ## - **A key:** a small brass key lying on the floor, bobbing a pixel.
+## - **A shop's reroll sign** (a shelf thing of kind `SHELF_SIGN`; the owner's ask of 2026-11-19): a
+##   wooden board on a post, two gold arrows chasing round on it (a reroll), and the next reroll's
+##   price under it, rising with each use.
 ##
 ## **Smooth** (docs/STYLE.md): each comes in and goes by STAGES (a sliver, half, whole), STAGE_FRAMES
 ## frames each, never popping; a pool's water moves a pixel a frame to its new height. Whole pixels,
@@ -42,6 +45,10 @@ const GOLD: PackedColorArray = [Color("b8801f"), Color("f2c230"), Color("fff3a6"
 const RED: Color = Color("e0592f")
 const WATER: PackedColorArray = [Color("0f4a44"), Color("1e9c8c"), Color("6fdcc0")]
 const OUTLINE: Color = Color("14121f")
+const WOOD: PackedColorArray = [Color("3d2a2e"), Color("7a4a35"), Color("b27a4a")]
+## A reroll sign's board and how high its post holds it.
+const BOARD: Vector2 = Vector2(14.0, 10.0)
+const POST: float = 12.0
 
 ## Shelf items by number: [at, choice view, price, frames come in, going].
 var _items: Dictionary = {}
@@ -247,6 +254,9 @@ func _draw_item(item: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
 	var share: float = _share(float(row[3]))
 	var choice: Dictionary = row[1]
+	if StringName(str(choice.get("kind", ""))) == EventsScript.SHELF_SIGN:
+		_draw_sign(at, share, int(row[2]))
+		return
 	# The plinth.
 	var plinth_h: float = maxf(roundf(PLINTH.y * share), 1.0)
 	draw_rect(Rect2(at + Vector2(-PLINTH.x * 0.5, -plinth_h), Vector2(PLINTH.x, plinth_h)), STONE[1])
@@ -267,6 +277,34 @@ func _draw_item(item: int, row: Array) -> void:
 	if share < 1.0:
 		return
 	_draw_number(int(row[2]), at + Vector2(0.0, 3.0))
+
+
+## A shop's reroll sign standing at `at`, `share` of its height come in, its next price `price`
+## under it: the post rises first, then the board, by the stages.
+func _draw_sign(at: Vector2, share: float, price: int) -> void:
+	var height: float = maxf(roundf((POST + BOARD.y) * share), 1.0)
+	var post_h: float = minf(height, POST)
+	draw_rect(Rect2(at + Vector2(-2.0, -post_h), Vector2(3.0, post_h)), OUTLINE)
+	draw_rect(Rect2(at + Vector2(-1.0, -post_h), Vector2(1.0, post_h)), WOOD[1])
+	var board_h: float = height - POST
+	if board_h > 0.0:
+		var top: Vector2 = at + Vector2(-BOARD.x * 0.5, -POST - board_h)
+		draw_rect(Rect2(top - Vector2.ONE, Vector2(BOARD.x + 2.0, board_h + 2.0)), OUTLINE)
+		draw_rect(Rect2(top, Vector2(BOARD.x, board_h)), WOOD[1])
+		draw_rect(Rect2(top, Vector2(BOARD.x, 1.0)), WOOD[2])
+		draw_rect(Rect2(top + Vector2(0.0, board_h - 1.0), Vector2(BOARD.x, 1.0)), WOOD[0])
+		if share >= 1.0:
+			# Two arrows chasing round: the top one going right, the bottom one going left.
+			var o: Vector2 = top + Vector2(3.0, 2.0)
+			draw_rect(Rect2(o + Vector2(0.0, 1.0), Vector2(1.0, 2.0)), GOLD[1])
+			draw_rect(Rect2(o + Vector2(0.0, 0.0), Vector2(7.0, 1.0)), GOLD[1])
+			draw_rect(Rect2(o + Vector2(5.0, -1.0), Vector2(1.0, 3.0)), GOLD[2])
+			draw_rect(Rect2(o + Vector2(7.0, 3.0), Vector2(1.0, 2.0)), GOLD[1])
+			draw_rect(Rect2(o + Vector2(1.0, 5.0), Vector2(7.0, 1.0)), GOLD[1])
+			draw_rect(Rect2(o + Vector2(2.0, 4.0), Vector2(1.0, 3.0)), GOLD[2])
+	if share < 1.0:
+		return
+	_draw_number(price, at + Vector2(0.0, 3.0))
 
 
 ## `value` in gold digits centred on `at` (its top), with a dark outline.

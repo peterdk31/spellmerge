@@ -14,6 +14,11 @@ var seat: int = -1
 var room: int = -1
 ## Whether the seat's wizard was in that room as it was cleared.
 var here: bool = false
+## Whether it lies as an item in that room (the owner's ask of 2026-11-19: a present player's reward
+## is an item in the room's middle, opened with A at it), and where (world pixels). One that lies
+## no more (the world went, or none was there) waits on the player's corner panel.
+var lying: bool = false
+var at: Vector2 = Vector2.ZERO
 ## The reward table it was rolled from (content/rewards; a reward reroll rolls from it again).
 var table: StringName = &""
 ## The reward room's type it was rolled among (`RewardType.to_row`; empty: none), rolled among again
@@ -32,8 +37,8 @@ func size() -> int:
 
 ## True when it already offers a choice of `kind` `id` `count`.
 func offers(kind: StringName, id: StringName, count: int) -> bool:
-	for at in kinds.size():
-		if kinds[at] == kind and ids[at] == id and counts[at] == count:
+	for choice in kinds.size():
+		if kinds[choice] == kind and ids[choice] == id and counts[choice] == count:
 			return true
 	return false
 

@@ -23,6 +23,16 @@ const KEY_SPOTS: Array[Vector2] = [
 ]
 ## How far a key keeps off a shop's item (pixels).
 const KEY_OFF_ITEM: float = 24.0
+## The zone a shop's reroll sign stands in (the owner's ask of 2026-11-19), and with none, where it
+## stands from the room's middle: under the shelf's row.
+const SIGN_ZONE: StringName = &"shelf_sign"
+const SIGN_SPOT: Vector2 = Vector2(0.0, 40.0)
+## The zone the players' reward items lie in (the owner's ask of 2026-11-19: a reward lies as an item
+## in the room's middle), and where each seat's lies from it (or from the room's middle), by seat: a
+## row under the middle, its middle column left free, so none is opened from inside the portal home
+## (48 px square on the middle) nor lies on a key's first spots.
+const REWARD_ZONE: StringName = &"reward"
+const REWARD_SPOTS: Array[Vector2] = [Vector2(-60.0, 48.0), Vector2(-36.0, 48.0), Vector2(36.0, 48.0), Vector2(60.0, 48.0)]
 
 
 ## The shelf's spots of a room whose places are `places` and whose middle is `middle` (world pixels).
@@ -36,6 +46,24 @@ static func shelf(places: RoomPlaces, middle: Vector2) -> PackedVector2Array:
 		for offset: Vector2 in SHELF_SPOTS:
 			spots.append((middle + offset).floor())
 	return spots
+
+
+## Where a shop's reroll sign stands (world pixels): its `shelf_sign` zone, else SIGN_SPOT from the
+## room's middle.
+static func sign_spot(places: RoomPlaces, middle: Vector2) -> Vector2:
+	var zone: Rect2 = places.zone(SIGN_ZONE) if places != null else Rect2()
+	return (zone.get_center() if zone.has_area() else middle + SIGN_SPOT).floor()
+
+
+## Where each seat's reward item lies in a room (world pixels, by seat, before each is put on clear
+## ground): REWARD_SPOTS round its `reward` zone's middle, else round the room's middle.
+static func reward_spots(places: RoomPlaces, middle: Vector2) -> PackedVector2Array:
+	var zone: Rect2 = places.zone(REWARD_ZONE) if places != null else Rect2()
+	var from: Vector2 = zone.get_center() if zone.has_area() else middle
+	var out := PackedVector2Array()
+	for offset: Vector2 in REWARD_SPOTS:
+		out.append((from + offset).floor())
+	return out
 
 
 ## The fountain's pool of a room (world pixels).
@@ -84,4 +112,5 @@ static func taken_by(kind: RoomKind, places: RoomPlaces, middle: Vector2) -> Arr
 	elif kind.fill == RoomKind.FILL_SHOP:
 		for spot: Vector2 in shelf(places, middle):
 			out.append(Rect2(spot, Vector2.ZERO).grow(KEY_OFF_ITEM))
+		out.append(Rect2(sign_spot(places, middle), Vector2.ZERO).grow(KEY_OFF_ITEM))
 	return out

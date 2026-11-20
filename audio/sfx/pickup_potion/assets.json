@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/pickup_potion/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_potion/pickup_potion.sound.json",
+			"recipe_hash": "sha256:ef6c8a7b50bd58cecd87140dfab97b9cc7fb1208e3d34b013e396ec692ea5901",
+			"audio_hash": "sha256:46f52368a8e9e979c6842186f730277bb61249db70024da8b7bc927a00151b7b",
+			"loudness": -19.7,
+			"peak": -8.4
+		},
+		{
+			"path": "audio/sfx/pickup_potion/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_potion/pickup_potion.sound.json",
+			"recipe_hash": "sha256:ef6c8a7b50bd58cecd87140dfab97b9cc7fb1208e3d34b013e396ec692ea5901",
+			"audio_hash": "sha256:b6ca8db27f50c03e7fb6591dc64fb5016da4ff342782ccc4e2e008786d10241d",
+			"loudness": -19.8,
+			"peak": -8.2
+		},
+		{
+			"path": "audio/sfx/pickup_potion/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_potion/pickup_potion.sound.json",
+			"recipe_hash": "sha256:ef6c8a7b50bd58cecd87140dfab97b9cc7fb1208e3d34b013e396ec692ea5901",
+			"audio_hash": "sha256:7a59c3b4720b85e78ae3e21a0874a89d17d442b0d1205dc1d8196b59ec88d1ae",
+			"loudness": -20.3,
+			"peak": -8.7
+		},
+		{
+			"path": "audio/sfx/pickup_potion/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_potion/pickup_potion.sound.json",
+			"recipe_hash": "sha256:ef6c8a7b50bd58cecd87140dfab97b9cc7fb1208e3d34b013e396ec692ea5901",
+			"audio_hash": "sha256:caff703e3b00e6492828a5774eebe2e57cc834e285b7357b3fc7400a889bac21",
+			"loudness": -20.2,
+			"peak": -8.8
+		}
+	]
+}

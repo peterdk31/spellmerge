@@ -60,8 +60,8 @@ func take() -> void:
 	await create_timer(0.3).timeout
 
 
-## Tell seat `seat` its offer `offer` of `count` choices was rolled with it there, and wait for its
-## menu to open.
+## Tell seat `seat` its offer `offer` of `count` choices was rolled with it there, its reward item in
+## its reach, press A at it, and wait for its menu to open.
 func _offer(seat: int, offer: int, count: int) -> bool:
 	var choices: Array[Dictionary] = []
 	# Every reward is an inventory item (the owner, 2026-11-19): a card, the coin, a potion; each
@@ -84,9 +84,12 @@ func _offer(seat: int, offer: int, count: int) -> bool:
 			view["icon"] = item.icon
 			view["description"] = item.description
 		choices.append(view)
-	var offers: Array[Dictionary] = [{"offer": offer, "here": true, "choices": choices}]
+	var offers: Array[Dictionary] = [{"offer": offer, "here": true, "lying": true, "choices": choices}]
 	_events.reward_rolled.emit(seat, offer, choices, true)
 	_events.rewards_waiting_changed.emit(seat, offers)
+	# A reward never pops up (the owner, 2026-11-19): the seat stands at its reward item and presses A.
+	_events.reward_near_changed.emit(seat, offer, Vector2.ZERO)
+	tap(seat, &"take")
 	if not await wait_for(func() -> bool: return _hud.call("get_reward", seat).call("is_open"), 60):
 		fail("seat %d's reward menu did not open" % (seat + 1))
 		return false

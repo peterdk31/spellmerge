@@ -112,6 +112,7 @@ const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
+const PickupSoundsScript := preload("res://gameplay/feel/pickup_sounds.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
@@ -136,6 +137,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const CoinsScript := preload("res://gameplay/feel/coins.gd")
 const SpecialRoomLooksScript := preload("res://gameplay/feel/special_room_looks.gd")
+const RewardItemsScript := preload("res://gameplay/feel/reward_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
@@ -447,6 +449,8 @@ var _body_sounds: BodySoundsScript = null
 ## The boss intro's two cues, played while the tree is paused for it, and what holds a boss with an
 ## intro's entrance cue back until it is known whether its intro played.
 var _intro_sound: BossIntroSoundScript = null
+## Each kind of pickup's sound (`pickup_sounds.gd`).
+var _pickup_sounds: PickupSoundsScript = PickupSoundsScript.new()
 var _intro_wait: BossIntroWait = BossIntroWait.new()
 ## The sound the death cue being played sounds in place of its own (an enemy's `death_sound`), read
 ## once by the next `play_cue` (so a cue its parts play does not take it).
@@ -545,6 +549,8 @@ var _coins: CoinsScript = null
 ## The shops' shelves, the fountains' pools and the keys on the floor (`special_room_looks.gd`,
 ## connected biomes CB11).
 var _special_rooms: SpecialRoomLooksScript = null
+## The players' reward items on the floor (`reward_items.gd`; the owner's ask of 2026-11-19).
+var _reward_items: RewardItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
 var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -847,6 +853,7 @@ func _ready() -> void:
 	_intro_sound.registry = registry
 	_intro_sound.audio = audio
 	add_child(_intro_sound)
+	_pickup_sounds.audio = audio
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
@@ -917,6 +924,10 @@ func _ready() -> void:
 	_special_rooms.name = "SpecialRoomLooks"
 	add_child(_special_rooms)
 	_special_rooms.bind(events)
+	_reward_items = RewardItemsScript.new()
+	_reward_items.name = "RewardItems"
+	add_child(_reward_items)
+	_reward_items.bind(events)
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -964,6 +975,7 @@ func _ready() -> void:
 	events.possess_ended.connect(_on_possess_ended)
 	events.boss_shown.connect(_on_boss_shown)
 	_intro_sound.bind(events)
+	_pickup_sounds.bind(events)
 	_intro_wait.bind(events)
 	_intro_wait.released.connect(_on_boss_released)
 	events.projectile_impact.connect(_on_projectile_impact)
@@ -2469,6 +2481,10 @@ func ground_items() -> GroundItemsScript:
 
 
 ## The coins on the floor's look (for tests).
+func reward_items() -> RewardItemsScript:
+	return _reward_items
+
+
 func coins() -> CoinsScript:
 	return _coins
 

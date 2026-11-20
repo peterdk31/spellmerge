@@ -14,7 +14,7 @@ func _relic(changes: Array[StatChange]) -> RelicBase:
 
 
 func test_a_stat_is_its_base_with_no_change() -> void:
-	check_equal(RunStats.value_of(&"reward_choices"), 2.0, "pick 1 of 2 (decision 17)")
+	check_equal(RunStats.value_of(&"reward_choices"), 3.0, "pick 1 of 3 (decision 17, the owner's 3 of 2026-11-19)")
 	check_equal(RunStats.whole_of(&"start_coins"), 0, "no coins to start with")
 	check_equal(RunStats.value_of(&"price_scale"), 1.0, "prices as they are")
 	for stat: StringName in RunStats.names():
@@ -28,7 +28,7 @@ func test_the_runs_changes_come_first_then_the_relics_each_in_order() -> void:
 	check_equal(RunStats.whole_of(&"start_coins", run, relics), 25, "the relic after the run's changes")
 	var setter: Array[Resource] = [_relic([StatChange.make(&"start_coins", 3.0, StatChange.How.SET)] as Array[StatChange])]
 	check_equal(RunStats.whole_of(&"start_coins", run, setter), 3, "a relic that sets the number has the last word")
-	check_equal(RunStats.whole_of(&"reward_choices", run, relics), 2, "a change of another stat changes nothing")
+	check_equal(RunStats.whole_of(&"reward_choices", run, relics), 3, "a change of another stat changes nothing")
 
 
 func test_a_stat_is_held_to_its_range_and_whole_numbers_round() -> void:
@@ -37,7 +37,7 @@ func test_a_stat_is_held_to_its_range_and_whole_numbers_round() -> void:
 	var none: Array[StatChange] = [StatChange.make(&"reward_choices", -9.0)]
 	check_equal(RunStats.whole_of(&"reward_choices", none), 1, "at least 1")
 	var part: Array[StatChange] = [StatChange.make(&"reward_choices", 0.6)]
-	check_equal(RunStats.value_of(&"reward_choices", part), 3.0, "a whole stat rounds")
+	check_equal(RunStats.value_of(&"reward_choices", part), 4.0, "a whole stat rounds")
 	var scale: Array[StatChange] = [StatChange.make(&"price_scale", 0.75, StatChange.How.TIMES)]
 	check_equal(RunStats.value_of(&"price_scale", scale), 0.75, "a stat that is not whole keeps its part")
 

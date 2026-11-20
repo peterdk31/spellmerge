@@ -38,18 +38,11 @@ const DIAGONAL: float = 1.41421356
 ## is warned of: its edge is measured from every wall instead, low walls included.
 static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], warn: bool = false) -> Image:
 	var cell: float = cell_of(size)
-	var w: int = maxi(ceili(size.x / cell), 1)
-	var h: int = maxi(ceili(size.y / cell), 1)
-	var wall := PackedByteArray()
-	wall.resize(w * h)
-	var hole := PackedByteArray()
-	hole.resize(w * h)
-	_lay(wall, w, h, cell, walls)
-	_lay(hole, w, h, cell, holes)
-	# A wall wins where both cover a cell (RoomPlaces.hole_rects).
-	for i in w * h:
-		if wall[i] != 0:
-			hole[i] = 0
+	var cells: Array = _cells(size, walls, holes)
+	var w: int = cells[0]
+	var h: int = cells[1]
+	var wall: PackedByteArray = cells[2]
+	var hole: PackedByteArray = cells[3]
 	var outside: PackedByteArray = _wall_outside(wall, hole, w, h)
 	if outside.is_empty() and warn:
 		push_warning("MistMask: the room (%s px) has no void round it: its mist thickens toward every wall, the low walls in it too" % size)
@@ -71,6 +64,32 @@ static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], warn:
 		bytes[i * 4 + 2] = _byte(into_wall[i] * cell / SPILL if wall[i] != 0 else 0.0)
 		bytes[i * 4 + 3] = 255
 	return Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, bytes)
+
+
+## Whether the mask of a room of `size` with `walls` and `holes` finds a void round it (`build` warns
+## when it does not, with `warn`): open cells or holes, or walls, joined to the grid's edge.
+static func finds_void(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> bool:
+	var cells: Array = _cells(size, walls, holes)
+	return not _wall_outside(cells[2], cells[3], cells[0], cells[1]).is_empty()
+
+
+## The mask's grid of a room of `size`: its width and height in cells, and its wall and hole cells
+## (each a byte a cell: 1 where `walls` or `holes` cover the cell's middle; a wall wins where both
+## do, RoomPlaces.hole_rects), as [w, h, wall, hole].
+static func _cells(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> Array:
+	var cell: float = cell_of(size)
+	var w: int = maxi(ceili(size.x / cell), 1)
+	var h: int = maxi(ceili(size.y / cell), 1)
+	var wall := PackedByteArray()
+	wall.resize(w * h)
+	var hole := PackedByteArray()
+	hole.resize(w * h)
+	_lay(wall, w, h, cell, walls)
+	_lay(hole, w, h, cell, holes)
+	for i in w * h:
+		if wall[i] != 0:
+			hole[i] = 0
+	return [w, h, wall, hole]
 
 
 ## How many px a texel of the mask of a room of `size` covers: CELL, or more for a room wider than
@@ -132,9 +151,11 @@ static func distances(marked: PackedByteArray, w: int, h: int, edge: bool) -> Pa
 ## open cells and holes, never from a hole onto open floor (a floating room's dark round its slab's
 ## edge walls; the hub's sea, holes round its island, and the cracks running in from it) are set in
 ## `wall` and taken out of `hole`, so no mist lies out over the dark and none pours into the sea as
-## into a pit; returned (empty for none). A room
-## whose floor runs to its edge with no wall or hole round it (most of its open floor joined to the
-## edge), or that is walled to its edge, is left as it is.
+## into a pit; returned (empty for none). A room walled to its edge (its slab's dark drawn as walls
+## out to its rectangle, as most of the crypt's templates are) has as its void the walls joined to the
+## grid's edge through walls (`_rim_outside`): a low wall standing free in the room is still no edge.
+## A room whose floor runs to its edge with no wall or hole round it (most of its open floor joined to
+## the edge) is left as it is.
 static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, h: int) -> PackedByteArray:
 	var outside := PackedByteArray()
 	outside.resize(w * h)
@@ -168,12 +189,43 @@ static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, 
 			open += 1
 			if outside[i] != 0:
 				open_out += 1
-	if count == 0 or open_out * 10 > open * 9:
+	if count == 0:
+		return _rim_outside(wall, w, h)
+	if open_out * 10 > open * 9:
 		return PackedByteArray()
 	for i in w * h:
 		if outside[i] != 0:
 			wall[i] = 1
 			hole[i] = 0
+	return outside
+
+
+## The walls joined to the grid's edge through walls (four ways): the void of a room walled to its
+## edge, its rim (`_wall_outside`, which calls it when every edge cell is wall). Each is wall already.
+static func _rim_outside(wall: PackedByteArray, w: int, h: int) -> PackedByteArray:
+	var outside := PackedByteArray()
+	outside.resize(w * h)
+	var queue := PackedInt32Array()
+	queue.resize(w * h)
+	var count: int = 0
+	for i in w * h:
+		var x: int = i % w
+		var y: int = i / w
+		if (x == 0 or y == 0 or x == w - 1 or y == h - 1) and wall[i] != 0:
+			outside[i] = 1
+			queue[count] = i
+			count += 1
+	var at: int = 0
+	while at < count:
+		var i: int = queue[at]
+		at += 1
+		var x: int = i % w
+		var y: int = i / w
+		for next: int in [i - 1 if x > 0 else -1, i + 1 if x < w - 1 else -1, i - w if y > 0 else -1, i + w if y < h - 1 else -1]:
+			if next >= 0 and outside[next] == 0 and wall[next] != 0:
+				outside[next] = 1
+				queue[count] = next
+				count += 1
 	return outside
 
 

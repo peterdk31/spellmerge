@@ -82,6 +82,9 @@ const DETOUR_PROBE: float = 32.0
 ## A downed bot's crawl: how near a teammate it stops, and how far an enemy pushes it aside.
 const CRAWL_BESIDE: float = 14.0
 const CRAWL_SHY: float = 64.0
+## How near a teammate's body may be to its line of fire before it holds fire (pixels: a body's
+## hurt circle and a bolt's width, with a margin).
+const MATE_CLEAR: float = 16.0
 
 var player: int = 0
 var mode: Mode = Mode.FIGHTER
@@ -292,7 +295,55 @@ func step(delta: float) -> void:
 	var way: Vector2 = Vector2.ZERO if brain.behaviour is ReviveScript else travel(wizard)
 	if way != Vector2.ZERO:
 		intent.move = way
+	var reach: float = INF
+	if brain.target != null:
+		reach = (brain.target.global_position + _offset_of(brain.target)).distance_to(wizard.global_position + wizard.body_offset)
+	if mate_in_line(wizard, intent.aim if intent.aim != Vector2.ZERO else wizard.aim, reach):
+		# Its spells hurt teammates too (everything hurts everything): it holds fire rather than shoot
+		# through one, as a person does; a cast that moves it (a dodge's dash) still goes.
+		intent.pressed_bits = held_fire(intent.pressed_bits)
+		intent.held_bits = held_fire(intent.held_bits)
 	send(intent)
+
+
+## True when a standing teammate's body stands in `wizard`'s line of fire along `aim`, nearer than
+## `reach` (its target's distance, body to body; INF: any): within MATE_CLEAR of the line, in front of it. Before
+## 2026-11-20 the bots shot through each other, and their bolts did more harm to teammates than the
+## enemies did (the losing seeds of the sweep, tests/README.md, `bots/`).
+func mate_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
+	if aim == Vector2.ZERO:
+		return false
+	var way: Vector2 = aim.normalized()
+	var from: Vector2 = wizard.global_position + wizard.body_offset
+	for seat in 4:
+		if seat == player:
+			continue
+		var mate := _flow.call("get_wizard", seat) as Actor
+		if mate == null or not mate.is_inside_tree() or mate.is_down():
+			continue
+		var rel: Vector2 = mate.global_position + mate.body_offset - from
+		var ahead: float = rel.dot(way)
+		if ahead <= 0.0 or ahead > reach:
+			continue
+		if absf(rel.cross(way)) < MATE_CLEAR:
+			return true
+	return false
+
+
+## `bits` (a staff a bit) less the staffs whose next cast hurts and does not move the caster (as the
+## brain last read them, `AIBrain.senses`): what it may still press with a teammate in its line.
+func held_fire(bits: int) -> int:
+	for at in brain.staff_count:
+		var sense: CastSense = brain.senses[at]
+		if sense != null and not sense.empty and sense.harms() and not sense.moves_caster:
+			bits &= ~(1 << at)
+	return bits
+
+
+## A body's hurt circle's middle from its feet (its `body_offset`; ZERO for a body that is no actor).
+static func _offset_of(body: Node2D) -> Vector2:
+	var as_actor := body as Actor
+	return as_actor.body_offset if as_actor != null else Vector2.ZERO
 
 
 ## Want `wanted` in the next frame: the walk (each axis full on or off, as the move keys), the aim

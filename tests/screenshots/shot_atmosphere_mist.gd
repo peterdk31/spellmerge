@@ -9,13 +9,17 @@ extends "res://tests/support/screenshot.gd"
 ## frames GAP apart at ZOOM of a wizard walking through the mist pooled by the room's pit (it parts round its
 ## feet and closes behind it); `mist_blast`, a blast in the mist (pushed out as its wave passes and
 ## drifting back); `mist_shots`, shots through it (dragged along their way); `mist_pit`, the crossing's
-## pit with the mist pooled over it; and `mist_boss`, the broom's hall. The HUD is hidden.
+## pit with the mist pooled over it; `mist_boss`, the broom's hall; and `mist_walled_<room>`, rooms
+## whose slab's dark is drawn as walls out to their edge (WALLED_ROOMS), thin over their middle and
+## round their pillars and tombs (playtest, 2026-11-20: their mist lay thick over the whole room). The
+## HUD is hidden.
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const ROOM: StringName = &"arena_02"
 const PIT_ROOM: StringName = &"arena_04"
 const BOSS_ROOM: StringName = &"boss_broom"
+const WALLED_ROOMS: Array[StringName] = [&"arena_07", &"arena_11"]
 const FIGHT_FRAMES: int = 150
 const FRAMES: int = 6
 const GAP: int = 7
@@ -82,6 +86,11 @@ func take() -> void:
 		return
 	await settle(150)
 	await shot("mist_boss")
+	for id in WALLED_ROOMS:
+		if not _start(flow, registry, id):
+			return
+		await settle(150)
+		await shot("mist_walled_%s" % id)
 
 
 func _start(flow: Node, registry: RegistryScript, id: StringName) -> bool:

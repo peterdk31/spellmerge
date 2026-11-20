@@ -501,3 +501,67 @@ func test_a_reward_rooms_type_comes_with_its_rewards() -> void:
 	check_equal(waiting.size(), 1, "the wizard's offer")
 	for choice: Dictionary in waiting[0]["choices"]:
 		check_equal((registry.call(&"get_resource", &"spells", choice["id"]) as SpellComponent).kind(), &"modifier", "a modifier room offers modifiers")
+
+
+## The owner's answers on #888: a secret room's symbol shows once it is found (its rock broken). Flow
+## tells the view the rooms opened (`rooms_opened`, its `LockDoors.opened`): shut as the biome starts, as the
+## door opens, `again` after a restore, empty as the biome goes.
+func test_the_rooms_opened_are_told_to_the_view() -> void:
+	var told: Array = []
+	var on_opened := func(opened: PackedByteArray, again: bool) -> void: told.append([opened, again])
+	events.connect("rooms_opened", on_opened)
+	var map: BiomeMap = _start(1, &"treasure", &"boss", [], [IMP])
+	_ticks(1)
+	check(not told.is_empty() and (told.back()[0] as PackedByteArray).size() == 3 and (told.back()[0] as PackedByteArray)[WEST] == 0, "told as the biome starts: the treasure room shut (%s)" % [told])
+	var snapshot := Snapshot.take(tick.state_areas(), root)
+	_put(0, flow.locks.key_at[0])
+	told.clear()
+	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 40.0))
+	check(flow.locks.is_open(WEST), "the door opens")
+	check_equal(told.size(), 1, "told once as it opens")
+	check((told.back()[0] as PackedByteArray)[WEST] == 1 and not told.back()[1], "the treasure room opened, played in")
+	told.clear()
+	check(snapshot.restore(tick.state_areas(), root).is_empty(), "restored to before")
+	check(not told.is_empty() and (told.back()[0] as PackedByteArray)[WEST] == 0 and told.back()[1], "told again as it stands: shut (%s)" % [told])
+	told.clear()
+	flow.stop_run()
+	check(not told.is_empty() and (told.back()[0] as PackedByteArray).is_empty(), "the biome gone: none")
+	events.disconnect("rooms_opened", on_opened)
+
+
+## The owner, 2026-11-20 (after #884): a reward room's done look waits for its rewards to be taken
+## (and a treasure or secret room's, the owner's answers on #888).
+## Rewards tells the view which rooms still hold one (`rooms_rewards_left`): from the clear (due)
+## through its roll while a present player's item lies there; a player who was away has its offer
+## waiting elsewhere (rule 4), which keeps nothing in the room; the item taken, the room holds none.
+func test_the_rooms_with_rewards_left_are_told_until_each_lying_one_is_taken() -> void:
+	var told: Array = []
+	var on_left := func(left: PackedByteArray, again: bool) -> void: told.append([left, again])
+	events.connect("rooms_rewards_left", on_left)
+	var map: BiomeMap = _start(2, &"fight", &"reward")
+	_ticks(1)
+	told.clear()
+	_wizard(0).global_position = _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0)
+	_ticks(1)
+	check(not told.is_empty(), "told as its clear is due")
+	check(_left_in(told, EAST), "the reward room holds its rewards from the moment its clear is due")
+	_ticks(1)
+	check(not told.is_empty() and _left_in(told, EAST), "rolled: seat 0's item lies there")
+	var away: Array = rewards.call(&"waiting_of", 1)
+	check(away.size() == 1 and not bool((away[0] as Dictionary)["lying"]), "seat 1 was away: its offer waits elsewhere")
+	var mine: Array = rewards.call(&"waiting_of", 0)
+	check_equal(mine.size(), 1, "seat 0's offer")
+	var snapshot := Snapshot.take(tick.state_areas(), root)
+	told.clear()
+	events.apply_command(&"reward_pick_requested", [0, int((mine[0] as Dictionary)["offer"]), 0])
+	check(not told.is_empty() and not _left_in(told, EAST) and not told.back()[1], "seat 0 took its item: nothing left in the room, though seat 1's still waits")
+	check_equal((rewards.call(&"waiting_of", 1) as Array).size(), 1, "seat 1's offer still waits, anywhere")
+	told.clear()
+	check(snapshot.restore(tick.state_areas(), root).is_empty(), "restored to before the pick")
+	check(not told.is_empty() and _left_in(told, EAST) and told.back()[1], "told again as it stands: the item lies there again")
+	events.disconnect("rooms_rewards_left", on_left)
+
+
+static func _left_in(told: Array, room: int) -> bool:
+	var left: PackedByteArray = told.back()[0]
+	return room < left.size() and left[room] != 0

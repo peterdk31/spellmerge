@@ -17,7 +17,9 @@ extends Node
 ##   (`room_rewards_due`'s spots; the owner, 2026-11-19: nothing pops up; `reward_item_changed`), and
 ##   its own driven body in reach (REWARD_REACH; `reward_near_changed`) opens it with A (the HUD's);
 ##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). An item
-##   left lying is lost with its world (the owner, 2026-11-19; `_unlay_rewards`). Nobody
+##   left lying is lost with its world (the owner, 2026-11-19; `_unlay_rewards`). The view is told
+##   which rooms still hold a reward to take (`rooms_rewards_left`: one due there or an item lying in
+##   it; a reward room's done look once its rewards are taken, the owner's of 2026-11-20). Nobody
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
@@ -258,6 +260,7 @@ func begin_run() -> void:
 		_say_shelf_near(seat)
 		_say_reward_near(seat)
 		_say_stats(seat)
+	_say_rewards_left(false)
 
 
 ## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
@@ -278,6 +281,7 @@ func step(delta: float) -> void:
 		_due_spots.clear()
 		for at in rooms.size():
 			_roll_clear(rooms[at], tables[at], RewardType.from_row(types.slice(at * 3, at * 3 + 3)), spots.slice(at * SEATS, at * SEATS + SEATS))
+		_say_rewards_left(false)
 	for seat in SEATS:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
@@ -442,6 +446,7 @@ func rebuild_derived() -> void:
 		_say_shelf_near(seat)
 		_say_reward_near(seat)
 		_say_stats(seat)
+	_say_rewards_left(true)
 
 
 # --- Heard ------------------------------------------------------------------------------
@@ -456,6 +461,7 @@ func _on_room_rewards_due(room: int, table: StringName, type: PackedStringArray,
 		_due_types.append_array(RewardType.from_row(type).to_row())
 		for seat in SEATS:
 			_due_spots.append(spots[seat] if seat < spots.size() else Vector2.INF)
+		_say_rewards_left(false)
 
 
 ## Room `room`'s clear: every seat with a wizard rolls its own offer from the table `table_id`,
@@ -520,6 +526,7 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	var wizard: Actor = _wizard_of(player)
 	if row.lying:
 		_say_reward_item(row, false)
+		_say_rewards_left(false)
 	_say_picked(wizard.id, EventsScript.PICKUP_REWARD, row.ids[choice], row.at if row.lying else wizard.position)
 	if events != null:
 		events.reward_taken.emit(player, offer, choice, _choice_view(row, choice))
@@ -947,6 +954,8 @@ func _unlay_rewards() -> void:
 		if _reward_near[seat] >= 0:
 			_reward_near[seat] = -1
 			_say_reward_near(seat)
+	if changed != 0:
+		_say_rewards_left(false)
 
 
 ## Whether offer number `number` lies as an item.
@@ -1144,6 +1153,33 @@ func _say_reward_near(seat: int) -> void:
 func _say_picked(actor: int, kind: StringName, id: StringName, at: Vector2) -> void:
 	if events != null and actor != ActorsScript.NONE:
 		events.item_picked_up.emit(actor, kind, id, at)
+
+
+## The rooms still holding a reward to take, told to the view (`rooms_rewards_left`): 1 for each
+## room with a clear due to be rolled or an offer lying in it, read from the state and kept nowhere.
+func _say_rewards_left(again: bool) -> void:
+	if events != null:
+		events.rooms_rewards_left.emit(rewards_left(), again)
+
+
+## By room number: 1 while room holds a reward to take (a clear due to be rolled there, or an offer
+## lying in it), as `rooms_rewards_left` tells it; as long as the highest such room.
+func rewards_left() -> PackedByteArray:
+	var left := PackedByteArray()
+	for room: int in _due_rooms:
+		_mark(left, room)
+	for offer: RewardOffer in _offers:
+		if offer.lying:
+			_mark(left, offer.room)
+	return left
+
+
+static func _mark(rooms: PackedByteArray, room: int) -> void:
+	if room < 0:
+		return
+	if rooms.size() <= room:
+		rooms.resize(room + 1)
+	rooms[room] = 1
 
 
 func _say_pool(at: int) -> void:

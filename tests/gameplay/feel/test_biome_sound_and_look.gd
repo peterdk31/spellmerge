@@ -13,6 +13,7 @@ const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
@@ -294,6 +295,31 @@ func test_the_void_is_black_with_motes_outside_the_rooms() -> void:
 	flow.stop_run()
 	feel.call(&"_step_rooms", 0.0, 1)
 	check_equal(backdrop.rect(), Rect2(), "outside a biome, no void is drawn")
+
+
+## The equal split's blank quarter shows the void (the owner, 2026-11-20): the spectacle gives the
+## void's motes off over the world the split screen's void view shows (`set_void_blank`), and none
+## while there is no blank.
+func test_the_blank_quarters_void_gets_its_own_drifting_motes() -> void:
+	_start(1)
+	feel.call(&"_step_rooms", 0.0, 1)
+	var spectacle: Node = feel.call(&"spectacle")
+	var air: AirMotesScript = spectacle.get(&"void_blank_air") as AirMotesScript
+	check(air != null and air.look != null, "the blank's void air uses the void's motes")
+	var bounds: Rect2 = projectiles.call(&"bounds") as Rect2
+	var blank := Rect2(bounds.position - Vector2.ONE * SplitScreenScript.VOID_AWAY - Vector2(320.0, 180.0), Vector2(640.0, 360.0))
+	check(not blank.intersects(bounds), "the void view looks past the biome")
+	check(bounds.grow(VoidBackdropScript.GROW).encloses(blank), "inside the void's black")
+	air.given = 0
+	for i in 120:
+		spectacle.call(&"_give_off_void", float(i) * 0.1, Rect2())
+	check_equal(air.given, 0, "no blank: no motes there")
+	spectacle.call(&"set_void_blank", blank)
+	for i in 120:
+		spectacle.call(&"_give_off_void", 20.0 + float(i) * 0.1, Rect2())
+	check(air.given > 0, "a blank: its void drifts with motes (%d)" % air.given)
+	check(blank.grow(AirMotesScript.VIEW_MARGIN + 1.0).encloses(air.given_box), "given off over the void view (%s)" % air.given_box)
+	spectacle.call(&"set_void_blank", Rect2())
 
 
 ## Enemies still spawning in count as close foes from the moment they start (the owner, 2026-11-19):

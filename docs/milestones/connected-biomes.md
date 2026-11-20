@@ -559,10 +559,25 @@ The owner, 2026-11-19: a camera setting for equal-sized split screens, as an alt
 - **Close foes** (#872) are framed inside each pane, down to the widest zoom (0.5), the split zoom 1.0 otherwise.
 - **Tests:** `tests/gameplay/feel/test_split_equal.gd`, additions to `test_split_screen.gd`, `tests/hud/test_pause_menu.gd`, `test_feel_carrier_looks.gd` and `tests/core/test_events.gd`; screenshots `tests/screenshots/shot_split_equal.gd`.
 
-### Open questions for the owner
+### Answered by the owner (2026-11-20)
 
-1. Equal with three or four players: two players standing together while a third is far each keep their own pane (one pane a player, as asked), so their two panes show nearly the same place. Should two near each other share a pane instead (as the Dynamic split's groups do)?
-2. Two players whose corner panels are on one side (P1 and P3, after P2 left): the halves are top and bottom so each panel stays in its own pane. Keep that, or always left and right?
+1. **Close players share a pane:** yes, as the Dynamic split's groups do.
+2. **Two panes are always left and right**, P1 and P3 too; a corner panel moves to its pane's side.
+
+### Equal split: grouped panes, left and right, the void quarter (2026-11-20)
+
+Built from those answers (gameplay/feel/README.md, "Equal panes"; hud/README.md, "A seat's corner on the equal split"), in Equal mode only (Dynamic as it was):
+
+- **Close players share a pane:** the equal split groups its wizards as the Voronoi split does (within `JOIN_REACH`, apart past `LEAVE_REACH`: no flicker at the join distance), and lays the groups' views: one group one view, two the left and right halves, three or four the quarters (`EqualPanes.lay`; the quarter each group takes keeps most of its seats' panels where they are). The layout changes with the views' usual easing (anchors walking at most 12 px a frame, dividers a pixel a frame, the blank moving in and out over 0.4 s).
+- **Two panes are always left and right**, whichever seats. Each seat's HUD takes a spot inside its own pane (a quarter, and its outer or inner side), sent as `hud_corners_changed` (view only); the HUD slides the corner panel by whole pixels (at least three frames) and lays the builder, inventory and reward menu in that quarter (`hud/panels/seat_corners.gd`). P1 and P3: P3's panel to the bottom right. Possessing or downed, a seat's box is still its body and the body it drives, so its pane follows it as before.
+- **The empty fourth quarter** (three panes) shows the void with its drifting motes: a void view (one more SubViewport, made once) looking past the biome's corner into the void's black, where the spectacle gives the void's motes off too; outside a biome it stays plain black.
+- **Tests:** `test_split_equal.gd` (grouping by distance for three and four players with the hysteresis, halves always for two, P1 and P3 with P3's HUD spot moved, the HUD spots inside the panes, a reset counted), `test_split_screen.gd` and `test_biome_sound_and_look.gd` (the void view and its motes), `tests/hud/test_seat_corners.gd` (the slide, P3's panel and menus moved and back). Nothing under the simulation's folders changed. Screenshots: `tests/screenshots/shot_split_equal_groups.gd`.
+
+### Answered by the owner (2026-11-20, on #880)
+
+1. **Four players in three groups:** the pair gets a half, the two alone a quarter each; no empty quarter then (the void quarter only for three players in three groups). Built: the pair's view is cut as its half's top quarter and the bottom quarter is its twin, a blank site shown with the pair's own picture and no divider (gameplay/feel/README.md, "Equal panes").
+2. **Two pairs:** the left and right halves, each panel kept in its own corner's row within its pair's half (no crossing): P2's panel at the top left quarter's inner side, P3's at the bottom right's.
+3. **The void quarter unlit:** fine.
 
 ## The d-pad never walks; quick-use bindings (2026-11-20)
 

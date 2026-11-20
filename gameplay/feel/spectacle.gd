@@ -226,6 +226,12 @@ var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 ## over the view outside every place of the grid, within VOID_SHARE of the motes' ring, under the
 ## motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
 var void_air: AirMotesScript = AirMotesScript.new(_ramp_table)
+## The same void's motes over the world the equal split's blank quarter shows (the owner,
+## 2026-11-20; `set_void_blank`, the split screen's void view, past the biome's corner), so the blank
+## shows the void as it drifts between the slabs.
+var void_blank_air: AirMotesScript = AirMotesScript.new(_ramp_table)
+## The world rect the void view shows (empty: none).
+var _void_blank: Rect2 = Rect2()
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -258,6 +264,7 @@ var _hit_on: bool = false
 
 func _ready() -> void:
 	void_air.use(VOID_AIR)
+	void_blank_air.use(VOID_AIR)
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
@@ -1222,6 +1229,13 @@ func _give_off_void(now: float, view: Rect2) -> void:
 	var in_biome: bool = grid != null and grid.places() > 0
 	var void_pool: MotesScript = pool if motes_on() and ambient_particles and in_biome else null
 	void_air.give_off(now, void_pool, view, Rect2(), VOID_SHARE, grid if in_biome else null)
+	void_blank_air.give_off(now, void_pool if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_SHARE, grid if in_biome else null)
+
+
+## The world rect the equal split's blank quarter shows the void of (`SplitScreen.void_rect`; empty:
+## none), where `void_blank_air` gives its motes off.
+func set_void_blank(rect: Rect2) -> void:
+	_void_blank = rect
 
 
 ## The "Ambient particles" setting (atmosphere B): whether the room's air gives off its dust (while

@@ -145,6 +145,7 @@ const RewardMenuScript := preload("res://hud/menus/reward/reward_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
 const BossIntroScript := preload("res://hud/panels/boss/boss_intro.gd")
+const SeatCornersScript := preload("res://hud/panels/seat_corners.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -184,6 +185,10 @@ var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
 var _rewards: Array[RewardMenuScript] = []
+## Where each seat's panel and menus sit (`hud_corners_changed`: the equal split's panes move them,
+## the owner, 2026-11-20; `seat_corners.gd`), and each seat's quarter as last handed to its menus.
+var _corners: SeatCornersScript = SeatCornersScript.new()
+var _menus_at: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
 ## By seat: the coins in its currency bag and its offers waiting (`bag_changed`,
 ## `rewards_waiting_changed`), for its corner panel.
 var _coins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -414,6 +419,7 @@ func _ready() -> void:
 		events.boss_intro_opened.connect(_on_boss_intro_opened)
 		events.bag_changed.connect(_on_bag_changed)
 		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
+		events.hud_corners_changed.connect(_corners.set_spots)
 	_quick_slots.bind(events, _panels, get_node_or_null("/root/Registry") as RegistryScript, spells)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
@@ -432,8 +438,30 @@ func _process(delta: float) -> void:
 		# The entrance waits while the game is paused.
 		_boss_banner.step(delta)
 	step_staffs()
+	step_corners()
 	for reward in _rewards:
 		reward.step()
+
+
+## Every seat's corner panel on its spot (slid there by whole pixels when it changed), and its
+## builder, inventory and reward menu moved with its quarter. Called every frame; tests call it.
+func step_corners() -> void:
+	var view: Vector2 = (get_node("Root") as Control).size
+	for player in PLAYER_COUNT:
+		var panel: PlayerPanelScript = _panels[player]
+		_corners.step(player, view, panel.size)
+		panel.position = _corners.panel_at(player)
+		var at: Vector2 = _corners.quarter_at(player)
+		if at != _menus_at[player]:
+			_menus_at[player] = at
+			_radials[player].move_quarter(at)
+			_inventories[player].move_quarter(at)
+			_rewards[player].move_room(reward_room(player))
+
+
+## Where seats' panels and menus sit (for tests and screenshots).
+func get_corners() -> SeatCornersScript:
+	return _corners
 
 
 ## Put every player's item hint over its item as the camera shows it now (none outside a room,
@@ -606,8 +634,12 @@ func reward_room(player: int) -> Rect2:
 	if _joined.count(true) <= 1:
 		return Rect2(Vector2(0.0, REWARD_CORNER_BAND), view - Vector2(0.0, REWARD_CORNER_BAND * 2.0))
 	var quarter: Vector2 = (view * 0.5).floor()
-	var top: float = REWARD_CORNER_BAND if player < 2 else 0.0
-	return Rect2(Vector2(float(player % 2), 1.0 if player >= 2 else 0.0) * quarter + Vector2(0.0, top), quarter - Vector2(0.0, REWARD_CORNER_BAND))
+	# Its seat's quarter now (its own corner's, or its pane's on the equal split: `_corners`).
+	var origin: Vector2 = _corners.quarter_at(player) if _menus_at[player].is_finite() else SeatCornersScript.quarter_origin(player, view)
+	# The panels' band at the top row's top, none at the bottom row's, in between while sliding (so
+	# an open menu moves with its quarter, never jumping by the band).
+	var top: float = roundf(REWARD_CORNER_BAND * (1.0 - clampf(origin.y / maxf(quarter.y, 1.0), 0.0, 1.0)))
+	return Rect2(origin + Vector2(0.0, top), quarter - Vector2(0.0, REWARD_CORNER_BAND))
 
 
 ## The reward menus keep off the band of the screen's top and bottom edges the corner panels sit in.

@@ -114,6 +114,8 @@ var _sense_shade: PackedInt32Array = PackedInt32Array()
 ## the biome changes (`_sensed_stale`).
 var _sensed: PackedByteArray = PackedByteArray()
 var _sensed_stale: bool = true
+## How many secret rooms were found (opened) when last read: a change works the senses out again.
+var _found_secrets: int = 0
 ## By seat: held now, the opening's stage, its frame (screen pixels) and scale, and where the map's
 ## corner sits in its frame (screen pixels).
 var _held: PackedByteArray = PackedByteArray([0, 0, 0, 0])
@@ -342,6 +344,17 @@ func draws(place: int) -> bool:
 	return false
 
 
+## How many secret rooms are opened now (a cheap count, read once a frame).
+func _secrets_found() -> int:
+	var count: int = 0
+	if pieces == null:
+		return count
+	for place in _secret.size():
+		if _secret[place] != 0 and pieces.is_opened(place):
+			count += 1
+	return count
+
+
 ## True when bridge `bridge` is drawn: a seen room at one end, a room the map may draw at the other.
 func _bridge_drawn(bridge: int) -> bool:
 	var a: int = _ends[bridge * 2]
@@ -382,6 +395,11 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	var world_now: int = pieces.world() if pieces != null else 0
 	if places != _laid_places or world_now != _laid_world:
 		_lay(grid, places, world_now)
+	var found: int = _secrets_found()
+	if found != _found_secrets:
+		# A secret room found draws it for its bridge, so no seat senses it any more (the review's).
+		_found_secrets = found
+		_sensed_stale = true
 	var again: int = pieces.done_again() if pieces != null else 0
 	if again != _read_again:
 		# The rooms done (cleared, opened, rewards left, fountains) told again after a restore: drawn as

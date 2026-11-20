@@ -722,6 +722,12 @@ func test_a_players_secret_sense_shows_a_secret_room_near_on_their_own_map_only(
 	check(not view.senses(1, EAST) and view.sense_shade_of(1, EAST) == 0, "never on another player's map")
 	check(not view.senses(0, WEST), "a room that is no secret one is never sensed")
 	check(not view.draws(EAST), "the party's map is as it was")
+	# Found (its rock broken) with nobody in it yet: drawn for its bridge, so sensed no more (the
+	# review's: the sense was worked out again only as the party's map changed).
+	flow.locks.open(EAST, _grid())
+	view.step(0.0, actors, 3, _grid(), _two_views())
+	check(view.draws(EAST) and not view.senses(0, EAST), "found: on the party's map, no longer sensed")
+	check_equal(view.sense_shade_of(0, EAST), 0, "its sensed look gone (every map shut: as it stands)")
 
 
 ## The owner, 2026-11-19: a sensed secret room reads as secret, in a faint void light of its own,

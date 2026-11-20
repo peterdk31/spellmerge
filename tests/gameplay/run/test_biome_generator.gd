@@ -689,6 +689,7 @@ func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
 	var shapes: Dictionary = registry.piece_shapes(&"crypt")
 	var rules: MapRules = crypt.biomes[0]
 	var extra: int = 0
+	var off_centre: Dictionary = {}
 	var unsound := PackedStringArray()
 	for seed_value in range(1, DEAD_END_SEEDS + 1):
 		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
@@ -702,7 +703,18 @@ func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
 			unsound.append("seed %d: %d pairs of doorways a walkway could join left unjoined" % [seed_value, left])
 		if map.style != &"loop" and map.bridges() >= map.rooms():
 			extra += 1
+		for bridge in map.bridges():
+			for end in 2:
+				var room: int = map.end_room(bridge, end)
+				var shape: PieceShape = map.room_shape(room, shapes)
+				var socket: int = map.end_socket(bridge, end)
+				var across: Vector2 = shape.socket_at[socket] - shape.size * 0.5
+				if absf(across.x if shape.socket_facing[socket] % 2 == 0 else across.y) >= 32.0:
+					off_centre[map.room_mirrors[room]] = int(off_centre.get(map.room_mirrors[room], 0)) + 1
 	check_equal(unsound, PackedStringArray(), "every bridge meets two rooms, every doorway a bridge")
+	# The owner, 2026-11-20: a doorway may stand anywhere along an edge; the bridges meet those off
+	# its middle in every mirroring of their rooms.
+	check_equal(off_centre.size(), 4, "bridges meet doorways off an edge's middle in all four mirrorings: %s" % [off_centre])
 	check(extra > 0, "rooms with more than one way in where the doorways line up, in styles that close no loop: %d maps of %d" % [extra, DEAD_END_SEEDS])
 	# Laid: open where joined, lip elsewhere.
 	var world := Fixture.new(root)
@@ -734,6 +746,33 @@ func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
 			child.free()
 	world.free_all()
 	into.free()
+
+
+## The owner, 2026-11-20: a secret room is reached only through its secret, so no loop or extra
+## entrance ever joins it, even where its line is no dead end.
+func test_no_loop_or_extra_entrance_joins_a_secret_room() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var secrets: int = 0
+	for seed_value in 30:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret":
+				secrets += 1
+				check_equal(_bridges_of(map, room), 1, "seed %d: secret room %d has its one bridge" % [seed_value, room])
+	check(secrets > 0, "secret rooms were placed: %d" % secrets)
+	# A secret line that is no dead end is named by the validator, never made.
+	var rules := (crypt.biomes[0] as MapRules).duplicate(true) as MapRules
+	for rule: KindRule in rules.kinds:
+		if rule.kind == &"secret":
+			rule.dead_end = false
+	var named: bool = false
+	for line: String in rules.biome_problems(content, shapes):
+		named = named or line.contains("'secret' enters by a secret")
+	check(named, "the validator names a secret line that is no dead end")
 
 
 ## What makes a dead end of `map`'s bridges: an end that names no room's socket, meets it off its

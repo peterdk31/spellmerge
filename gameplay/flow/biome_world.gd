@@ -170,6 +170,17 @@ func mouth_rect(bridge: int, end: int) -> Rect2:
 	return _moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]) if shape != null else Rect2()
 
 
+## The world rectangle of the doorway where bridge `bridge`'s end `end` meets its room: from the
+## landing inside the room's socket (`PieceShape.LANDING`) out to the far side of its mouth
+## (`PieceShape.MOUTH_DEPTH`), across the mouth; where a secret room's rock stands (`LockDoors`).
+func doorway_rect(bridge: int, end: int) -> Rect2:
+	if map == null or bridge < 0 or bridge >= map.bridges():
+		return Rect2()
+	var room: int = map.end_room(bridge, end)
+	var shape: PieceShape = map.room_shape(room, _shapes)
+	return _moved(shape.strip(map.end_socket(bridge, end), -PieceShape.LANDING, PieceShape.MOUTH_DEPTH), map.room_places[room]) if shape != null else Rect2()
+
+
 ## The world's bounds for the biome: every piece (`area`), and MARGIN round them.
 func bounds() -> Rect2:
 	return area().grow(MARGIN)

@@ -33,6 +33,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_hand_requested`, `bag_drop_requested` | `hud` (the inventory; commands, items I7) | `player` |
 | `bag_use_requested` | `hud` (the inventory: a potion drunk; a command, the owner's of 2026-11-19) | `player` |
+| `quick_bind_requested` | `hud` (the inventory's d-pad on a usable item: binds that arm's quick-use slot; a command, the owner's of 2026-11-20) | `player` |
+| `quick_use_requested` | `hud` (a d-pad arm in play, the Y map not held: one of the item bound there used; a command) | `player` |
+| `quick_bound` | `player` (what each quick-use slot of the body a seat shows is bound to, after `inventory_announced` and on every change) | `hud` (the corner panel's cross, the inventory) |
 | `inventory_refused` | `player` | `hud` (the inventory's note) |
 | `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |
@@ -106,6 +109,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_reroll_requested` | HUD (X in the reward picker; a command) | `rewards` |
 | `map_teleport_requested` | HUD (A on a room picked on the open Y map; a command; the owner's of 2026-11-19) | `flow` |
 | `map_pick_changed` | HUD (the room picked on a seat's open Y map; view only) | `feel` (its outline on that map) |
+| `map_frame_shown` | `feel` (a seat's map frame and whether it is fully open, as either changes; view only) | `hud` (the map's legend) |
 | `teleport_rooms_shown` | `flow` (the cleared rooms a seat's wizard may teleport to, as it changes; view only) | `hud` (the map picker) |
 | `wizard_teleported` | `flow` (a wizard teleported from the map: where it left, where it stands) | `feel` (the stepped vanish where it left) |
 | `join_held` | `flow` (a seat that joined after the party left the start room waits for the run's end; view only) | `hud` (its corner panel says why) |

@@ -27,6 +27,8 @@ const OUTLINE: Color = Color(0.05, 0.05, 0.08)
 const KEY_FACE: Color = Color(0.22, 0.24, 0.3)
 const TEXT_ON_PLAIN: Color = Color(0.95, 0.96, 0.98)
 const TEXT_ON_COLOR: Color = Color(0.06, 0.06, 0.1)
+## The lit tip of each d-pad arm, from the cross's middle (its top left pixel).
+const DPAD_ARMS: Dictionary = {"up": Vector2(-1.0, -4.0), "right": Vector2(2.0, -1.0), "down": Vector2(-1.0, 2.0), "left": Vector2(-4.0, -1.0)}
 
 var _input: InputManagerScript = null
 var _player: int = 0
@@ -176,15 +178,18 @@ func _draw_trigger(area: Rect2, face: Color) -> void:
 	draw_line(Vector2(area.position.x + 2.0, area.position.y + 2.5), Vector2(area.end.x - 2.0, area.position.y + 2.5), TEXT_ON_PLAIN.darkened(0.3), 1.0)
 
 
-## The d-pad: a cross with the arm of its label (`left` or `right`) lit.
+## The d-pad: a cross with the arm of its label (`up`, `right`, `down`, `left`) lit, or every arm's
+## tip (`all`: the whole d-pad).
 func _draw_dpad(area: Rect2) -> void:
 	var c: Vector2 = area.get_center().floor()
 	draw_rect(Rect2(c.x - 5.0, c.y - 2.0, 10.0, 4.0), OUTLINE)
 	draw_rect(Rect2(c.x - 2.0, c.y - 5.0, 4.0, 10.0), OUTLINE)
 	draw_rect(Rect2(c.x - 4.0, c.y - 1.0, 8.0, 2.0), KEY_FACE)
 	draw_rect(Rect2(c.x - 1.0, c.y - 4.0, 2.0, 8.0), KEY_FACE)
-	var lit: float = -4.0 if String(_glyph["label"]) == "left" else 2.0
-	draw_rect(Rect2(c.x + lit, c.y - 1.0, 2.0, 2.0), TEXT_ON_PLAIN)
+	var label: String = String(_glyph["label"])
+	for arm: String in DPAD_ARMS:
+		if label == arm or label == "all":
+			draw_rect(Rect2(c + DPAD_ARMS[arm], Vector2(2.0, 2.0)), TEXT_ON_PLAIN)
 
 
 ## The mouse: a body with the button of its label lit (LMB the left, RMB the right), the way a

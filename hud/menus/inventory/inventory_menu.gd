@@ -18,6 +18,10 @@ extends Control
 ## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
 ##   A uses the one pointed at where its kind can be used (a potion is drunk: `bag_use_requested`,
 ##   the owner's of 2026-11-19) and X drops one where its kind can be dropped (`ItemKinds.can`).
+##   A d-pad arm (`quick_*`; 1-4 on the keyboard) binds the usable item pointed at to that arm's
+##   quick-use slot, as a hand's button puts a staff on a hand (`quick_bind_requested`; the owner,
+##   2026-11-20): bound on another arm it moves, bound on that arm already it is let go. Each item
+##   bound shows its arm's glyph beside it on the ring, and the hint row says "Bind".
 ## - **The column:** the HP bar, then the four hands, each its button's glyph, its staff's head and
 ##   numbers (`NUMBERS`), and while a staff is pointed at an arrow beside each number of every other
 ##   hand's staff: up or down as the pointed staff's number is higher or lower, green where that is
@@ -54,9 +58,11 @@ const ENTER_HAND: int = 1
 ## The button that opens and closes it.
 const TOGGLE_ACTION: StringName = &"inventory"
 ## The hint row's buttons: enter, drop, back, close.
-const HINT_ACTIONS: Array[StringName] = [&"accept", &"alternate", &"back", &"inventory"]
+const HINT_ACTIONS: Array[StringName] = [&"accept", &"alternate", &"back", &"inventory", &"dpad"]
+## The d-pad's arms by quick-use slot (0 up, 1 right, 2 down, 3 left), as the input manager has them.
+const QUICK_ACTIONS: Array[StringName] = InputManagerScript.QUICK_ACTIONS
 ## The buttons read here (the rest come as UIFocus signals).
-const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"inventory"]
+const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"inventory", &"quick_up", &"quick_right", &"quick_down", &"quick_left"]
 ## Which layer the ring shows.
 enum Layer { BAGS, STAFFS, KINDS, CARDS, ITEMS }
 ## Each bag's word.
@@ -107,6 +113,7 @@ const NOTE_TIME: float = 1.4
 
 const OPEN_VERB: String = "Open"
 const USE_VERB: String = "Use"
+const BIND_VERB: String = "Bind"
 const DROP_VERB: String = "Drop"
 const BACK_VERB: String = "Back"
 const CLOSE_VERB: String = "Close"
@@ -160,6 +167,8 @@ var _info: Rect2 = Rect2()
 ## Each hand's glyph in the column, and on the staffs ring beside each staff on a hand.
 var _hand_glyphs: Array[ActionGlyphScript] = []
 var _ring_glyphs: Array[ActionGlyphScript] = []
+## On a ring of items, each quick-use slot's arm glyph beside the item bound to it.
+var _quick_glyphs: Array[ActionGlyphScript] = []
 
 
 func _ready() -> void:
@@ -173,6 +182,10 @@ func _ready() -> void:
 		var glyph: ActionGlyphScript = _make_glyph("RingHand%d" % hand)
 		glyph.visible = false
 		_ring_glyphs.append(glyph)
+	for slot in QUICK_ACTIONS.size():
+		var quick: ActionGlyphScript = _make_glyph("RingQuick%d" % slot)
+		quick.visible = false
+		_quick_glyphs.append(quick)
 	_menu.make_hints(HINT_ACTIONS)
 	for action in READ_ACTIONS:
 		_seen[action] = 0
@@ -190,11 +203,15 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		for glyph: ActionGlyphScript in [_hand_glyphs[hand], _ring_glyphs[hand]]:
 			glyph.bind(input)
 			glyph.show_action(index, HAND_ACTIONS[hand])
+	for slot in _quick_glyphs.size():
+		_quick_glyphs[slot].bind(input)
+		_quick_glyphs[slot].show_action(index, QUICK_ACTIONS[slot])
 	if _events != null:
 		_events.inventory_announced.connect(_on_inventory_announced)
 		_events.bag_changed.connect(_on_bag_changed)
 		_events.owned_staff_changed.connect(_on_owned_staff_changed)
 		_events.hands_changed.connect(_on_hands_changed)
+		_events.quick_bound.connect(_on_quick_bound)
 		_events.inventory_refused.connect(_on_inventory_refused)
 		_events.player_stats_changed.connect(_on_stats_changed)
 	if _ui_focus != null:
@@ -357,6 +374,7 @@ func step(delta: float) -> void:
 		close_inventory()
 		return
 	_poll_hands()
+	_poll_quick()
 	_poll_step(delta)
 	_poll_pointer()
 	if _note_left > 0.0:
@@ -403,6 +421,13 @@ func _poll_hands() -> void:
 				put_on_hand(hand)
 			elif hand == ENTER_HAND and (_layer == Layer.BAGS or _layer == Layer.KINDS or _menu.uses_mouse()):
 				enter_pointed()
+
+
+## The d-pad's arms: on a ring of items, the usable item pointed at bound to that arm (`bind_pointed`).
+func _poll_quick() -> void:
+	for slot in QUICK_ACTIONS.size():
+		for _press in _presses(QUICK_ACTIONS[slot]):
+			bind_pointed(slot)
 
 
 ## The left stick (P1's move keys) steps the pointer round the ring, with key-repeat.
@@ -518,6 +543,16 @@ func put_on_hand(hand: int) -> void:
 	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand, _mirror.body)
 
 
+## A d-pad arm on a ring of items: the usable item pointed at bound to quick-use slot `slot` (or let
+## go when it is bound there already: the simulation's rule, `quick_bind_requested`).
+func bind_pointed(slot: int) -> void:
+	var entry: Dictionary = pointed()
+	if _layer != Layer.ITEMS or _events == null or not _item_can(entry, ItemKinds.USE):
+		return
+	_sound(UiSounds.CHOOSE)
+	_events.quick_bind_requested.emit(index, slot, _bag, entry["item"], _mirror.body)
+
+
 ## X: drop the staff pointed at, or one copy of the card or item (`bag_drop_requested`).
 func drop_pointed() -> void:
 	var entry: Dictionary = pointed()
@@ -565,6 +600,13 @@ func _on_hands_changed(player: int, hands: PackedInt32Array) -> void:
 		return
 	_mirror.hear_hands(hands)
 	_refill()
+
+
+func _on_quick_bound(player: int, slot: int, bag: StringName, id: StringName) -> void:
+	if player != index:
+		return
+	_mirror.hear_quick(slot, bag, id)
+	_changed()
 
 
 func _on_inventory_refused(player: int, reason: String) -> void:
@@ -679,8 +721,9 @@ func _refresh_hints() -> void:
 		first = USE_VERB
 		can_enter = _item_can(entry, ItemKinds.USE)
 		can_drop = _item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE)
-	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB]
-	var live: Array[bool] = [can_enter, can_drop, true, true]
+	var can_bind: bool = _layer == Layer.ITEMS and _item_can(entry, ItemKinds.USE)
+	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB, BIND_VERB]
+	var live: Array[bool] = [can_enter, can_drop, true, true, can_bind]
 	_menu.set_hints(verbs, live)
 
 
@@ -694,6 +737,16 @@ func _place_ring_glyphs() -> void:
 			continue
 		var middle: Vector2 = _menu.tile_center(_menu.angle_of_entry(entry), RING_RADIUS + TILE_SIZE * 0.5 + 6.0)
 		glyph.position = (middle - glyph.custom_minimum_size * 0.5).round()
+	for slot in _quick_glyphs.size():
+		var quick: ActionGlyphScript = _quick_glyphs[slot]
+		var bound: StringName = _mirror.quick_id(slot)
+		var at: int = entry_of("item", bound) if _open and _layer == Layer.ITEMS and bound != &"" and _mirror.quick_slot_of(_bag, bound) == slot else NONE
+		quick.visible = at != NONE
+		if at == NONE:
+			continue
+		# Inside the ring, so an item at its top never pushes the glyph off the view.
+		var spot: Vector2 = _menu.tile_center(_menu.angle_of_entry(at), RING_RADIUS - TILE_SIZE * 0.5 - 7.0)
+		quick.position = (spot - quick.custom_minimum_size * 0.5).round()
 
 
 ## The top left of the quarter it lays itself out in (view pixels; INF: its own corner's), set by

@@ -405,7 +405,7 @@ func test_nothing_is_asked_with_nothing_pointed_at_or_on_the_wrong_ring() -> voi
 	_tap(&"staff_2")
 	_frame()
 	check(_hand_asks.is_empty() and _drop_asks.is_empty(), "nor the staffs ring with nothing pointed at")
-	check_equal(_inventory().hint_verbs(), ["Open", "Drop", "Back", "Close"] as Array[String], "the hints")
+	check_equal(_inventory().hint_verbs(), ["Open", "Drop", "Back", "Close", "Bind"] as Array[String], "the hints (Bind only on a ring of items)")
 
 
 func test_the_left_stick_steps_round_the_ring() -> void:

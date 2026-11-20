@@ -138,6 +138,9 @@ const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 const MapPickerScript := preload("res://hud/panels/map_picker.gd")
+const MapLegendScript := preload("res://hud/panels/map_legend.gd")
+const QuickSlotsScript := preload("res://hud/panels/quick_slots.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const RewardMenuScript := preload("res://hud/menus/reward/reward_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
@@ -198,6 +201,8 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
+## By seat * 4 + slot: each d-pad arm's (`quick_*`) press count at the last poll.
+var _seen_quick: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
@@ -222,6 +227,10 @@ var _stone_line: StoneLineScript = null
 var _item_hints: ItemHintsScript = null
 ## The pick on each seat's open Y map: a room to teleport to (the owner, 2026-11-19; `map_picker.gd`).
 var _map_picker: MapPickerScript = MapPickerScript.new()
+## Each seat's quick-use slots on its corner panel (the owner, 2026-11-20; `quick_slots.gd`).
+var _quick_slots: QuickSlotsScript = QuickSlotsScript.new()
+## The open Y map's legend under each seat's frame (the owner, 2026-11-20; `map_legend.gd`).
+var _map_legend: MapLegendScript = null
 var _hint_menus: Array[bool] = [false, false, false, false]
 var _pad_line: PadLineScript = null
 ## The boss bar (top middle) and the entrance banner (upper middle), boss plan OB16.
@@ -294,6 +303,7 @@ func _ready() -> void:
 			_seen_inventory[player] = input.get_press_count(player, INVENTORY_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
+			_dpad_pressed(player)
 	# The menus' focus moves and backs, heard before any menu hears UIFocus, so it knows a press
 	# was a choice or a back before that menu moves the focus in answer (ui_sounds.gd).
 	_ui_sounds = UiSounds.new()
@@ -376,6 +386,12 @@ func _ready() -> void:
 	root_control.move_child(_item_hints, 1)
 	_item_hints.bind(events, input, spells)
 	_map_picker.bind(events)
+	# The map's legend: over the map (Feel's layer, under this one), under the panels and menus.
+	_map_legend = MapLegendScript.new()
+	_map_legend.name = "MapLegend"
+	root_control.add_child(_map_legend)
+	root_control.move_child(_map_legend, _item_hints.get_index() + 1)
+	_map_legend.bind(events, input)
 	# The loading screen over every line and overlay made above. Over it: the pause menu and the pad
 	# line, since either stops the game, and a departure from the stone with it (the screen stays down
 	# until the run starts), and the frame rate readout (the freeze it covers is what that counts).
@@ -404,6 +420,7 @@ func _ready() -> void:
 		events.bag_changed.connect(_on_bag_changed)
 		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
 		events.hud_corners_changed.connect(_corners.set_spots)
+	_quick_slots.bind(events, _panels, get_node_or_null("/root/Registry") as RegistryScript, spells)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -457,6 +474,21 @@ func step_hints(delta: float) -> void:
 	var to_screen: Transform2D = viewport.get_canvas_transform() if viewport != null else Transform2D.IDENTITY
 	# While the screen is split (connected biomes CB6) each hint follows its player's own view.
 	_item_hints.step(delta, menus, transform.affine_inverse() * to_screen, ScreenViews.on(viewport), transform.affine_inverse())
+	var picking: int = 0
+	for player in PLAYER_COUNT:
+		if _map_picker.picking(player):
+			picking |= 1 << player
+	_map_legend.step(delta, picking, transform.affine_inverse())
+
+
+## The pick on the open Y map (for tests and screenshots).
+func get_map_picker() -> MapPickerScript:
+	return _map_picker
+
+
+## The open Y map's legend (for tests and screenshots).
+func get_map_legend() -> MapLegendScript:
+	return _map_legend
 
 
 ## The item hints (for tests and screenshots).
@@ -494,10 +526,21 @@ func poll() -> void:
 		var take_count: int = input.get_press_count(player, TAKE_ACTION)
 		var take_now: bool = take_count > _seen_take[player]
 		_seen_take[player] = take_count
+		var dpad: int = _dpad_pressed(player)
 		var had_menu: bool = _had_menu[player]
-		# The open Y map's pick: A there teleports (the owner, 2026-11-19) and does nothing else.
+		# The open Y map's pick: the d-pad moves it and A there teleports (the owner, 2026-11-19 and
+		# 2026-11-20); A does nothing else then.
 		var map_held: bool = _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and _map_picker.holds(player, input)
-		var map_took: bool = _map_picker.poll(player, map_held, input.get_move(player), start_now or take_now)
+		var way: Vector2 = Vector2.ZERO
+		for slot in InputManagerScript.QUICK_ACTIONS.size():
+			if dpad & (1 << slot) != 0:
+				way = InputManagerScript.QUICK_WAYS[slot]
+		var map_took: bool = _map_picker.poll(player, map_held, way, start_now or take_now)
+		if dpad != 0 and not map_held and input.is_joined(player) and _may_open_menu(player, had_menu) and events != null:
+			# A d-pad arm in play uses the item bound to it (the owner, 2026-11-20); held, the map's.
+			for slot in InputManagerScript.QUICK_ACTIONS.size():
+				if dpad & (1 << slot) != 0:
+					events.quick_use_requested.emit(player, slot)
 		if input.is_joined(player):
 			if _boss_intro.is_open():
 				# A is the intro's while it is open (it asks whether the pause menu is).
@@ -535,6 +578,18 @@ func poll() -> void:
 		# A seat in the game with no device of this machine on it is played on another one. Asked
 		# of the input layer each frame: a device handed over or mirrored sends no event.
 		_panels[player].set_online(_online and _joined[player] and not _plays_here(player))
+
+
+## The d-pad arms (`quick_*`) seat `player` pressed since the last poll, a bit a slot (several presses
+## of one arm count once).
+func _dpad_pressed(player: int) -> int:
+	var fresh: int = 0
+	for slot in InputManagerScript.QUICK_ACTIONS.size():
+		var count: int = input.get_press_count(player, InputManagerScript.QUICK_ACTIONS[slot])
+		if count > _seen_quick[player * 4 + slot]:
+			fresh |= 1 << slot
+		_seen_quick[player * 4 + slot] = count
+	return fresh
 
 
 ## Whether seat `player` is played on this machine: a real device sits on it (another machine's
@@ -838,6 +893,7 @@ func _on_run_started(_player_count: int) -> void:
 func _on_run_ended(_victory: bool) -> void:
 	_reset_all()
 	_item_hints.clear()
+	_quick_slots.clear()
 	for panel in _panels:
 		panel.clear_staffs()
 

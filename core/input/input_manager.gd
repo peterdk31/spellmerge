@@ -70,7 +70,7 @@ extends Node
 ## naming an action. `glyph_kind_changed(player)` fires when it changes: a device joins or
 ## leaves, or the keyboard player turns the mouse aim on or off (core/input/input_glyphs.gd).
 ##
-## Several inputs can feed one action (W and Up, the d-pad and the stick). Each
+## Several inputs can feed one action (W and Up, the left stick and the arrow keys). Each
 ## input is tracked as its own source and the action takes the strongest one, so
 ## letting go of one input never cancels another that is still held.
 
@@ -114,11 +114,20 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## `back` keeps B and E. `map` (Y; M), held, shows the party's map over the player's own view
 ## (connected biomes CB9, Feel's `party_map_view.gd`: view only, it never reaches the simulation);
 ## inside a menu Y is the menu's `extra`, and the map waits while the menu holds the player.
+## **The d-pad never walks** (the owner, 2026-11-20): only the left stick and the move keys (WASD, the
+## arrows) are `move_*`. The d-pad's four arms are `quick_up`, `quick_right`, `quick_down` and
+## `quick_left` (1, 2, 3 and 4 on the keyboard): in play each uses the item bound to it (a quick
+## potion, `hud/panels`), on the held Y map they move the teleport pick, and in a menu they step its
+## focus as the stick does (core/ui_focus).
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4",
 	&"accept", &"back", &"alternate", &"pause", &"page_prev", &"page_next", &"extra", &"kind_prev", &"kind_next",
-	&"take", &"inventory", &"map",
+	&"take", &"inventory", &"map", &"quick_up", &"quick_right", &"quick_down", &"quick_left",
 ]
+## The d-pad's arms by quick-use slot (0 up, 1 right, 2 down, 3 left: `Inventory.QUICK_SLOTS`).
+const QUICK_ACTIONS: Array[StringName] = [&"quick_up", &"quick_right", &"quick_down", &"quick_left"]
+## The way each arm points, by slot.
+const QUICK_WAYS: Array[Vector2] = [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
 ## The staff cast actions, by staff index (0 to 3: RB, RT, LB, LT).
 const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 ## Source ids: keys use their keycode; the other kinds sit in separate ranges.

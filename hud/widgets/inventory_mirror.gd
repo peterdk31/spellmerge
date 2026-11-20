@@ -14,6 +14,8 @@ extends RefCounted
 ##     mirror.hear_staff(number, plan)        # an empty plan: no longer owned
 ##     mirror.hear_hands(hands)
 ##
+## - **Quick-use slots** (`quick_bound`; the owner, 2026-11-20): what each d-pad arm is bound to
+##   (`quick_slot_of(bag, id)`, `quick_id`).
 ## - **The body** (`inventory_announced`, items I8): the key of the body all this is of (`body`),
 ##   which the menus send with their requests so the seat refuses one for a body it no longer shows.
 
@@ -28,6 +30,9 @@ var _bags: Dictionary = {}
 var _plans: Dictionary = {}
 ## By hand (button): the number on it, NONE for none.
 var _hands: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
+## By quick-use slot (0 up, 1 right, 2 down, 3 left): the bag and the id bound (`&""`: none).
+var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
+var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
 ## The key of the body it mirrors (`Actor.key`, from `inventory_announced`; 0 before any).
 var body: int = 0
 
@@ -51,12 +56,34 @@ func hear_hands(hands: PackedInt32Array) -> void:
 		_hands[hand] = hands[hand] if hand < hands.size() else NONE
 
 
+## Quick-use slot `slot` is bound to `id` of `bag` (`&""`: nothing).
+func hear_quick(slot: int, bag: StringName, id: StringName) -> void:
+	if slot >= 0 and slot < _quick_ids.size():
+		_quick_bags[slot] = bag
+		_quick_ids[slot] = id
+
+
+## The quick-use slot `id` of `bag` is bound to, NONE for none.
+func quick_slot_of(bag: StringName, id: StringName) -> int:
+	for slot in _quick_ids.size():
+		if id != &"" and _quick_ids[slot] == id and _quick_bags[slot] == bag:
+			return slot
+	return NONE
+
+
+## The id quick-use slot `slot` is bound to (`&""`: none).
+func quick_id(slot: int) -> StringName:
+	return _quick_ids[slot] if slot >= 0 and slot < _quick_ids.size() else &""
+
+
 ## Forget everything (a run ended: its wizard is gone), and mirror the body `of` from now on.
 func clear(of: int = 0) -> void:
 	body = of
 	_bags.clear()
 	_plans.clear()
 	_hands.fill(NONE)
+	_quick_bags.fill(&"")
+	_quick_ids.fill(&"")
 
 
 # --- Bags -------------------------------------------------------------------------------

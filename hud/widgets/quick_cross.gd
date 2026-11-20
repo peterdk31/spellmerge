@@ -7,10 +7,12 @@ extends Control
 ## `quick_bound` and `bag_changed`.
 ##
 ## **Smooth** (docs/STYLE.md): nothing jumps. A slot steps through SLOT_STAGES looks at FPS (none, its
-## cell's frame, its icon in shadow, its icon), to its frame for a slot bound to nothing that the
-## cross shows, to its shadow for one with none left; its icon goes out the same way before another
+## cell's frame, its icon in shadow, two shades between, its icon), to its frame for a slot bound to
+## nothing that the cross shows, to its shadow for one with none left (greying and filling again
+## through the shades between); its icon goes out the same way before another
 ## comes in. A count that changes nods its cell up a pixel (more) or dips it (fewer) through NOD's
-## poses. The whole cross comes in as the first slot is bound, its width (`custom_minimum_size`)
+## poses. The cross is hidden while it takes no room (`visible`, told by `shown_changed`), so its row
+## adds no gap. The whole cross comes in as the first slot is bound, its width (`custom_minimum_size`)
 ## and height growing by CROSS_STAGES whole steps and the cells cut at its edge, and goes the same way after the
 ## last is let go. Whole pixels, never a fade or a blur.
 ##
@@ -25,11 +27,11 @@ const ICON: int = 8
 const SIDE: int = CELL * 3
 const AT: Array[Vector2i] = [Vector2i(CELL, 0), Vector2i(CELL * 2, CELL), Vector2i(CELL, CELL * 2), Vector2i(0, CELL)]
 const NUB: Vector2i = Vector2i(CELL, CELL)
-## A slot's looks: 0 none, 1 its frame, 2 its icon in shadow, 3 its icon.
-const SLOT_STAGES: int = 3
+## A slot's looks: 0 none, 1 its frame, 2 its icon in shadow, 3 and 4 shades between, 5 its icon.
+const SLOT_STAGES: int = 5
 const FRAMED: int = 1
 const SHADOW: int = 2
-const FULL: int = 3
+const FULL: int = 5
 ## The cross's width stages (0 no room ... CROSS_STAGES all of SIDE) and how fast every stage steps.
 const CROSS_STAGES: int = 3
 const FPS: float = 20.0
@@ -63,12 +65,16 @@ var _nod_way: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _cross: int = 0
 var _clock: float = 0.0
 
+## It went from taking no room to taking some, or back (`visible` follows).
+signal shown_changed()
+
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2.ZERO
+	visible = false
 	set_process(false)
 
 
@@ -181,6 +187,9 @@ func _all_out() -> bool:
 func _size_to_cross() -> void:
 	var side: float = float((SIDE * _cross) / CROSS_STAGES)
 	custom_minimum_size = Vector2(side, side)
+	if visible != (_cross > 0):
+		visible = _cross > 0
+		shown_changed.emit()
 
 
 func _draw() -> void:
@@ -204,7 +213,8 @@ func _draw_slot(slot: int) -> void:
 	draw_rect(cell, OUTLINE)
 	draw_rect(cell.grow(-1.0), CELL_FACE if stage >= SHADOW else OUTLINE)
 	if stage >= SHADOW and _drawn_icon[slot] != null:
-		var tint: Color = Color.WHITE if stage >= FULL and _drawn_count[slot] > 0 else GREY
+		# Shadow, the shades between, full: whole steps of the tint, never a fade of the icon.
+		var tint: Color = GREY.lerp(Color.WHITE, float(stage - SHADOW) / float(FULL - SHADOW))
 		draw_texture_rect(_drawn_icon[slot], Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), false, tint)
 		_draw_count(cell, _drawn_count[slot], TEXT if _drawn_count[slot] > 0 else DIM)
 

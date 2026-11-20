@@ -177,6 +177,40 @@ func test_the_cross_steps_in_never_jumps() -> void:
 		check(widths[at] == floorf(widths[at]), "whole pixels")
 
 
+func test_greying_and_filling_again_pass_the_shades_between() -> void:
+	var cross := QuickCrossScript.new()
+	own(cross)
+	var icon := PlaceholderTexture2D.new()
+	cross.set_slot(0, icon, 1, true)
+	check(cross.visible and cross.stage_of(0) == QuickCrossScript.FULL, "drawn as it stands")
+	cross.set_slot(0, icon, 0)
+	var stages: Array[int] = []
+	while cross.is_moving():
+		cross.advance()
+		stages.append(cross.stage_of(0))
+	check_equal(stages.slice(0, 3), [4, 3, 2] as Array[int], "none left: full to shadow a shade a frame (Smooth)")
+	cross.set_slot(0, icon, 2)
+	stages.clear()
+	while cross.is_moving():
+		cross.advance()
+		stages.append(cross.stage_of(0))
+	check_equal(stages.slice(0, 3), [3, 4, 5] as Array[int], "refilled: back through the shades")
+
+
+func test_an_empty_cross_is_hidden_and_adds_no_gap() -> void:
+	var panel: Control = _hud.get_panel(0)
+	var plan: Dictionary = {"cards": [&"bolt"], "casts": [{"slots": PackedInt32Array([0])}]}
+	var icons: Array[Texture2D] = [null]
+	panel.call("set_staff_plan", 0, plan, icons)
+	panel.set("visible", true)
+	await process_frame
+	var cross: QuickCrossScript = _cross()
+	check(not cross.visible, "nothing bound: the cross is hidden")
+	var staffs := panel.find_child("Staffs", true, false) as Control
+	var lower := panel.find_child("Lower", true, false) as Control
+	check_equal(staffs.size.x, lower.size.x, "the staff rows take the whole row: no gap for an empty cross")
+
+
 func test_on_the_held_map_the_dpad_moves_the_pick_and_drinks_nothing() -> void:
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "potions")
 	_wizard.inventory.bind_quick(3, POTIONS, &"healing")

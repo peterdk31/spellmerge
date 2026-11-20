@@ -127,6 +127,7 @@ func _ready() -> void:
 	_quick.name = "QuickCross"
 	_quick.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_lower.add_child(_quick)
+	_quick.shown_changed.connect(_refresh_rows)
 	_held_note = Label.new()
 	_held_note.name = "JoinHeld"
 	_held_note.visible = false
@@ -383,8 +384,10 @@ func _refresh_rows() -> void:
 	for staff in STAFF_COUNT:
 		_rows[staff].visible = _has_cards[staff] and not _menu_open
 	_staffs.visible = not _menu_open and _has_cards.has(true)
-	_quick.visible = not _menu_open
-	_lower.visible = _staffs.visible or _quick.visible
+	# The cross shows only while it takes room (it says so itself), so an empty one adds no gap;
+	# while a menu is open the whole row hides with the staff rows.
+	_lower.visible = _staffs.visible or (_quick.cross_stage() > 0 and not _menu_open)
+	_quick.modulate.a = 0.0 if _menu_open else 1.0
 
 
 func _refresh_status() -> void:

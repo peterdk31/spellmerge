@@ -141,6 +141,20 @@ func _sections(bytes: PackedByteArray) -> PackedInt32Array:
 	return out
 
 
+## A loadout of nothing but the quick-use bindings `bindings` ([slot, bag, id] each), by hand.
+func _quick_bytes(bindings: Array) -> PackedByteArray:
+	var payload := PackedByteArray([bindings.size()])
+	for binding: Array in bindings:
+		payload.append(int(binding[0]))
+		for text: String in [String(binding[1]), String(binding[2])]:
+			payload.append(text.length())
+			payload.append_array(text.to_ascii_buffer())
+	var out := PackedByteArray([4, PlayerLoadout.BAGS, 1, 0, 0, PlayerLoadout.STAFFS, 1, 0, 0, PlayerLoadout.HANDS, 1, 0, 0, PlayerLoadout.QUICK, 0, 0])
+	out.encode_u16(out.size() - 2, payload.size())
+	out.append_array(payload)
+	return out
+
+
 func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 	var good: PackedByteArray = _bytes(_player())
 	var at: PackedInt32Array = _sections(good)
@@ -213,6 +227,12 @@ func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 	change.call("a bound bag that is no id", quick + 6, 0x2e)
 	change.call("a bound item with no name", quick + 13, 0)
 	change.call("a bound item that is no id", quick + 14, 0x2f)
+	# Bindings the writer never writes: an empty one, slots out of order, one item on two slots.
+	cases["quick-use slots out of order"] = _quick_bytes([[3, "potions", "vigor"], [1, "potions", "healing"]])
+	cases["one item on two quick-use slots"] = _quick_bytes([[0, "potions", "healing"], [1, "potions", "healing"]])
+	cases["one quick-use slot twice"] = _quick_bytes([[1, "potions", "vigor"], [1, "potions", "healing"]])
+	cases["an empty quick-use binding"] = _quick_bytes([[0, "", ""], [0, "potions", "healing"]])
+	check_equal(PlayerLoadout.new().decode_at(_quick_bytes([[1, "potions", "healing"], [3, "potions", "vigor"]]), 0), "", "the same built by hand as the writer writes it is read")
 	var left_over: PackedByteArray = good.duplicate()
 	left_over.encode_u16(hands + 1, left_over.decode_u16(hands + 1) + 1)
 	left_over.append(0)

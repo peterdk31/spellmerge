@@ -580,6 +580,7 @@ The owner decided on 2026-11-20 (on #876's map teleport): **the D-pad never walk
 2. **The cheat code's d-pad** (up, down, left, right, then A B X Y) now uses whatever those arms are bound to as it is typed. Keep it, or change the pad code?
 3. **Only usable items bind** (the potions today; a relic or a card does not). Should a staff or a card kind ever be bindable?
 4. **The cross shows only while something is bound**; an empty cross could instead always show, as a hint that the d-pad can be bound.
+5. **A greyed slot (none left) can only be let go by binding another item over it** or refilled by a pickup: an item with none left is not on the inventory's ring to press its arm on. Should the inventory show bound items with 0 too, so they can be let go?
 
 ## Answered by the owner (2026-11-18)
 

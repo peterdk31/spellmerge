@@ -467,6 +467,7 @@ func _read_quick(bytes: PackedByteArray, at: int, end: int) -> String:
 	at += 1
 	if count > QUICK_SLOTS:
 		return "%d quick-use slots, more than %d" % [count, QUICK_SLOTS]
+	var last: int = -1
 	for each in count:
 		if at >= end:
 			return "quick-use binding %d is cut short" % each
@@ -475,8 +476,15 @@ func _read_quick(bytes: PackedByteArray, at: int, end: int) -> String:
 		var id: Array = [] if bag.is_empty() else _decode_id(bytes, bag[1], end)
 		if id.is_empty():
 			return "quick-use binding %d is cut short or is not an id" % each
-		if slot >= QUICK_SLOTS or _quick_ids[slot] != &"" or not set_quick(slot, bag[0], id[0]):
-			return "quick-use slot %d is out of range, bound twice or not a name" % slot
+		# As the writer writes them: each slot once, in order, a name and an id, no item on two slots.
+		if slot >= QUICK_SLOTS or slot <= last or not _is_name(bag[0]) or not _is_name(id[0]):
+			return "quick-use slot %d is out of range or order, or not a name" % slot
+		for other in QUICK_SLOTS:
+			if _quick_ids[other] == id[0] and _quick_bags[other] == bag[0]:
+				return "quick-use slots %d and %d hold one item" % [other, slot]
+		if not set_quick(slot, bag[0], id[0]):
+			return "quick-use slot %d is past a limit" % slot
+		last = slot
 		at = id[1]
 	read_to = at
 	return ""

@@ -24,6 +24,8 @@ var _ids: Array[StringName] = []
 var _held: Array[Dictionary] = [{}, {}, {}, {}]
 ## By seat: drawn as it stands at the next change (a body announced anew).
 var _at_once: Array[bool] = [true, true, true, true]
+## The icon of an item with none of its own: one, so a count's change is never taken for another item.
+var _no_icon: Texture2D = PlaceholderTexture2D.new()
 
 
 func _init() -> void:
@@ -98,6 +100,6 @@ func _tell(seat: int, slot: int, at_once: bool) -> void:
 	if id != &"":
 		icon = ItemLooks.of(ItemKinds.kind_in(bag, id), id, _registry, _spells)["icon"] as Texture2D
 		if icon == null:
-			icon = PlaceholderTexture2D.new()
+			icon = _no_icon
 		count = int((_held[seat].get(bag, {}) as Dictionary).get(id, 0))
 	_panels[seat].call(&"set_quick", slot, icon, count, at_once)

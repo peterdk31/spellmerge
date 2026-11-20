@@ -457,6 +457,7 @@ func step_corners() -> void:
 			_radials[player].move_quarter(at)
 			_inventories[player].move_quarter(at)
 			_rewards[player].move_room(reward_room(player))
+		_refresh_in(player, view)
 
 
 ## Where seats' panels and menus sit (for tests and screenshots).
@@ -806,12 +807,44 @@ func get_panel(player: int) -> PlayerPanelScript:
 	return _panels[player]
 
 
-## A corner panel shows while its player is in a room, except while their radial builder is open:
-## the radial shows the bars itself, so its column can sit where the panel was (owner,
-## 2026-10-31, docs/milestones/M2-builder-tree.md). The radial is shown before its menu opens and
-## hidden before it closes, so `visible` is already right when UIFocus says so.
+## A corner panel shows while its player is in a room, except while their radial builder,
+## inventory or reward menu is open over it: the menu shows the bars itself, so its column can sit where the panel
+## was (owner, 2026-10-31, docs/milestones/M2-builder-tree.md); a menu open in another quarter than
+## its panel leaves the panel shown (the owner, 2026-11-20: hidden only if it would be covered).
+## The menus are shown before they open and hidden before they close, so `visible` is already right
+## when UIFocus says so; `step_corners` asks again each frame (panels and quarters slide, a reward
+## menu unrolls).
 func _refresh(player: int) -> void:
-	_panels[player].visible = _in_room and _joined[player] and not _radials[player].visible and not _inventories[player].visible
+	_refresh_in(player, (get_node("Root") as Control).size)
+
+
+## `_refresh` on a view of `view` pixels (`step_corners` has it at hand).
+func _refresh_in(player: int, view: Vector2) -> void:
+	_panels[player].visible = _in_room and _joined[player] and not _covered(player, view)
+
+
+## True while seat `player`'s open builder, inventory or reward menu lies over its corner panel, on
+## a view of `view` pixels: a reward menu by its whole laid-out height (so rolling up and down for a
+## reroll never shows the panel between), a builder or inventory by its quarter, and while panel
+## and quarter slide (their paths differ) the panel stays hidden under them.
+func _covered(player: int, view: Vector2) -> bool:
+	var panel: PlayerPanelScript = _panels[player]
+	var at := Rect2(panel.position, panel.size)
+	var reward: RewardMenuScript = _rewards[player]
+	if reward.visible and Rect2(reward.position, Vector2(reward.size.x, reward.full_height())).intersects(at):
+		return true
+	if not _radials[player].visible and not _inventories[player].visible:
+		return false
+	if _corners.is_sliding(player):
+		return true
+	var origin: Vector2 = _menus_at[player] if _menus_at[player].is_finite() else SeatCornersScript.quarter_origin(player, view)
+	return menu_covers(origin, view, at)
+
+
+## True when a builder or inventory laid in the quarter at `origin` of a view of `view` pixels lies
+## over a panel at `panel` (they fill their quarter).
+static func menu_covers(origin: Vector2, view: Vector2, panel: Rect2) -> bool:
+	return Rect2(origin, (view * 0.5).floor()).intersects(panel)
 
 
 func _on_player_joined(player: int) -> void:

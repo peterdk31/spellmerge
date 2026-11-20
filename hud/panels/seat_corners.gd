@@ -118,4 +118,8 @@ static func slide(from: Vector2, to: Vector2) -> Vector2:
 	if step >= length:
 		return to
 	var next: Vector2 = (from + way * (step / length)).round()
+	# A slant rounded to whole pixels can come out longer than its step: a pixel shorter until not.
+	while (next - from).length() > SLIDE_MOST and step > 1.0:
+		step -= 1.0
+		next = (from + way * (step / length)).round()
 	return to if next == from else next

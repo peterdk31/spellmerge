@@ -63,6 +63,10 @@ public:
 	double threat_query(Object *manager, const Vector2 &point, double radius, int64_t team, int64_t own, double horizon);
 	// `shot_places`: which places hold a shot, from the room grid's whole squares (asks handed back).
 	int64_t shot_places(Object *manager, int64_t from);
+	// The draw regions' hand-out (`DrawRegions`: `_count`, `_write`): each region's rows counted, and
+	// each row copied into its region's buffer, by the place its square lies in.
+	void region_counts(Object *regions, const PackedFloat32Array &rows, int64_t count);
+	void region_rows(Object *regions, const PackedFloat32Array &rows, int64_t count);
 
 protected:
 	static void _bind_methods();

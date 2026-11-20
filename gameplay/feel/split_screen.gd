@@ -13,8 +13,13 @@ extends Node
 ##   root's screen by a rect over that box on a canvas layer (LAYER, over the world and under the
 ##   HUD's panels), textured with the view, whose shader keeps its cell and draws the divider
 ##   (`split_cell.gdshader`). A view keeps its node while it lives (its slot).
+## - **Each view draws the world and its own readers of the light:** its canvas cull mask is the
+##   world's layer and its own (`ViewReaders.view_mask`, by its place in `views()`, which is its light
+##   buffer's), so of each reader (the apply rect, the motes, the mist) it draws its own copy, whose
+##   material's uniform names its buffer; the void view is one view more, after them (no buffer: no
+##   light in the void).
 ## - **The root stops drawing the world** while there is a view: its canvas cull mask drops the
-##   world's visibility layer (WORLD_LAYER, every canvas item's default) and keeps SCREEN_LAYER,
+##   world's visibility layer (WORLD_LAYER, every canvas item's default) and the views' own layers, and keeps SCREEN_LAYER,
 ##   which every canvas item on one of the root's canvas layers gets (the HUD's panels, the markers,
 ##   the cells), so the HUD stays in the screen's corners, drawn once over the views.
 ## - **Published** (`ScreenViews.publish` on the root) while there are two views or more, for what
@@ -46,11 +51,13 @@ const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
+const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
 
-## The visibility layer of the world's canvas items (the default), and the one the root keeps.
-const WORLD_LAYER: int = 1
-const SCREEN_LAYER: int = 1 << 1
+## The visibility layer of the world's canvas items (the default), and the one the root keeps
+## (`view_readers.gd`'s, which also names each view's own layer: its copies of what reads the light).
+const WORLD_LAYER: int = ViewReadersScript.WORLD_LAYER
+const SCREEN_LAYER: int = ViewReadersScript.SCREEN_LAYER
 ## The canvas layer the views are shown on: over the world, under the HUD's panels (10).
 const LAYER: int = 5
 ## The divider's colour (the void's dark).
@@ -263,6 +270,11 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2, box: 
 	if shown.size != box.size:
 		shown.size = box.size
 	shown.canvas_transform = laid.to_screen[view].translated(-Vector2(box.position))
+	# The world and this view's own readers of the light (its light buffer is the view's place in
+	# `views()`, as the light is handed them).
+	var mask: int = ViewReadersScript.view_mask(view)
+	if shown.canvas_cull_mask != mask:
+		shown.canvas_cull_mask = mask
 	shown.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var cell: TextureRect = _cells[slot]
 	cell.visible = true
@@ -373,6 +385,11 @@ func _show_void(quarter: int, screen: Vector2) -> void:
 	var zoom: float = maxf(camera.view_zoom(), 0.0001)
 	var origin: Vector2 = ((void_bounds.position - Vector2.ONE * VOID_AWAY) * zoom - Vector2(half) * 0.5).round()
 	_void_view.canvas_transform = Transform2D(0.0, Vector2(zoom, zoom), 0.0, -origin)
+	# One view more than those drawn (its readers after theirs: the light reads none there, and the
+	# motes cull by what it shows; Feel's spectacle hands the light its box after the views').
+	var mask: int = ViewReadersScript.view_mask(mini(camera.views.count, ViewReadersScript.VIEWS_MOST - 1))
+	if _void_view.canvas_cull_mask != mask:
+		_void_view.canvas_cull_mask = mask
 	_void_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_void_cell.position = Vector2(float(half.x * (quarter % 2)), float(half.y * (quarter >> 1)))
 	_void_cell.size = Vector2(half)
@@ -405,7 +422,7 @@ func _new_view(named: String) -> SubViewport:
 	view.snap_2d_transforms_to_pixel = _root.snap_2d_transforms_to_pixel
 	view.snap_2d_vertices_to_pixel = _root.snap_2d_vertices_to_pixel
 	view.canvas_item_default_texture_filter = _root.canvas_item_default_texture_filter
-	view.canvas_cull_mask = WORLD_LAYER
+	view.canvas_cull_mask = ViewReadersScript.view_mask(0)
 	view.size = Vector2i(_root.get_visible_rect().size)
 	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(view)
@@ -435,7 +452,7 @@ func _start() -> void:
 	_keep_on_screen(_root)
 	if not get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.connect(_on_node_added)
-	_root.canvas_cull_mask = (_mask_before & ~WORLD_LAYER) | SCREEN_LAYER
+	_root.canvas_cull_mask = (_mask_before & ~(WORLD_LAYER | ViewReadersScript.ALL_VIEW_LAYERS)) | SCREEN_LAYER
 
 
 ## One picture again: the root draws the world, no view draws, nothing published.

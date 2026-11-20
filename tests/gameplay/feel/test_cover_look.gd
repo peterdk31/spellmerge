@@ -136,7 +136,14 @@ func test_one_batch_a_kind_made_by_batches_at_the_marks_z() -> void:
 	for kind_id: StringName in [&"test_grass", &"test_moss"]:
 		var batch: MultiMeshInstance2D = cover.batch_of(kind_id)
 		check(batch != null and batch.visible, "%s has its batch" % kind_id)
-		check_equal(batch.multimesh.custom_aabb, BatchesScript.WORLD, "%s's batch is made by Batches.multimesh(): never culled" % kind_id)
+		# Its box is its room's (the performance pass, 2026-11-20): a view that does not show the room
+		# culls it; every tuft, its frame and bend inside the box.
+		var box: AABB = batch.multimesh.custom_aabb
+		var room := Rect2(Vector2(box.position.x, box.position.y), Vector2(box.size.x, box.size.y))
+		var layout_rect := Rect2(cover.layout.origin, cover.layout.size)
+		check(room.encloses(layout_rect.grow(16.0)) and not room.encloses(layout_rect.grow(64.0)), "%s's batch's box is its room's, grown by a tuft (%s)" % [kind_id, room])
+		for foot in _feet(cover, kind_id):
+			check(room.grow(-16.0).has_point(foot), "a tuft's foot and frame inside it")
 		check(batch.multimesh.use_colors and batch.multimesh.use_custom_data, "%s's rows carry a colour and custom data, as the warm-up draws a batch" % kind_id)
 		check_equal((batch.material as ShaderMaterial).shader, CoverScript.SHADER, "drawn by the cover shader")
 		check_equal((batch.material as ShaderMaterial).get_shader_parameter(&"sheet_size"), Vector2(96, 16), "told its sheet's size, to draw exactly a frame of it")

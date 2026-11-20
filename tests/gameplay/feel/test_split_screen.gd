@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 ## drawn once over the views); the views are published for what reads the picture by the screen;
 ## the spell light has a buffer a view and tells each reader every view's transform. Merged again,
 ## all of it is put back.
+const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
@@ -96,7 +97,8 @@ func test_a_split_draws_the_world_in_views_and_the_hud_on_the_root() -> void:
 		var cell := _split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(view))) as TextureRect
 		check_equal(shown.canvas_transform, laid.to_screen[view].translated(-cell.position), "view %d draws through its own transform, from its box's corner" % view)
 		check_equal(Vector2(shown.size), cell.size, "view %d is its box's size" % view)
-		check_equal(shown.canvas_cull_mask, SplitScreenScript.WORLD_LAYER, "view %d draws the world's layer" % view)
+		check_equal(shown.canvas_cull_mask, SplitScreenScript.WORLD_LAYER | ViewReadersScript.view_layer(view), "view %d draws the world's layer and its own readers'" % view)
+	check_equal(root.canvas_cull_mask & (SplitScreenScript.WORLD_LAYER | ViewReadersScript.ALL_VIEW_LAYERS), 0, "the root draws neither the world nor any view's readers")
 	# Merged again: everything put back.
 	far.global_position = Vector2(60.0, 0.0)
 	_frames(400)
@@ -106,11 +108,17 @@ func test_a_split_draws_the_world_in_views_and_the_hud_on_the_root() -> void:
 	check(_split.views().is_empty(), "no view")
 
 
-func test_the_light_has_a_buffer_a_view_and_tells_its_readers_each_view() -> void:
+func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> void:
 	var light := own(SpellLightScript.new(null, 0)) as SpellLightScript
 	root.add_child(light)
 	var reader := ShaderMaterial.new()
 	reader.shader = preload("res://gameplay/feel/mote.gdshader")
+	var holder := own(Node2D.new()) as Node2D
+	root.add_child(holder)
+	var before := MultiMeshInstance2D.new()
+	before.material = reader
+	before.z_index = 3
+	holder.add_child(before)
 	light.read_by(&"motes", reader)
 	_wizard(0, Vector2(0.0, 0.0))
 	_wizard(1, Vector2(3000.0, 0.0))
@@ -119,18 +127,59 @@ func test_the_light_has_a_buffer_a_view_and_tells_its_readers_each_view() -> voi
 	check_equal(light.view_count(), 2, "a buffer a view")
 	check(light.view_buffer(1).world_2d == light.viewport.world_2d, "the second buffer draws the same lights")
 	check(light.view_buffer(1).get_parent() == light, "it is the light's")
-	var apply := light.apply.material as ShaderMaterial
-	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 2, "the apply rect reads two views")
-	check_equal(int(reader.get_shader_parameter(&"light_view_count")), 2, "and so does a reader")
 	check(reader.get_shader_parameter(&"light_buffer_1") == light.view_buffer(1).get_texture(), "the reader has the second view's buffer")
+	check(not (light.apply.material as ShaderMaterial).get_shader_parameter(&"light_view_count") is int, "no view is matched by its transform any more")
+	# Named, never matched (the owner, 2026-11-20): each reader is one item a view.
+	for item: CanvasItem in [light.apply, before]:
+		check_equal(item.visibility_layer, ViewReadersScript.view_layer(0), "%s is the first view's (and the one picture's)" % item.name)
+		var copy: CanvasItem = light.readers.copy_of(item, 1)
+		check(copy != null and copy.visible, "%s has a copy for the second view" % item.name)
+		if copy == null:
+			continue
+		check_equal(copy.visibility_layer, ViewReadersScript.view_layer(1), "on the second view's layer alone")
+		var own := copy.material as ShaderMaterial
+		check(own != null and own != item.material and own.shader == (item.material as ShaderMaterial).shader, "drawn with a material of its own, the same shader")
+		check_equal(int(own.get_shader_parameter(ViewReadersScript.VIEW_ID)), 1, "naming the second view's buffer")
+		check(own.get_shader_parameter(&"light_buffer_1") == (item.material as ShaderMaterial).get_shader_parameter(&"light_buffer_1"), "its other uniforms the item's")
+		check_equal(copy.get_index(), item.get_index() + 1, "drawn just after it")
+		check_equal(copy.z_index, item.z_index, "at its z")
+		check(light.readers.copy_of(item, 2) == null, "no copy for a view not drawn")
+	# A reader that comes while split gets its copy too.
+	var later := MultiMeshInstance2D.new()
+	later.material = reader
+	holder.add_child(later)
+	light.use_views(_split.views())
+	check(light.readers.copy_of(later, 1) != null, "a reader come while split gets its copy")
+	# A uniform set on the item's material reaches every view's copy of it.
+	reader.set_shader_parameter(&"sim_time", 12.5)
+	light.follow()
+	check_equal(float((light.readers.copy_of(before, 1).material as ShaderMaterial).get_shader_parameter(&"sim_time")), 12.5, "a uniform set on the item's material reaches the view's")
+	check((light.readers.copy_of(before, 1).material as ShaderMaterial).get_shader_parameter(ViewReadersScript.CULL_BOX) is Vector4, "a reader that culls is told its view's box")
+	before.visible = false
+	light.follow()
+	check(not light.readers.copy_of(before, 1).visible, "a hidden reader's copy is hidden")
 	var drawn: Transform2D = (_split.views()[1] as SubViewport).canvas_transform
-	var named: Vector4 = apply.get_shader_parameter(&"light_view_1")
-	check(named.is_equal_approx(Vector4(drawn.x.x, drawn.origin.x, drawn.origin.y, 0.0)), "the second view's transform is named (%s)" % named)
 	var expected: Transform2D = Transform2D(0.0, Vector2.ONE / SpellLightScript.DOWNSCALE, 0.0, Vector2.ZERO) * drawn
 	check(light.view_buffer(1).canvas_transform.is_equal_approx(expected), "the second buffer follows the second view, scaled down")
+	var copy_of_later: CanvasItem = light.readers.copy_of(later, 1)
+	later.queue_free()
+	await process_frame
+	check(not is_instance_valid(copy_of_later) or copy_of_later.is_queued_for_deletion(), "a reader gone takes its copies")
 	light.use_views([] as Array[Viewport])
 	check_equal(light.view_count(), 0, "one picture again")
-	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 0, "the apply rect reads the one buffer")
+	check(not light.readers.copy_of(light.apply, 1).visible, "the copies are hidden with one picture")
+	light.release()
+	# The light switched off: its readers drawn as any of the world's again, culled by no box.
+	root.remove_child(light)
+	check_equal(before.visibility_layer, ViewReadersScript.WORLD_LAYER, "a reader the light let go is on the world's layer again")
+	check_equal(reader.get_shader_parameter(ViewReadersScript.CULL_BOX), Vector4.ZERO, "and culls by no box")
+	# A reader whose material is changed to one the light does not read is let go too.
+	root.add_child(light)
+	light.use_views(_split.views())
+	before.material = ShaderMaterial.new()
+	light.use_views(_split.views())
+	check(not light.readers.items().has(before), "a reader drawn with another material is let go")
+	check_equal(before.visibility_layer, ViewReadersScript.WORLD_LAYER, "back on the world's layer")
 	light.release()
 
 

@@ -314,7 +314,11 @@ func _throw_motes(n: int) -> void:
 ## The vertices the batches send the GPU this frame: each batch's instances x its mesh's vertices.
 func _vertices() -> int:
 	var total: int = 0
+	# A biome's batches draw by room, under each batch's node (core/projectiles/draw_regions.gd).
+	var batches: Array[Node] = _mgr.get_children()
 	for child in _mgr.get_children():
+		batches.append_array(child.get_children())
+	for child in batches:
 		var batch := child as MultiMeshInstance2D
 		if batch != null and batch.multimesh.mesh is ArrayMesh:
 			total += batch.multimesh.visible_instance_count * (batch.multimesh.mesh as ArrayMesh).surface_get_array_len(0)

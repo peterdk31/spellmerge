@@ -60,6 +60,11 @@ constexpr double WALL_CELL = 8.0;
 // `PLACE_ASK`: RoomGrid's PLACE_CELL and WHOLE_ASK, on the manager).
 constexpr double PLACE_CELL = 32.0;
 constexpr int64_t PLACE_ASK = 255;
+// The draw regions' (`DrawRegions`, core/projectiles/draw_regions.gd): a row whose transform has a
+// part past this is a crosser (the performance pass, 2026-11-20).
+constexpr double REGION_SPAN_MOST = 128.0;
+// The most places drawn by region (`DrawRegions.MOST`): the hand-out's arrays are this size + 1.
+constexpr int64_t REGION_MOST = 64;
 constexpr int S_HELD = 2;
 constexpr int S_RETURNING = 3;
 constexpr int S_WAITING = 8;
@@ -203,6 +208,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
 	X(room_grid, "_room_grid", OBJECT) \
 	X(places_found, "_places_found", PACKED_BYTE_ARRAY) \
+	X(draw_regions, "_draw_regions", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
 	X(grid_x, "_grid_x", FLOAT) \
 	X(grid_y, "_grid_y", FLOAT) \
@@ -359,17 +365,33 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(spell_at, "_spell_at", PACKED_INT64_ARRAY) \
 	X(spell_damage, "_spell_damage", PACKED_FLOAT64_ARRAY)
 
+// Every member of the manager's draw regions (`DrawRegions`, `_draw_regions`; the performance pass,
+// 2026-11-20) the hand-out reads and writes: its place squares, how many across and down and their
+// corner, its places, each region's rows counted and written, and the batch's buffers written now.
+// Checked on the regions by `check_fields`.
+#define REGION_FIELDS(X) \
+	X(rg_whole, "_whole", PACKED_BYTE_ARRAY) \
+	X(rg_columns, "_columns", INT) \
+	X(rg_lines, "_lines", INT) \
+	X(rg_origin, "_origin", VECTOR2) \
+	X(rg_places, "places", INT) \
+	X(rg_counts, "counts", PACKED_INT32_ARRAY) \
+	X(rg_fill, "_fill", PACKED_INT32_ARRAY) \
+	X(rg_current, "_current", ARRAY)
+
 struct Names {
 #define SM_DECLARE(id, gd, type) StringName id;
 	MANAGER_FIELDS(SM_DECLARE)
 	GRID_FIELDS(SM_DECLARE)
 	BATCH_FIELDS(SM_DECLARE)
+	REGION_FIELDS(SM_DECLARE)
 #undef SM_DECLARE
 	Names() {
 #define SM_INIT(id, gd, type) id = StringName(gd);
 		MANAGER_FIELDS(SM_INIT)
 		GRID_FIELDS(SM_INIT)
 		BATCH_FIELDS(SM_INIT)
+		REGION_FIELDS(SM_INIT)
 #undef SM_INIT
 	}
 };
@@ -1397,6 +1419,8 @@ const Constant CONSTANTS[] = {
 	{ "WALL_CELL", (double)WALL_CELL },
 	{ "PLACE_CELL", (double)PLACE_CELL },
 	{ "PLACE_ASK", (double)PLACE_ASK },
+	{ "REGION_SPAN_MOST", (double)REGION_SPAN_MOST },
+	{ "REGION_MOST", (double)REGION_MOST },
 	{ "S_HELD", (double)S_HELD },
 	{ "S_RETURNING", (double)S_RETURNING },
 	{ "S_WAITING", (double)S_WAITING },
@@ -1516,6 +1540,18 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 	}
 	BATCH_FIELDS(SM_BATCH_CHECK)
 #undef SM_BATCH_CHECK
+	// The draw regions', on the regions (the performance pass, 2026-11-20).
+	Object *regions = manager->get(names->draw_regions);
+	if (regions == nullptr) {
+		wrong.push_back(String("member _draw_regions missing or empty"));
+		return wrong;
+	}
+#define SM_REGION_CHECK(id, gd, type)                                     \
+	if (regions->get(names->id).get_type() != Variant::type) {             \
+		wrong.push_back(String("draw regions member ") + gd + " missing or not " #type); \
+	}
+	REGION_FIELDS(SM_REGION_CHECK)
+#undef SM_REGION_CHECK
 	return wrong;
 }
 
@@ -2677,6 +2713,101 @@ int64_t ShotKernel::shot_places(Object *m, int64_t from) {
 	return -1;
 }
 
+// --- The draw regions --------------------------------------------------------------------------
+
+namespace {
+
+// `DrawRegions`' place squares, read for one call.
+struct Regions {
+	Arr<PackedByteArray> whole;
+	Arr<PackedInt32Array> counts, fill;
+	int64_t columns = 0, lines = 0, places = 0;
+	double origin_x = 0.0, origin_y = 0.0;
+	bool load(Object *r) {
+		const Names &k = *names;
+		whole.load(r, k.rg_whole);
+		counts.load(r, k.rg_counts);
+		fill.load(r, k.rg_fill);
+		columns = r->get(k.rg_columns);
+		lines = r->get(k.rg_lines);
+		places = r->get(k.rg_places);
+		const Vector2 origin = r->get(k.rg_origin);
+		origin_x = origin.x;
+		origin_y = origin.y;
+		return places >= 0 && places <= REGION_MOST && whole.n >= columns * lines && counts.n > places && fill.n > places;
+	}
+	// `DrawRegions.region_of`.
+	int64_t region_of(const float *row) const {
+		if (std::abs((double)row[0]) > REGION_SPAN_MOST || std::abs((double)row[1]) > REGION_SPAN_MOST || std::abs((double)row[4]) > REGION_SPAN_MOST || std::abs((double)row[5]) > REGION_SPAN_MOST) {
+			return 0;
+		}
+		const int64_t x = floori(((double)row[3] - origin_x) / PLACE_CELL);
+		const int64_t y = floori(((double)row[7] - origin_y) / PLACE_CELL);
+		if (x < 0 || x >= columns || y < 0 || y >= lines) {
+			return 0;
+		}
+		const int64_t code = whole.p[y * columns + x];
+		if (code == 0 || code == PLACE_ASK || code > places) {
+			return 0;
+		}
+		return code;
+	}
+};
+
+} // namespace
+
+void ShotKernel::region_counts(Object *regions, const PackedFloat32Array &rows, int64_t count) {
+	ERR_FAIL_NULL(regions);
+	Regions r;
+	ERR_FAIL_COND(!r.load(regions) || count < 0 || rows.size() < count * DRAW_STRIDE);
+	const float *in = rows.ptr();
+	for (int64_t row = 0; row < count; row++) {
+		r.counts[r.region_of(in + row * DRAW_STRIDE)] += 1;
+	}
+}
+
+void ShotKernel::region_rows(Object *regions, const PackedFloat32Array &rows, int64_t count) {
+	ERR_FAIL_NULL(regions);
+	Regions r;
+	ERR_FAIL_COND(!r.load(regions) || count < 0 || rows.size() < count * DRAW_STRIDE);
+	Array current = regions->get(names->rg_current);
+	ERR_FAIL_COND(current.size() <= r.places);
+	// Each region's buffer (the regions sized each for its count first), taken out of the list while
+	// written (`ptrw` then copies it only if the renderer still holds it) and put back after.
+	// Fixed arrays (no allocation a frame): at most REGION_MOST places (`load` checks it).
+	PackedFloat32Array held[REGION_MOST + 1];
+	float *out[REGION_MOST + 1] = {};
+	int64_t room[REGION_MOST + 1] = {};
+	for (int64_t region = 0; region <= r.places; region++) {
+		if (r.counts[region] == 0) {
+			continue;
+		}
+		held[region] = current[region];
+		current[region] = PackedFloat32Array();
+		out[region] = held[region].ptrw();
+		room[region] = held[region].size() / DRAW_STRIDE;
+	}
+	const float *in = rows.ptr();
+	for (int64_t row = 0; row < count; row++) {
+		const float *from = in + row * DRAW_STRIDE;
+		const int64_t region = r.region_of(from);
+		const int64_t at = r.fill[region];
+		r.fill[region] = (int32_t)(at + 1);
+		if (at >= room[region]) {
+			continue;
+		}
+		float *to = out[region] + at * DRAW_STRIDE;
+		for (int f = 0; f < DRAW_STRIDE; f++) {
+			to[f] = from[f];
+		}
+	}
+	for (int64_t region = 0; region <= r.places; region++) {
+		if (r.counts[region] != 0) {
+			current[region] = held[region];
+		}
+	}
+}
+
 void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
 	ClassDB::bind_method(D_METHOD("set_threads", "threads"), &ShotKernel::set_threads);
@@ -2693,4 +2824,6 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("threat_fill", "manager", "horizon"), &ShotKernel::threat_fill);
 	ClassDB::bind_method(D_METHOD("threat_query", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_query);
 	ClassDB::bind_method(D_METHOD("shot_places", "manager", "from"), &ShotKernel::shot_places);
+	ClassDB::bind_method(D_METHOD("region_counts", "regions", "rows", "count"), &ShotKernel::region_counts);
+	ClassDB::bind_method(D_METHOD("region_rows", "regions", "rows", "count"), &ShotKernel::region_rows);
 }

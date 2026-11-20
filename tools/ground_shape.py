@@ -472,7 +472,7 @@ class Ground:
                 px, py = x + 0.5, y + 0.5
                 qx, qy = abs(px - cx) - hw, abs(py - cy) - hh
                 inward = -(length_of(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - corner)
-                if inward >= reach:
+                if inward >= reach > 0.0:
                     # Deep inside: no wander, bay or keep-clear circle can change it.
                     self.land[p] = 1
                     continue

@@ -314,7 +314,7 @@ const RACK_ROW: Array[StringName] = [&"patient_sentry", &"glacier_engine", &"ham
 const RACK_ROW_2: Array[StringName] = [&"prism_crown", &"choir_of_wisps", &"meteor_orchard", &"maelstrom_heart", &"hall_of_mirrors", &"thunderclap_gauntlet"]
 
 
-func test_the_rack_is_one_row_on_open_floor() -> void:
+func test_the_rack_is_two_rows_on_open_floor() -> void:
 	var places: RoomPlaces = _room().places()
 	var row: Array[Vector2] = []
 	var ids: Array[StringName] = []

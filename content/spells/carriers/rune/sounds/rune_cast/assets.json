@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/rune/sounds/rune_cast/rune_cast.sound.json",
-			"recipe_hash": "sha256:8cbef3de299880ebccfda9afa911a750073c73ed9fc60fc7f5f329cc9ae04e27",
-			"audio_hash": "sha256:bf43af6885217f1fd5b4b7813af43f7297ddb70b8cb614d3eda8333bc3b8d5c6",
-			"loudness": -22.9,
-			"peak": -6.3
+			"recipe_hash": "sha256:ff2520c0b4434168fd2b063c5e74f2fe6626bdfb65dc883d9934392aad8f8242",
+			"audio_hash": "sha256:466f7936ee6c0aaaa58aad59c24ca0899eba78d89524a7379316db2308522f0e",
+			"loudness": -34.0,
+			"peak": -15.4
 		},
 		{
 			"path": "content/spells/carriers/rune/sounds/rune_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/rune/sounds/rune_cast/rune_cast.sound.json",
-			"recipe_hash": "sha256:8cbef3de299880ebccfda9afa911a750073c73ed9fc60fc7f5f329cc9ae04e27",
-			"audio_hash": "sha256:ee8209c3671a311700ea856b699dfa1ef6373605dd66d40a6ad9a6be8c0f4c43",
-			"loudness": -22.8,
-			"peak": -5.8
+			"recipe_hash": "sha256:ff2520c0b4434168fd2b063c5e74f2fe6626bdfb65dc883d9934392aad8f8242",
+			"audio_hash": "sha256:547d717707132283d320ef8daf35112679afc72cb5c03ed3ed9f176057b42f33",
+			"loudness": -33.7,
+			"peak": -14.8
 		},
 		{
 			"path": "content/spells/carriers/rune/sounds/rune_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/rune/sounds/rune_cast/rune_cast.sound.json",
-			"recipe_hash": "sha256:8cbef3de299880ebccfda9afa911a750073c73ed9fc60fc7f5f329cc9ae04e27",
-			"audio_hash": "sha256:7e633b28b904f7f52d6234ca63e825c9b77488a8ecdda71e439d3205ad6497f7",
-			"loudness": -22.7,
-			"peak": -6.1
+			"recipe_hash": "sha256:ff2520c0b4434168fd2b063c5e74f2fe6626bdfb65dc883d9934392aad8f8242",
+			"audio_hash": "sha256:46d4deb1e0ae57b39991793c3d62a9d5b00c4cad721fc0456668d3c987cc48f3",
+			"loudness": -33.7,
+			"peak": -14.8
 		},
 		{
 			"path": "content/spells/carriers/rune/sounds/rune_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/rune/sounds/rune_cast/rune_cast.sound.json",
-			"recipe_hash": "sha256:8cbef3de299880ebccfda9afa911a750073c73ed9fc60fc7f5f329cc9ae04e27",
-			"audio_hash": "sha256:ac78f63662e7317abaeb59990103e30fd2bda36c77ff9b7cff8fdf37333c6c78",
-			"loudness": -23.6,
-			"peak": -6.3
+			"recipe_hash": "sha256:ff2520c0b4434168fd2b063c5e74f2fe6626bdfb65dc883d9934392aad8f8242",
+			"audio_hash": "sha256:b090a1cad1c439b701b88d7828ff9b8fe7e44439476bde16515e5afc376947d8",
+			"loudness": -34.6,
+			"peak": -17.0
 		}
 	]
 }

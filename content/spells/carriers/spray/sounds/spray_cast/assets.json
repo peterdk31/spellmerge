@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
-			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
-			"audio_hash": "sha256:f1aaf3a65ea60595039579d9cb365f885272abc43194d486fd3307e3bdd79f72",
-			"loudness": -26.1,
-			"peak": -6.8
+			"recipe_hash": "sha256:ead857745d8404110ebc74e34f44dd1783c92e6d0c54a2a0b0833fe20bd22008",
+			"audio_hash": "sha256:4248235a15d5ec063113ba74ec8d93ba2a32a761ce00a26d7422a5b7a15408ee",
+			"loudness": -40.0,
+			"peak": -19.7
 		},
 		{
 			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
-			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
-			"audio_hash": "sha256:0e6b80ed034d7f31766ade625abe7534b81642d31764e2e0f5fdd3f74f89c560",
-			"loudness": -26.5,
-			"peak": -8.2
+			"recipe_hash": "sha256:ead857745d8404110ebc74e34f44dd1783c92e6d0c54a2a0b0833fe20bd22008",
+			"audio_hash": "sha256:4dd25c233a3e00f1d7a9a419aba91ee04810b6c9bc0c0e22ae82978f43fed697",
+			"loudness": -39.9,
+			"peak": -18.7
 		},
 		{
 			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
-			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
-			"audio_hash": "sha256:341cd08935093ef053377e4c92043fb782e83c6783b692fe6a2a54c775c96898",
-			"loudness": -25.2,
-			"peak": -6.4
+			"recipe_hash": "sha256:ead857745d8404110ebc74e34f44dd1783c92e6d0c54a2a0b0833fe20bd22008",
+			"audio_hash": "sha256:05349b3c4a265d046d801992b74bfa5dd10c8a825009f86ff2d5cf6253218092",
+			"loudness": -40.3,
+			"peak": -20.0
 		},
 		{
 			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
-			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
-			"audio_hash": "sha256:e60e956010694c93586f432f5314eef525ea11484a527e4e1c5588beb1d8a01c",
-			"loudness": -26.2,
-			"peak": -8.0
+			"recipe_hash": "sha256:ead857745d8404110ebc74e34f44dd1783c92e6d0c54a2a0b0833fe20bd22008",
+			"audio_hash": "sha256:17dcd65278f58807ad23cec182bb5f0c427367e50fbe240858b624a2202bf4d1",
+			"loudness": -39.8,
+			"peak": -19.6
 		}
 	]
 }

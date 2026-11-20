@@ -64,7 +64,7 @@ func _wizard(index: int) -> Actor:
 
 ## What combat sends for one hit: its kind, then the damage.
 func _hit(by: int, target: Node, kind: StringName = &"shot") -> void:
-	bus.hit_landed.emit(by, target, 5, Vector2.ZERO, kind, -1)
+	bus.hit_landed.emit(by, target, 5, Vector2.ZERO, kind, -1, &"")
 	bus.damage_dealt.emit(by, target, 5, Vector2(4.0, 0.0))
 
 

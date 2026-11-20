@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.18000000000000002,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 309006
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 600,
+				"q": 0.6,
+				"to": 276.0
+			},
+			"length": 0.128,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 110,
+				"to": 86.9
+			},
+			"length": 0.096,
+			"gain": -10,
+			"amp": {
+				"attack": 0.015,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 700,
+				"to": 301.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.096,
+			"gain": -6,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A pulse's wave catching a body: a wide, round snow, longer, as several are caught at once. It sits 7 dB under the family's level (gain -7): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -7,
+	"fx": {
+		"lowpass": 1200
+	}
+}

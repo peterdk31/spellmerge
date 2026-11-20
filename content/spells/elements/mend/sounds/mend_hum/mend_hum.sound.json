@@ -1,0 +1,42 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 2.0,
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 392,
+				"to": 396,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": 588,
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -10
+		},
+		{
+			"source": "sine",
+			"pitch": 196,
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Mend in a beam's hum: a warm, soft chord held on (G and D), no strike."
+}

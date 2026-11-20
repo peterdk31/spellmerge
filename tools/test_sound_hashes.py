@@ -96,7 +96,7 @@ class CheckTest(unittest.TestCase):
         self.bake()
         style = self.root / sound.STYLE
         text = style.read_text(encoding="utf-8")
-        row = "| `combat` (cast, hit, small effects) | -20 momentary |"
+        row = "| `combat` (cast, hit, small effects) | -26 momentary |"
         self.assertIn(row, text)
         style.write_text(text.replace(row, "| `combat` (cast, hit, small effects) | -14 momentary |"), encoding="utf-8")
         self.assertIn("docs/STYLE.md", sound.check(self.root)[0])

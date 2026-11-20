@@ -690,3 +690,16 @@ func test_a_plain_hit_is_a_hit_with_no_effect_of_its_own() -> void:
 		card.behaviour_strength = 1.0
 		var spell: CompiledSpell = _compile("effect_%d bolt" % kind).casts[0].group.spells[0]
 		check(spell.behaviour(kind) > 0.0 and not spell.plain_hit(), "behaviour %d" % kind)
+
+
+func test_a_hit_names_its_carrier_card_and_a_blast_or_zap_names_none() -> void:
+	# Feel sounds a carrier's own hit from its card (`CarrierCard.hit_sound`, docs/milestones/sound.md,
+	# "Hits by carrier"); a blast's strike and a zap's arc are theirs, so they keep their kind's sound.
+	_fake.items[&"zap"] = load("res://content/spells/modifiers/zap/zap.tres")
+	_fake.items[&"beam"] = load("res://content/spells/carriers/beam/beam.tres")
+	var spell: CompiledSpell = _compile("blast zap bolt").casts[0].group.spells[0]
+	check_equal(spell.hit.card, &"bolt", "a bolt's hit names the bolt")
+	check(spell.blast_hit != null and spell.blast_hit.card == &"", "its blast's strike names no card")
+	check(spell.zap_hit != null and spell.zap_hit.card == &"", "nor its zap's arc")
+	check_equal(spell.hit.copy().card, &"bolt", "a copy of the hit (a relay's) keeps its card")
+	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.card, &"beam", "a beam's names the beam")

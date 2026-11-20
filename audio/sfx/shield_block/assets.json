@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/shield_block/shield_block.sound.json",
-			"recipe_hash": "sha256:24afbb1d9b31733c6a6d007ca036e4e488556c29f0480b8c7dff87f3c8a4a85e",
-			"audio_hash": "sha256:e4412451af9b7ff9179392b812011754d2e77828f8320d2b7c531379671fc3f6",
-			"loudness": -20.2,
-			"peak": -4.7
+			"recipe_hash": "sha256:23c6cfb167e4eedc2063fcbd7fc0676aef9b3b9ce867327dd0a8f9e2e64276a3",
+			"audio_hash": "sha256:69ae3361b94ff5cfb433ee953982ea44e9a4dd15dbbfcaa067b84c3fdb2110a0",
+			"loudness": -26.2,
+			"peak": -10.7
 		},
 		{
 			"path": "audio/sfx/shield_block/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/shield_block/shield_block.sound.json",
-			"recipe_hash": "sha256:24afbb1d9b31733c6a6d007ca036e4e488556c29f0480b8c7dff87f3c8a4a85e",
-			"audio_hash": "sha256:f0bd2ee9c8c3fd2bb6cb75d9f6f952bad88dae94676c33e17decd3a10db796e9",
-			"loudness": -19.9,
-			"peak": -4.7
+			"recipe_hash": "sha256:23c6cfb167e4eedc2063fcbd7fc0676aef9b3b9ce867327dd0a8f9e2e64276a3",
+			"audio_hash": "sha256:a698f38c84e221d2bcc575446c3afed93368518942e73ec87ed34c9ed3e808cf",
+			"loudness": -25.9,
+			"peak": -10.7
 		},
 		{
 			"path": "audio/sfx/shield_block/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/shield_block/shield_block.sound.json",
-			"recipe_hash": "sha256:24afbb1d9b31733c6a6d007ca036e4e488556c29f0480b8c7dff87f3c8a4a85e",
-			"audio_hash": "sha256:204ea0956ba4f99e90f46386880b6e3ffda69fe55092401b6df05aef2f6313cb",
-			"loudness": -19.8,
-			"peak": -4.4
+			"recipe_hash": "sha256:23c6cfb167e4eedc2063fcbd7fc0676aef9b3b9ce867327dd0a8f9e2e64276a3",
+			"audio_hash": "sha256:51a4f37e6ba94499119c1ed0a7bb8db7c570bcbd61f45557aeec5a264485b5ef",
+			"loudness": -25.8,
+			"peak": -10.4
 		},
 		{
 			"path": "audio/sfx/shield_block/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/shield_block/shield_block.sound.json",
-			"recipe_hash": "sha256:24afbb1d9b31733c6a6d007ca036e4e488556c29f0480b8c7dff87f3c8a4a85e",
-			"audio_hash": "sha256:3815ba697582c4b3f366faab49c40d25d5f9b417aae9651bc0e603bc61b8daca",
-			"loudness": -20.1,
-			"peak": -4.6
+			"recipe_hash": "sha256:23c6cfb167e4eedc2063fcbd7fc0676aef9b3b9ce867327dd0a8f9e2e64276a3",
+			"audio_hash": "sha256:9ff7e9de0d55fe771411f6fa92054bdb2db7d6077388ea2357687dbe45c8f562",
+			"loudness": -26.1,
+			"peak": -10.6
 		}
 	]
 }

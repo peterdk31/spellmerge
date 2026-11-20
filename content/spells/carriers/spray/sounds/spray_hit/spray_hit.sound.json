@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.08,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 312004
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 700,
+				"q": 0.6,
+				"to": 322.0
+			},
+			"length": 0.048,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 900,
+				"to": 387.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.036,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A spray's droplet landing: a tiny tap, quiet (gain -15), as it pours. It sits 15 dB under the family's level (gain -15): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -15,
+	"fx": {
+		"lowpass": 1200
+	}
+}

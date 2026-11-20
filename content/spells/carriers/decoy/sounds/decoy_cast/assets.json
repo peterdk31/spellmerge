@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/decoy/sounds/decoy_cast/decoy_cast.sound.json",
-			"recipe_hash": "sha256:b6ee76cde578949c892dfe99e8176f21f7da921e178f0dbe6640cdd47c30bfa9",
-			"audio_hash": "sha256:7827aea1490bcf17bc2c7b94bf6a98e39c4547d184f6e7d76aec78443e254649",
-			"loudness": -23.1,
-			"peak": -4.5
+			"recipe_hash": "sha256:aa727cc06fefe0954febfac50ab36e84a613b54a7b84dbd9b76752579091b6f5",
+			"audio_hash": "sha256:544278d3d7eb848f69e4f15e1f191aa4f0be589c97287336056c7a5796fd64d8",
+			"loudness": -34.1,
+			"peak": -17.7
 		},
 		{
 			"path": "content/spells/carriers/decoy/sounds/decoy_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/decoy/sounds/decoy_cast/decoy_cast.sound.json",
-			"recipe_hash": "sha256:b6ee76cde578949c892dfe99e8176f21f7da921e178f0dbe6640cdd47c30bfa9",
-			"audio_hash": "sha256:fe01532d3ca0fd469f16213d02bc5159e683b08e02813d581937a8467897a701",
-			"loudness": -23.3,
-			"peak": -4.5
+			"recipe_hash": "sha256:aa727cc06fefe0954febfac50ab36e84a613b54a7b84dbd9b76752579091b6f5",
+			"audio_hash": "sha256:db0212368f335274a70f15adbf05d72d7f2fa8573b992f925debe1325674fe91",
+			"loudness": -34.2,
+			"peak": -17.1
 		},
 		{
 			"path": "content/spells/carriers/decoy/sounds/decoy_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/decoy/sounds/decoy_cast/decoy_cast.sound.json",
-			"recipe_hash": "sha256:b6ee76cde578949c892dfe99e8176f21f7da921e178f0dbe6640cdd47c30bfa9",
-			"audio_hash": "sha256:06c5fc329f032e140336ff064348e93f7bf7dfa729b31abd9afb7eed1a925cd4",
-			"loudness": -22.8,
-			"peak": -4.6
+			"recipe_hash": "sha256:aa727cc06fefe0954febfac50ab36e84a613b54a7b84dbd9b76752579091b6f5",
+			"audio_hash": "sha256:948e2be211b6ae644119a18c3b9ce3c36781febe780d9cd6eb7e3350d02e2176",
+			"loudness": -33.9,
+			"peak": -17.7
 		},
 		{
 			"path": "content/spells/carriers/decoy/sounds/decoy_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/decoy/sounds/decoy_cast/decoy_cast.sound.json",
-			"recipe_hash": "sha256:b6ee76cde578949c892dfe99e8176f21f7da921e178f0dbe6640cdd47c30bfa9",
-			"audio_hash": "sha256:a31fd4e88a9e88c83c83cec942acf37f9b3a81eb7a18ba3a066c8968ec6d279e",
-			"loudness": -22.8,
-			"peak": -5.0
+			"recipe_hash": "sha256:aa727cc06fefe0954febfac50ab36e84a613b54a7b84dbd9b76752579091b6f5",
+			"audio_hash": "sha256:8c862c9fb410fbd44b712bd4afbaef9514a8e8336f7a1f612c1c91718f8783be",
+			"loudness": -33.9,
+			"peak": -17.5
 		}
 	]
 }

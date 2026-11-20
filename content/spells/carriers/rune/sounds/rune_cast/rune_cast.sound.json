@@ -2,78 +2,47 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.5,
+	"seconds": 0.168,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 110
+		"time": 0.03,
+		"seed": 210
 	},
 	"layers": [
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 100,
-				"to": 50
+				"from": 200,
+				"to": 120
 			},
-			"length": 0.12,
+			"length": 0.072,
+			"gain": -4,
 			"amp": {
-				"attack": 0.006,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -15,
-			"drive": 2.0
-		},
-		{
-			"source": "partials",
-			"pitch": 330,
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.45
-				},
-				{
-					"ratio": 2.76,
-					"gain": -12,
-					"decay": 0.25
-				},
-				{
-					"ratio": 5.4,
-					"gain": -26,
-					"decay": 0.1
-				}
-			],
-			"amp": {
-				"attack": 0.002
-			},
-			"gain": -4,
-			"start": 0.01
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 320,
-				"to": 220,
-				"q": 5.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.14,
+			"length": 0.096,
+			"gain": -3,
 			"amp": {
-				"attack": 0.005,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -7
+			}
 		}
 	],
+	"notes": "A rune's cast: a deep, firm pop (200 to 120 Hz), as the mark is set. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A rune's cast: a crystal set down on the floor, a low struck stone bell at 330 Hz with a dull knock under it.",
-	"gain": -3
+		"lowpass": 1300
+	}
 }

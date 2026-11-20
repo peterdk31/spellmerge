@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.13999999999999999,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 316005
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 550,
+				"q": 0.6,
+				"to": 253.0
+			},
+			"length": 0.096,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 100,
+				"to": 79.0
+			},
+			"length": 0.072,
+			"gain": -10,
+			"amp": {
+				"attack": 0.015,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 450,
+				"to": 193.5
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.072,
+			"gain": -4,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A wall's hit: a coarse snow, its grain low and thick. It sits 10 dB under the family's level (gain -10): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -10,
+	"fx": {
+		"lowpass": 1200
+	}
+}

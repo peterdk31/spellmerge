@@ -27,3 +27,4 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.04, "push": 2, "stret
 cast_cue = &"cast_atom"
 shown_cue = &"spray_jet"
 cast_sound = &"spray_cast"
+hit_sound = &"spray_hit"

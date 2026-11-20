@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/wall/sounds/wall_cast/wall_cast.sound.json",
-			"recipe_hash": "sha256:96fa3a8610e221828bceff655d8aeabf55735953a16963d68555b54359ba6ac5",
-			"audio_hash": "sha256:78c00fd5c01af7c2173f42862f475d1fc5f4e5f9f088fecffd15f70b8859491b",
-			"loudness": -23.5,
-			"peak": -4.9
+			"recipe_hash": "sha256:6848a1c87091996b87444abdc9a9dc569ba1193c80cb146668ec8be87b97e1de",
+			"audio_hash": "sha256:25b171d06b0ad289b5f5fa46afec7ca4d35533f51705a1c45deb95f2d9e183db",
+			"loudness": -34.2,
+			"peak": -14.7
 		},
 		{
 			"path": "content/spells/carriers/wall/sounds/wall_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/wall/sounds/wall_cast/wall_cast.sound.json",
-			"recipe_hash": "sha256:96fa3a8610e221828bceff655d8aeabf55735953a16963d68555b54359ba6ac5",
-			"audio_hash": "sha256:6cb7e663c1421771dc9c778207a7f73b507ff46653fe9692c1e2aee9b6affd02",
-			"loudness": -24.4,
-			"peak": -7.1
+			"recipe_hash": "sha256:6848a1c87091996b87444abdc9a9dc569ba1193c80cb146668ec8be87b97e1de",
+			"audio_hash": "sha256:3c85d7fd36c5f53d30c054e41550a3ad08ebb5da1c41c6089acde95eb8cfdb92",
+			"loudness": -33.1,
+			"peak": -11.9
 		},
 		{
 			"path": "content/spells/carriers/wall/sounds/wall_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/wall/sounds/wall_cast/wall_cast.sound.json",
-			"recipe_hash": "sha256:96fa3a8610e221828bceff655d8aeabf55735953a16963d68555b54359ba6ac5",
-			"audio_hash": "sha256:09bfeadfedec2c6fadf4eabfc704c94437a42f594d44277b4877ebc74d48b9cc",
-			"loudness": -24.3,
-			"peak": -6.4
+			"recipe_hash": "sha256:6848a1c87091996b87444abdc9a9dc569ba1193c80cb146668ec8be87b97e1de",
+			"audio_hash": "sha256:6e94e269132d26d1f0ca4d21d272a55a829539250e33783f9c798d01d07a4fd6",
+			"loudness": -35.0,
+			"peak": -17.3
 		},
 		{
 			"path": "content/spells/carriers/wall/sounds/wall_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/wall/sounds/wall_cast/wall_cast.sound.json",
-			"recipe_hash": "sha256:96fa3a8610e221828bceff655d8aeabf55735953a16963d68555b54359ba6ac5",
-			"audio_hash": "sha256:3156e72df0d50445a3d771ee8aada04901c041742f1e6a63cba5c6a62bc87b8c",
-			"loudness": -23.8,
-			"peak": -6.8
+			"recipe_hash": "sha256:6848a1c87091996b87444abdc9a9dc569ba1193c80cb146668ec8be87b97e1de",
+			"audio_hash": "sha256:65eee23e1f1ee2d3636b2b0620929570b290a4876c85f2167df195da0826b517",
+			"loudness": -33.7,
+			"peak": -15.6
 		}
 	]
 }

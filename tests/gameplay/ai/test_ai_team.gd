@@ -21,7 +21,7 @@ func after_each() -> void:
 	fx.free_all()
 
 
-func _on_hit_landed(_caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int) -> void:
+func _on_hit_landed(_caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
 	if kind == CombatScript.KIND_HEAL:
 		healed[target.get_instance_id()] = int(healed.get(target.get_instance_id(), 0)) + 1
 

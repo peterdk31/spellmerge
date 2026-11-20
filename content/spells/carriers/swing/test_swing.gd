@@ -62,7 +62,7 @@ func test_its_hits_are_swing_hits() -> void:
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(18.0, 0.0))
 	var kinds: Array[StringName] = []
-	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: int, _at: Vector2, kind: StringName, _shot: int) -> void:
+	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: int, _at: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
 		if target == imp:
 			kinds.append(kind))
 	arena.install_cards(0, 0, ["swing"])

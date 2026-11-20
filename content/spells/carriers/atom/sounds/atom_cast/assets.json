@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/atom/sounds/atom_cast/atom_cast.sound.json",
-			"recipe_hash": "sha256:0b3891740c749c4db03f9bd51f3967a0f84a35b8327e7105606dfdb765f31c94",
-			"audio_hash": "sha256:f77ccd649a7675879add0a81ce9ea6bea7394d2ab4b4e3a7f0bc82085dd260f4",
-			"loudness": -25.4,
-			"peak": -5.7
+			"recipe_hash": "sha256:e96a55d5a12e3d26459d83eecc3833335631852b539d6e3de33c22684c30ac0b",
+			"audio_hash": "sha256:436d10d4ce083cd3a988ed1f5354c855db3afda77b604515ac866b3819b98b9f",
+			"loudness": -36.0,
+			"peak": -15.7
 		},
 		{
 			"path": "content/spells/carriers/atom/sounds/atom_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/atom/sounds/atom_cast/atom_cast.sound.json",
-			"recipe_hash": "sha256:0b3891740c749c4db03f9bd51f3967a0f84a35b8327e7105606dfdb765f31c94",
-			"audio_hash": "sha256:af6728a3b5449c14970125aa33bf7d013ebe988d704429a3fd39cd69660c4e0c",
-			"loudness": -24.6,
-			"peak": -4.6
+			"recipe_hash": "sha256:e96a55d5a12e3d26459d83eecc3833335631852b539d6e3de33c22684c30ac0b",
+			"audio_hash": "sha256:3bbf592bdad9dfcf3e15b7ef199b73954353143ed7ec840db2b74a5945b0ab8f",
+			"loudness": -36.0,
+			"peak": -15.7
 		},
 		{
 			"path": "content/spells/carriers/atom/sounds/atom_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/atom/sounds/atom_cast/atom_cast.sound.json",
-			"recipe_hash": "sha256:0b3891740c749c4db03f9bd51f3967a0f84a35b8327e7105606dfdb765f31c94",
-			"audio_hash": "sha256:4828cfb91a4ad6c33dd00605685a6f33c9c89b43f04fcec3e59eb01c70e65d5f",
-			"loudness": -24.8,
-			"peak": -5.3
+			"recipe_hash": "sha256:e96a55d5a12e3d26459d83eecc3833335631852b539d6e3de33c22684c30ac0b",
+			"audio_hash": "sha256:23405d049f5d51337da421391d36cb66ea66ef252de37e5a0a7638da0f6abcd7",
+			"loudness": -35.8,
+			"peak": -15.5
 		},
 		{
 			"path": "content/spells/carriers/atom/sounds/atom_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/atom/sounds/atom_cast/atom_cast.sound.json",
-			"recipe_hash": "sha256:0b3891740c749c4db03f9bd51f3967a0f84a35b8327e7105606dfdb765f31c94",
-			"audio_hash": "sha256:a1b2ebc6a7b2b98c84eecabf9dc9d8bbd55c1f95a4807f8ad226d83935ea33fb",
-			"loudness": -25.2,
-			"peak": -7.3
+			"recipe_hash": "sha256:e96a55d5a12e3d26459d83eecc3833335631852b539d6e3de33c22684c30ac0b",
+			"audio_hash": "sha256:3cca2dd3dd63e87c1ac5b71f11ff7ae6efacb0adad3b99e38e58b8b5ac07ba41",
+			"loudness": -36.2,
+			"peak": -15.8
 		}
 	]
 }

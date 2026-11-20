@@ -25,3 +25,4 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.03, "push": -3, "stre
 cast_cue = &"cast_bolt"
 look_shader = ExtResource("3_shader")
 cast_sound = &"bolt_cast"
+hit_sound = &"bolt_hit"

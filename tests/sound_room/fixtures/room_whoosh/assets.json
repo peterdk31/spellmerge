@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['whoosh']",
-			"recipe_hash": "sha256:cdc0f3ccea3e5bd40e3238021f3601497883f0f1cc1ae18d42c2e811f2af9e6b",
-			"audio_hash": "sha256:0329c5394c656a65704ade1f3611de8b1adebb3f1bac62bb7ac9240dfd55be59",
-			"loudness": -19.9,
-			"peak": -6.1
+			"recipe_hash": "sha256:102919fe82e0f8d85c83cb129fa9323f8a1d147edf33abd339d410fde14c63aa",
+			"audio_hash": "sha256:1ed8285b720eaaeb8d1686e70280bb49f09bc4b7b94572c37aabd2050eac7a06",
+			"loudness": -25.9,
+			"peak": -12.1
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_whoosh/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['whoosh']",
-			"recipe_hash": "sha256:cdc0f3ccea3e5bd40e3238021f3601497883f0f1cc1ae18d42c2e811f2af9e6b",
-			"audio_hash": "sha256:eea11b2bf55107701b49bd7e43c2967b1e947c88bbacd6df5b512d694d9acf1e",
-			"loudness": -20.0,
-			"peak": -9.1
+			"recipe_hash": "sha256:102919fe82e0f8d85c83cb129fa9323f8a1d147edf33abd339d410fde14c63aa",
+			"audio_hash": "sha256:d088a86f1915f67102720d3d975c78e5e8f79d08aaf8ef9b42131ce650820441",
+			"loudness": -26.0,
+			"peak": -15.1
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_whoosh/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['whoosh']",
-			"recipe_hash": "sha256:cdc0f3ccea3e5bd40e3238021f3601497883f0f1cc1ae18d42c2e811f2af9e6b",
-			"audio_hash": "sha256:35770f3214a049a4d69b8c9561eec54f4d40d10d83e993afcaf23c2bc71d95e9",
-			"loudness": -20.3,
-			"peak": -7.6
+			"recipe_hash": "sha256:102919fe82e0f8d85c83cb129fa9323f8a1d147edf33abd339d410fde14c63aa",
+			"audio_hash": "sha256:1eca55d8d577f5c051ae8df7ebe703e6a1f8dc8fb9955fe139ade0d0465f95b4",
+			"loudness": -26.3,
+			"peak": -13.6
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_whoosh/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['whoosh']",
-			"recipe_hash": "sha256:cdc0f3ccea3e5bd40e3238021f3601497883f0f1cc1ae18d42c2e811f2af9e6b",
-			"audio_hash": "sha256:c1383689d3476c3ea4f070fc0971aad7062017e6646b4152b256684401959ecf",
-			"loudness": -19.8,
-			"peak": -8.4
+			"recipe_hash": "sha256:102919fe82e0f8d85c83cb129fa9323f8a1d147edf33abd339d410fde14c63aa",
+			"audio_hash": "sha256:ad5b03039126032bbd977f7ec01d180d39d00bcccf5bb0364e0d02d90cb0ac07",
+			"loudness": -25.8,
+			"peak": -14.4
 		}
 	]
 }

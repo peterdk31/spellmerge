@@ -52,6 +52,9 @@ var barrier: int = 0
 var barrier_seconds: float = 0.0
 ## The spell's own name, for "downed by your own <name>"; empty when not known.
 var source_name: String = ""
+## The carrier card whose hit this is (its id), so Feel can sound it as its own
+## (`CarrierCard.hit_sound`); `&""` for a hit no carrier card makes (a blast's strike, a zap's arc).
+var card: StringName = &""
 
 
 ## A new profile with everything this one has: every element and status, the kind, heal, slam, pin
@@ -83,4 +86,5 @@ func scaled(share: float, knock_share: float) -> HitProfile:
 	made.later_status_strengths = later_status_strengths.duplicate()
 	made.kind = kind
 	made.source_name = source_name
+	made.card = card
 	return made

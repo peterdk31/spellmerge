@@ -150,8 +150,12 @@ func test_the_level_is_state_and_a_run_s_start_renews_it() -> void:
 	var walk := StateWalk.new()
 	walk.values("Difficulty", difficulty, [])
 	check_equal(walk.problems, PackedStringArray(), "the area's state walks without problems")
+	var leveled: int = SimHash.of(difficulty)
+	events.emit_signal("run_room_leveled", 1.3)
+	check(SimHash.of(difficulty) != leveled, "the depth level changes the hash")
 	tick.begin_run()
 	check_equal(_level(), 1.0, "a run's start: 1 again")
+	check_equal(float(difficulty.get(&"depth_level")), 1.0, "and its depth level")
 
 
 ## The hub is no run of rooms: whatever the last run's level, nothing is scaled there.

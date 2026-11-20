@@ -1665,7 +1665,10 @@ func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party:
 	_biome_reveal = 0
 	_biome_fights.clear()
 	for fight: RoomFight in fights:
-		_biome_fights.append(fight.fresh() if fight != null else RoomFight.new())
+		var made: RoomFight = fight.fresh() if fight != null else RoomFight.new()
+		if made.level <= 0.0:
+			made.level = map.level_of(_biome_fights.size())
+		_biome_fights.append(made)
 	mode = MODE_RUN
 	_biome_given = true
 	if start_run(requester, party):

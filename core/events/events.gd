@@ -655,8 +655,8 @@ signal item_refused(player: int, item: int)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty setting's level changed to `level` (M3; 1 at normal), which the
-## enemies' skill follows (enemy AI AI10). Not the room's scale (`run_room_scaled`), which sharpens
-## nothing either: an enemy's aim follows the room's depth level (`run_room_leveled`). Not sent yet.
+## enemies' skill follows (enemy AI AI10). Not the room's scale (`run_room_scaled`) either,
+## which changes no aim: an enemy's aim follows the room's depth level (`run_room_leveled`). Not sent yet.
 signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------

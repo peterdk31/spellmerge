@@ -33,7 +33,7 @@ const EVENTS: Dictionary = {
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
 	&"split_screen_changed": [["mode", TYPE_INT]],
-	&"hud_corners_changed": [["corners", TYPE_PACKED_INT32_ARRAY], ["menus", TYPE_PACKED_INT32_ARRAY]],
+	&"hud_corners_changed": [["corners", TYPE_PACKED_INT32_ARRAY]],
 	&"damage_numbers_changed": [["on", TYPE_BOOL]],
 	&"projectile_cap_changed": [["cap", TYPE_INT]],
 	&"shot_cap_requested": [["player", TYPE_INT], ["cap", TYPE_INT]],

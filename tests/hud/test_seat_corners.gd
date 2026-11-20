@@ -132,18 +132,3 @@ func test_a_slanted_slide_never_steps_past_the_most() -> void:
 		check(next.distance_to(at) <= SeatCornersScript.SLIDE_MOST, "at most %d px a frame (%s to %s)" % [SeatCornersScript.SLIDE_MOST, at, next])
 		at = next
 	check_equal(at, to, "it arrives")
-
-
-## The menus' quarter told apart from the spot: the panel stays, the quarter slides.
-func test_the_menus_quarter_is_its_own() -> void:
-	var corners := SeatCornersScript.new()
-	corners.step(1, VIEW, SIZE)
-	corners.set_spots(PackedInt32Array([0, 1, 7, 6]), PackedInt32Array([0, 2, 1, 3]))
-	for i in 60:
-		corners.step(1, VIEW, SIZE)
-	check_equal(corners.panel_at(1), SeatCornersScript.panel_spot(1, VIEW, SIZE), "P2's panel at the top left quarter's inner side")
-	check_equal(corners.quarter_at(1), SeatCornersScript.quarter_origin(2, VIEW), "P2's menus in the bottom left quarter")
-	corners.set_spots(PackedInt32Array([0, 1, 7, 6]))
-	for i in 60:
-		corners.step(1, VIEW, SIZE)
-	check_equal(corners.quarter_at(1), SeatCornersScript.quarter_origin(0, VIEW), "no menus told: its spot's quarter")

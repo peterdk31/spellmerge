@@ -1,9 +1,10 @@
 extends "res://tests/support/suite.gd"
-## Two players sharing a half of the equal split open their menus each in their own quarter of it
-## (the owner, 2026-11-20; hud/panels/seat_corners.gd, gameplay/feel/equal_panes.gd `menus`): with
-## two pairs, and with the pair of four players in three groups, both players of a half open their
-## builder, inventory or reward menu at once and the two never overlap; each stays inside its pane.
-## The menus slide to their quarter by whole pixels, never jumping.
+## Two players sharing a half of the equal split have each their own quarter of it, the corner
+## panel with its menus (the owner, 2026-11-20 and on #881; gameplay/feel/equal_panes.gd `_part`,
+## hud/panels/seat_corners.gd): with two pairs, and with the pair of four players in three groups,
+## both players of a half open their builder, inventory or reward menu at once and the two never
+## overlap; each stays inside its pane. Panel and menus slide there together by whole pixels; a
+## panel hides only while its own open menu covers it.
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -68,7 +69,7 @@ func _lay(groups: Array) -> EqualPanesScript:
 		by_first[group.min()] = mask
 	var panes := EqualPanesScript.new()
 	panes.lay(by_first)
-	_bus.hud_corners_changed.emit(panes.corner, panes.menus)
+	_bus.hud_corners_changed.emit(panes.corner)
 	for i in 60:
 		_hud.step_corners()
 	return panes
@@ -149,6 +150,9 @@ func _check_apart(groups: Array, pair: Array, what: String) -> void:
 	check(_reward_rect(a).has_area() and not _reward_rect(a).intersects(_reward_rect(b)), "%s: the reward menus never overlap (%s, %s)" % [what, _reward_rect(a), _reward_rect(b)])
 	for seat: int in pair:
 		check(_pane_of(panes, groups, seat).encloses(_reward_rect(seat)), "%s: P%d's reward menu inside its pane" % [what, seat + 1])
+		var panel: Control = _hud.get_panel(seat)
+		var covered: bool = _reward_rect(seat).intersects(Rect2(panel.position, panel.size))
+		check_equal(panel.visible, not covered, "%s: P%d's panel hidden only if its reward menu covers it" % [what, seat + 1])
 
 
 func test_two_pairs_open_their_menus_in_their_own_quarters() -> void:
@@ -163,15 +167,15 @@ func test_the_pair_of_four_players_in_three_groups() -> void:
 	_check_apart([[0, 1], [2], [3]], [0, 1], "a pair and two alone")
 
 
-func test_the_menus_slide_to_their_quarter_by_whole_pixels() -> void:
+func test_panel_and_menus_slide_to_their_quarter_together_by_whole_pixels() -> void:
 	_tap(1, &"back")
 	_frame()
 	check(_hud.get_radial(1).is_open(), "P2's builder open in its own quarter")
 	var last: Vector2 = _hud.get_radial(1).quarter_at
 	var target: Vector2 = SeatCornersScript.quarter_origin(2, _view())
-	_bus.hud_corners_changed.emit(PackedInt32Array([0, 1, 7, 6]), PackedInt32Array([0, 2, 1, 3]))
+	_bus.hud_corners_changed.emit(PackedInt32Array([0, 4, 2, 6]))
 	var frames: int = 0
-	while _hud.get_radial(1).quarter_at != target and frames < 200:
+	while _hud.get_corners().is_sliding(1) and frames < 200:
 		_hud.step_corners()
 		frames += 1
 		var at: Vector2 = _hud.get_radial(1).quarter_at
@@ -180,4 +184,26 @@ func test_the_menus_slide_to_their_quarter_by_whole_pixels() -> void:
 		last = at
 	check_equal(_hud.get_radial(1).quarter_at, target, "P2's builder in the bottom left quarter")
 	check(frames >= 3, "over at least three frames (%d)" % frames)
-	check_equal(_hud.get_panel(1).position.y, 4.0, "its panel keeps its row")
+	var panel: Control = _hud.get_panel(1)
+	check_equal(panel.position, SeatCornersScript.panel_spot(4, _view(), panel.size), "its panel with it, at the bottom left")
+	check(not panel.visible, "its panel hidden under its open builder")
+	_tap(1, &"back")
+	_frame()
+	check(panel.visible, "shown again once the builder closes")
+
+
+## The owner, on #881: a panel hides only while its menu would cover it; a menu open in another
+## quarter leaves it shown.
+func test_a_panel_hides_only_under_its_own_menu() -> void:
+	_tap(1, &"back")
+	_frame()
+	check(not _hud.get_panel(1).visible, "on its own quarter the builder covers the panel")
+	var view: Vector2 = _view()
+	var panel: Control = _hud.get_panel(1)
+	var rect := Rect2(panel.position, panel.size)
+	check(HudScript.menu_covers(SeatCornersScript.quarter_origin(1, view), view, rect), "its own quarter covers it")
+	check(not HudScript.menu_covers(SeatCornersScript.quarter_origin(3, view), view, rect), "the quarter under it does not")
+	check(not HudScript.menu_covers(SeatCornersScript.quarter_origin(0, view), view, rect), "nor the one beside it")
+	_tap(1, &"back")
+	_frame()
+	check(panel.visible, "shown again once the builder closes")

@@ -2709,7 +2709,7 @@ func _tell_hud_corners() -> void:
 	if split_screen.camera.corners_version == _corners_sent or events == null:
 		return
 	_corners_sent = split_screen.camera.corners_version
-	events.hud_corners_changed.emit(split_screen.camera.corners, split_screen.camera.menus)
+	events.hud_corners_changed.emit(split_screen.camera.corners)
 
 
 ## Show a flash of the kind `id` (content/flashes) at `at`, aimed along `dir`, in the ramp of

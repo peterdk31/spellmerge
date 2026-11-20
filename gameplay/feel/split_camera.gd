@@ -106,10 +106,7 @@ var equal: bool = false
 ## By seat: the quarter and side of the screen its HUD sits in (`EqualPanes.corner`'s spots): its
 ## pane's while the equal split is laid, its own corner's otherwise. Read only.
 var corners: PackedInt32Array = PackedInt32Array()
-## By seat: the quarter its menus open in (`EqualPanes.menus`): its pane's while the equal split is
-## laid (two seats sharing a half each their own quarter of it), its own corner's otherwise. Read only.
-var menus: PackedInt32Array = PackedInt32Array()
-## Counts the changes of `corners` and `menus` (a reader compares it with the count it last saw).
+## Counts the changes of `corners` (a reader compares it with the count it last saw).
 var corners_version: int = 0
 
 ## By slot: FREE, LIVE or MERGING; the seats it holds; where it looks (the camera's centre, its
@@ -198,10 +195,8 @@ func _init() -> void:
 	_group_site.resize(ActorsScript.SEATS)
 	_group_slot.resize(ActorsScript.SEATS)
 	corners.resize(ActorsScript.SEATS)
-	menus.resize(ActorsScript.SEATS)
 	for seat in ActorsScript.SEATS:
 		corners[seat] = EqualPanesScript.home_spot(seat)
-		menus[seat] = seat
 
 
 ## Every view gone at once (a new room: the world's camera jumps to it, and splits again from there).
@@ -701,15 +696,13 @@ func _step_corners() -> void:
 	_set_corners(equal and split)
 
 
-## `corners` and `menus` the panes' (`laid`) or every seat's own corner's, counted when they change.
+## `corners` the panes' spots (`laid`) or every seat's own corner's, counted when they change.
 func _set_corners(laid: bool) -> void:
 	var changed: bool = false
 	for seat in ActorsScript.SEATS:
 		var spot: int = _panes.corner[seat] if laid else EqualPanesScript.home_spot(seat)
-		var quarter: int = _panes.menus[seat] if laid else seat
-		if spot != corners[seat] or quarter != menus[seat]:
+		if spot != corners[seat]:
 			corners[seat] = spot
-			menus[seat] = quarter
 			changed = true
 	if changed:
 		corners_version += 1

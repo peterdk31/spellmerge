@@ -1,13 +1,17 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of two players sharing a half of the equal split opening their menus at once, each in
-## its own quarter of the half (the owner, 2026-11-20; gameplay/feel/equal_panes.gd `menus`,
-## hud/panels/seat_corners.gd), on the split test map (tests/support/biome_maps.gd):
-## - `shared_half_builders`: four players in two pairs, the halves; P1 and P2 (left) and P3 and P4
-##   (right) with their builders open, P2's in the bottom left quarter, P3's in the top right.
+## Screenshots of two players sharing a half of the equal split, each with its own quarter of the
+## half, the corner panel with its menus (the owner, 2026-11-20 and on #881;
+## gameplay/feel/equal_panes.gd `_part`, hud/panels/seat_corners.gd), on the split test map
+## (tests/support/biome_maps.gd):
+## - `shared_half_panels`: four players in two pairs, the halves, no menu open: P2's panel at the
+##   bottom left, P3's at the top right.
+## - `shared_half_builders`: the same four with their builders open, P2's in the bottom left
+##   quarter, P3's in the top right.
 ## - `shared_half_inventories`: the same four with their inventories open.
-## - `shared_half_rewards`: the same four with a reward menu open.
-## - `shared_half_twin_builders`: a pair and two alone: the pair the left half, P2's builder in its
-##   twin quarter, P1's in the top one.
+## - `shared_half_rewards`: the same four with a reward menu open (each corner panel hidden, since
+##   its reward menu covers part of it).
+## - `shared_half_twin_builders`: a pair and two alone: the pair the left half, P2's builder (and
+##   panel) in its twin quarter, P1's in the top one.
 
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const COIN: ItemContent = preload("res://content/coins/coin/coin.tres")
@@ -48,6 +52,7 @@ func take() -> void:
 	await settle(240)
 	if not _views_are(feel, 2, "two pairs"):
 		return
+	await shot("shared_half_panels")
 	# The builders.
 	if not await _open([0, 1, 2, 3], &"back", "get_radial"):
 		return

@@ -9,8 +9,10 @@ extends "res://tests/support/suite.gd"
 const BotScript := preload("res://tests/bots/bot.gd")
 const BuildsScript := preload("res://tests/bots/bot_builds.gd")
 
-## The starter staffs of Play by number (Flow.STARTER_HEADS: RB's, RT's).
-const STAFF_IDS: Array[StringName] = [&"curl", &"star"]
+const FlowScript := preload("res://gameplay/flow/flow.gd")
+## The replay seed a run of these tests is recorded with, so its run seed (and the builds drawn from
+## it) are the same on every start.
+const REPLAY_SEED: int = 11
 ## Physics frames the mend bot is given to heal (its staff ready, a bolt's flight).
 const HEAL_FRAMES: int = 150
 
@@ -34,16 +36,23 @@ func after_each() -> void:
 		bot.leave()
 	_bots.clear()
 	_flow.call("stop_run")
+	var frames: Node = root.get_node("Frames")
+	if bool(frames.call("is_recording")):
+		frames.call("stop_recording")
 	_flow.set(&"play_bag", _bag_had)
 	for index in 4:
 		_input.call("leave", index)
 	await commands_applied()
 
 
+## The starter staff of Play on hand `number` (Flow's STARTER_HEADS, RB's and RT's).
+func _staff(number: int) -> StaffBase:
+	return root.get_node("Registry").call("get_resource", &"wizard", FlowScript.STARTER_HEADS[number]) as StaffBase
+
+
 ## The compiled staff of `cards` on the starter staff `number`.
 func _compiled(cards: Array[StringName], number: int) -> CompiledStaff:
-	var staff := root.get_node("Registry").call("get_resource", &"wizard", STAFF_IDS[number]) as StaffBase
-	return root.get_node("Spells").call("compile_staff", cards, staff) as CompiledStaff
+	return root.get_node("Spells").call("compile_staff", cards, _staff(number)) as CompiledStaff
 
 
 # --- The table ---------------------------------------------------------------------------------
@@ -52,11 +61,11 @@ func _compiled(cards: Array[StringName], number: int) -> CompiledStaff:
 func test_every_build_is_valid_by_the_card_rules() -> void:
 	for build: Dictionary in BuildsScript.all():
 		var staffs: Array = build["staffs"]
-		check_equal(staffs.size(), STAFF_IDS.size(), "%s: a staff for RB and one for RT" % build["name"])
+		check_equal(staffs.size(), FlowScript.START_HANDS, "%s: a staff for each starter staff (RB, RT)" % build["name"])
 		for number in staffs.size():
 			var cards: Array[StringName] = BuildsScript.cards_of(build, number)
 			var compiled: CompiledStaff = _compiled(cards, number)
-			check(cards.size() <= 6, "%s staff %d fits the starter staff's 6 slots" % [build["name"], number])
+			check(cards.size() <= _staff(number).slots, "%s staff %d fits the starter staff's %d slots" % [build["name"], number, _staff(number).slots])
 			check(compiled != null and not compiled.is_empty(), "%s staff %d casts" % [build["name"], number])
 			if compiled == null:
 				continue
@@ -97,6 +106,18 @@ func test_the_same_run_seed_draws_the_same_builds() -> void:
 			check(BuildsScript.pick(Sim.seeded(run_seed), seat, 3) == BuildsScript.pick(Sim.seeded(run_seed), seat, 3), "seed %d seat %d: the same build" % [run_seed, seat])
 
 
+func test_different_seeds_draw_different_builds() -> void:
+	var names: Dictionary = {}
+	for run_seed in range(1, 40):
+		names[BuildsScript.pick(Sim.seeded(run_seed), 0, 1)["name"]] = true
+	check(names.size() > 1, "the draw follows the seed, not a fixed build")
+	var seats: Dictionary = {}
+	for seat: int in [0, 2, 3]:
+		for run_seed in range(1, 40):
+			seats["%d %s" % [seat, BuildsScript.pick(Sim.seeded(run_seed), seat, 4)["name"]]] = true
+	check(seats.size() > 3, "and is keyed by the seat")
+
+
 func test_the_draw_reaches_every_fighters_build() -> void:
 	var seen: Dictionary = {}
 	for run_seed in range(1, 200):
@@ -122,8 +143,10 @@ func _built_pair() -> Array:
 		var bot := BotScript.new()
 		if bot.join(index, BotScript.Mode.FIGHTER, _input, _flow):
 			_bots.append(bot)
-	_events.emit_signal("play_requested", 0)
+	# Play, recorded: the replay's seed deals the run's (as the smoke test starts it).
+	root.get_node("Frames").call("record", &"play_requested", 0, REPLAY_SEED)
 	await process_frame
+	await physics_frame
 	var first := _flow.call("get_wizard", 0) as Actor
 	var mender := _flow.call("get_wizard", 1) as Actor
 	if first == null or mender == null or _bots.size() < 2:
@@ -140,6 +163,9 @@ func test_a_drawn_build_is_on_the_staffs() -> void:
 	var pair: Array = await _built_pair()
 	if pair.is_empty():
 		return
+	var sim: Sim = root.get_node("Tick").get(&"sim") as Sim
+	check(sim.run_seed != 0, "the run has its seed")
+	check(_bots[0].build == BuildsScript.pick(Sim.seeded(sim.run_seed), 0, 2), "P1's build is the one the run's seed draws (%s)" % _bots[0].build["name"])
 	check(_bots[0].holds_build(pair[0]), "P1 holds its build (%s)" % _bots[0].build["name"])
 	check(_bots[1].build == BuildsScript.MENDER and _bots[1].holds_build(pair[1]), "P2 holds the mend build")
 
@@ -215,6 +241,7 @@ func test_the_mend_bot_holds_its_heal_with_a_foe_in_its_line() -> void:
 	# left the staff, whichever way it was aimed.
 	foe.global_position = mender.global_position + Vector2(-6.0, 2.0)
 	check(bot.foe_in_line(mender, Vector2.RIGHT, bot.heal_reach()), "a foe on top of the mender holds the heal, aimed away")
+	check(bot.foe_in_line(mender, Vector2.ZERO, bot.heal_reach()), "and with no aim at all")
 	foe.queue_free()
 
 
@@ -224,3 +251,51 @@ func test_a_point_near_the_line_is_in_it() -> void:
 	check(not BotScript._near_line(Vector2.ZERO, Vector2.RIGHT, Vector2(100.0, 40.0), 200.0, BotScript.FOE_CLEAR), "too far aside")
 	check(not BotScript._near_line(Vector2.ZERO, Vector2.RIGHT, Vector2(-30.0, 0.0), 200.0, BotScript.FOE_CLEAR), "behind")
 	check(not BotScript._near_line(Vector2.ZERO, Vector2.RIGHT, Vector2(300.0, 0.0), 200.0, BotScript.FOE_CLEAR), "past the reach")
+
+
+## End to end (the review of 2026-11-20), through the frames the bot fills with a hurt teammate in
+## reach: a foe pressed against the mender (a heal any way it aims would hit it as it leaves the
+## staff) and the heal staff is never pressed or held; a foe in the line past the teammate, and no
+## heal lands on it. Without the gate in `step` the brain's `heal ally` presses it.
+func test_the_mend_bot_never_heals_a_foe() -> void:
+	var pair: Array = await _built_pair()
+	if pair.is_empty():
+		return
+	var first: Actor = pair[0]
+	var mender: Actor = pair[1]
+	_bots[0].mode = BotScript.Mode.IDLER
+	first.health.health = first.health.max_health * 0.4
+	var foe := (load("res://content/enemies/crypt_mite/crypt_mite.tscn") as PackedScene).instantiate() as Actor
+	(_flow.get(&"world") as Node2D).add_child(foe)
+	var foe_healed: Array[float] = [0.0]
+	var on_hit := func(caster: int, target: Node, amount: float, _at: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
+		if kind == &"heal" and caster == mender.id and target == foe:
+			foe_healed[0] += amount
+	_events.connect("hit_landed", on_hit)
+	var pressed: int = await _heal_presses(first, mender, foe, Vector2(-8.0, 0.0))
+	check(is_instance_valid(foe) and not foe.is_down(), "the foe stood there the whole time")
+	check_equal(pressed, 0, "the heal staff (RB) is never pressed with a foe pressed against the mender")
+	await _heal_presses(first, mender, foe, Vector2(110.0, 4.0))
+	_events.disconnect("hit_landed", on_hit)
+	check_equal(foe_healed[0], 0.0, "no heal lands on a foe in the line past the teammate")
+	foe.queue_free()
+
+
+## HEAL_FRAMES physics frames with `first` (hurt) 60 px right of `mender` and `foe` at `foe_at` from
+## it, kept there and alive; returns the heal staff's bit (RB's) if any frame P2's bot filled pressed
+## or held it, else 0.
+func _heal_presses(first: Actor, mender: Actor, foe: Actor, foe_at: Vector2) -> int:
+	var frames: Node = root.get_node("Frames")
+	var heal_bit: int = 1 << 0
+	var pressed: int = 0
+	for i in HEAL_FRAMES:
+		first.global_position = mender.global_position + Vector2(60.0, 0.0)
+		foe.global_position = mender.global_position + foe_at
+		if foe.health != null:
+			# Hurt (a heal would show) and never killed by the mender's fighting staff.
+			foe.health.max_health = 10000.0
+			foe.health.health = 5000.0
+		await physics_frame
+		var frame: InputFrame = frames.call("frame_of", 1)
+		pressed |= (frame.pressed_bits | frame.held_bits) & heal_bit
+	return pressed

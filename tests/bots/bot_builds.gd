@@ -73,7 +73,8 @@ static func cards_of(build: Dictionary, number: int) -> Array[StringName]:
 
 
 ## A card bag that builds any one build of the table: each card as many times as one build uses it
-## at most, one entry a copy (as `Flow.play_bag`).
+## at most, one entry a copy (as `Flow.play_bag`). It does not count the start cards already on the
+## staffs (Play's `dash` and `bolt`), so a wizard keeps a spare or two: simpler, and harmless.
 static func bag() -> Array[StringName]:
 	var most: Dictionary = {}
 	for build: Dictionary in all():

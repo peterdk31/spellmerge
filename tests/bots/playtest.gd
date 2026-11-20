@@ -347,9 +347,12 @@ func _count_heal(caster: int, target: Node, amount: float) -> void:
 			continue
 		var body := target as Actor
 		_heals[seat] += 1
-		if body != null and body.team() == wizard.team():
+		if body == null:
+			# A body that is no actor (none heals today): counted as a prop's, never a foe's.
+			_healed_world[seat] += amount
+		elif body.team() == wizard.team():
 			_healed_mates[seat] += amount
-		elif body != null and body.team() == ActorsScript.TEAM_WORLD:
+		elif body.team() == ActorsScript.TEAM_WORLD:
 			_healed_world[seat] += amount
 		else:
 			_healed_foes[seat] += amount

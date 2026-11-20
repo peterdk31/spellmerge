@@ -31,6 +31,7 @@ The owner, 2026-11-20 (on #883): the test bots get more powerful staffs, and a b
 
 - A bot plays through its seat's input frames only. It reads no spell field and changes no simulation state of its own.
 - A bot never uses the d-pad (quick-use items), the map's teleport or a reroll.
+- Play's bag is a test-settable member of Flow, not a run rule (as the smoke test's unscaled run): a recording made by a runner that stocked it plays back only with the same bag, or its `staff_cards_requested` commands are refused.
 - **The pinned seed:** the 4-bot smoke test must win `REPLAY_SEED` (tests/smoke/four_bot_runner.gd). A change to the bots' builds that loses it moves the pin to a seed they win and says why.
 
 ## Validate

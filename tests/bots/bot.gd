@@ -369,7 +369,8 @@ func step(delta: float) -> void:
 		# through one, as a person does; a cast that moves it (a dodge's dash) still goes.
 		intent.pressed_bits = held_fire(intent.pressed_bits)
 		intent.held_bits = held_fire(intent.held_bits)
-	if foe_in_line(wizard, intent.aim if intent.aim != Vector2.ZERO else wizard.aim, heal_reach()):
+	var heal_aim: Vector2 = intent.aim if intent.aim != Vector2.ZERO else wizard.aim
+	if heal_aim == Vector2.ZERO or foe_in_line(wizard, heal_aim, heal_reach()):
 		# A heal heals whatever it hits, friend or foe: never one along a line a foe stands near, nor
 		# with a foe pressed against it.
 		intent.pressed_bits = held_heal(intent.pressed_bits)
@@ -410,10 +411,11 @@ func mate_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
 
 ## True when a foe's body (an open actor of another team than `wizard`'s, standing, dying or
 ## spawning in) stands within FOE_CLEAR of `wizard`'s line of fire along `aim`, ahead of it and
-## nearer than `reach` (INF: any; 0: none), or within FOE_CLOSE of it any way round. A heal held for
+## nearer than `reach` (INF: any; 0: none, false), or within FOE_CLOSE of it any way round (`aim`
+## ZERO: only that). A heal held for
 ## one never lands on a foe. A prop (the world's team) counts too: a heal is wasted on one.
 func foe_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
-	if aim == Vector2.ZERO or reach <= 0.0:
+	if reach <= 0.0:
 		return false
 	var table := _flow.get_node_or_null(^"/root/Actors") as ActorsScript
 	if table == null:
@@ -431,7 +433,9 @@ func foe_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
 		if foe == null or not foe.is_inside_tree():
 			continue
 		var body: Vector2 = foe.global_position + _offset_of(foe)
-		if from.distance_squared_to(body) < FOE_CLOSE * FOE_CLOSE or _near_line(from, way, body, reach, FOE_CLEAR):
+		if from.distance_squared_to(body) < FOE_CLOSE * FOE_CLOSE:
+			return true
+		if way != Vector2.ZERO and _near_line(from, way, body, reach, FOE_CLEAR):
 			return true
 	return false
 

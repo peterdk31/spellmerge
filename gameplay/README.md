@@ -85,8 +85,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `cover_changed` | `cover` (each tick's changes of one room, by its number; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look of that room) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `run` |
-| `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table, among items of the room's reward type) |
-| `special_room_opened` | `flow` (a shop or a fountain entered the first time: its shelf's spots or its pool; CB11) | `rewards` (stocks the shelf, fills the pool) |
+| `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table, among items of the room's reward type; each seat's reward item at its spot) |
+| `special_room_opened` | `flow` (a shop or a fountain entered the first time: its shelf's spots and reroll sign, or its pool; CB11) | `rewards` (stocks the shelf, fills the pool) |
 | `key_door_shown`, `secret_rock_shown`, `key_shown` | `flow` (a biome's key doors, secret rocks and keys; CB11) | `feel` (`lock_looks.gd`, `special_room_looks.gd`) |
 | `shelf_changed`, `fountain_changed` | `rewards` (a shop's items, a fountain's pool; CB11) | `feel` (`special_room_looks.gd`) |
 | `rooms_seen` | `flow` (the party's map: each room unseen, shown or entered; again after a restore; connected biomes CB9) | `feel` (the dark over the unvisited rooms, the held Y map) |
@@ -98,6 +98,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_rerolled` | `rewards` (an offer rerolled: one reward reroll spent, its new choices; the owner's of 2026-11-19) | `hud` (the menu turns its cards over) |
 | `reward_reroll_refused` | `rewards` (none held: nothing spent) | `hud` (the menu's title says so) |
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
+| `item_picked_up` | `rewards`, `items`, `flow` (an actor picked up an item: a coin, a key, a bought or ground item, a reward) | `feel` (each kind's pickup sound) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
 | `health_gift_requested` | `rewards` (a fountain's draw), `player` (a potion drunk) | `combat` (it keeps an actor's health) |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
@@ -115,7 +116,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
 | `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
 | `shelf_buy_requested` | HUD (a command) | `rewards` (A at a shop's item; connected biomes CB11's follow-up) |
-| `shelf_near_changed`, `shelf_refused` | `rewards` (the shop item in a seat's reach, a refused buy) | HUD (the item hint) |
+| `shelf_near_changed`, `shelf_refused` | `rewards` (the shop item or reroll sign in a seat's reach, a refused buy) | HUD (the item hint) |
+| `reward_item_changed` | `rewards` (a seat's reward item lying in its room, or gone) | `feel` (the reward item's look) |
+| `reward_near_changed` | `rewards` (a seat's own reward item in reach) | HUD (the hint; A opens its menu) |
 | `run_stats_told` | `rewards` (a seat's run stats, by name) | `feel` (the held Y map: `secret_sense`) |
 | `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
 | `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag, or what the inventory menu drops, lands beside the body) |

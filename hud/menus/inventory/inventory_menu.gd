@@ -6,14 +6,15 @@ extends Control
 ## right stick or P1's mouse (or stepped round with the left stick and the move keys), with layers.
 ##
 ## - **The first ring:** the bags (`ItemKinds.BAGS`), each with how full it is ("2/4", "2/∞").
-##   A (P1: a left click) enters the bag pointed at; B goes back out a layer, and closes it on the
+##   A or RT (the thumb stays on the stick turning the ring, as in the builder: the owner, 2026-11-19;
+##   P1: a left click) enters the bag pointed at; B goes back out a layer, and closes it on the
 ##   first ring; Select (Tab), Start and going down close it.
 ## - **Staffs:** every staff owned, the hands' first (each marked with its button), then the bag's.
 ##   A hand's button (RB, RT, LB, LT; on the keyboard Space, the left and right mouse buttons, Q)
 ##   puts the staff pointed at on that hand (from the bag the staff there goes into the bag; from
 ##   another hand the two change places); the button of the hand it is on takes it off into the bag.
 ##   X drops it on the ground.
-## - **Cards:** the kinds the bag holds, then (A) a kind's cards with their counts; X drops one.
+## - **Cards:** the kinds the bag holds, then (A or RT) a kind's cards with their counts; X drops one.
 ## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
 ##   A uses the one pointed at where its kind can be used (a potion is drunk: `bag_use_requested`,
 ##   the owner's of 2026-11-19) and X drops one where its kind can be dropped (`ItemKinds.can`).
@@ -48,6 +49,8 @@ const PLAYER_COUNT: int = 4
 const HANDS: int = 4
 ## Each hand's button, by hand (0 RB, 1 RT, 2 LB, 3 LT).
 const HAND_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
+## The hand whose button (RT) also enters a bag or a card kind, as A does.
+const ENTER_HAND: int = 1
 ## The button that opens and closes it.
 const TOGGLE_ACTION: StringName = &"inventory"
 ## The hint row's buttons: enter, drop, back, close.
@@ -390,14 +393,15 @@ func _presses(action: StringName) -> int:
 	return maxi(new, 0)
 
 
-## The hand buttons: on the staffs ring, the pointed staff onto that hand (or off it); on a ring
-## of things to enter, P1's left click (`staff_2`) enters as A does.
+## The hand buttons: on the staffs ring, the pointed staff onto that hand (or off it); on the bags'
+## and the card kinds' rings, RT (`staff_2`, P1's left click) enters what is pointed at as A does
+## (the owner, 2026-11-19), and P1's left click does on any other ring too.
 func _poll_hands() -> void:
 	for hand in HANDS:
 		for _press in _presses(HAND_ACTIONS[hand]):
 			if _layer == Layer.STAFFS:
 				put_on_hand(hand)
-			elif hand == 1 and _menu.uses_mouse():
+			elif hand == ENTER_HAND and (_layer == Layer.BAGS or _layer == Layer.KINDS or _menu.uses_mouse()):
 				enter_pointed()
 
 

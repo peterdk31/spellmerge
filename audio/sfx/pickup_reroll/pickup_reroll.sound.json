@@ -1,0 +1,114 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.3,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 903
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1300,
+				"q": 4.0
+			},
+			"start": 0.0,
+			"length": 0.025,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1050,
+				"q": 4.0
+			},
+			"start": 0.05,
+			"length": 0.025,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -2
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1400,
+				"q": 4.0
+			},
+			"start": 0.095,
+			"length": 0.025,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1150,
+				"q": 4.0
+			},
+			"start": 0.13,
+			"length": 0.025,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1250,
+				"q": 4.0
+			},
+			"start": 0.16,
+			"length": 0.025,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -9
+		},
+		{
+			"source": "triangle",
+			"pitch": {
+				"from": 220,
+				"to": 520
+			},
+			"length": 0.2,
+			"gain": -7,
+			"amp": {
+				"attack": 0.02,
+				"shape": "arch",
+				"power": 1.5
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.4
+		},
+		"lowpass": 3800
+	},
+	"notes": "A reroll picked up: a quick tumble of five small wooden knocks, each softer and faster than the last, over a low rising whirr, as dice rolled in a cup."
+}

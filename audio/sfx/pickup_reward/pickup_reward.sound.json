@@ -1,0 +1,108 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.6,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 906
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": 523,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.35
+				},
+				{
+					"ratio": 2,
+					"gain": -10,
+					"decay": 0.2
+				},
+				{
+					"ratio": 3,
+					"gain": -18,
+					"decay": 0.1
+				}
+			],
+			"amp": {
+				"attack": 0.005
+			}
+		},
+		{
+			"source": "partials",
+			"pitch": 659,
+			"start": 0.08,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.35
+				},
+				{
+					"ratio": 2,
+					"gain": -10,
+					"decay": 0.2
+				},
+				{
+					"ratio": 3,
+					"gain": -18,
+					"decay": 0.1
+				}
+			],
+			"amp": {
+				"attack": 0.005
+			},
+			"gain": -1
+		},
+		{
+			"source": "partials",
+			"pitch": 784,
+			"start": 0.16,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.45
+				},
+				{
+					"ratio": 2,
+					"gain": -10,
+					"decay": 0.25
+				},
+				{
+					"ratio": 3,
+					"gain": -18,
+					"decay": 0.12
+				}
+			],
+			"amp": {
+				"attack": 0.005
+			},
+			"gain": -1
+		},
+		{
+			"source": "sine",
+			"pitch": 262,
+			"length": 0.45,
+			"gain": -9,
+			"amp": {
+				"attack": 0.08,
+				"shape": "arch",
+				"power": 1.5
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.32,
+			"size": 1.0
+		},
+		"lowpass": 4500
+	},
+	"notes": "A reward taken: a warm chime of three notes rising up a major chord over a low swell, a little grander than any other pickup, never a fanfare."
+}

@@ -171,6 +171,19 @@ func test_two_seats_and_one_item_the_first_in_seat_order_takes_it() -> void:
 	check(_refused.is_empty(), "and nobody was refused: it was gone")
 
 
+## The owner's ask of 2026-11-19: each pickup is said for its sound (`item_picked_up`), once, by its
+## taker, of its kind.
+func test_a_take_says_its_pickup_for_its_sound() -> void:
+	root.add_child(_world.frames)
+	var first := _wizard(0, Vector2(-8, 0))
+	var picked: Array = []
+	_world.bus.item_picked_up.connect(func(actor: int, kind: StringName, id: StringName, at: Vector2) -> void: picked.append([actor, kind, id, at]))
+	var item: int = _items.lay(ItemStack.card(&"fire"), Vector2.ZERO)
+	_ask(0, item)
+	_tick()
+	check_equal(picked, [[first.id, ItemKinds.CARD, &"fire", Vector2.ZERO]], "said once, by its taker, of its kind")
+
+
 func test_a_downed_body_takes_nothing_and_has_nothing_in_reach() -> void:
 	var body := _wizard(0, Vector2.ZERO)
 	var item: int = _items.lay(ItemStack.card(&"fire"), Vector2(5, 0))

@@ -176,6 +176,7 @@ func take(actor: int, item: int) -> Take:
 		return Take.NO_ROOM
 	_rows.remove_at(at)
 	_say_gone(row)
+	_say_picked(body, row)
 	return Take.TAKEN
 
 
@@ -394,6 +395,7 @@ func _walk_over(body: Actor) -> void:
 		if PickupRule.take(body.inventory, row.stack):
 			_rows.remove_at(at)
 			_say_gone(row)
+			_say_picked(body, row)
 			skipped = at
 		else:
 			skipped = at + 1
@@ -431,6 +433,12 @@ func _say_gone(row: GroundItem) -> void:
 	_said.erase(row.number)
 	if events != null:
 		events.ground_item_changed.emit(row.number, row.at, {})
+
+
+## `body` took `row`'s item (for its pickup sound: `item_picked_up`, the owner's ask of 2026-11-19).
+func _say_picked(body: Actor, row: GroundItem) -> void:
+	if events != null and row.stack != null:
+		events.item_picked_up.emit(body.id, row.stack.kind, row.stack.id, row.at)
 
 
 ## DIRECTIONS' indices, the way pointing furthest from `away` first (as seen from `feet`), the

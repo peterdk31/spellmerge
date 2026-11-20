@@ -21,6 +21,9 @@ const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 ## What A is called on the hint: a ground item's, and a shop item's (`BUY`, with its price).
 const VERB: String = "Take"
 const BUY: String = "Buy"
+## A seat's own reward item's words (the owner, 2026-11-19: A at it opens the reward's pick).
+const OPEN: String = "Open"
+const REWARD_NAME: String = "reward"
 ## A note's words (`show_note`): at a shut key door with no key of one's own (the owner, 2026-11-19).
 const NEEDS_KEY: String = "Needs a key"
 ## At an unvisited room's doorway (`room_reroll_shown`, the owner's of 2026-11-19): X rerolls it, and
@@ -92,7 +95,8 @@ func bind(input: InputManagerScript, spells: SpellsScript) -> void:
 
 
 ## Show `view` (the item `item`) for `player`; item -1 or an empty view hides it. `verb` is what A
-## does (VERB, or BUY for a shop's item, whose view's `price` follows its name).
+## does (VERB, or BUY for a shop's item, whose view's `price` follows its name; empty: the name alone,
+## a shop's reroll sign's "Reroll shelf").
 func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) -> void:
 	_player = player
 	_item = item if not view.is_empty() else -1
@@ -105,7 +109,7 @@ func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) ->
 	if _glyph != null:
 		_glyph.visible = true
 		_glyph.show_action(player, ACTION)
-	_title = "%s %s" % [verb, String(view.get("name", ""))]
+	_title = String(view.get("name", "")) if verb == "" else "%s %s" % [verb, String(view.get("name", ""))]
 	if view.has("price"):
 		_title += " (%d)" % int(view["price"])
 	_line = tooltip_line(view)

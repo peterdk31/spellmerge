@@ -1,7 +1,7 @@
 extends Control
 ## A seat's reward menu (connected biomes CB10, decisions 16 and 17; DESIGN rules 3 and 4; the cards
 ## by the owner's redesign of 2026-11-19): the oldest of the seat's offers not yet picked
-## (`rewards_waiting_changed`), "Pick 1 of 2" over a row of cards, one a choice (`reward_card.gd`:
+## (`rewards_waiting_changed`), "Pick 1 of 3" over a row of cards, one a choice (`reward_card.gd`:
 ## its icon, its name and what it does, as the Rewards area's view says), side by side as
 ## `reward_layout.gd` lays them out in the room it is given (`room`: its seat's quarter of the view
 ## while several play, the whole view for one), so 1 to 4 or more choices stay readable in a quarter
@@ -9,9 +9,11 @@ extends Control
 ## along the row, wrapping round (UIFocus); `accept` on a card sends the command
 ## `reward_pick_requested(seat, offer, choice)` and closes it; `back` closes it with nothing sent,
 ## the offer left unspent. `hud/panels/panels.gd` opens it for its seat (nodes Root/Reward1 to
-## Root/Reward4): by itself as an offer is rolled for a seat whose wizard was in the room
-## (`reward_rolled`'s `here`: `wants_open`), and on the seat's A with no menu open and nothing else
-## for A while it has one waiting (the unspent icon on its corner panel says so). It is that seat's
+## Root/Reward4), never by itself (the owner, 2026-11-19: a present player's reward lies as an item
+## in the room): on the seat's A at its own reward item (`reward_near_changed`; `open_menu(offer)`),
+## and on the seat's A with no menu open and nothing else for A while it has an offer waiting that
+## lies nowhere (one rolled while it was away: `waiting_away`, the
+## unspent icon on its corner panel says so; `open_menu()`, the oldest such). It is that seat's
 ## alone and pauses nothing (pillar 2). It closes by itself when the offer it shows is gone. A pick
 ## the Rewards area refuses (`reward_refused`: no room in the bag, a heal while down) opens it again
 ## on that offer, its title saying so. Display and intent only: what a pick gives is the Rewards
@@ -73,8 +75,13 @@ var _open: bool = false
 ## The seat's offers waiting, oldest first (`rewards_waiting_changed`), and the one shown (-1: none).
 var _offers: Array[Dictionary] = []
 var _shown: int = -1
-## An offer was rolled while the seat's wizard was there: the panels open it when they may.
+## The menu wants to open again (a refused pick, another count of rerolled choices) on offer
+## `_wanted`: the panels open it when they may.
 var _wants_open: bool = false
+var _wanted: int = -1
+## The offer whose pick was last sent, until the Rewards area answers (it goes, or is refused): A at
+## its item meanwhile opens nothing (online the answer comes a few frames later).
+var _sent: int = -1
 ## The offer whose pick was refused, shown with REFUSED_TEXT the next time it opens (-1: none).
 var _refused: int = -1
 ## The new choices of the offer shown, rerolled and not yet turned over onto the cards (empty: none).
@@ -124,7 +131,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_ui_focus = ui_focus
 	if _events != null:
 		_events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
-		_events.reward_rolled.connect(_on_reward_rolled)
 		_events.reward_refused.connect(_on_reward_refused)
 		_events.reward_rerolled.connect(_on_reward_rerolled)
 		_events.reward_reroll_refused.connect(_on_reward_reroll_refused)
@@ -145,23 +151,41 @@ func waiting() -> int:
 	return _offers.size()
 
 
-## True once an offer was rolled with the seat's wizard there and the menu has not opened since.
+## The offer it wants to open again on (`wants_open`).
+func wanted() -> int:
+	return _wanted
+
+
+## How many of the seat's offers wait lying nowhere (no reward item in a room: opened from anywhere).
+func waiting_away() -> int:
+	var count: int = 0
+	for offer: Dictionary in _offers:
+		if not bool(offer.get("lying", false)):
+			count += 1
+	return count
+
+
+## True while it wants to open again on an offer the seat still has (a refused pick, a reroll of
+## another count of choices) and has not since.
 func wants_open() -> bool:
-	return _wants_open and not _offers.is_empty()
+	return _wants_open and _offer_of(_wanted) >= 0
 
 
-## Open it for its seat on its oldest offer (closing any other panel of theirs), laid out in `room`.
-## False with none waiting, already open, or the seat has no device.
-func open_menu() -> bool:
-	if visible and not _open and not _offers.is_empty():
+## Open it for its seat (closing any other panel of theirs), laid out in `room`, on its offer number
+## `offer` (its reward item's), or with -1 on its oldest offer lying nowhere. False with no such
+## offer, already open, or the seat has no device.
+func open_menu(offer: int = -1) -> bool:
+	var at: int = _offer_of(offer) if offer >= 0 and offer != _sent else (_first_away() if offer < 0 else -1)
+	if visible and not _open and at >= 0:
 		# Still rolling up: it opens again once rolled up (the panels ask each frame), never by a jump.
 		_wants_open = true
+		_wanted = int(_offers[at].get("offer", -1))
 		return false
 	_wants_open = false
-	if _open or _ui_focus == null or _offers.is_empty():
+	if _open or _ui_focus == null or at < 0:
 		return false
 	_ui_focus.close(index)
-	_fill(_offers[0])
+	_fill(_offers[at])
 	visible = true
 	var controls: Array[Control] = []
 	for card: CardScript in _cards:
@@ -305,6 +329,7 @@ func _turn_over() -> void:
 		# Another count of choices: closed and opened again on the new ones (from the waiting list).
 		close_menu()
 		_wants_open = true
+		_wanted = _shown
 		return
 	for at in choices.size():
 		_cards[at].show_choice(choices[at])
@@ -441,22 +466,37 @@ func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void
 	if player != index:
 		return
 	_offers = offers.duplicate()
+	if _offer_of(_sent) < 0:
+		_sent = -1
 	if _offers.is_empty():
 		_wants_open = false
-	if _open and (_offers.is_empty() or int(_offers[0].get("offer", -1)) != _shown):
+	if _open and _offer_of(_shown) < 0:
 		# The offer it showed was picked or went (a run's start): the menu goes with it.
 		close_menu()
 
 
-func _on_reward_rolled(player: int, _offer: int, _choices: Array[Dictionary], here: bool) -> void:
-	if player == index and here:
-		_wants_open = true
+## Where offer number `offer` is among the seat's waiting offers (-1: not there).
+func _offer_of(offer: int) -> int:
+	for at in _offers.size():
+		if int(_offers[at].get("offer", -1)) == offer:
+			return at
+	return -1
+
+
+## Where the seat's oldest offer lying nowhere is among its waiting offers (-1: none).
+func _first_away() -> int:
+	for at in _offers.size():
+		if not bool(_offers[at].get("lying", false)):
+			return at
+	return -1
 
 
 func _on_reward_refused(player: int, offer: int) -> void:
 	if player == index:
 		_refused = offer
 		_wants_open = true
+		_wanted = offer
+		_sent = -1
 
 
 func _on_reward_rerolled(player: int, offer: int, choices: Array[Dictionary]) -> void:
@@ -507,6 +547,7 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	UiSounds.send(_events, UiSounds.CHOOSE)
 	if _events != null:
+		_sent = _shown
 		_events.reward_pick_requested.emit(index, _shown, choice)
 	close_menu()
 

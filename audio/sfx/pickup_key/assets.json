@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/pickup_key/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_key/pickup_key.sound.json",
+			"recipe_hash": "sha256:448ba92d391e6fba2e9ba8ccfc6c866ffedefcbc9c15c2351d3c9fca8440f0b3",
+			"audio_hash": "sha256:544e895051e81a43001054c18a741909b9853c76f8d8da30dd7d8822123f4af5",
+			"loudness": -20.0,
+			"peak": -6.8
+		},
+		{
+			"path": "audio/sfx/pickup_key/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_key/pickup_key.sound.json",
+			"recipe_hash": "sha256:448ba92d391e6fba2e9ba8ccfc6c866ffedefcbc9c15c2351d3c9fca8440f0b3",
+			"audio_hash": "sha256:50b82a789e0d2c09147dc46ec58d32313600fc56cb5a4041b29ca28028b7b62e",
+			"loudness": -19.7,
+			"peak": -6.0
+		},
+		{
+			"path": "audio/sfx/pickup_key/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_key/pickup_key.sound.json",
+			"recipe_hash": "sha256:448ba92d391e6fba2e9ba8ccfc6c866ffedefcbc9c15c2351d3c9fca8440f0b3",
+			"audio_hash": "sha256:694fd85821dfed8fcf94382ab48223cca56f861ca071d5324a8af4ac908220ec",
+			"loudness": -20.1,
+			"peak": -5.8
+		},
+		{
+			"path": "audio/sfx/pickup_key/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pickup_key/pickup_key.sound.json",
+			"recipe_hash": "sha256:448ba92d391e6fba2e9ba8ccfc6c866ffedefcbc9c15c2351d3c9fca8440f0b3",
+			"audio_hash": "sha256:37858388ec1f24fc8a67139ca8a0f650efe0786ae1af43b203ae9409a9657dd5",
+			"loudness": -20.1,
+			"peak": -5.7
+		}
+	]
+}

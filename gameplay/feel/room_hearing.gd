@@ -23,7 +23,8 @@ extends RefCounted
 ## It learns the pieces from `room_built` (their templates, rooms first and then bridges, a new world
 ## from FIRST_ROOM) and a room's kind from the layout's `RoomKind.LAYOUT_META`, else the first kind its
 ## template hosts; a reward room's type (`RewardType`, the owner's ask of 2026-11-19) from the layout's
-## `RewardType.LAYOUT_META` (none: any), for the mouths' signs and the held map.
+## `RewardType.LAYOUT_META` (none: any), for the mouths' signs and the held map; and which rooms
+## are cleared (`rooms_cleared`, Flow's state as told; the owner, 2026-11-20), for their cleared look.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -60,11 +61,32 @@ var _followed: int = NONE
 ## How many worlds were laid (`room_built` of FIRST_ROOM): the looks that read the grid lay theirs
 ## again when it changes.
 var _world: int = 0
+## By room number: cleared (1), as Flow told it last (`rooms_cleared`), and how many times it was told
+## `again` (after a restore): the looks that play the cleared look in draw it as it stands then.
+var _cleared: PackedByteArray = PackedByteArray()
+var _cleared_again: int = 0
 
 
 func bind(events: EventsScript) -> void:
 	if events != null:
 		events.room_built.connect(_on_room_built)
+		events.rooms_cleared.connect(_on_rooms_cleared)
+
+
+func _on_rooms_cleared(cleared: PackedByteArray, again: bool) -> void:
+	_cleared = cleared
+	if again:
+		_cleared_again += 1
+
+
+## True when room `room` is cleared (as Flow told it last).
+func is_cleared(room: int) -> bool:
+	return room >= 0 and room < _cleared.size() and _cleared[room] != 0
+
+
+## How many times the rooms cleared were told again after a restore (it changes with each).
+func cleared_again() -> int:
+	return _cleared_again
 
 
 ## A piece laid (`room_built`): its template and kind kept by its number.
@@ -77,6 +99,9 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_followed = NONE
 		_touch_places = -1
 		_world += 1
+		# A new world's rooms are none of them cleared until Flow says so (an old biome's never carry
+		# over by number: a restore into the hub or a row run tells no empty map).
+		_cleared = PackedByteArray()
 	if number < 0:
 		return
 	while _templates.size() <= number:

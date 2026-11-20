@@ -2,79 +2,62 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.4,
+	"seconds": 0.18200000000000002,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 105
+		"time": 0.03,
+		"seed": 205
 	},
 	"layers": [
 		{
-			"source": "partials",
+			"source": "sine",
 			"pitch": {
 				"from": 300,
-				"to": 200
+				"to": 170
 			},
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.3
-				},
-				{
-					"ratio": 1.5,
-					"gain": -8,
-					"decay": 0.22
-				},
-				{
-					"ratio": 3.0,
-					"gain": -20,
-					"decay": 0.1
-				}
-			],
+			"length": 0.078,
+			"gain": -4,
 			"amp": {
-				"attack": 0.002
-			},
-			"gain": -2
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 260,
-				"to": 180,
-				"q": 6.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.25,
+			"length": 0.10400000000000001,
+			"gain": -3,
 			"amp": {
-				"attack": 0.01,
+				"attack": 0.008,
 				"shape": "perc",
-				"power": 1.6
-			},
-			"gain": -6
+				"power": 2.0
+			}
 		},
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 140,
-				"to": 80
+				"from": 240,
+				"to": 130
 			},
-			"length": 0.12,
+			"length": 0.06,
+			"gain": -6,
 			"amp": {
 				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
 			},
-			"gain": -16
+			"start": 0.08
 		}
 	],
+	"notes": "A decoy's cast: two soft pops, the second lower (240 Hz after 300 Hz), as the double steps out. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A decoy's cast: a hollow, falling double tone, a second of the caster stepping out (partials at 1 and 1.5 falling from 300 to 200 Hz over a soft tube puff).",
-	"gain": -3
+		"lowpass": 1300
+	}
 }

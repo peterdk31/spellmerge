@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.12000000000000001,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 303003
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 650,
+				"q": 0.6,
+				"to": 299.0
+			},
+			"length": 0.08,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 140,
+				"to": 110.60000000000001
+			},
+			"length": 0.06,
+			"gain": -14,
+			"amp": {
+				"attack": 0.015,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 700,
+				"to": 301.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.06,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A bolt landing: like packed snow struck, a soft puff of low-passed air with a faint low bump and a fine dull grain; no ring, no room, nothing over 1.2 kHz. It sits 10 dB under the family's level (gain -10): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -10,
+	"fx": {
+		"lowpass": 1200
+	}
+}

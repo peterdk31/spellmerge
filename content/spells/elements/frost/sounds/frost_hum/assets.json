@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/frost/sounds/frost_hum/frost_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/frost/sounds/frost_hum/frost_hum.sound.json",
+			"recipe_hash": "sha256:f31746b4f2372266324ea22bfbf641a2ee3c7814e148cb1fe8bf454bae337bfa",
+			"audio_hash": "sha256:736ec2f54edaa5272d51923cce1046b333b6c2e7a25dbe293c1f71f04cac85c1",
+			"loudness": -24.0,
+			"peak": -17.7
+		}
+	]
+}

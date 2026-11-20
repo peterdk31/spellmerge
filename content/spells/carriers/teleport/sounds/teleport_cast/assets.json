@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
-			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
-			"audio_hash": "sha256:0f3b544583a306fe9306405f70c59b1b821bd2b90a49cb417cf695b55e5b1a4d",
-			"loudness": -22.7,
-			"peak": -12.9
+			"recipe_hash": "sha256:d60eb8b67a70230238df19494ceb6acd8ff859da02061e7c4379e132171c5dd9",
+			"audio_hash": "sha256:4588fc4b3a3623f76bd76a57fcf50d5261a71f1ffe9dac3846bfd7b506928626",
+			"loudness": -33.8,
+			"peak": -14.8
 		},
 		{
 			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
-			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
-			"audio_hash": "sha256:94d0fbebf30c6ef3a66f65cad69e3bd934642e009f0be56ff4787b1ad32bde4d",
-			"loudness": -22.8,
-			"peak": -13.0
+			"recipe_hash": "sha256:d60eb8b67a70230238df19494ceb6acd8ff859da02061e7c4379e132171c5dd9",
+			"audio_hash": "sha256:98c3c5f58b4fdc0d863ea5febe4cdbc2cc87e6718efd8406428b28fc98adc693",
+			"loudness": -34.1,
+			"peak": -15.3
 		},
 		{
 			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
-			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
-			"audio_hash": "sha256:c4f3f48d5fe8a5bfa7fd6b8095b9d2bf190533c70fa89bff339a7638d009c6af",
-			"loudness": -23.2,
-			"peak": -13.9
+			"recipe_hash": "sha256:d60eb8b67a70230238df19494ceb6acd8ff859da02061e7c4379e132171c5dd9",
+			"audio_hash": "sha256:054ff88319e4c942de3779c4ff669b43a91fc76497b7e66d9a53a3830dd5edf2",
+			"loudness": -33.8,
+			"peak": -15.0
 		},
 		{
 			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
-			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
-			"audio_hash": "sha256:88cede32c7698e1952c23160bc402eb63e28dc258acf950aa1ee353e1efa7368",
-			"loudness": -23.3,
-			"peak": -13.2
+			"recipe_hash": "sha256:d60eb8b67a70230238df19494ceb6acd8ff859da02061e7c4379e132171c5dd9",
+			"audio_hash": "sha256:d5e56b6f21aa311dd7d8d8d3a7b8cd00e0b3d91fc0eb54e94a6a6f43288626b8",
+			"loudness": -34.2,
+			"peak": -14.4
 		}
 	]
 }

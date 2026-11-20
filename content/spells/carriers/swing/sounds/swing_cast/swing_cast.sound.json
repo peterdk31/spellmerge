@@ -2,54 +2,47 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.26,
+	"seconds": 0.12600000000000003,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 114
+		"time": 0.03,
+		"seed": 214
 	},
 	"layers": [
 		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 280,
-				"to": 760,
-				"q": 2.4,
-				"curve": "arch"
+			"source": "sine",
+			"pitch": {
+				"from": 230,
+				"to": 130
 			},
-			"length": 0.24,
+			"length": 0.054,
+			"gain": -4,
 			"amp": {
-				"attack": 0.02,
-				"shape": "arch",
-				"power": 1.6
-			},
-			"gain": 0
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 180,
-				"to": 140,
-				"q": 4.0
+				"type": "low",
+				"from": 900,
+				"q": 0.6,
+				"to": 333.0
 			},
-			"length": 0.12,
+			"length": 0.07200000000000001,
+			"gain": 0,
 			"amp": {
-				"attack": 0.01,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -8
+			}
 		}
 	],
+	"notes": "A swing's cast: a low, short pop (230 to 130 Hz) with a flick of air, as the staff sweeps. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A swing's cast: the staff cutting the air, a low swish swept up from 280 Hz and back, short and dry. 3 dB under the family's level (gain -3), which keeps its peak under the limit.",
-	"gain": -3
+		"lowpass": 1300
+	}
 }

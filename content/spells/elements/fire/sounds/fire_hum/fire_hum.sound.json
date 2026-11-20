@@ -1,0 +1,35 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 1.8,
+	"layers": [
+		{
+			"patch": "fire_roar",
+			"filter": {
+				"from": 300,
+				"to": 480,
+				"curve": "arch",
+				"q": 0.9
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"drive": 1.0
+		},
+		{
+			"patch": "fire_crackle",
+			"pitch": 20,
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Fire in a beam's hum: a low, steady roar breathing slowly, with a few dull crackles."
+}

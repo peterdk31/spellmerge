@@ -142,7 +142,7 @@ const EVENTS: Dictionary = {
 	&"carry_ended": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["carrier", TYPE_INT], ["way", TYPE_VECTOR2], ["pinned", TYPE_BOOL], ["tag", TYPE_INT]],
 	&"possess_started": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"possess_ended": [["caster", TYPE_INT], ["actor", TYPE_INT]],
-	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT]],
+	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT], ["card", TYPE_STRING_NAME]],
 	&"heal_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
 	&"damage_number_shown": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["amount", TYPE_FLOAT], ["element", TYPE_STRING_NAME], ["kind", TYPE_STRING_NAME], ["rise", TYPE_FLOAT], ["seconds", TYPE_FLOAT], ["size", TYPE_FLOAT]],
 	# Players.

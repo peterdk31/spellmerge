@@ -29,3 +29,4 @@ staff_pose = Array[Dictionary]([{"phase": "wind", "at": 1.0, "turn": -67.5, "eas
 cast_cue = &"cast_swing"
 look_shader = ExtResource("9_look")
 cast_sound = &"swing_cast"
+hit_sound = &"swing_hit"

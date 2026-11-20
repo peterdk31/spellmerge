@@ -36,9 +36,12 @@ var registry: Object = null:
 	set(value):
 		registry = value
 		_sound_of.clear()
+		_hit_of.clear()
 
 ## Each card's sound by its id (a carrier's cast sound, an infusion's hint; `&""` for none), read once.
 var _sound_of: Dictionary[StringName, StringName] = {}
+## Each carrier card's hit sound by its id (`&""` for none), read once (`hit_sound`).
+var _hit_of: Dictionary[StringName, StringName] = {}
 ## The sounds the cast being played has played so far (the first `_played_count`).
 var _played: Array[StringName] = []
 var _played_count: int = 0
@@ -84,6 +87,23 @@ func play(cast: CompiledCast, at: Vector2, volume: float = 0.0, staff: int = -1,
 func carrier_sound(card: StringName) -> StringName:
 	var sound: StringName = _card_sound(card)
 	return sound if sound != &"" else FALLBACK
+
+
+## The hit sound of the carrier card `card` (`CarrierCard.hit_sound`; `&""`: none, so its hit kind's
+## sound plays). Read from the registry once, as the cast sounds are; Feel asks it for each hit.
+func hit_sound(card: StringName) -> StringName:
+	if card == &"":
+		return &""
+	var known: Variant = _hit_of.get(card)
+	if known != null:
+		return known as StringName
+	var sound: StringName = &""
+	if registry != null and registry.has_method(&"get_resource"):
+		var resource: Resource = registry.call(&"get_resource", SPELL_FOLDER, card) as Resource
+		if resource is CarrierCard:
+			sound = (resource as CarrierCard).hit_sound
+	_hit_of[card] = sound
+	return sound
 
 
 ## The hint of the infusion card `card` (`&""`: none).

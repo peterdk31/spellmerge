@@ -1,0 +1,24 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 2.0,
+	"layers": [
+		{
+			"patch": "water_wash",
+			"filter": {
+				"from": 300,
+				"to": 700,
+				"q": 1.0
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Water in a beam's hum: a soft wash, opening and closing slowly."
+}

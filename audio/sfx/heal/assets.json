@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/heal/heal.sound.json",
-			"recipe_hash": "sha256:4a5edae09d59e332978aba9918c93eaf33ab09f6b63f8914f64d49969e14355d",
-			"audio_hash": "sha256:a1ae97a3c2739bde4738104466499373ca85dddbe4e48f89481df36446b70a18",
-			"loudness": -20.4,
-			"peak": -7.0
+			"recipe_hash": "sha256:e3200015b1434f90845e578c16945f10b1016f22bfe480a84bc5181272b58087",
+			"audio_hash": "sha256:f83fcdcafe3656c9c3a0162076761546a19eb0c945d7c6de8ee9e0420a72d28e",
+			"loudness": -26.4,
+			"peak": -13.0
 		},
 		{
 			"path": "audio/sfx/heal/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/heal/heal.sound.json",
-			"recipe_hash": "sha256:4a5edae09d59e332978aba9918c93eaf33ab09f6b63f8914f64d49969e14355d",
-			"audio_hash": "sha256:644ab77ad524c724ca6bce4e658c3ac880bc4e7da95f2e68cae3c44f510e3c1f",
-			"loudness": -19.8,
-			"peak": -8.4
+			"recipe_hash": "sha256:e3200015b1434f90845e578c16945f10b1016f22bfe480a84bc5181272b58087",
+			"audio_hash": "sha256:49f55d5fa91283fd0b2ebd9d130d7de896b1c9b9b9243d40172b0d3b3719db14",
+			"loudness": -25.8,
+			"peak": -14.4
 		},
 		{
 			"path": "audio/sfx/heal/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/heal/heal.sound.json",
-			"recipe_hash": "sha256:4a5edae09d59e332978aba9918c93eaf33ab09f6b63f8914f64d49969e14355d",
-			"audio_hash": "sha256:22f85b49115095bd578fc92df291873c72528543d0ffb9d24cf8c42828cdcc8b",
-			"loudness": -19.7,
-			"peak": -8.0
+			"recipe_hash": "sha256:e3200015b1434f90845e578c16945f10b1016f22bfe480a84bc5181272b58087",
+			"audio_hash": "sha256:9bfadf7fcc4797903e9d366bffc6e1815fd5d94c20031c0958cb3150b016229d",
+			"loudness": -25.7,
+			"peak": -14.0
 		},
 		{
 			"path": "audio/sfx/heal/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/heal/heal.sound.json",
-			"recipe_hash": "sha256:4a5edae09d59e332978aba9918c93eaf33ab09f6b63f8914f64d49969e14355d",
-			"audio_hash": "sha256:bd122dd95681ab992af41b7a322bde9dabc5ffe339010ddc1851f78e1290f2ae",
-			"loudness": -20.1,
-			"peak": -7.4
+			"recipe_hash": "sha256:e3200015b1434f90845e578c16945f10b1016f22bfe480a84bc5181272b58087",
+			"audio_hash": "sha256:40582d873e2e2a63e87749b42a3814f069959a3b2452258f708f7cb9bb13cedc",
+			"loudness": -26.1,
+			"peak": -13.4
 		}
 	]
 }

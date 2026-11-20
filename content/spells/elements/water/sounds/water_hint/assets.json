@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/water/sounds/water_hint/water_hint.sound.json",
-			"recipe_hash": "sha256:1c149ef66cfca27a28b8ff7abc279a402521759715b08373f0b8c5a646826122",
-			"audio_hash": "sha256:e45d0c8d99d0ebe3eaffa106ef4db524e8bdbd767ced9dd53ef077f1a67249da",
-			"loudness": -24.2,
-			"peak": -9.8
+			"recipe_hash": "sha256:4fc23596e6ad4d1bd54486c175db6db07b467c37853e139c4207cb26d911c0b7",
+			"audio_hash": "sha256:8db08ced2b73e085ab280eb6df2a7c9af3cc5b5f256eb0a3edeefeac87d0402f",
+			"loudness": -30.2,
+			"peak": -15.8
 		},
 		{
 			"path": "content/spells/elements/water/sounds/water_hint/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/water/sounds/water_hint/water_hint.sound.json",
-			"recipe_hash": "sha256:1c149ef66cfca27a28b8ff7abc279a402521759715b08373f0b8c5a646826122",
-			"audio_hash": "sha256:9ad14b5ac83aeb8c232035e8e6cef49ff1a82880867f000c5bd7aa9e8b137165",
-			"loudness": -24.4,
-			"peak": -9.3
+			"recipe_hash": "sha256:4fc23596e6ad4d1bd54486c175db6db07b467c37853e139c4207cb26d911c0b7",
+			"audio_hash": "sha256:f113ddf70f62fe5744188b208f4a0286b20b17abc733c1dd6c7ebbef46159dd0",
+			"loudness": -30.4,
+			"peak": -15.3
 		},
 		{
 			"path": "content/spells/elements/water/sounds/water_hint/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/water/sounds/water_hint/water_hint.sound.json",
-			"recipe_hash": "sha256:1c149ef66cfca27a28b8ff7abc279a402521759715b08373f0b8c5a646826122",
-			"audio_hash": "sha256:06f3831326e40bc75e3aada6a4536dea3294896d778e6b63927b0c24f898240e",
-			"loudness": -24.4,
-			"peak": -9.0
+			"recipe_hash": "sha256:4fc23596e6ad4d1bd54486c175db6db07b467c37853e139c4207cb26d911c0b7",
+			"audio_hash": "sha256:3958e39252f0b20d5f58af50994e4fc12d6f8ede461dadf8f8528c9e02bc91a2",
+			"loudness": -30.4,
+			"peak": -15.0
 		},
 		{
 			"path": "content/spells/elements/water/sounds/water_hint/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/elements/water/sounds/water_hint/water_hint.sound.json",
-			"recipe_hash": "sha256:1c149ef66cfca27a28b8ff7abc279a402521759715b08373f0b8c5a646826122",
-			"audio_hash": "sha256:8bb9519e90612017e6af558451259db315f3ecc204e12cdc35be0f6220743e8b",
-			"loudness": -23.0,
-			"peak": -5.8
+			"recipe_hash": "sha256:4fc23596e6ad4d1bd54486c175db6db07b467c37853e139c4207cb26d911c0b7",
+			"audio_hash": "sha256:4b441d4ada181cd7bbf39a99c39e6c9e2262493b63b121daf5a9193f8dc60908",
+			"loudness": -29.0,
+			"peak": -11.8
 		}
 	]
 }

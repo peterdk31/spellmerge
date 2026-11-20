@@ -2,91 +2,62 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.42,
+	"seconds": 0.168,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 106
+		"time": 0.03,
+		"seed": 206
 	},
 	"layers": [
 		{
-			"source": "partials",
+			"source": "sine",
 			"pitch": {
-				"from": 220,
-				"to": 330,
-				"curve": "linear"
+				"from": 360,
+				"to": 220
 			},
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.3
-				},
-				{
-					"ratio": 2,
-					"gain": -10,
-					"decay": 0.18
-				},
-				{
-					"ratio": 3,
-					"gain": -20,
-					"decay": 0.08
-				}
-			],
+			"length": 0.072,
+			"gain": -4,
 			"amp": {
-				"attack": 0.002
-			},
-			"gain": -2
-		},
-		{
-			"source": "partials",
-			"pitch": {
-				"from": 330,
-				"to": 440,
-				"curve": "linear"
-			},
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.22
-				},
-				{
-					"ratio": 2,
-					"gain": -12,
-					"decay": 0.12
-				}
-			],
-			"amp": {
-				"attack": 0.002
-			},
-			"gain": -7,
-			"start": 0.08
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 300,
-				"to": 220,
-				"q": 5.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.16,
+			"length": 0.096,
+			"gain": -3,
 			"amp": {
-				"attack": 0.01,
+				"attack": 0.008,
 				"shape": "perc",
-				"power": 1.8
+				"power": 2.0
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 380,
+				"to": 250
 			},
-			"gain": -8
+			"length": 0.05,
+			"gain": -8,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"start": 0.07
 		}
 	],
+	"notes": "A familiar's cast: two small pops close together, the second higher, as the small helper appears. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A familiar's cast: two soft, low rising notes, a small thing woken (warm partials gliding up from 220 to 330 and 330 to 440 Hz) over a breath of the tube.",
-	"gain": -3
+		"lowpass": 1300
+	}
 }

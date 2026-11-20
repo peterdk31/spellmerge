@@ -27,3 +27,4 @@ shown_cue = &"trade"
 impact_cue = &"impact_ring"
 look_shader = ExtResource("3_shader")
 cast_sound = &"swap_cast"
+hit_sound = &"swap_hit"

@@ -2,85 +2,62 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.4,
+	"seconds": 0.18200000000000002,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 113
+		"time": 0.03,
+		"seed": 213
 	},
 	"layers": [
 		{
-			"source": "partials",
+			"source": "sine",
 			"pitch": {
-				"from": 180,
-				"to": 270,
-				"curve": "linear"
+				"from": 300,
+				"to": 180
 			},
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.3
-				},
-				{
-					"ratio": 2,
-					"gain": -12,
-					"decay": 0.15
-				}
-			],
+			"length": 0.078,
+			"gain": -4,
 			"amp": {
-				"attack": 0.002
-			},
-			"gain": -3
-		},
-		{
-			"source": "partials",
-			"pitch": {
-				"from": 270,
-				"to": 180,
-				"curve": "linear"
-			},
-			"partials": [
-				{
-					"ratio": 1,
-					"gain": 0,
-					"decay": 0.3
-				},
-				{
-					"ratio": 2,
-					"gain": -12,
-					"decay": 0.15
-				}
-			],
-			"amp": {
-				"attack": 0.002
-			},
-			"gain": -3
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 300,
-				"to": 220,
-				"q": 4.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.14,
+			"length": 0.10400000000000001,
+			"gain": -3,
 			"amp": {
 				"attack": 0.008,
 				"shape": "perc",
-				"power": 1.8
+				"power": 2.0
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 180,
+				"to": 300
 			},
-			"gain": -8
+			"length": 0.06,
+			"gain": -6,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"start": 0.07
 		}
 	],
+	"notes": "A swap's cast: two pops crossing, one falling from 300 Hz and one rising from 180 Hz. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A swap's cast: two low tones crossing, one gliding up from 180 to 270 Hz as the other glides down, two places trading. 4 dB under the family's level (gain -4), which keeps its two strikes' peak under the limit.",
-	"gain": -4
+		"lowpass": 1300
+	}
 }

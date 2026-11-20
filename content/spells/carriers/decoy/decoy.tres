@@ -24,3 +24,4 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.05, "lift": -1, "stre
 shown_cue = &"conjure"
 end_cue = &"dismiss"
 cast_sound = &"decoy_cast"
+hit_sound = &"decoy_hit"

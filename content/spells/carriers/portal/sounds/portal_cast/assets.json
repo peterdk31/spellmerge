@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
-			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
-			"audio_hash": "sha256:25ac54cc3f2e94ea5681473092bbc2963b74534f8e63ef1060df8569d59ffc59",
-			"loudness": -22.9,
-			"peak": -12.4
+			"recipe_hash": "sha256:d3b3073869c4ebeeca4de8ad8081dd0afe287e10be54f6f0b1cd9bcca84170b2",
+			"audio_hash": "sha256:0cb6075570f5b4c25646025878aa194d43c7e222c4030e85c042a7a75442e314",
+			"loudness": -34.0,
+			"peak": -17.6
 		},
 		{
 			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
-			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
-			"audio_hash": "sha256:fecbb28d34694316dfa3f7a2d3b93ee7e14aafcbe349c6344fc4c3f67dc8c9de",
-			"loudness": -23.1,
-			"peak": -12.6
+			"recipe_hash": "sha256:d3b3073869c4ebeeca4de8ad8081dd0afe287e10be54f6f0b1cd9bcca84170b2",
+			"audio_hash": "sha256:e76ba7a405210757265a244a7ac7d9ab6b97a1dfd4816b7c4d1aa94575515b9f",
+			"loudness": -34.4,
+			"peak": -17.2
 		},
 		{
 			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
-			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
-			"audio_hash": "sha256:fe5d7ba1b21da83d17528d61f847ce9770961f66dd39a35466285cfa10d571a5",
-			"loudness": -23.1,
-			"peak": -13.0
+			"recipe_hash": "sha256:d3b3073869c4ebeeca4de8ad8081dd0afe287e10be54f6f0b1cd9bcca84170b2",
+			"audio_hash": "sha256:fe6bab5cfca286d5d92ae90c3cd591155aa1f3dea27861da92e79b3c2a37cd87",
+			"loudness": -34.0,
+			"peak": -16.5
 		},
 		{
 			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
-			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
-			"audio_hash": "sha256:141334ef54fa9af027316d3f4f3a69a1b57a2cdea2a6f280689471522c8c433d",
-			"loudness": -22.9,
-			"peak": -12.8
+			"recipe_hash": "sha256:d3b3073869c4ebeeca4de8ad8081dd0afe287e10be54f6f0b1cd9bcca84170b2",
+			"audio_hash": "sha256:f61e780a38b0a1c08567308bcbcfaf15701f712f8ebfbe501f1fa0292fa9f01e",
+			"loudness": -33.6,
+			"peak": -15.4
 		}
 	]
 }

@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_ray/hit_ray.sound.json",
-			"recipe_hash": "sha256:8dbf91915718e4e887d80249b992551dbeb8c57177546ef5a086bf67ee54a326",
-			"audio_hash": "sha256:28443c70e0f0d6a3100a722fe1da1aceea238952416da4f457c8f982d605bb17",
-			"loudness": -24.9,
-			"peak": -5.3
+			"recipe_hash": "sha256:5ae4825e74d27547a3c1d6194ec293a4950d24a49c9b8aad8e29aa4f40c53ac8",
+			"audio_hash": "sha256:485c868dc7e756ce361310ae0a96f89aa88b1c04b85d97d7a8dbac898f869211",
+			"loudness": -30.9,
+			"peak": -11.3
 		},
 		{
 			"path": "audio/sfx/hit_ray/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_ray/hit_ray.sound.json",
-			"recipe_hash": "sha256:8dbf91915718e4e887d80249b992551dbeb8c57177546ef5a086bf67ee54a326",
-			"audio_hash": "sha256:71875ef1ddd94a319fe2542e2027830f80f0fcc40ed0183f5a1aa61437c0c986",
-			"loudness": -24.9,
-			"peak": -5.4
+			"recipe_hash": "sha256:5ae4825e74d27547a3c1d6194ec293a4950d24a49c9b8aad8e29aa4f40c53ac8",
+			"audio_hash": "sha256:958cdb14c3bd08c4ea76ffa922042f703835b52a06be80a1f1c579d7a7296080",
+			"loudness": -30.9,
+			"peak": -11.4
 		},
 		{
 			"path": "audio/sfx/hit_ray/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_ray/hit_ray.sound.json",
-			"recipe_hash": "sha256:8dbf91915718e4e887d80249b992551dbeb8c57177546ef5a086bf67ee54a326",
-			"audio_hash": "sha256:2ecc474cd11bbd027e46e5b2c2c39489a85cb61f15c15c0f87460a4c9e4e7495",
-			"loudness": -24.8,
-			"peak": -4.7
+			"recipe_hash": "sha256:5ae4825e74d27547a3c1d6194ec293a4950d24a49c9b8aad8e29aa4f40c53ac8",
+			"audio_hash": "sha256:5b32a489231e864297279efad78c2def8aca13571017ce2de63d4aa1d27abb33",
+			"loudness": -30.8,
+			"peak": -10.7
 		},
 		{
 			"path": "audio/sfx/hit_ray/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_ray/hit_ray.sound.json",
-			"recipe_hash": "sha256:8dbf91915718e4e887d80249b992551dbeb8c57177546ef5a086bf67ee54a326",
-			"audio_hash": "sha256:5c7c7cff20f3c4969354cccc48f401f8a40d772d5fb66c598f71eb39990b2b2e",
-			"loudness": -25.4,
-			"peak": -5.5
+			"recipe_hash": "sha256:5ae4825e74d27547a3c1d6194ec293a4950d24a49c9b8aad8e29aa4f40c53ac8",
+			"audio_hash": "sha256:a3817e3eacd3f29bb0c84b10601db5a60575108de373aa7c2fbecf6becda22fd",
+			"loudness": -31.4,
+			"peak": -11.5
 		}
 	]
 }

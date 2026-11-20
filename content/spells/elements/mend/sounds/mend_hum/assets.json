@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/mend/sounds/mend_hum/mend_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/mend/sounds/mend_hum/mend_hum.sound.json",
+			"recipe_hash": "sha256:69644e75634bfa779c761062c5ee03427b75fe50cfd120c47a972da6a890e670",
+			"audio_hash": "sha256:306ab84403bba6cf07e7a3dcd8020d3b93add5775eb848ca1767db34cb85f59d",
+			"loudness": -24.0,
+			"peak": -17.3
+		}
+	]
+}

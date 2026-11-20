@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/water/sounds/water_hum/water_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/water/sounds/water_hum/water_hum.sound.json",
+			"recipe_hash": "sha256:1749aabd2ce67a82a0b2df95e04ceba1dd3c623572aef92dbd3049f0fa084f94",
+			"audio_hash": "sha256:8f56a985433bd85b5cf2fc9c6dd701ef098f313f3ee0c11bb25c3d9b1df5a7bc",
+			"loudness": -24.0,
+			"peak": -10.9
+		}
+	]
+}

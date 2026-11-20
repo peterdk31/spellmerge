@@ -2,57 +2,63 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.4,
+	"seconds": 0.168,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 107
+		"time": 0.03,
+		"seed": 207
 	},
 	"layers": [
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 210,
-				"to": 70
+				"from": 260,
+				"to": 140
 			},
-			"length": 0.14,
+			"length": 0.072,
+			"gain": -4,
 			"amp": {
-				"attack": 0.006,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -13,
-			"drive": 1.8
-		},
-		{
-			"patch": "water_wash",
-			"gain": -2,
-			"length": 0.34
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 420,
-				"to": 260,
-				"q": 6.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.12,
+			"length": 0.096,
+			"gain": -3,
 			"amp": {
-				"attack": 0.005,
+				"attack": 0.008,
 				"shape": "perc",
-				"power": 2.4
+				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 1100,
+				"q": 1.2,
+				"to": 220
 			},
-			"gain": -6
+			"length": 0.1,
+			"gain": -6,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.8
+			}
 		}
 	],
+	"notes": "A pool's cast: a wet pop (260 to 140 Hz) with a soft squelch of noise falling from 1.1 kHz. It sits 8 dB under the family's level (gain -8): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -8,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "A pool's cast: a wet, low plop (a sine dropping from 210 to 70 Hz and a short ring) and a wash of the spit mire landing, water's own soft wash under it.",
-	"gain": -2
+		"lowpass": 1300
+	}
 }

@@ -70,7 +70,7 @@ class BakeTest(unittest.TestCase):
                           "prompt": f"{folder}/blip.sound.json"})
         self.assertEqual(entry["tool"], f"tools/sound.py (procedural synthesis, generator {sound.sound_synth.GENERATOR})")
         self.assertTrue(entry["recipe_hash"].startswith("sha256:"))
-        self.assertAlmostEqual(entry["loudness"], -20.0, delta=1.0)
+        self.assertAlmostEqual(entry["loudness"], -26.0, delta=1.0)
         self.assertLessEqual(entry["peak"], -4.0)
         self.assertFalse((self.root / folder / "variants/1.ogg.import").exists(), "Godot writes a one-shot's .import")
 
@@ -277,7 +277,7 @@ class FamiliesTest(unittest.TestCase):
     def test_the_families_are_read_from_the_style_guide(self) -> None:
         fams = sound.families()
         self.assertEqual(set(fams), {"combat", "big", "boss", "held", "ambience", "ui", "music"})
-        self.assertEqual(fams["combat"], sound.Family("combat", -20.0, "momentary", -3.0, 4, 0.04, 1.5, -10.0, 2000.0))
+        self.assertEqual(fams["combat"], sound.Family("combat", -26.0, "momentary", -3.0, 4, 0.04, 1.5, -10.0, 2000.0))
         self.assertEqual(fams["held"], sound.Family("held", -24.0, "integrated", -6.0, 1, 0.0, 0.0, -9.0, 2000.0))
         self.assertIsNone(fams["music"].top, "music has no ceiling on its top")
         self.assertEqual(fams["ui"].pitch, 0.02)

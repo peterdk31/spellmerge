@@ -1,0 +1,24 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 2.2,
+	"layers": [
+		{
+			"patch": "storm_gust",
+			"filter": {
+				"from": 240,
+				"to": 700,
+				"q": 1.6
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Storm in a beam's hum: a low wind rising and falling slowly."
+}

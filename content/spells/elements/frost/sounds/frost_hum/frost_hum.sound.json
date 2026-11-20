@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 2.0,
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": 330,
+			"ratio": 2.76,
+			"index": {
+				"from": 0.3,
+				"to": 0.6,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.7
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 495,
+				"to": 500,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -12
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "Frost in a beam's hum: a soft, low ring of glass held on (a glassy FM tone at 330 Hz and a faint fifth over it)."
+}

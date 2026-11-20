@@ -50,3 +50,4 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift
 cast_cue = &"cast_rune"
 shown_cue = &"pool_throw"
 cast_sound = &"pool_cast"
+hit_sound = &"pool_hit"

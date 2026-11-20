@@ -114,6 +114,14 @@ var _pose_packed: bool = false
 ## `ElementBase.cast_hint`s over it). Empty: the shared `cast`. Its recipe is in the card's own
 ## `sounds/<id>/` folder (audio/README.md).
 @export var cast_sound: StringName = &""
+## Its own hit sound (a sound id): what a hit of its shots, sweep or ray sounds on a body (Feel's
+## hits; the hit names its card, `HitProfile.card`, and Feel reads this from it). Empty: its hit
+## kind's sound (Feel's preset, `kind_looks`). Its recipe is in the card's own `sounds/<id>/` folder.
+@export var hit_sound: StringName = &""
+## Its held sound (a sound id; empty: none): a loop held from its caster while one of it is live (a
+## beam's hum, Feel's beam sounds, `gameplay/feel/beam_sounds.gd`), its infusions' `ElementBase.held_hint`s
+## under it. Its recipe is in the card's own `sounds/<id>/` folder.
+@export var held_sound: StringName = &""
 @export var shown_cue: StringName = &""
 @export var impact_cue: StringName = &"impact"
 @export var end_cue: StringName = &""

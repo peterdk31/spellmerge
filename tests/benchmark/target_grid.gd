@@ -192,7 +192,7 @@ func _on_hit(caster: int, target: Node, point: Vector2, tag: int, _slot: int) ->
 	_handler_us += Time.get_ticks_usec() - start
 
 
-func _on_touch(by: int, target: Node, amount: int, _where: Vector2, kind: StringName, _slot: int) -> void:
+func _on_touch(by: int, target: Node, amount: int, _where: Vector2, kind: StringName, _slot: int, _card: StringName) -> void:
 	var start: int = Time.get_ticks_usec()
 	_touches += 1
 	var which: int = _index_of.get(target.get_instance_id(), -99)

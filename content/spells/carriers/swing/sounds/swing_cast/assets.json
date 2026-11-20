@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/swing/sounds/swing_cast/swing_cast.sound.json",
-			"recipe_hash": "sha256:931da5a18cabb98cfa9d168f9b3c33b000d4e1bb35ae418a35c44978df3ae823",
-			"audio_hash": "sha256:ba2fb913689a0c25092a149db5a42fe8a66ccba1b0ca734626b399153af2e105",
-			"loudness": -23.2,
-			"peak": -6.4
+			"recipe_hash": "sha256:6113582bfb28f0068d3e0dbbc5b9bf8a5446983c838b00b56baeecf019797d7c",
+			"audio_hash": "sha256:94e71ab6022a3a3527a18d746ef8368a88a6a4a9843d807d4ee0c9bd04ec05d9",
+			"loudness": -34.6,
+			"peak": -15.2
 		},
 		{
 			"path": "content/spells/carriers/swing/sounds/swing_cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/swing/sounds/swing_cast/swing_cast.sound.json",
-			"recipe_hash": "sha256:931da5a18cabb98cfa9d168f9b3c33b000d4e1bb35ae418a35c44978df3ae823",
-			"audio_hash": "sha256:51ad8316b8b1307750b0f05d1aba3f73f224be28f75f3f18eb8d191d2e11ea76",
-			"loudness": -22.7,
-			"peak": -4.5
+			"recipe_hash": "sha256:6113582bfb28f0068d3e0dbbc5b9bf8a5446983c838b00b56baeecf019797d7c",
+			"audio_hash": "sha256:e47d30aed7aed9ef41caaa01dddfdfee854832836f52d7a42d6d516b06f43117",
+			"loudness": -34.2,
+			"peak": -13.4
 		},
 		{
 			"path": "content/spells/carriers/swing/sounds/swing_cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/swing/sounds/swing_cast/swing_cast.sound.json",
-			"recipe_hash": "sha256:931da5a18cabb98cfa9d168f9b3c33b000d4e1bb35ae418a35c44978df3ae823",
-			"audio_hash": "sha256:916a99e6022d7ca67e6da32b6a49715065d26746a6a0325e111f28000c84e27a",
-			"loudness": -23.0,
-			"peak": -6.3
+			"recipe_hash": "sha256:6113582bfb28f0068d3e0dbbc5b9bf8a5446983c838b00b56baeecf019797d7c",
+			"audio_hash": "sha256:1f2387fee82353fe3522182db4a3ab242a229e2d22976fdf9d930fb19b552001",
+			"loudness": -34.2,
+			"peak": -14.9
 		},
 		{
 			"path": "content/spells/carriers/swing/sounds/swing_cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/carriers/swing/sounds/swing_cast/swing_cast.sound.json",
-			"recipe_hash": "sha256:931da5a18cabb98cfa9d168f9b3c33b000d4e1bb35ae418a35c44978df3ae823",
-			"audio_hash": "sha256:8a49133fb05ab6b57bc94e5d7a96dd17779f3d66c2bdc757c511644897a83b73",
-			"loudness": -23.1,
-			"peak": -7.1
+			"recipe_hash": "sha256:6113582bfb28f0068d3e0dbbc5b9bf8a5446983c838b00b56baeecf019797d7c",
+			"audio_hash": "sha256:9a2a85a311b1c1b18f0362c6ff87ee91a4b2752d73c6b6b443f033886535d6a0",
+			"loudness": -33.0,
+			"peak": -13.9
 		}
 	]
 }

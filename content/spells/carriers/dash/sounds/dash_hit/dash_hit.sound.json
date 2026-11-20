@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.13999999999999999,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 304006
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 560,
+				"q": 0.6,
+				"to": 257.6
+			},
+			"length": 0.096,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 120,
+				"to": 94.80000000000001
+			},
+			"length": 0.072,
+			"gain": -10,
+			"amp": {
+				"attack": 0.015,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 700,
+				"to": 301.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.072,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A dash's body striking: a heavier snow, longer, with a firmer low bump. It sits 10 dB under the family's level (gain -10): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -10,
+	"fx": {
+		"lowpass": 1200
+	}
+}

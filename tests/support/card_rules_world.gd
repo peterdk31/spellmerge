@@ -366,7 +366,7 @@ func _listen() -> void:
 		_put("expired %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.damage_dealt.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2) -> void:
 		_put("damage %s -> %s %.2f" % [_who(caster), _name_of(target), amount]))
-	bus.hit_landed.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2, kind: StringName, _shot: int) -> void:
+	bus.hit_landed.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2, kind: StringName, _shot: int, _card: StringName) -> void:
 		_put("landed %s -> %s %.2f %s" % [_who(caster), _name_of(target), amount, kind]))
 	bus.heal_dealt.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2) -> void:
 		_put("heal %s -> %s %.2f" % [_who(caster), _name_of(target), amount]))

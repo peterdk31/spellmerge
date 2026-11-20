@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
-			"audio_hash": "sha256:a695803ed27de956da4b713ddfca1863dfcee232dadd58b6ca5a35573563e59f",
-			"loudness": -22.0,
-			"peak": -8.3
+			"recipe_hash": "sha256:67722538c99a0e01f1543dca2e9984d71c3cdceca4e25221fb2424283e886bcd",
+			"audio_hash": "sha256:eaae12e5e4dc39fdc3feda7b16651a33c62dea0f1d5b7b2045188607eb6bdd6c",
+			"loudness": -28.0,
+			"peak": -14.3
 		},
 		{
 			"path": "audio/sfx/enemy_materialize/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
-			"audio_hash": "sha256:b84424ee0f22b70a8e9fbe6fe6a98d5dec52b3956262e8f473eff0a57917fa08",
-			"loudness": -21.8,
-			"peak": -9.8
+			"recipe_hash": "sha256:67722538c99a0e01f1543dca2e9984d71c3cdceca4e25221fb2424283e886bcd",
+			"audio_hash": "sha256:3f9c721044b072e3e26f09ca9d52da71a108450da89392501d02907c20739fb5",
+			"loudness": -27.8,
+			"peak": -15.8
 		},
 		{
 			"path": "audio/sfx/enemy_materialize/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
-			"audio_hash": "sha256:3b910ee388ca1751a091f2de16e37a71c93ee4c21253d1a3b0e9d9ee1d42968d",
-			"loudness": -22.1,
-			"peak": -9.1
+			"recipe_hash": "sha256:67722538c99a0e01f1543dca2e9984d71c3cdceca4e25221fb2424283e886bcd",
+			"audio_hash": "sha256:7df02991f2d4948cdd98a96c90a622f1ca61087b43bf2ffa20543b4ec1a54c5a",
+			"loudness": -28.1,
+			"peak": -15.1
 		},
 		{
 			"path": "audio/sfx/enemy_materialize/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
-			"audio_hash": "sha256:81564f4cc70e0b2a91ae5245e7247583b4d41b951cc0f3f63c0df1f90c57a1f0",
-			"loudness": -22.1,
-			"peak": -7.9
+			"recipe_hash": "sha256:67722538c99a0e01f1543dca2e9984d71c3cdceca4e25221fb2424283e886bcd",
+			"audio_hash": "sha256:1fce72b86aa929f59ffb5d4435d796dfc8ec70c1ee5ba7e301e2d3c07507c881",
+			"loudness": -28.1,
+			"peak": -13.9
 		}
 	]
 }

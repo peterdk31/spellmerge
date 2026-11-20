@@ -64,7 +64,10 @@ static func fastest_usec(work: Callable, repeats: int) -> int:
 ## again and again for as long as that run took (at least once), so the two share the machine alike
 ## (a reference timed alone, a few milliseconds, often runs in one undisturbed slice of a busy core
 ## while a longer run is cut off by the others). The fastest run of `work` over the fastest round's
-## time a reference (each Callable taking nothing).
+## time a reference (each Callable taking nothing). On a busy machine the work's fastest run may have
+## had a quieter moment than the reference's average over as long: the multiple is then somewhat low
+## (twice a reference measured 1.5 under the loaded suite), never high, so a load can let a budget
+## pass more easily, never fail one a quiet machine passes.
 static func against(work: Callable, reference: Callable, repeats: int) -> Timed:
 	_make_inputs()
 	var work_best: int = -1

@@ -96,6 +96,23 @@ func test_it_does_not_walk_into_a_crowd_to_revive() -> void:
 	check_equal(chosen, 0, "steps it chose to revive with foes round the mate")
 
 
+## Low after a fight, it still revives: with no foe left nothing can down it beside the one downed
+## (playtest, 2026-11-20: a bot under LOW walked on to the next fight and left its teammates down).
+func test_low_with_the_fight_over_it_still_revives() -> void:
+	var health: Health = _world.players[0].health
+	health.health = health.max_health * ReviveScript.LOW * 0.5
+	var steps: int = int((2.5 + CoopScript.REVIVE_HOLD_TIME + 1.5) / Fixture.STEP)
+	var near: int = _drive(BOT_PROFILE, steps)
+	check(near >= int(CoopScript.REVIVE_HOLD_TIME / Fixture.STEP), "it stood in revive range long enough to revive (%d steps)" % near)
+
+
+func test_low_with_a_fight_on_it_does_not_go() -> void:
+	_world.imp(Vector2(100.0, 400.0))
+	var health: Health = _world.players[0].health
+	health.health = health.max_health * ReviveScript.LOW * 0.5
+	check_equal(_revive_steps(BOT_PROFILE, int(4.0 / Fixture.STEP)), 0, "steps it chose to revive, low with a foe about")
+
+
 func test_a_profile_that_does_not_revive_never_goes() -> void:
 	var enemy_like: AIProfile = BOT_PROFILE.duplicate() as AIProfile
 	enemy_like.revives = 0.0

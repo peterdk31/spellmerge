@@ -51,10 +51,12 @@ extends ActorController
 ##   this seat only, a staff named by its number) puts the shown body's staffs on hands, in the bag
 ##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
 ##   refusal is `inventory_refused` with its words. `bag_use_requested` (the owner, 2026-11-19)
-##   drinks one potion of the shown body's potions bag (`PotionBase`, found in the registry): one is
-##   taken and the body is given what it does through Combat (`health_gift_requested`); refused for
-##   none held (NO_ITEM), a thing that is not drunk (NO_USE) and a potion that only heals while the
-##   body is whole (NO_NEED: never wasted).
+##   uses one item of the shown body's bag that has a use (a potion, an active relic: its
+##   `ItemContent.use_of`, found in the registry): the body is given what its use does through Combat
+##   (`health_gift_requested`), one copy taken when the use is consumed, else it recharges for the
+##   use's cooldown (`Inventory.start_recharge`; `item_recharging` tells the HUD); refused for
+##   none held (NO_ITEM), a thing with no use (NO_USE, `ItemKinds.usable`), one still recharging (NO_CHARGE) and a use that only heals while the
+##   body is whole (NO_NEED, `ItemUse.wasted_on`: never wasted).
 ## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the
 ##   inventory menu's d-pad on an item, binds the shown body's quick-use slot (`Inventory.bind_quick`;
 ##   refused as it says), and `quick_use_requested(player, slot)`, a d-pad arm pressed in play, uses
@@ -109,6 +111,7 @@ const NO_USE: String = "That cannot be used."
 ## Why a drop of a kind that is never dropped (none today: everything is, the owner, 2026-11-19) is refused.
 const NO_DROP: String = "That cannot be dropped."
 const NO_NEED: String = "You are already whole."
+const NO_CHARGE: String = "That is still recharging."
 ## Why every request of the builder's and the inventory's is refused while the home body is down
 ## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
 const NO_DOWN: String = "You cannot do that while down."
@@ -314,6 +317,10 @@ func _watch(body: Actor) -> void:
 		inventory.staff_changed.connect(_on_owned_staff_changed)
 		inventory.hands_changed.connect(_on_hands_changed)
 		inventory.quick_changed.connect(_on_quick_changed)
+		inventory.recharge_changed.connect(_on_recharge_changed)
+	if inventory != null and registry != null:
+		# The same content its use reads (`_use_item`), so what binds is what is used.
+		inventory.registry = registry
 
 
 func _unwatch(body: Actor) -> void:
@@ -327,6 +334,7 @@ func _unwatch(body: Actor) -> void:
 		inventory.staff_changed.disconnect(_on_owned_staff_changed)
 		inventory.hands_changed.disconnect(_on_hands_changed)
 		inventory.quick_changed.disconnect(_on_quick_changed)
+		inventory.recharge_changed.disconnect(_on_recharge_changed)
 
 
 ## A snapshot restored: it hears the body it drives (the base's) and the shown body, which may be
@@ -552,6 +560,9 @@ func _announce_body() -> void:
 	_on_hands_changed()
 	for slot in Inventory.QUICK_SLOTS:
 		_on_quick_changed(slot)
+	if body.inventory != null:
+		for recharging: Array in body.inventory.recharging():
+			_on_recharge_changed(recharging[0], recharging[1])
 
 
 ## `bag_changed` for this seat: what the shown body's bag `bag` holds now (its currency bag too: the
@@ -587,6 +598,15 @@ func _on_quick_changed(slot: int) -> void:
 	var body: Actor = shown()
 	if body != null and body.events != null and body.inventory != null:
 		body.events.quick_bound.emit(seat, slot, body.inventory.quick_bag(slot), body.inventory.quick_id(slot))
+
+
+## `item_recharging` for this seat: how long `id` of `bag` of the shown body still recharges, of its
+## whole cooldown (0 left: ready again), at its start and each sixteenth of it (`Inventory.step`).
+func _on_recharge_changed(bag: StringName, id: StringName) -> void:
+	var body: Actor = shown()
+	if body == null or body.events == null or body.inventory == null:
+		return
+	body.events.item_recharging.emit(seat, bag, id, body.inventory.recharge_left(bag, id), body.inventory.recharge_whole(bag, id))
 
 
 ## The seat's events: the shown body's bus (every body shares one).
@@ -679,9 +699,8 @@ func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number
 	_answer_inventory(refusal)
 
 
-## The inventory menu asked to drink one `id` of `bag` (the owner, 2026-11-19): a potion the shown
-## body holds is taken and does what it does (`PotionBase`: more most health, then a heal, through
-## Combat), refused as the class doc says.
+## The inventory menu asked to use one `id` of `bag` (the owner, 2026-11-19): an item with a use
+## the shown body holds is taken and its use done (`_use_item`), refused as the class doc says.
 func _on_bag_use_requested(player: int, bag: StringName, id: StringName, body: int) -> void:
 	if player != seat:
 		return
@@ -719,26 +738,31 @@ func _on_quick_use_requested(player: int, slot: int) -> void:
 	_use_item(body.inventory.quick_bag(slot), body.inventory.quick_id(slot))
 
 
-## Use one `id` of `bag` of the shown body: a potion is taken and does what it does (more most
-## health, then a heal, through Combat), refused as the class doc says.
+## Use one `id` of `bag` of the shown body: an item with a use (`ItemKinds.use_of`, an `ItemUse`: a
+## potion, an active relic) has it done: more most health, then a heal, through Combat; one copy taken
+## when the use is consumed (a potion), kept and recharging for its cooldown when not (an active
+## relic: `Inventory.start_recharge`); refused as the class doc says.
 func _use_item(bag: StringName, id: StringName) -> void:
 	var shown_body: Actor = shown()
 	var inventory: Inventory = shown_body.inventory
-	var kind: StringName = ItemKinds.kind_in(bag, id)
 	if inventory == null or inventory.count_of(bag, id) < 1:
 		_refuse_inventory(NO_ITEM)
 		return
-	var potion := ItemLooks.content_of(kind, id, registry) as PotionBase
-	if not ItemKinds.can(kind, ItemKinds.USE) or potion == null:
+	var use: ItemUse = ItemKinds.use_of(bag, id, registry)
+	if use == null:
 		_refuse_inventory(NO_USE)
 		return
-	if shown_body.health == null or potion.wasted_on(shown_body.health.health, shown_body.health.max_health):
+	if inventory.recharge_left(bag, id) > 0.0:
+		_refuse_inventory(NO_CHARGE)
+		return
+	if shown_body.health == null or use.wasted_on(shown_body.health.health, shown_body.health.max_health):
 		_refuse_inventory(NO_NEED)
 		return
 	var bus: EventsScript = _bus()
-	if bus == null or not inventory.take(bag, id, 1):
+	if bus == null or (use.consumed and not inventory.take(bag, id, 1)):
 		return
-	bus.health_gift_requested.emit(shown_body.id, potion.heal, potion.more_most)
+	inventory.start_recharge(bag, id, use.cooldown)
+	bus.health_gift_requested.emit(shown_body.id, use.heal, use.more_most)
 
 
 ## A refusal of the inventory menu's to the seat (`inventory_refused`); nothing for a change made.

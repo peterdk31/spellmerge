@@ -20,8 +20,8 @@ extends Node
 ## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
-## runs' (`validate_runs()`), and pushes one warning per problem, so broken spell or run content
-## shows up on the first run.
+## runs' (`validate_runs()`) and the items' (`validate_items()`: each item's use),
+## and pushes one warning per problem, so broken spell, run or item content shows up on the first run.
 ##
 ## Sounds (docs/milestones/sound.md, section 3) are `.ogg` files and `.tres` files (an
 ## `AudioStreamRandomizer` of a sound's baked variants: `<id>.tres` naming `variants/1.ogg` ...)
@@ -70,6 +70,7 @@ func _ready() -> void:
 		warn_spell_problems()
 		warn_story_problems()
 		warn_run_problems()
+		warn_item_problems()
 
 
 ## Reads the content and audio folders again. The roots can be changed so
@@ -303,6 +304,27 @@ func validate_runs() -> PackedStringArray:
 	if flags.size() > RunUnlocks.MAX_FLAGS:
 		found.append("The runs' rule changes name %d save flags, more than the %d a run's start carries (RunUnlocks.MAX_FLAGS)." % [flags.size(), RunUnlocks.MAX_FLAGS])
 	return found
+
+
+## The problems with the items (`ItemContent.problems`, the potions, coins, keys, rerolls and
+## relics, each kind's folders by `ItemKinds`): its use is checked (`ItemUse.problems`: it does
+## something, its cooldown is 0 or more), named with its fix. Empty when all is well.
+func validate_items() -> PackedStringArray:
+	var found := PackedStringArray()
+	for kind: StringName in ItemKinds.kinds():
+		for folder: StringName in ItemKinds.content_of(kind):
+			for res: Resource in get_all(folder):
+				if res is ItemContent and ItemKinds.is_content(kind, res):
+					found.append_array((res as ItemContent).problems())
+	return found
+
+
+## Pushes one warning per problem `validate_items()` finds, and returns how many.
+func warn_item_problems() -> int:
+	var problems: PackedStringArray = validate_items()
+	for line: String in problems:
+		push_warning("Registry: " + line)
+	return problems.size()
 
 
 ## Pushes one warning per problem `validate_runs()` finds, and returns how many.

@@ -4,7 +4,7 @@ extends RefCounted
 ## icon, name and description): one answer for every kind, so the Rewards area's choices, a shop's
 ## shelf and the inventory show an item the same way. A card's are Spells' to say (no script
 ## outside core/spells reads a card); a staff's its `StaffBase`'s; any other kind's its content's
-## (`ItemContent`, or a `RelicBase`: `shown_name`, `description`, `icon`), found in the registry
+## (an `ItemContent`, a relic's too: `shown_name`, `description`, `icon`), found in the registry
 ## folders of its row (`ItemKinds.content_of`). Static only; it keeps nothing.
 ##
 ##     var look: Dictionary = ItemLooks.of(ItemKinds.POTION, &"healing", registry, spells)
@@ -40,10 +40,4 @@ static func of(kind: StringName, id: StringName, registry: RegistryScript, spell
 ## The content `kind` `id` is (the first of its row's folders that has it and is of its class), or
 ## null.
 static func content_of(kind: StringName, id: StringName, registry: RegistryScript) -> Resource:
-	if registry == null or id == &"":
-		return null
-	for folder: StringName in ItemKinds.content_of(kind):
-		var found: Resource = registry.get_resource(folder, id)
-		if found != null and ItemKinds.is_content(kind, found):
-			return found
-	return null
+	return ItemKinds.content(kind, id, registry)

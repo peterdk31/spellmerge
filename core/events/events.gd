@@ -84,6 +84,20 @@ signal map_teleport_requested(player: int, room: int)
 ## on its open map to teleport to (`room`; -1: none, the map shut). For the view only. Heard by feel
 ## (the pick drawn on that player's map).
 signal map_pick_changed(player: int, room: int)
+## Sender: hud (the inventory menu's d-pad on an item; the owner, 2026-11-20). `player` asked to bind
+## their quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) to `id` of `bag` (a usable
+## item, `ItemKinds.USE`): bound on another slot already, it moves; bound there already (or `id`
+## `&""`), the slot is let go. `body` as `staff_change_requested`'s. A command: heard by player at the
+## next tick's start, which binds it (`quick_bound`) or says `inventory_refused`.
+signal quick_bind_requested(player: int, slot: int, bag: StringName, id: StringName, body: int)
+## Sender: hud (a d-pad arm pressed in play, the map shut; the owner, 2026-11-20). `player` uses one of
+## the item bound to their quick-use slot `slot`. A command: heard by player at the next tick's start,
+## which uses it as `bag_use_requested` does, or says `inventory_refused` (none left, down, not needed).
+signal quick_use_requested(player: int, slot: int)
+## Sender: feel (the held Y map, `party_map_view.gd`). Seat `player`'s map frame (screen pixels) and
+## whether it is fully open (`open`); an empty `frame` as it shuts. Sent when either changes. View
+## only: heard by hud (the map's legend under the frame).
+signal map_frame_shown(player: int, frame: Rect2i, open: bool)
 ## A player voted for door number `door`. Heard by flow.
 signal door_vote_requested(player: int, door: int)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
@@ -279,6 +293,8 @@ signal bag_changed(player: int, bag: StringName, ids: Array[StringName], counts:
 signal owned_staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. Which staff is on which hand of `player`'s own wizard: by button (0 RB, 1 RT, 2 LB, 3 LT) the number of the staff on it, -1 for an empty hand (items I3). Sent when the wizard appears and whenever it changes. Heard by hud (the builder's strip of staffs).
 signal hands_changed(player: int, hands: PackedInt32Array)
+## Sender: player. What quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) of the body `player` shows is bound to: `id` of `bag` (`&""`: nothing). Sent for every slot when the body is announced (after `inventory_announced`) and whenever one changes; how many are left is `bag_changed`'s. Heard by hud (the corner panel's d-pad, the inventory menu).
+signal quick_bound(player: int, slot: int, bag: StringName, id: StringName)
 ## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by nobody now: Feel sounds every actor's cast on `cast_left` instead.

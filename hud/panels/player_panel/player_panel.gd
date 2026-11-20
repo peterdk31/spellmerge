@@ -24,12 +24,17 @@ extends PanelContainer
 ## PlayerPanel1-4) and the lines' own. Updating only changes text when a number changed, and
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
+## Beside the staff rows, the seat's four quick-use slots (`set_quick`; `hud/widgets/quick_cross.gd`, a
+## small d-pad cross with each bound item's icon and count, the owner's of 2026-11-20): it takes room
+## only while something is bound, growing and shrinking by whole steps (Smooth).
+##
 ## While the player has a menu open the staff rows hide: the builder shows the staffs, and the
 ## radial builder's column takes the space under the panel.
 
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
+const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
@@ -65,6 +70,9 @@ var _keys: KeyCountScript = null
 var _reward_rerolls: KeyCountScript = null
 var _coins: int = 0
 var _unspent: int = 0
+## The staff rows and the quick-use cross beside them (`set_quick`).
+var _lower: HBoxContainer = null
+var _quick: QuickCrossScript = null
 
 @onready var _seat_row: Control = %SeatRow
 @onready var _seat: Label = %Seat
@@ -104,14 +112,29 @@ func _ready() -> void:
 	_purse_row.add_child(_purse)
 	_staffs.get_parent().add_child(_purse_row)
 	_staffs.get_parent().move_child(_purse_row, _staffs.get_index())
+	# The staff rows and, on their right, the quick-use cross.
+	_lower = HBoxContainer.new()
+	_lower.name = "Lower"
+	_lower.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lower.add_theme_constant_override(&"separation", 3)
+	var rows_box: Node = _staffs.get_parent()
+	rows_box.add_child(_lower)
+	rows_box.move_child(_lower, _staffs.get_index())
+	_staffs.reparent(_lower, false)
+	_staffs.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_staffs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_quick = QuickCrossScript.new()
+	_quick.name = "QuickCross"
+	_quick.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_lower.add_child(_quick)
 	_held_note = Label.new()
 	_held_note.name = "JoinHeld"
 	_held_note.visible = false
 	_held_note.text = JOIN_HELD_TEXT
 	_held_note.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
 	_held_note.add_theme_font_size_override(&"font_size", 8)
-	_staffs.get_parent().add_child(_held_note)
-	_staffs.get_parent().move_child(_held_note, _purse_row.get_index())
+	rows_box.add_child(_held_note)
+	rows_box.move_child(_held_note, _purse_row.get_index())
 	_align_rows()
 	_refresh_status()
 
@@ -232,6 +255,17 @@ func seat_text() -> String:
 	return _seat.text if _seat_row.visible else ""
 
 
+## Show quick-use slot `slot` (a d-pad arm: 0 up, 1 right, 2 down, 3 left) bound to `icon` (null:
+## nothing) with `count` of it held (0: greyed, the binding kept); `at_once` draws it as it stands.
+func set_quick(slot: int, icon: Texture2D, count: int, at_once: bool = false) -> void:
+	_quick.set_slot(slot, icon, count, at_once)
+
+
+## The quick-use cross (for tests and screenshots).
+func quick_cross() -> QuickCrossScript:
+	return _quick
+
+
 ## Show staff `staff` (0-3) as the plan of `staff_changed` says (`Spells.staff_view`), with
 ## `icons` the icon of each card by slot. A staff with no card hides its row.
 func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D]) -> void:
@@ -349,6 +383,8 @@ func _refresh_rows() -> void:
 	for staff in STAFF_COUNT:
 		_rows[staff].visible = _has_cards[staff] and not _menu_open
 	_staffs.visible = not _menu_open and _has_cards.has(true)
+	_quick.visible = not _menu_open
+	_lower.visible = _staffs.visible or _quick.visible
 
 
 func _refresh_status() -> void:

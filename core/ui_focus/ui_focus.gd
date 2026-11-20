@@ -16,7 +16,7 @@ extends Node
 ## never pauses the game, and no player ever waits for another.
 ##
 ## Controls: move_up and move_left go to the previous control, move_down and
-## move_right to the next (wrapping round); `accept` (A) activates the focused
+## move_right to the next (wrapping round), and the d-pad's arms (`quick_*`) the same way; `accept` (A) activates the focused
 ## control, `back` (B) cancels, `alternate` (X) sends `alternate` for the focused control
 ## and `page_prev` / `page_next` (LB, RB) send `paged`. A panel laid out in two
 ## dimensions gives a navigator (`set_navigator`): each move asks it for the control
@@ -45,7 +45,7 @@ const MAX_PLAYERS: int = InputManagerScript.MAX_PLAYERS
 ## Returned by focus_index() where nothing is focused.
 const NO_FOCUS: int = -1
 
-const PREVIOUS_ACTIONS: Array[StringName] = [&"move_up", &"move_left"]
+const PREVIOUS_ACTIONS: Array[StringName] = [&"move_up", &"move_left", &"quick_up", &"quick_left"]
 ## A (Space) activates and B (Q) goes back, as on most gamepads (staffs A6a); X (J) is the
 ## panel's second action on the focused control, LB and RB (Z, C) page (staffs B8).
 const ACTIVATE: StringName = &"accept"
@@ -54,12 +54,15 @@ const ALTERNATE: StringName = &"alternate"
 const PAGE_PREV: StringName = &"page_prev"
 const PAGE_NEXT: StringName = &"page_next"
 ## The direction of each move action, for a navigator.
+## The d-pad never walks (the owner, 2026-11-20), but in a menu it steps the focus as the stick does.
 const DIRECTIONS: Dictionary = {
 	&"move_up": Vector2i.UP, &"move_down": Vector2i.DOWN, &"move_left": Vector2i.LEFT, &"move_right": Vector2i.RIGHT,
+	&"quick_up": Vector2i.UP, &"quick_down": Vector2i.DOWN, &"quick_left": Vector2i.LEFT, &"quick_right": Vector2i.RIGHT,
 }
 ## Every action read while a panel is open.
 const WATCHED: Array[StringName] = [
 	&"move_up", &"move_left", &"move_down", &"move_right", &"accept", &"back", &"alternate", &"page_prev", &"page_next",
+	&"quick_up", &"quick_left", &"quick_down", &"quick_right",
 ]
 
 ## A panel opened for `player`.

@@ -35,6 +35,9 @@ extends CanvasLayer
 ## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
 ## pixels; nothing fades.
 ##
+## **Told to the HUD:** each seat's frame and whether it is fully open (`map_frame_shown`, as either
+## changes), so the HUD's legend sits under it (`hud/panels/map_legend.gd`).
+##
 ## Feel's: a canvas layer under the HUD's (`LAYER`), a frame (a Control that clips) a seat; stepped once
 ## a frame (`step`). Nothing is allocated while it is drawn.
 
@@ -128,6 +131,11 @@ var _symbol_rows: PackedInt32Array = PackedInt32Array()
 ## The wizards' places and colours this frame (world pixels; INF: none), by seat.
 var _wizard_at: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
 var _wizard_colour: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
+## The bus (`map_frame_shown`, told to the HUD's legend) and, by seat, the frame told last and whether
+## it was open then.
+var _events: Node = null
+var _told_frame: Array[Rect2i] = [Rect2i(), Rect2i(), Rect2i(), Rect2i()]
+var _told_open: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 var _laid_places: int = -1
 var _laid_world: int = -1
 var _clock: float = 0.0
@@ -165,6 +173,7 @@ func _init() -> void:
 
 
 func bind(events: Node) -> void:
+	_events = events
 	if events != null:
 		events.rooms_seen.connect(_on_rooms_seen)
 		events.run_stats_told.connect(_on_run_stats_told)
@@ -338,6 +347,20 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	_read_wizards(table)
 	for seat in ActorsScript.SEATS:
 		_place(seat, views)
+		_tell_frame(seat)
+
+
+## Tell the HUD seat `seat`'s frame and whether it is fully open (`map_frame_shown`), as it changes.
+func _tell_frame(seat: int) -> void:
+	var shown: bool = _maps[seat].visible
+	var frame: Rect2i = _frame[seat] if shown else Rect2i()
+	var open: int = 1 if shown and _stage[seat] >= OPEN_STAGES else 0
+	if frame == _told_frame[seat] and open == _told_open[seat]:
+		return
+	_told_frame[seat] = frame
+	_told_open[seat] = open
+	if _events != null:
+		_events.map_frame_shown.emit(seat, frame, open == 1)
 
 
 ## True while an opening still opens or closes, or a piece's look still changes on an open map.

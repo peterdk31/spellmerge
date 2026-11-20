@@ -55,6 +55,12 @@ extends ActorController
 ##   taken and the body is given what it does through Combat (`health_gift_requested`); refused for
 ##   none held (NO_ITEM), a thing that is not drunk (NO_USE) and a potion that only heals while the
 ##   body is whole (NO_NEED: never wasted).
+## - **Quick-use** (the owner, 2026-11-20): `quick_bind_requested(player, slot, bag, id, body)`, the
+##   inventory menu's d-pad on an item, binds the shown body's quick-use slot (`Inventory.bind_quick`;
+##   refused as it says), and `quick_use_requested(player, slot)`, a d-pad arm pressed in play, uses
+##   one of the item bound there as `bag_use_requested` does (nothing for a slot bound to nothing;
+##   NO_DOWN while down, NO_ITEM with none left, the binding kept). `quick_bound(seat, slot, bag, id)`
+##   tells the HUD each slot of the shown body, after `inventory_announced` and on every change.
 ## - **Down** (items I7b): while the shown body is down every request of the builder's and the
 ##   inventory's is refused (NO_DOWN, as `build_refused` or `inventory_refused`) and changes nothing.
 ## - **The body named** (items I8): each of those requests carries the key of the body the menu
@@ -113,7 +119,7 @@ const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
 	Inventory.Refusal.NO_ROOM: NO_ROOM, Inventory.Refusal.NO_ITEM: NO_ITEM,
-	Inventory.Refusal.NO_DROP: NO_DROP,
+	Inventory.Refusal.NO_DROP: NO_DROP, Inventory.Refusal.NO_USE: NO_USE,
 }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
@@ -307,6 +313,7 @@ func _watch(body: Actor) -> void:
 		inventory.bag_changed.connect(_on_bag_changed)
 		inventory.staff_changed.connect(_on_owned_staff_changed)
 		inventory.hands_changed.connect(_on_hands_changed)
+		inventory.quick_changed.connect(_on_quick_changed)
 
 
 func _unwatch(body: Actor) -> void:
@@ -319,6 +326,7 @@ func _unwatch(body: Actor) -> void:
 		inventory.bag_changed.disconnect(_on_bag_changed)
 		inventory.staff_changed.disconnect(_on_owned_staff_changed)
 		inventory.hands_changed.disconnect(_on_hands_changed)
+		inventory.quick_changed.disconnect(_on_quick_changed)
 
 
 ## A snapshot restored: it hears the body it drives (the base's) and the shown body, which may be
@@ -361,6 +369,8 @@ func _bind_home(actor: Actor) -> void:
 		bus.listen(&"staff_hand_requested", _on_staff_hand_requested)
 		bus.listen(&"bag_drop_requested", _on_bag_drop_requested)
 		bus.listen(&"bag_use_requested", _on_bag_use_requested)
+		bus.listen(&"quick_bind_requested", _on_quick_bind_requested)
+		bus.listen(&"quick_use_requested", _on_quick_use_requested)
 
 
 ## Where the seat's mouse aims from: the hand of the body it drives (`Actor.aim_pivot`; items I8),
@@ -540,6 +550,8 @@ func _announce_body() -> void:
 		for number: int in body.inventory.numbers():
 			_on_owned_staff_changed(number)
 	_on_hands_changed()
+	for slot in Inventory.QUICK_SLOTS:
+		_on_quick_changed(slot)
 
 
 ## `bag_changed` for this seat: what the shown body's bag `bag` holds now (its currency bag too: the
@@ -568,6 +580,13 @@ func _on_hands_changed() -> void:
 	var body: Actor = shown()
 	if body != null and body.events != null and body.inventory != null:
 		body.events.hands_changed.emit(seat, body.inventory.hands())
+
+
+## `quick_bound` for this seat: what the shown body's quick-use slot `slot` is bound to.
+func _on_quick_changed(slot: int) -> void:
+	var body: Actor = shown()
+	if body != null and body.events != null and body.inventory != null:
+		body.events.quick_bound.emit(seat, slot, body.inventory.quick_bag(slot), body.inventory.quick_id(slot))
 
 
 ## The seat's events: the shown body's bus (every body shares one).
@@ -670,6 +689,39 @@ func _on_bag_use_requested(player: int, bag: StringName, id: StringName, body: i
 	if why != "":
 		_refuse_inventory(why)
 		return
+	_use_item(bag, id)
+
+
+## The inventory menu's d-pad on `id` of `bag` (the owner, 2026-11-20): the shown body's quick-use
+## slot `slot` bound to it, or let go (`Inventory.bind_quick`), refused as it says.
+func _on_quick_bind_requested(player: int, slot: int, bag: StringName, id: StringName, body: int) -> void:
+	if player != seat:
+		return
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
+		return
+	var inventory: Inventory = _builder_inventory()
+	_answer_inventory(inventory.bind_quick(slot, bag, id) if inventory != null else Inventory.Refusal.NO_ITEM)
+
+
+## A d-pad arm pressed in play (the owner, 2026-11-20): one of what the shown body's quick-use slot
+## `slot` is bound to is used (`_use_item`); nothing for a slot bound to nothing.
+func _on_quick_use_requested(player: int, slot: int) -> void:
+	if player != seat:
+		return
+	var body: Actor = shown()
+	if body == null or body.inventory == null or body.inventory.quick_id(slot) == &"":
+		return
+	if body.is_down():
+		_refuse_inventory(NO_DOWN)
+		return
+	_use_item(body.inventory.quick_bag(slot), body.inventory.quick_id(slot))
+
+
+## Use one `id` of `bag` of the shown body: a potion is taken and does what it does (more most
+## health, then a heal, through Combat), refused as the class doc says.
+func _use_item(bag: StringName, id: StringName) -> void:
 	var shown_body: Actor = shown()
 	var inventory: Inventory = shown_body.inventory
 	var kind: StringName = ItemKinds.kind_in(bag, id)

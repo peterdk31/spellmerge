@@ -18,6 +18,8 @@ extends RefCounted
 ##   slot (`&""` an empty slot). A staff's mana is not taken along: a run starts with every pool full.
 ## - **Hands** (`set_hands`, `hands`, `hand_of`): by hand, the number of the staff on it or NO_STAFF.
 ##   A staff on no hand is in the staff bag.
+## - **Quick-use slots** (`set_quick`, `quick_bag`, `quick_id`; the owner, 2026-11-20): by d-pad
+##   arm (0 to QUICK_SLOTS - 1), the bag and id of the item bound to it, or none.
 ##
 ## **The bytes** (`encode_into`, `decode_at`) are tagged sections: a count, then each section as its
 ## tag, its length and its payload, every one of SECTIONS once, in order. A later section (a name,
@@ -33,7 +35,8 @@ const NO_STAFF: int = -1
 const BAGS: int = 1
 const STAFFS: int = 2
 const HANDS: int = 3
-const SECTIONS: PackedByteArray = [BAGS, STAFFS, HANDS]
+const QUICK: int = 4
+const SECTIONS: PackedByteArray = [BAGS, STAFFS, HANDS, QUICK]
 
 ## The limits, the writers' and the decoder's: bags, counted stacks in all bags together, copies
 ## in a stack, staffs owned, a staff's number, the slots of a staff (StaffBase's range), hands.
@@ -44,12 +47,13 @@ const MAX_STAFFS: int = 32
 const MAX_NUMBER: int = 0xfffe
 const MAX_CARDS: int = 64
 const MAX_HANDS: int = 8
+const QUICK_SLOTS: int = 4
 ## The most bytes one takes; a writer refuses what would pass it.
 const MAX_BYTES: int = 16384
 ## A hand with no staff, as its bytes.
 const _NO_STAFF_BYTES: int = 0xffff
 ## The bytes of an empty loadout: the section count, and each section's tag, length and count of none.
-const _EMPTY_BYTES: int = 1 + 3 * 4
+const _EMPTY_BYTES: int = 1 + 4 * 4
 
 ## The bags that hold something, by name, and beside each its stacks' ids (an `Array[StringName]`)
 ## and their copies (a PackedInt32Array).
@@ -63,6 +67,9 @@ var _staff_ids: Array[StringName] = []
 var _staff_cards: Array = []
 ## By hand: the number of the staff on it, or NO_STAFF.
 var _hands: PackedInt32Array = PackedInt32Array()
+## By quick-use slot: the bag and the id bound to it (`&""`: none).
+var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
+var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
 ## How many bytes it takes now (`size`).
 var _size: int = _EMPTY_BYTES
 ## Where the last `decode_at` stopped reading (scratch).
@@ -140,7 +147,39 @@ func set_hands(numbers: PackedInt32Array) -> bool:
 	return true
 
 
+## Quick-use slot `slot` is bound to `id` of `bag` (both `&""`: to nothing). False, and nothing
+## changes, for a slot past QUICK_SLOTS, a bag or id that is not a name (one without the other), or
+## a limit passed.
+func set_quick(slot: int, bag: StringName, id: StringName) -> bool:
+	if slot < 0 or slot >= QUICK_SLOTS:
+		return false
+	var none: bool = bag == &"" and id == &""
+	if not none and (not _is_name(bag) or not _is_name(id)):
+		return false
+	var more: int = (0 if none else 1 + _id_bytes(bag) + _id_bytes(id)) - _quick_bytes(slot)
+	if _size + more > MAX_BYTES:
+		return false
+	_size += more
+	_quick_bags[slot] = bag
+	_quick_ids[slot] = id
+	return true
+
+
+func _quick_bytes(slot: int) -> int:
+	return 0 if _quick_ids[slot] == &"" else 1 + _id_bytes(_quick_bags[slot]) + _id_bytes(_quick_ids[slot])
+
+
 # --- Reading ----------------------------------------------------------------------------
+
+## The bag of the item quick-use slot `slot` is bound to (`&""`: none).
+func quick_bag(slot: int) -> StringName:
+	return _quick_bags[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
+
+
+## The id of the item quick-use slot `slot` is bound to (`&""`: none).
+func quick_id(slot: int) -> StringName:
+	return _quick_ids[slot] if slot >= 0 and slot < QUICK_SLOTS else &""
+
 
 ## The bags that hold something counted, in the order they were first written.
 func bags() -> Array[StringName]:
@@ -192,9 +231,9 @@ func hand_of(number: int) -> int:
 	return _hands.find(number) if number != NO_STAFF else -1
 
 
-## True when it holds nothing: no stack, no staff and no hand.
+## True when it holds nothing: no stack, no staff, no hand and no quick-use binding.
 func is_empty() -> bool:
-	return _bags.is_empty() and _numbers.is_empty() and _hands.is_empty()
+	return _bags.is_empty() and _numbers.is_empty() and _hands.is_empty() and _quick_ids == [&"", &"", &"", &""]
 
 
 ## How many bytes it takes (`encode_into`): never more than MAX_BYTES.
@@ -216,6 +255,8 @@ func copy() -> PlayerLoadout:
 	for cards: Array[StringName] in _staff_cards:
 		made._staff_cards.append(cards.duplicate())
 	made._hands = _hands.duplicate()
+	made._quick_bags = _quick_bags.duplicate()
+	made._quick_ids = _quick_ids.duplicate()
 	made._size = _size
 	return made
 
@@ -240,6 +281,7 @@ func equals(other: PlayerLoadout) -> bool:
 ## - STAFFS: the staff count, then each staff's number (16 bits), its id, its card count and each
 ##   card's id (an id is its length and its letters; length 0 an empty slot).
 ## - HANDS: the hand count, then each hand's staff number (16 bits; 0xffff for none).
+## - QUICK: the count of bound slots, then each one's slot, its bag's name and its item's id.
 func encode_into(out: PackedByteArray) -> void:
 	out.append(SECTIONS.size())
 	for tag in SECTIONS:
@@ -270,6 +312,17 @@ func encode_into(out: PackedByteArray) -> void:
 				out.append(_hands.size())
 				for number in _hands:
 					_encode_u16(out, _NO_STAFF_BYTES if number == NO_STAFF else number)
+			QUICK:
+				var bound: int = 0
+				for slot in QUICK_SLOTS:
+					if _quick_ids[slot] != &"":
+						bound += 1
+				out.append(bound)
+				for slot in QUICK_SLOTS:
+					if _quick_ids[slot] != &"":
+						out.append(slot)
+						_encode_id(out, _quick_bags[slot])
+						_encode_id(out, _quick_ids[slot])
 		out.encode_u16(length_at, out.size() - length_at - 2)
 
 
@@ -288,6 +341,8 @@ func decode_at(bytes: PackedByteArray, at: int) -> String:
 	_staff_ids = read._staff_ids
 	_staff_cards = read._staff_cards
 	_hands = read._hands
+	_quick_bags = read._quick_bags
+	_quick_ids = read._quick_ids
 	_size = read._size
 	read_to = read.read_to
 	return ""
@@ -318,6 +373,8 @@ func _read(bytes: PackedByteArray, at: int) -> String:
 				problem = _read_staffs(bytes, at, end)
 			HANDS:
 				problem = _read_hands(bytes, at, end)
+			QUICK:
+				problem = _read_quick(bytes, at, end)
 		if problem != "":
 			return problem
 		if read_to != end:
@@ -402,6 +459,29 @@ func _read_hands(bytes: PackedByteArray, at: int, end: int) -> String:
 	return ""
 
 
+## The QUICK section's payload, as `_read_bags`.
+func _read_quick(bytes: PackedByteArray, at: int, end: int) -> String:
+	if at >= end:
+		return "the quick-use slots are cut short"
+	var count: int = bytes[at]
+	at += 1
+	if count > QUICK_SLOTS:
+		return "%d quick-use slots, more than %d" % [count, QUICK_SLOTS]
+	for each in count:
+		if at >= end:
+			return "quick-use binding %d is cut short" % each
+		var slot: int = bytes[at]
+		var bag: Array = _decode_id(bytes, at + 1, end)
+		var id: Array = [] if bag.is_empty() else _decode_id(bytes, bag[1], end)
+		if id.is_empty():
+			return "quick-use binding %d is cut short or is not an id" % each
+		if slot >= QUICK_SLOTS or _quick_ids[slot] != &"" or not set_quick(slot, bag[0], id[0]):
+			return "quick-use slot %d is out of range, bound twice or not a name" % slot
+		at = id[1]
+	read_to = at
+	return ""
+
+
 # --- Inside -----------------------------------------------------------------------------
 
 ## True for a name: an id that is not empty.
@@ -447,4 +527,4 @@ func _to_string() -> String:
 		parts.append("%s %s x%s" % [_bags[at], _stack_ids[at], _stack_counts[at]])
 	for at in _numbers.size():
 		parts.append("staff %d %s %s" % [_numbers[at], _staff_ids[at], _staff_cards[at]])
-	return "PlayerLoadout(%s, hands %s)" % [", ".join(parts), _hands]
+	return "PlayerLoadout(%s, hands %s, quick %s %s)" % [", ".join(parts), _hands, _quick_bags, _quick_ids]

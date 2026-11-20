@@ -17,8 +17,8 @@ extends Node
 ##   starts it over (the stick is no button, so it never does). It speaks for that pad's seat; a
 ##   pad with no seat when the last button is pressed sends nothing (but A is also `join`, so a
 ##   pad pressing the code usually has joined by then).
-## - **Both do what their keys do, too:** the letters and the d-pad walk and cast as they are
-##   pressed, and A, B, X, Y act as ever (A on the lit stone starts the run, so the code then
+## - **Both do what their keys do, too:** the letters walk and cast as they are pressed, the d-pad
+##   uses what its arms are bound to (quick-use, the owner's of 2026-11-20; it never walks), and A, B, X, Y act as ever (A on the lit stone starts the run, so the code then
 ##   does nothing; B opens the builder). Type it standing clear of the stone and the rack.
 ##
 ## Made by `hud/panels/panels.gd` (node CheatCode), `bind`. It allocates only on a key or a button.

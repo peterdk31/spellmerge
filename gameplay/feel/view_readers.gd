@@ -160,7 +160,7 @@ func use(count: int, boxes: ViewBoxesScript = null) -> void:
 			for view in range(1, views):
 				var own: ShaderMaterial = _material_of(material, view)
 				own.set_shader_parameter(CULL_BOX, _boxes[view])
-	follow()
+	_follow_copies()
 
 
 ## The box view `view` culls by now (x0, y0, x1, y1; zero: none; for tests).
@@ -169,8 +169,27 @@ func box_of(view: int) -> Vector4:
 
 
 ## The copies set as their items are (shown only for the views drawn), and placed just after them;
-## each view's material given its item material's uniforms. Run every frame before drawing.
+## each view's material given its item material's uniforms. Run once every frame before drawing
+## (the light's `follow`, after the game has set this frame's numbers).
 func follow() -> void:
+	_follow_copies()
+	if views < 2:
+		return
+	for material: ShaderMaterial in _materials:
+		var by_view: Array = _materials[material]
+		var names: PackedStringArray = _uniforms[material]
+		for view in range(1, views):
+			var own := by_view[view - 1] as ShaderMaterial
+			if own == null:
+				continue
+			for named in names:
+				var value: Variant = material.get_shader_parameter(named)
+				if own.get_shader_parameter(named) != value:
+					own.set_shader_parameter(named, value)
+
+
+## The copies set as their items are (shown only for the views drawn), and placed just after them.
+func _follow_copies() -> void:
 	for i in _items.size():
 		var item: CanvasItem = _items[i]
 		if not is_instance_valid(item):
@@ -185,19 +204,6 @@ func follow() -> void:
 				copy.visible = shown
 			if shown:
 				_follow(copy, item, view)
-	if views < 2:
-		return
-	for material: ShaderMaterial in _materials:
-		var by_view: Array = _materials[material]
-		var names: PackedStringArray = _uniforms[material]
-		for view in range(1, views):
-			var own := by_view[view - 1] as ShaderMaterial
-			if own == null:
-				continue
-			for named in names:
-				var value: Variant = material.get_shader_parameter(named)
-				if own.get_shader_parameter(named) != value:
-					own.set_shader_parameter(named, value)
 
 
 ## The readers (for tests).

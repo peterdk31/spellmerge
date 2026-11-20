@@ -42,7 +42,7 @@ func take() -> void:
 		fail("Feel has no mark layer (the Floor marks setting is off?)")
 		return
 	print("WIDE MARKS: %d layers, the last room at %s" % [int(marks.call("layer_count")), middle])
-	var spots: Array[Vector2] = [middle + Vector2(-90.0, -20.0), middle + Vector2(0.0, -40.0), middle + Vector2(90.0, -20.0)]
+	var spots: Array[Vector2] = [middle + Vector2(-110.0, 110.0), middle + Vector2(0.0, 120.0), middle + Vector2(110.0, 110.0)]
 	var tints: Array[Color] = [Color.WHITE, Color("e0592f"), Color("4fd6dc")]
 	var looks: Array[int] = [0, 1 << 0, 1 << 1]
 	for i in spots.size():

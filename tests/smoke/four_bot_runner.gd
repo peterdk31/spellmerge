@@ -4,7 +4,7 @@ extends Node
 ## after #886; `Frames.record` of `hub_requested`), as players do: each bot plays its hub errand
 ## (tests/bots/bot_hub.gd): bots 1-3 draw their starting builds from the hub's dice
 ## (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and bot 2's three staffs: its
-## mend, a dash and the rack's Wild star taken with A and rebuilt as an attack), each staff set with
+## mend, a dash and the rack's Firebolt taken with A as its attack), each staff set with
 ## `staff_cards_requested` from a bag stocked for it (`BuildsScript.stock`, put back when the node
 ## goes), and all four walk onto the teleporter stone, where bot 1 presses A once it is lit: the run
 ## starts from the stone and every wizard carries its loadout in. The run is the crypt's biome

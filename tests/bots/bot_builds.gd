@@ -17,15 +17,14 @@ extends RefCounted
 ##   with RB (it taps whichever staff's next cast moves its caster) and fights with RT. Each bot's is
 ##   drawn from the run's dice (`Sim.chance_int`, purpose PURPOSE, its seat the key, its one roll the
 ##   counter 0; the hub's run, where it is set): the same replay seed, the same builds, on every
-##   machine and every replay. They take no rack staff: every one of the rack's but the Wild star is
-##   on the dev staff (no mana cost, no cooldown), which would win every fight and tell the sweep
-##   nothing, and there is one Wild star.
+##   machine and every replay. They take no rack staff.
 ## - **The mender** (`MENDER`): in a team of two or more, the bot at MEND_SEAT carries three staffs
 ##   (the owner, on #886 and 2026-11-20: heal, dash and attack): the mend on RB (mend on a plain
 ##   bolt, which stops at the first body it hits: a mend heals whatever it hits, friend or foe,
 ##   content/spells/elements/mend, so a shot that ends at the first body is the one a bot can aim at
-##   a teammate), the dash on RT, and the hub's Wild star from the rack on LB, rebuilt as a
-##   fighter's homing bigger bolt (`MENDER_ATTACK`). Its brain picks the staff it needs, as every
+##   a teammate), the dash on RT, and the hub rack's Firebolt on LB as its attack (fire on a bolt:
+##   a normal premade staff; the owner, 2026-11-20, on #891: bots never take a dev staff or the
+##   Wild star). Its brain picks the staff it needs, as every
 ##   bot's does (it reads what each staff casts next, never a button): it heals the most hurt
 ##   teammate it reaches along a clear line (the AI's `heal ally` behaviour, gameplay/ai/
 ##   behaviours/heal_ally.gd), taps the dash to get away, and fights with the attack; the bot holds
@@ -53,12 +52,13 @@ const FIGHTERS: Array[Dictionary] = [
 ]
 ## The hands a wizard starts with (RB and RT); a rack staff goes on the next.
 const START_HANDS: int = FlowScript.START_HANDS
-## The rack staff the mender takes: the hub's Wild star (on a star staff, as the starters).
-const RACK_STAFF: StaffItem = preload("res://content/items/staffs/wild_star/wild_star.tres")
-## The mender's attack, built on the rack staff (a fighter's: the seeker's).
-const MENDER_ATTACK: Array[StringName] = [&"homing", &"bigger", &"bolt"]
-## The mender's build: the heal on RB, the dash on RT, the rack staff on LB with its attack.
-const MENDER: Dictionary = {"name": "mender", "rack": RACK_STAFF, "staffs": [[&"mend", &"overcharge", &"faster", &"bolt"], [&"dash"], MENDER_ATTACK]}
+## The rack staff the mender takes: the hub's Firebolt (fire on a bolt, on the moon staff, a
+## starter's numbers), used as it is: its attack. Bots take only the rack's normal staffs, never a
+## dev staff or the Wild star (the owner, 2026-11-20, on #891).
+const RACK_STAFF: StaffItem = preload("res://content/items/staffs/firebolt/firebolt.tres")
+## The mender's build: the heal on RB, the dash on RT, and the rack's Firebolt on LB as it is (a
+## hand past the build's list keeps its cards).
+const MENDER: Dictionary = {"name": "mender", "rack": RACK_STAFF, "staffs": [[&"mend", &"overcharge", &"faster", &"bolt"], [&"dash"]]}
 
 ## True when the bot at `seat` mends, in a team of `team` bots that fight.
 static func mends(seat: int, team: int) -> bool:
@@ -93,6 +93,23 @@ static func cards_of(build: Dictionary, hand: int) -> Array[StringName]:
 ## How many hands `build` sets the cards of.
 static func hands_of(build: Dictionary) -> int:
 	return (build["staffs"] as Array).size()
+
+
+## How many hands hold a staff of `build`: the start hands, and the rack staff's past them.
+static func held_hands(build: Dictionary) -> int:
+	return START_HANDS + (1 if rack_of(build) != null else 0)
+
+
+## The cards hand `hand` holds once `build` is set: the build's for that hand, else (past its list)
+## the rack staff's as it lay on the rack, else none.
+static func cards_held(build: Dictionary, hand: int) -> Array[StringName]:
+	if hand < hands_of(build):
+		return cards_of(build, hand)
+	var out: Array[StringName] = []
+	var rack: StaffItem = rack_of(build)
+	if rack != null and hand == START_HANDS:
+		out.assign(rack.cards)
+	return out
 
 
 ## The rack staff `build` takes in the hub, or null for none.

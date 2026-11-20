@@ -5,7 +5,8 @@ extends "res://tests/support/suite.gd"
 ## attack hurts, the dash moves its caster, the mend heals and hurts nobody), the bag builds each,
 ## the draw is the run's dice (the same seed the same builds), only P2 of a team of two or more
 ## mends, and in a run the mend bot heals a hurt teammate with its heal, dashes from a shot with its
-## dash, and holds its heal while a foe stands in its line of fire. Its rack staff is put on its LB
+## dash, fights with its rack staff (the Firebolt) and holds its heal while a foe stands in its line
+## of fire. Its rack staff is put on its LB
 ## here as the hub's rack would give it (tests/bots/test_bot_hub.gd takes it from the rack).
 
 const BotScript := preload("res://tests/bots/bot.gd")
@@ -64,9 +65,9 @@ func _staff(build: Dictionary, hand: int) -> StaffBase:
 	return root.get_node("Registry").call("get_resource", &"wizard", FlowScript.STARTER_HEADS[hand]) as StaffBase
 
 
-## The compiled staff of `build`'s hand `hand`.
+## The compiled staff of `build`'s hand `hand` (its rack staff's own cards past the build's list).
 func _compiled(build: Dictionary, hand: int) -> CompiledStaff:
-	return root.get_node("Spells").call("compile_staff", BuildsScript.cards_of(build, hand), _staff(build, hand)) as CompiledStaff
+	return root.get_node("Spells").call("compile_staff", BuildsScript.cards_held(build, hand), _staff(build, hand)) as CompiledStaff
 
 
 # --- The table ---------------------------------------------------------------------------------
@@ -74,11 +75,10 @@ func _compiled(build: Dictionary, hand: int) -> CompiledStaff:
 
 func test_every_build_is_valid_by_the_card_rules() -> void:
 	for build: Dictionary in BuildsScript.all():
-		var hands: int = BuildsScript.hands_of(build)
-		var rack: StaffItem = BuildsScript.rack_of(build)
-		check_equal(hands, FlowScript.START_HANDS + (1 if rack != null else 0), "%s: a staff for each starter staff (RB, RT) and its rack staff (LB)" % build["name"])
+		var hands: int = BuildsScript.held_hands(build)
+		check_equal(BuildsScript.hands_of(build), FlowScript.START_HANDS, "%s: cards for each starter staff (RB, RT)" % build["name"])
 		for number in hands:
-			var cards: Array[StringName] = BuildsScript.cards_of(build, number)
+			var cards: Array[StringName] = BuildsScript.cards_held(build, number)
 			var compiled: CompiledStaff = _compiled(build, number)
 			check(cards.size() <= _staff(build, number).slots, "%s staff %d fits its staff's %d slots" % [build["name"], number, _staff(build, number).slots])
 			check(compiled != null and not compiled.is_empty(), "%s staff %d casts" % [build["name"], number])
@@ -89,7 +89,8 @@ func test_every_build_is_valid_by_the_card_rules() -> void:
 
 
 ## What the brain reads of each build: the fighters dash on RB and hurt on RT; the mender heals on
-## RB, hurting nobody, dashes on RT and hurts on LB (the owner, 2026-11-20: heal, dash and attack).
+## RB, hurting nobody, dashes on RT and hurts on LB with the rack's Firebolt (the owner, 2026-11-20:
+## heal, dash and a fire bolt).
 func test_each_build_has_the_staffs_its_bot_plays() -> void:
 	for build: Dictionary in BuildsScript.all():
 		var first: CastSense = _compiled(build, 0).casts[0].sense
@@ -110,6 +111,10 @@ func test_only_the_mender_takes_a_rack_staff_and_it_lies_in_the_hub() -> void:
 		check(BuildsScript.rack_of(build) == null, "%s takes no rack staff" % build["name"])
 	var rack: StaffItem = BuildsScript.rack_of(BuildsScript.MENDER)
 	check(rack != null and rack.problems().is_empty(), "the mender's rack staff is a valid premade staff")
+	# The owner, 2026-11-20, on #891: bots never take a dev staff or the Wild star.
+	check(rack != null and rack.staff.cooldown > 0.0 and rack.staff.max_mana <= 100.0, "a fair staff: a starter's mana and a cooldown, never the dev staff")
+	check(rack != null and rack.id != &"wild_star", "never the Wild star")
+	check(rack != null and rack.id == &"firebolt", "the Firebolt (fire on a bolt)")
 	var hub: Node = (load("res://content/rooms/hub/hub.tscn") as PackedScene).instantiate()
 	var laid: bool = false
 	for stand_in: Node in hub.get_node("Items").get_children():

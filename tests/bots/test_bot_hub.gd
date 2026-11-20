@@ -2,9 +2,9 @@ extends "res://tests/support/suite.gd"
 ## Tests for the bots' hub errand (tests/bots/bot_hub.gd; the owner, 2026-11-20, after #886: the
 ## bots' runs start in the hub, where each takes a staff from the rack as a player would): two bots
 ## started in the hub (the hub recorded, as the runners start it) draw their builds there, the mender
-## walks to the rack's Wild star and takes it with A, both walk onto the teleporter stone and P1
+## walks to the rack's Firebolt and takes it with A, both walk onto the teleporter stone and P1
 ## starts the run with A, and the run's wizards carry the builds in (the rack staff on the mender's
-## LB, rebuilt as its attack). The same replay seed plays the same errand, tick for tick. A bot with
+## LB, its cards as they lay). The same replay seed plays the same errand, tick for tick. A bot with
 ## no build only walks to the stone.
 
 const BotScript := preload("res://tests/bots/bot.gd")
@@ -101,8 +101,7 @@ func test_the_mender_takes_its_rack_staff_in_the_hub_and_carries_it_into_the_run
 	var hands: PackedInt32Array = mender.inventory.hands()
 	check(hands.size() > 2 and hands[2] != Inventory.NO_STAFF, "the rack staff is on the mender's LB")
 	if hands.size() > 2 and hands[2] != Inventory.NO_STAFF:
-		check(mender.inventory.staff(hands[2]).staff == BuildsScript.RACK_STAFF.staff, "the Wild star's staff")
-		check_equal(mender.inventory.cards_of(hands[2]), mender.inventory.staff(hands[2]).fit(BuildsScript.MENDER_ATTACK), "rebuilt as its attack")
+		check(HubScript.is_rack_staff(mender.inventory.staff(hands[2]), BuildsScript.RACK_STAFF), "the Firebolt, its cards as they lay on the rack")
 
 
 func test_the_same_replay_seed_plays_the_same_errand() -> void:
@@ -135,11 +134,13 @@ func test_the_seats_stand_apart_on_the_stone() -> void:
 		spots.append(spot)
 
 
-func test_only_the_wild_star_is_the_rack_staff() -> void:
+func test_only_the_firebolt_is_the_menders_rack_staff() -> void:
 	var rack: StaffItem = BuildsScript.RACK_STAFF
-	check(HubScript.is_rack_staff(rack.stack(), rack), "the Wild star is")
+	check(HubScript.is_rack_staff(rack.stack(), rack), "the Firebolt is")
+	var wild: StaffItem = load("res://content/items/staffs/wild_star/wild_star.tres") as StaffItem
+	check(not HubScript.is_rack_staff(wild.stack(), rack), "the Wild star is not")
 	var same_staff_other_cards: ItemStack = ItemStack.of_staff(rack.staff, [&"bolt"] as Array[StringName])
-	check(not HubScript.is_rack_staff(same_staff_other_cards, rack), "a star staff with other cards is not")
+	check(not HubScript.is_rack_staff(same_staff_other_cards, rack), "its staff with other cards is not")
 	var sentry: StaffItem = load("res://content/items/staffs/patient_sentry/patient_sentry.tres") as StaffItem
 	check(not HubScript.is_rack_staff(sentry.stack(), rack), "another premade staff is not")
 

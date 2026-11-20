@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StaffItem" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/staff_item.gd" id="1_item"]
+[ext_resource type="Resource" path="res://content/wizard/staffs/moon/moon.tres" id="2_moon"]
+
+[resource]
+script = ExtResource("1_item")
+id = &"firebolt"
+display_name = "Firebolt"
+staff = ExtResource("2_moon")
+cards = Array[StringName]([&"fire", &"bolt"])

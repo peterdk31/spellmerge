@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=23 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/hub/hub_ground.tscn" id="3_ground"]
@@ -14,6 +14,9 @@
 [ext_resource type="Resource" path="res://content/items/staffs/the_mutiny/the_mutiny.tres" id="22_the_mutiny"]
 [ext_resource type="Resource" path="res://content/items/staffs/frostfire_cascade/frostfire_cascade.tres" id="23_frostfire_cascade"]
 [ext_resource type="Resource" path="res://content/items/staffs/patient_sentry/patient_sentry.tres" id="24_patient_sentry"]
+[ext_resource type="Resource" path="res://content/items/staffs/firebolt/firebolt.tres" id="25_firebolt"]
+[ext_resource type="Resource" path="res://content/items/staffs/frost_seeker/frost_seeker.tres" id="26_frost_seeker"]
+[ext_resource type="Resource" path="res://content/items/staffs/twin_bolt/twin_bolt.tres" id="27_twin_bolt"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -92,6 +95,21 @@ script = ExtResource("11_enemy_stand_in")
 enemy = ExtResource("14_dummy")
 
 [node name="Items" type="Node2D" parent="."]
+
+[node name="TwinBolt" type="Node2D" parent="Items"]
+position = Vector2(416, 720)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("27_twin_bolt")
+
+[node name="FrostSeeker" type="Node2D" parent="Items"]
+position = Vector2(480, 720)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("26_frost_seeker")
+
+[node name="Firebolt" type="Node2D" parent="Items"]
+position = Vector2(544, 720)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("25_firebolt")
 
 [node name="Rack" type="Node2D" parent="Items"]
 position = Vector2(608, 720)

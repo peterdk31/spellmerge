@@ -13,7 +13,7 @@ extends "res://tests/support/screenshot.gd"
 ## bot. The arguments are in tests/README.md (`bots/`). The bots start in the hub (the owner,
 ## 2026-11-20, after #886), as players do: each plays its hub errand (tests/bots/bot_hub.gd), drawing
 ## its build from the hub's dice (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and
-## with two or more P2's mend, dash and the rack's Wild star rebuilt as an attack), and all walk onto
+## with two or more P2's mend, dash and the rack's Firebolt taken as its attack), and all walk onto
 ## the teleporter stone, where P1 starts the run; `PLAYTEST heals` says what each bot's heals gave to
 ## teammates and to foes. `--plain` plays the starter staffs instead and `--build` the smoke test's
 ## old random staffs (set as the run starts); with either the bots only walk to the stone. With `--shots` (on a display) it saves screenshots as `playtest_<seed>_<players>_<what>`

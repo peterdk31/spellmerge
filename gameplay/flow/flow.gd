@@ -1094,12 +1094,15 @@ func _on_player_joined(player: int) -> void:
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
 	# A player back after leaving this run comes back holding what it left with (`LeftPlayers`), its
 	# staffs' mana too (set once it is made: its Caster's pools start full).
+	# What still recharged of its relics recharges on from where it was (the recharge is the item's).
 	var mana: Dictionary = left_players.mana_of(player)
+	var recharges: Array = left_players.recharges_of(player)
 	_add_wizard(world, _room, player, at, left_players.take(player))
 	var back := get_wizard(player) as Actor
 	if back != null and back.inventory != null:
 		for number: int in mana:
 			back.inventory.set_staff_mana(number, float(mana[number]))
+		back.inventory.set_recharges(recharges)
 	_count_players()
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	# In a room where a fall costs nothing (the hub), a joiner needs no moment of protection.
@@ -1126,7 +1129,8 @@ func _on_player_left(player: int) -> void:
 	# What it holds is kept for its return in this run (the owner, 2026-11-19: the whole inventory).
 	if state != State.IDLE:
 		var body := wizard as Actor
-		left_players.keep(player, PlayerScript.loadout_of(body), body.inventory.staff_mana() if body != null and body.inventory != null else {})
+		var held: Inventory = body.inventory if body != null else null
+		left_players.keep(player, PlayerScript.loadout_of(body), held.staff_mana() if held != null else {}, held.recharges() if held != null else [])
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
 	var parent: Node = wizard.get_parent()

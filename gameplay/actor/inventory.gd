@@ -2,7 +2,8 @@ class_name Inventory
 extends ActorComponent
 ## The inventory (items I3, docs/milestones/items.md, "The model"): the things an actor holds, in
 ## bags, and which of its staffs is on which hand. A component of the actor kit, stepped by its body only
-## while an item recharges (`step`, `recharge_left`: an active relic's cooldown); the
+## while an item it holds recharges (`step`, `recharge_left`: an active relic's cooldown, kept in
+## the item's own stack, `ItemStack.recharge_left`); the
 ## wizard has one in its scene (`content/wizard/base/wizard.tscn`), and every other actor is given
 ## one by its actor (items I8: an enemy's or a prop's staffs on its hands, its bags empty). Hands are
 ## its Caster's: a body with no Caster has none (`free_hand`), so whatever it takes goes in a bag.
@@ -65,6 +66,13 @@ extends ActorComponent
 ##   bound on this slot already, it is let go (as a hand's button takes its staff off). A binding
 ##   names the item, not a copy: with none left it stays (the HUD greys it, on the panel and on the
 ##   inventory's ring) and is full again as one is taken.
+## - **Recharging** (the owner, 2026-11-20): an item whose use is kept (an active relic) recharges
+##   for its use's cooldown after a use (`start_recharge`), counted down by `step`. **The recharge is
+##   the item's**, in its own stack (`ItemStack.recharge_left`), never the holder's: a relic dropped
+##   mid-recharge lies recharging (the ground steps it, gameplay/items) and is taken mid-recharge,
+##   told at once (`recharge_changed`) so the new holder's HUD shows it. Of several copies of one id
+##   the readiest is the one used and shown (`recharge_left`). A loadout carries none (a run's start
+##   begins ready); a rejoin gives it back (`recharges`, `set_recharges`: Flow's `LeftPlayers`).
 ##   It is in the player loadout, so a run's start and a rejoin keep it. **No slot is bound at first,
 ##   and an item with a use taken (`add`) that no slot is bound to fills the first slot bound to nothing**
 ##   (up, right, down, left; the owner, 2026-11-20); a loadout taken keeps its own bindings.
@@ -133,13 +141,7 @@ var _carried_kept: int = 0
 ## By quick-use slot: the bag and the id of the item bound to it (`&""`: none).
 var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
 var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
-## Items recharging after a use (the owner, 2026-11-20: an active relic recharges for its use's
-## cooldown): by `_recharge_key(bag, id)`, the seconds left, counted down by `step` with the tick's
-## delta. State: hashed and snapshotted.
-var _recharge: Dictionary = {}
-## By the same key: the whole cooldown it recharges for (to tell its steps).
-var _recharge_whole: Dictionary = {}
-## Scratch: the keys done recharging in a step.
+## Scratch: the items (`_recharge_key`) whose told recharge changed in a step.
 var _recharged: Array[StringName] = []
 ## The content registry (`ItemKinds.usable` reads an item's tag from it): set by its body's controller
 ## (`PlayerController`) or `take_loadout`; null: the registry autoload.
@@ -396,12 +398,14 @@ func has_room(stack: ItemStack) -> bool:
 func add(stack: ItemStack) -> bool:
 	if not has_room(stack):
 		return false
-	var numbered: PackedInt32Array = _put(stack)
 	var bag: StringName = ItemKinds.bag_of(stack.kind)
+	var was: Vector2 = _recharge_of(bag, stack.id)
+	var numbered: PackedInt32Array = _put(stack)
 	_say_bag(bag)
 	for number in numbered:
 		_say_staff(number)
 	_bind_if_free(bag, stack.id)
+	_say_recharge_since(bag, stack.id, was)
 	return true
 
 
@@ -471,6 +475,7 @@ func drop_taken(kind: StringName) -> int:
 func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	if count <= 0 or count_of(bag, id) < count:
 		return false
+	var was: Vector2 = _recharge_of(bag, id)
 	var gone: PackedInt32Array = PackedInt32Array()
 	if ItemKinds.stacks(ItemKinds.kind_in(bag, id)):
 		_change_count(bag, id, -count)
@@ -489,6 +494,7 @@ func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	_say_bag(bag)
 	for number in gone:
 		_say_staff(number)
+	_say_recharge_since(bag, id, was)
 	return true
 
 
@@ -835,23 +841,24 @@ func drop(bag: StringName, id: StringName) -> Refusal:
 	if not ItemKinds.can(kind, ItemKinds.DROP) and not ItemKinds.can(kind, ItemKinds.DROP_ONE):
 		# A kind that is never dropped (none today: everything is, the owner, 2026-11-19): the simulation checks.
 		return Refusal.NO_DROP
+	var was: Vector2 = _recharge_of(bag, id)
 	var lying: ItemStack = null
 	if ItemKinds.stacks(kind):
-		_change_count(bag, id, -1)
 		lying = ItemStack.new()
 		lying.kind = kind
 		lying.id = id
 		lying.count = 1
+		# The copy laid recharges as its stack does (the recharge is the item's).
+		lying.join_recharge(_readiest(bag, id))
+		_change_count(bag, id, -1)
 	else:
-		# A kind that does not stack: that stack itself goes, with whatever it holds.
-		var stacks: Array[ItemStack] = _bags[bag]
-		for at in stacks.size():
-			if stacks[at].id == id:
-				lying = stacks[at]
-				stacks.remove_at(at)
-				break
+		# A kind that does not stack: that stack itself goes, with whatever it holds (its recharge
+		# too); of several copies, the least ready, so the readiest is kept for a use.
+		lying = _least_ready(bag, id)
+		_bags[bag].erase(lying)
 	_say_bag(bag)
 	_drop(lying)
+	_say_recharge_since(bag, id, was)
 	return Refusal.NONE
 
 
@@ -902,75 +909,122 @@ func at_rest() -> bool:
 
 # --- Recharging -------------------------------------------------------------------------
 
-## How finely a recharge is told (`recharge_changed`): at each sixteenth of its cooldown, so the HUD
-## shows the simulation's own count (16 rows on the inventory's ring, 8 on the cross) and never keeps
-## a clock of its own.
-const RECHARGE_STEPS: int = 16
-
-
-## The seconds before `id` of `bag` can be used again (0: ready).
+## The seconds before `id` of `bag` can be used again (0: ready, or none held): its readiest copy's.
 func recharge_left(bag: StringName, id: StringName) -> float:
-	return float(_recharge.get(_recharge_key(bag, id), 0.0))
+	var copy: ItemStack = _readiest(bag, id)
+	return copy.recharge_left if copy != null else 0.0
 
 
-## The whole cooldown `id` of `bag` recharges for (0: not recharging).
+## The whole cooldown `id` of `bag` recharges for (0: not recharging): its readiest copy's.
 func recharge_whole(bag: StringName, id: StringName) -> float:
-	return float(_recharge_whole.get(_recharge_key(bag, id), 0.0))
+	var copy: ItemStack = _readiest(bag, id)
+	return copy.recharge_whole if copy != null else 0.0
 
 
-## `id` of `bag` recharges for `seconds` (its use's cooldown; nothing for none). The recharge is the
-## holder's, by its bag and id: an item dropped and taken back still recharges, one taken by another body is ready for it; a loadout (a run's
-## start, a rejoin) starts ready.
+## `id` of `bag` (its readiest copy) recharges for `seconds` (its use's cooldown; nothing for none).
 func start_recharge(bag: StringName, id: StringName, seconds: float) -> void:
-	if seconds <= 0.0:
+	var copy: ItemStack = _readiest(bag, id)
+	if copy == null or seconds <= 0.0:
 		return
-	var key: StringName = _recharge_key(bag, id)
-	_recharge[key] = seconds
-	_recharge_whole[key] = seconds
+	copy.start_recharge(seconds)
 	_edited = true
 	recharge_changed.emit(bag, id)
 
 
-## True while anything recharges (its body steps it then: `step`).
+## True while anything it holds recharges (its body steps it then: `step`).
 func is_recharging() -> bool:
-	return not _recharge.is_empty()
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.is_recharging():
+				return true
+	return false
 
 
-## Every item recharging: [bag, id] each, in the order they began.
+## Every item recharging: [bag, id] each, once, in bag and stack order.
 func recharging() -> Array:
 	var out: Array = []
-	for key: StringName in _recharge:
-		var parts: PackedStringArray = String(key).split("/", true, 1)
-		out.append([StringName(parts[0]), StringName(parts[1])])
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.is_recharging() and not out.has([bag, stack.id]):
+				out.append([bag, stack.id])
 	return out
 
 
+## Every copy recharging, as a rejoin takes it back (`set_recharges`): [bag, id, left, whole] each,
+## in bag and stack order.
+func recharges() -> Array:
+	var out: Array = []
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.is_recharging():
+				out.append([bag, stack.id, stack.recharge_left, stack.recharge_whole])
+	return out
+
+
+## Its copies recharge as `list` says (`recharges`' shape: a rejoining wizard's, Flow's
+## `LeftPlayers`): each entry the next ready copy of its bag and id, one it holds none of left out.
+func set_recharges(list: Array) -> void:
+	for entry: Array in list:
+		var bag: StringName = entry[0]
+		var id: StringName = entry[1]
+		for stack: ItemStack in _stacks(bag):
+			if stack.id == id and not stack.is_recharging():
+				stack.recharge_whole = float(entry[3])
+				stack.recharge_left = minf(float(entry[2]), stack.recharge_whole)
+				_edited = true
+				recharge_changed.emit(bag, id)
+				break
+
+
 ## Count every recharge down by `delta` (its body's step, the tick's delta): told at each
-## RECHARGE_STEPS step it passes (`recharge_changed`), and once ready.
+## `ItemStack.RECHARGE_STEPS` step it passes (`recharge_changed`), and once ready.
 func step(delta: float) -> void:
 	_recharged.clear()
-	for key: StringName in _recharge:
-		var whole: float = float(_recharge_whole[key])
-		var before: int = _recharge_step(float(_recharge[key]), whole)
-		var left: float = float(_recharge[key]) - delta
-		_recharge[key] = left
-		if left <= 0.0 or _recharge_step(left, whole) != before:
-			_recharged.append(key)
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.step_recharge(delta):
+				var key: StringName = _recharge_key(bag, stack.id)
+				if not _recharged.has(key):
+					_recharged.append(key)
 	for key: StringName in _recharged:
-		if float(_recharge[key]) <= 0.0:
-			_recharge.erase(key)
-			_recharge_whole.erase(key)
 		var parts: PackedStringArray = String(key).split("/", true, 1)
 		recharge_changed.emit(StringName(parts[0]), StringName(parts[1]))
-
-
-static func _recharge_step(left: float, whole: float) -> int:
-	return ceili(float(RECHARGE_STEPS) * left / whole - 0.000001) if whole > 0.0 and left > 0.0 else 0
 
 
 ## Bag names hold no "/" (`ItemKinds.BAGS`), so the key splits back at its first.
 static func _recharge_key(bag: StringName, id: StringName) -> StringName:
 	return StringName("%s/%s" % [bag, id])
+
+
+## The copy of `id` in `bag` with the least recharge left (the first of those), or null for none.
+func _readiest(bag: StringName, id: StringName) -> ItemStack:
+	var found: ItemStack = null
+	for stack: ItemStack in _stacks(bag):
+		if stack.id == id and (found == null or stack.recharge_left < found.recharge_left):
+			found = stack
+	return found
+
+
+## The copy of `id` in `bag` with the most recharge left (the last of those), or null for none.
+func _least_ready(bag: StringName, id: StringName) -> ItemStack:
+	var found: ItemStack = null
+	for stack: ItemStack in _stacks(bag):
+		if stack.id == id and (found == null or stack.recharge_left >= found.recharge_left):
+			found = stack
+	return found
+
+
+## What `recharge_left` and `recharge_whole` of `id` in `bag` are now (x, y).
+func _recharge_of(bag: StringName, id: StringName) -> Vector2:
+	var copy: ItemStack = _readiest(bag, id)
+	return Vector2(copy.recharge_left, copy.recharge_whole) if copy != null else Vector2.ZERO
+
+
+## Tell `recharge_changed` for `id` of `bag` when its recharge is no longer `was` (`_recharge_of`):
+## a copy taken mid-recharge, or the recharging one let go.
+func _say_recharge_since(bag: StringName, id: StringName, was: Vector2) -> void:
+	if _recharge_of(bag, id) != was:
+		recharge_changed.emit(bag, id)
 
 
 ## Say a change (`bag_changed`, `staff_changed`, `hands_changed`); after its start, it is no longer
@@ -1001,6 +1055,7 @@ func _put(stack: ItemStack) -> PackedInt32Array:
 		for held: ItemStack in stacks:
 			if held.id == stack.id:
 				held.count += stack.count
+				held.join_recharge(stack)
 				return numbered
 		stacks.append(stack.copy())
 		return numbered

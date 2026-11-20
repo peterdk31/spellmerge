@@ -78,9 +78,7 @@ const COOLDOWN: float = 2.0
 func _active_relic() -> RelicBase:
 	var relic := RelicBase.new()
 	relic.id = &"test_active_idol"
-	relic.active_use = ItemUse.health(25.0, 0.0)
-	relic.active_use.consumed = false
-	relic.active_use.cooldown = COOLDOWN
+	relic.active_use = ItemUse.kept(25.0, 0.0, COOLDOWN)
 	check_equal(relic.problems(), PackedStringArray(), "a sound active relic")
 	check(_world.registry.add(&"relics", relic), "a test-only relic")
 	return relic
@@ -121,7 +119,7 @@ func test_an_active_relic_is_kept_and_recharges_between_uses() -> void:
 	var told: int = recharges.size()
 	_world.run(int(COOLDOWN * 60.0) + 2)
 	check_equal(wizard.inventory.recharge_left(&"relics", relic.id), 0.0, "recharged after its cooldown")
-	check_equal(recharges.size() - told, Inventory.RECHARGE_STEPS, "told at each sixteenth and once ready: %d" % (recharges.size() - told))
+	check_equal(recharges.size() - told, ItemStack.RECHARGE_STEPS, "told at each sixteenth and once ready: %d" % (recharges.size() - told))
 	check_equal((recharges.back() as Array).slice(0, 2), [relic.id, false], "the HUD told: ready")
 	_press(0)
 	check_equal(wizard.health.health, 70.0, "used again across its cooldown: healed again")

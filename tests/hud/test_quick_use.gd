@@ -338,19 +338,83 @@ func test_the_cross_fits_beside_six_slot_staffs_in_an_equal_pane() -> void:
 	check(with.x <= 160.0 and with.y <= 90.0, "the panel fits a quarter pane's corner: %s" % with)
 
 
-func test_a_recharging_item_shows_a_shutter_sinking_by_whole_rows() -> void:
+func test_a_recharging_item_shows_a_shutter_stepping_by_whole_rows() -> void:
 	var cross := QuickCrossScript.new()
 	own(cross)
 	cross.set_slot(0, PlaceholderTexture2D.new(), 1, true)
 	cross.set_recharge(0, 2.0, 2.0)
-	check_equal(cross.recharge_rows(0), QuickCrossScript.ICON, "just used: the icon shut")
 	var rows: Array[int] = []
-	for _frame in 140:
-		cross.count_down(1.0 / 60.0)
-		if rows.is_empty() or rows.back() != cross.recharge_rows(0):
-			rows.append(cross.recharge_rows(0))
-	check_equal(rows, [8, 7, 6, 5, 4, 3, 2, 1, 0] as Array[int], "it sinks a whole row at a time, never a jump (Smooth): %s" % [rows])
-	check(not cross.is_moving(), "and rests once ready")
+	while cross.is_moving():
+		cross.advance()
+		rows.append(cross.recharge_rows(0))
+	check_equal(rows, [1, 2, 3, 4, 5, 6, 7, 8] as Array[int], "just used: the shutter drops in a row a frame, never at once (Smooth)")
+	cross.set_recharge(0, 1.0, 2.0)
+	rows.clear()
+	while cross.is_moving():
+		cross.advance()
+		rows.append(cross.recharge_rows(0))
+	check_equal(rows, [7, 6, 5, 4] as Array[int], "told half left: it sinks to half, a row a frame")
+	cross.set_recharge(0, 0.0, 2.0)
+	for _frame in 8:
+		cross.advance()
+	check_equal(cross.recharge_rows(0), 0, "ready: open")
+	cross.set_recharge(0, 2.0, 2.0, true)
+	check_equal(cross.recharge_rows(0), 8, "drawn as it stands when told so (a body shown anew)")
+	cross.set_slot(0, PlaceholderTexture2D.new(), 1)
+	rows.clear()
+	while cross.is_moving():
+		cross.advance()
+		rows.append(cross.recharge_rows(0))
+	check_equal(rows.slice(0, 3), [7, 6, 5] as Array[int], "another item bound: the old shutter steps out with its icon")
+
+
+func test_a_relic_used_in_play_shows_its_recharge_as_the_simulation_counts_it() -> void:
+	var relic := RelicBase.new()
+	relic.id = &"test_hud_idol"
+	relic.active_use = ItemUse.health(10.0, 0.0)
+	relic.active_use.consumed = false
+	relic.active_use.cooldown = 4.0
+	check(_world.registry.add(&"relics", relic), "a test-only active relic")
+	# The HUD reads the content autoload (an item's use, its look), as in the game.
+	var content: Node = root.get_node("Registry")
+	content.call("add", &"relics", relic)
+	var stack := ItemStack.new()
+	stack.kind = ItemKinds.RELIC
+	stack.id = relic.id
+	check(_wizard.inventory.add(stack), "taken, auto-bound up")
+	_world.hurt(_wizard, 50)
+	_frame()
+	_tap(&"quick_up")
+	for _step in 4:
+		_frame()
+	var cross: QuickCrossScript = _cross()
+	check(_wizard.inventory.recharge_left(&"relics", relic.id) > 0.0, "used: recharging")
+	check(cross.recharge_rows(0) > 0, "the cross shows its shutter: %d rows" % cross.recharge_rows(0))
+	var held: int = cross.recharge_rows(0)
+	for _step in 40:
+		_hud.poll()
+		cross.advance()
+	check_equal(cross.recharge_rows(0), held, "the tick stopped (a pause, a hit-stop): the shutter holds, no clock of the HUD's own")
+	for _step in 20:
+		_frame()
+	check(cross.recharge_rows(0) < held, "the tick runs: it sinks as the simulation counts (%d of %d)" % [cross.recharge_rows(0), held])
+	var inventory: InventoryScript = _hud.get_inventory(0)
+	_tap(&"inventory")
+	_frame()
+	_input.send_virtual_aim(0, inventory.menu().direction_to(inventory.entry_of("bag", &"relics")))
+	_frame()
+	_tap(&"accept")
+	_frame()
+	_input.send_virtual_aim(0, inventory.menu().direction_to(inventory.entry_of("item", relic.id)))
+	_frame()
+	check(inventory.recharging(relic.id) and inventory.recharge_rows(relic.id) > 0, "the ring shows it recharging too: %d rows" % inventory.recharge_rows(relic.id))
+	check_equal(inventory.menu().hint_live()[0], false, "Use dimmed while it recharges")
+	for _step in 50:
+		_frame()
+	check(not inventory.recharging(relic.id), "recharged")
+	check_equal(inventory.menu().hint_live()[0], true, "Use lit again")
+	_world.registry.remove(&"relics", relic.id)
+	content.call("remove", &"relics", relic.id)
 
 
 func test_the_panel_hears_a_recharge_for_the_slot_bound_to_it() -> void:
@@ -358,7 +422,11 @@ func test_the_panel_hears_a_recharge_for_the_slot_bound_to_it() -> void:
 	_frame()
 	_bus.item_recharging.emit(0, POTIONS, &"healing", 1.0, 2.0)
 	var cross: QuickCrossScript = _cross()
+	for _step in 3:
+		_frame()
 	check_equal(cross.recharge_rows(0), 4, "half its cooldown left: half the icon shut")
 	check_equal(cross.recharge_rows(1), 0, "another arm untouched")
 	_bus.item_recharging.emit(0, POTIONS, &"healing", 0.0, 2.0)
+	for _step in 3:
+		_frame()
 	check_equal(cross.recharge_rows(0), 0, "ready: open")

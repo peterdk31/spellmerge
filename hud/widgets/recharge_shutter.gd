@@ -3,10 +3,11 @@ extends RefCounted
 ## the corner panel's d-pad cross and the inventory's ring): a dark shutter over its icon, its
 ## height the part of the cooldown still left in whole pixel rows, sinking a row at a time as it
 ## recharges until the icon is whole again. **Smooth** (docs/STYLE.md): it steps by whole rows (an
-## 8-pixel icon in 8 steps, a 16-pixel one in 16), never a fade or a partial pixel. Static only; the
-## HUD widgets that show items count the seconds down themselves (`item_recharging` tells them).
+## 8-pixel icon in 8 steps, a 16-pixel one in 16), never a fade or a partial pixel; a widget steps
+## its drawn rows toward `rows` of what it was told (`item_recharging`, the simulation's own count at
+## each sixteenth) a row a frame, so the shutter drops in over its rows too. Static only.
 ##
-##     RechargeShutter.draw(self, icon_rect, left, whole)
+##     RechargeShutter.draw(self, icon_rect, drawn_rows)
 
 ## The shutter's colour: solid, so the rows are hard edges (no transparency, no fade).
 const SHADE: Color = Color("#14121f")
@@ -21,9 +22,9 @@ static func rows(left: float, whole: float, side: int) -> int:
 	return clampi(ceili(float(side) * minf(left / whole, 1.0) - 0.000001), 1, side)
 
 
-## Draw the shutter over `rect` (an icon's) on `canvas` for `left` seconds of `whole`.
-static func draw(canvas: CanvasItem, rect: Rect2, left: float, whole: float) -> void:
-	var shut: int = rows(left, whole, int(rect.size.y))
+## Draw `shut` rows of shutter over `rect` (an icon's, whole pixels) on `canvas`.
+static func draw(canvas: CanvasItem, rect: Rect2, shut: int) -> void:
+	shut = mini(shut, int(rect.size.y))
 	if shut <= 0:
 		return
 	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, shut)), SHADE)

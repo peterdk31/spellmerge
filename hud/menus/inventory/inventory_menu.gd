@@ -189,11 +189,14 @@ var _shade_clock: float = 0.0
 ## remembered): an item that runs out (bound, so kept on the ring with 0), or is gone a moment as its
 ## binding moves, keeps its place instead of jumping to the end (Smooth).
 var _item_order: Array[StringName] = []
-## Items recharging after a use (`item_recharging`: an active relic's cooldown): "bag/id" -> [seconds
-## left, whole cooldown, when told (msec)]; drawn as a shutter over the item's icon.
+## Items recharging after a use (`item_recharging`: an active relic's cooldown, told by the
+## simulation at each sixteenth): "bag/id" -> the shutter rows told (of ICON_SIZE); drawn as a shutter
+## over the item's icon. The ring keeps no clock for it.
 var _charges: Dictionary = {}
-## The shutter rows drawn last, by "bag/id", so the ring redraws only as a row changes.
+## By "bag/id": the shutter rows drawn, stepping a row a frame toward those told (Smooth), and the
+## clock that steps them.
 var _charge_rows: Dictionary = {}
+var _charge_clock: float = 0.0
 
 
 func _ready() -> void:
@@ -407,7 +410,7 @@ func step(delta: float) -> void:
 		_note_left -= delta
 		_dirty = true
 	_step_shades(delta)
-	_step_charges()
+	_step_charges(delta)
 	if _menu.pointed_for(_clock) < POP_TIME:
 		_dirty = true
 	if _dirty:
@@ -606,6 +609,7 @@ func _on_inventory_announced(player: int, body: int) -> void:
 	if player != index:
 		return
 	_charges.clear()
+	_charge_rows.clear()
 	_mirror.clear(body)
 	_refill()
 
@@ -760,7 +764,7 @@ func _refresh_hints() -> void:
 	if _layer == Layer.ITEMS:
 		first = USE_VERB
 		var held: bool = entry.has("item") and int(entry["count"]) > 0
-		can_enter = held and _item_usable(entry) and recharge_of(entry["item"]).x <= 0.0
+		can_enter = held and _item_usable(entry) and not recharging(entry["item"])
 		can_drop = held and (_item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE))
 	var can_bind: bool = _layer == Layer.ITEMS and _item_usable(entry)
 	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB, BIND_VERB]
@@ -1023,11 +1027,10 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 	elif data.has("item"):
 		var item_icon: Texture2D = _look(data["item"])["icon"] as Texture2D
 		if item_icon != null and size >= SMALL_ICON:
-			var side: float = minf(ICON_SIZE, rect.size.x - 2.0)
+			var side: float = floorf(minf(ICON_SIZE, rect.size.x - 2.0))
 			var icon_rect := Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side))
 			draw_texture_rect(item_icon, icon_rect, false, shade_tint(int(_shade.get(data["item"], 0))))
-			var charge: Vector2 = recharge_of(data["item"])
-			RechargeShutter.draw(self, icon_rect, charge.x, charge.y)
+			RechargeShutter.draw(self, icon_rect, recharge_rows(data["item"]))
 	var none_left: bool = data.has("item") and int(data["count"]) == 0
 	if data.has("count") and (int(data["count"]) > 1 or none_left) and not data.has("kind"):
 		var number: String = str(int(data["count"]))
@@ -1092,32 +1095,50 @@ func _on_item_recharging(player: int, bag: StringName, id: StringName, left: flo
 	if player != index:
 		return
 	var key: String = "%s/%s" % [bag, id]
-	if left > 0.0:
-		_charges[key] = [left, whole, Time.get_ticks_msec()]
+	var shut: int = RechargeShutter.rows(left, whole, int(ICON_SIZE))
+	if shut > 0:
+		_charges[key] = shut
 	else:
 		_charges.erase(key)
+	if not _open:
+		# Not shown: drawn as it stands when it is.
+		_charge_rows[key] = shut
 	_dirty = true
 
 
-## The seconds `id` of the bag entered still recharges (0: ready), and its whole cooldown.
-func recharge_of(id: StringName) -> Vector2:
-	var told: Array = _charges.get("%s/%s" % [_bag, id], [])
-	if told.is_empty():
-		return Vector2.ZERO
-	var left: float = float(told[0]) - float(Time.get_ticks_msec() - int(told[2])) / 1000.0
-	return Vector2(maxf(left, 0.0), float(told[1]))
+## The shutter rows drawn over item `id` of the bag entered (0: none; for tests).
+func recharge_rows(id: StringName) -> int:
+	return int(_charge_rows.get("%s/%s" % [_bag, id], 0))
 
 
-## The ring redrawn as a recharging item's shutter loses a row (Smooth: whole rows, `RechargeShutter`).
-func _step_charges() -> void:
-	if _charges.is_empty() or _layer != Layer.ITEMS:
+## True while item `id` of the bag entered recharges (its Use is dimmed).
+func recharging(id: StringName) -> bool:
+	return _charges.has("%s/%s" % [_bag, id])
+
+
+## Each shutter's drawn rows a row nearer what was told at GREY_FPS (Smooth: it drops in and sinks by
+## whole rows, never jumps).
+func _step_charges(delta: float) -> void:
+	var moving: bool = false
+	for key: String in _charges:
+		if int(_charge_rows.get(key, 0)) != int(_charges[key]):
+			moving = true
+	for key: String in _charge_rows:
+		if not _charges.has(key) and int(_charge_rows[key]) != 0:
+			moving = true
+	if not moving:
+		_charge_clock = 0.0
 		return
-	for entry: Dictionary in _entries:
-		var charge: Vector2 = recharge_of(entry["item"])
-		var shut: int = RechargeShutter.rows(charge.x, charge.y, int(ICON_SIZE))
-		if int(_charge_rows.get(entry["item"], 0)) != shut:
-			_charge_rows[entry["item"]] = shut
-			_dirty = true
+	_charge_clock += delta
+	while _charge_clock >= 1.0 / GREY_FPS:
+		_charge_clock -= 1.0 / GREY_FPS
+		for key: String in _charges:
+			if not _charge_rows.has(key):
+				_charge_rows[key] = 0
+		for key: String in _charge_rows:
+			var at: int = int(_charge_rows[key])
+			_charge_rows[key] = at + signi(int(_charges.get(key, 0)) - at)
+	_dirty = true
 
 
 ## `ids` in the order the ring has shown them, each new one remembered after them in its own order.

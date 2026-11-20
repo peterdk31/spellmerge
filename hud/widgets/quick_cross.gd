@@ -14,8 +14,10 @@ extends Control
 ## nothing, to its shadow for one with none left (greying and filling again through the shades
 ## between); its icon goes out the same way before another comes in. A count that changes nods its
 ## cell up a pixel (more) or dips it (fewer) through NOD's poses. Whole pixels, never a fade or a
-## blur. A slot whose item recharges (an active relic's cooldown: `set_recharge`) has a shutter over
-## its icon that sinks a whole row at a time as the seconds count down (`RechargeShutter`).
+## blur. A slot whose item recharges (an active relic's cooldown: `set_recharge`, told by the
+## simulation at each sixteenth) has a shutter over its icon; the rows drawn step toward the rows told
+## a row a frame, so it drops in over its rows after a use and sinks a row at a time as it recharges
+## (`RechargeShutter`). The cross keeps no clock for it.
 ##
 ## Display only: no input, no simulation state; it processes only while something steps and
 ## allocates nothing a frame.
@@ -65,9 +67,9 @@ var _drawn_count: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _nod: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _nod_way: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _clock: float = 0.0
-## By slot: the seconds its item still recharges (counted down here) and its whole cooldown.
-var _charge_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
-var _charge_whole: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+## By slot: the shutter rows told (its item's recharge) and the rows drawn, stepping toward them.
+var _charge_told: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _charge_rows: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 
 
 func _init() -> void:
@@ -84,7 +86,7 @@ func set_slot(slot: int, icon: Texture2D, count: int, at_once: bool = false) -> 
 		return
 	if icon != _icon[slot]:
 		# Another item: its own recharge, if any, is told next.
-		_charge_left[slot] = 0.0
+		_charge_told[slot] = 0
 	_icon[slot] = icon
 	_count[slot] = maxi(count, 0)
 	if at_once:
@@ -92,23 +94,26 @@ func set_slot(slot: int, icon: Texture2D, count: int, at_once: bool = false) -> 
 		_stage[slot] = _wanted(slot)
 		_drawn_count[slot] = _count[slot]
 		_nod[slot] = 0
+		_charge_rows[slot] = _charge_target(slot)
 	set_process(is_moving())
 	queue_redraw()
 
 
-## Slot `slot`'s item recharges for `left` more seconds of its `whole` cooldown (0: ready).
-func set_recharge(slot: int, left: float, whole: float) -> void:
+## Slot `slot`'s item recharges for `left` more seconds of its `whole` cooldown (0: ready), as the
+## simulation told it. With `at_once`, drawn as it stands.
+func set_recharge(slot: int, left: float, whole: float, at_once: bool = false) -> void:
 	if slot < 0 or slot >= SLOTS:
 		return
-	_charge_left[slot] = maxf(left, 0.0)
-	_charge_whole[slot] = whole
+	_charge_told[slot] = RechargeShutter.rows(left, whole, ICON)
+	if at_once:
+		_charge_rows[slot] = _charge_target(slot)
 	set_process(is_moving())
 	queue_redraw()
 
 
-## The shutter rows over slot `slot`'s icon (0: ready; for tests).
+## The shutter rows drawn over slot `slot`'s icon (0: none; for tests).
 func recharge_rows(slot: int) -> int:
-	return RechargeShutter.rows(_charge_left[slot], _charge_whole[slot], ICON)
+	return _charge_rows[slot]
 
 
 ## Slot `slot`'s stage (FRAMED ... FULL; for tests), its count drawn and whether it is bound.
@@ -127,7 +132,7 @@ func is_bound(slot: int) -> bool:
 ## True while a stage still steps.
 func is_moving() -> bool:
 	for slot in SLOTS:
-		if _charge_left[slot] > 0.0:
+		if _charge_rows[slot] != _charge_target(slot):
 			return true
 		if _stage[slot] != _wanted(slot) or _drawn_icon[slot] != _icon[slot] or _drawn_count[slot] != _count[slot] or _nod[slot] != 0:
 			return true
@@ -136,6 +141,8 @@ func is_moving() -> bool:
 
 ## One step of every stage (a frame at FPS; tests call it directly).
 func advance() -> void:
+	for slot in SLOTS:
+		_charge_rows[slot] += signi(_charge_target(slot) - _charge_rows[slot])
 	for slot in SLOTS:
 		if _nod[slot] != 0:
 			_nod[slot] = (_nod[slot] + 1) % (NOD_UP.size() + 1)
@@ -160,7 +167,6 @@ func advance() -> void:
 
 
 func _process(delta: float) -> void:
-	count_down(delta)
 	_clock += delta
 	while _clock >= 1.0 / FPS:
 		_clock -= 1.0 / FPS
@@ -170,15 +176,9 @@ func _process(delta: float) -> void:
 		set_process(false)
 
 
-## Count every recharge down by `delta` seconds; redrawn as a shutter row changes (tests call it).
-func count_down(delta: float) -> void:
-	for slot in SLOTS:
-		if _charge_left[slot] <= 0.0:
-			continue
-		var before: int = recharge_rows(slot)
-		_charge_left[slot] = maxf(_charge_left[slot] - delta, 0.0)
-		if recharge_rows(slot) != before:
-			queue_redraw()
+## The rows slot `slot`'s shutter is going to: what was told, none while its icon goes out.
+func _charge_target(slot: int) -> int:
+	return _charge_told[slot] if _drawn_icon[slot] == _icon[slot] else 0
 
 
 func _wanted(slot: int) -> int:
@@ -212,7 +212,7 @@ func _draw_slot(slot: int) -> void:
 		# Shadow, the shades between, full: whole steps of the tint, never a fade of the icon.
 		var tint: Color = GREY.lerp(Color.WHITE, float(stage - SHADOW) / float(FULL - SHADOW))
 		draw_texture_rect(_drawn_icon[slot], Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), false, tint)
-		RechargeShutter.draw(self, Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), _charge_left[slot], _charge_whole[slot])
+		RechargeShutter.draw(self, Rect2(cell.position + Vector2(1, 1), Vector2(ICON, ICON)), _charge_rows[slot])
 		_draw_count(cell, _drawn_count[slot], TEXT if _drawn_count[slot] > 0 else DIM)
 
 

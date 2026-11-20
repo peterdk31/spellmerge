@@ -299,8 +299,10 @@ signal hands_changed(player: int, hands: PackedInt32Array)
 signal quick_bound(player: int, slot: int, bag: StringName, id: StringName)
 ## Sender: player (the owner, 2026-11-20). `id` of `bag` of the body `player` shows recharges after a
 ## use (an active relic's cooldown, `ItemUse.cooldown`): `left` seconds of its `whole` cooldown, as it
-## starts, after `inventory_announced`, and 0 as it is ready again. Heard by the HUD (the corner
-## panel's cross and the inventory's ring show the fill; between, they count it down themselves).
+## starts, at each sixteenth of it (`Inventory.RECHARGE_STEPS`), after `inventory_announced`, and 0 as
+## it is ready again. Heard by the HUD (the corner panel's cross and the inventory's ring show it as
+## told, never counting on a clock of their own, so a pause or a hit-stop holds it as it holds the
+## simulation).
 signal item_recharging(player: int, bag: StringName, id: StringName, left: float, whole: float)
 ## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)

@@ -601,14 +601,12 @@ func _on_quick_changed(slot: int) -> void:
 
 
 ## `item_recharging` for this seat: how long `id` of `bag` of the shown body still recharges, of its
-## use's whole cooldown (0 left: ready again).
+## whole cooldown (0 left: ready again), at its start and each sixteenth of it (`Inventory.step`).
 func _on_recharge_changed(bag: StringName, id: StringName) -> void:
 	var body: Actor = shown()
 	if body == null or body.events == null or body.inventory == null:
 		return
-	var use: ItemUse = ItemKinds.use_of(bag, id, registry)
-	var whole: float = use.cooldown if use != null else 0.0
-	body.events.item_recharging.emit(seat, bag, id, body.inventory.recharge_left(bag, id), whole)
+	body.events.item_recharging.emit(seat, bag, id, body.inventory.recharge_left(bag, id), body.inventory.recharge_whole(bag, id))
 
 
 ## The seat's events: the shown body's bus (every body shares one).

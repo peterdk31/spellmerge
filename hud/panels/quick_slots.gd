@@ -6,7 +6,7 @@ extends RefCounted
 ## another body shown, a wizard made again) is drawn as it stands. Display only: the HUD's, made and
 ## bound by `panels.gd`; it keeps no rules and sends nothing. An item recharging after a use
 ## (`item_recharging`: an active relic's cooldown) is told to the slots bound to it
-## (`set_quick_recharge`), again as a slot is bound to it, with what is left by then.
+## (`set_quick_recharge`), again as a slot is bound to it, as last told (the HUD keeps no clock).
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -28,7 +28,7 @@ var _held: Array[Dictionary] = [{}, {}, {}, {}]
 var _at_once: Array[bool] = [true, true, true, true]
 ## The icon of an item with none of its own: one, so a count's change is never taken for another item.
 var _no_icon: Texture2D = PlaceholderTexture2D.new()
-## By seat: "bag/id" -> [seconds left, whole cooldown, when told (msec)], for items recharging.
+## By seat: "bag/id" -> [seconds left, whole cooldown] as last told, for items recharging.
 var _charges: Array[Dictionary] = [{}, {}, {}, {}]
 
 
@@ -102,7 +102,7 @@ func _on_item_recharging(seat: int, bag: StringName, id: StringName, left: float
 		return
 	var key: String = "%s/%s" % [bag, id]
 	if left > 0.0:
-		_charges[seat][key] = [left, whole, Time.get_ticks_msec()]
+		_charges[seat][key] = [left, whole]
 	else:
 		_charges[seat].erase(key)
 	for slot in SLOTS:
@@ -110,14 +110,13 @@ func _on_item_recharging(seat: int, bag: StringName, id: StringName, left: float
 			_tell_charge(seat, slot)
 
 
-## Seat `seat`'s slot `slot`: what is left of its item's recharge (none: ready).
+## Seat `seat`'s slot `slot`: its item's recharge as last told (none: ready).
 func _tell_charge(seat: int, slot: int) -> void:
 	if seat >= _panels.size() or _panels[seat] == null:
 		return
 	var key: String = "%s/%s" % [_bags[seat * SLOTS + slot], _ids[seat * SLOTS + slot]]
-	var told: Array = _charges[seat].get(key, [0.0, 0.0, 0])
-	var left: float = float(told[0]) - float(Time.get_ticks_msec() - int(told[2])) / 1000.0 if float(told[0]) > 0.0 else 0.0
-	_panels[seat].call(&"set_quick_recharge", slot, maxf(left, 0.0), float(told[1]))
+	var told: Array = _charges[seat].get(key, [0.0, 0.0])
+	_panels[seat].call(&"set_quick_recharge", slot, float(told[0]), float(told[1]), _at_once[seat])
 
 
 func _tell(seat: int, slot: int, at_once: bool) -> void:

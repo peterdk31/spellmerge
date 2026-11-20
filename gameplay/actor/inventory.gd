@@ -137,6 +137,8 @@ var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
 ## cooldown): by `_recharge_key(bag, id)`, the seconds left, counted down by `step` with the tick's
 ## delta. State: hashed and snapshotted.
 var _recharge: Dictionary = {}
+## By the same key: the whole cooldown it recharges for (to tell its steps).
+var _recharge_whole: Dictionary = {}
 ## Scratch: the keys done recharging in a step.
 var _recharged: Array[StringName] = []
 ## The content registry (`ItemKinds.usable` reads an item's tag from it): set by its body's controller
@@ -894,18 +896,37 @@ func _on_hand(stack: ItemStack, hand: int) -> void:
 
 ## As its actor's scene and data made it (props W2, `ActorComponent.at_rest`): nothing it holds
 ## changed since its start, so an untouched body's state hash sums it up with the body.
+func at_rest() -> bool:
+	return not _edited
+
+
 # --- Recharging -------------------------------------------------------------------------
+
+## How finely a recharge is told (`recharge_changed`): at each sixteenth of its cooldown, so the HUD
+## shows the simulation's own count (16 rows on the inventory's ring, 8 on the cross) and never keeps
+## a clock of its own.
+const RECHARGE_STEPS: int = 16
+
 
 ## The seconds before `id` of `bag` can be used again (0: ready).
 func recharge_left(bag: StringName, id: StringName) -> float:
 	return float(_recharge.get(_recharge_key(bag, id), 0.0))
 
 
-## `id` of `bag` recharges for `seconds` (its use's cooldown; nothing for none).
+## The whole cooldown `id` of `bag` recharges for (0: not recharging).
+func recharge_whole(bag: StringName, id: StringName) -> float:
+	return float(_recharge_whole.get(_recharge_key(bag, id), 0.0))
+
+
+## `id` of `bag` recharges for `seconds` (its use's cooldown; nothing for none). The recharge is the
+## holder's, by its bag and id: an item dropped and taken back still recharges, one taken by another body is ready for it; a loadout (a run's
+## start, a rejoin) starts ready.
 func start_recharge(bag: StringName, id: StringName, seconds: float) -> void:
 	if seconds <= 0.0:
 		return
-	_recharge[_recharge_key(bag, id)] = seconds
+	var key: StringName = _recharge_key(bag, id)
+	_recharge[key] = seconds
+	_recharge_whole[key] = seconds
 	_edited = true
 	recharge_changed.emit(bag, id)
 
@@ -915,35 +936,41 @@ func is_recharging() -> bool:
 	return not _recharge.is_empty()
 
 
-## Every item recharging: [bag, id, seconds left] each, in the order they began.
+## Every item recharging: [bag, id] each, in the order they began.
 func recharging() -> Array:
 	var out: Array = []
 	for key: StringName in _recharge:
 		var parts: PackedStringArray = String(key).split("/", true, 1)
-		out.append([StringName(parts[0]), StringName(parts[1]), float(_recharge[key])])
+		out.append([StringName(parts[0]), StringName(parts[1])])
 	return out
 
 
-## Count every recharge down by `delta` (its body's step, the tick's delta); one done is ready again.
+## Count every recharge down by `delta` (its body's step, the tick's delta): told at each
+## RECHARGE_STEPS step it passes (`recharge_changed`), and once ready.
 func step(delta: float) -> void:
 	_recharged.clear()
 	for key: StringName in _recharge:
+		var whole: float = float(_recharge_whole[key])
+		var before: int = _recharge_step(float(_recharge[key]), whole)
 		var left: float = float(_recharge[key]) - delta
 		_recharge[key] = left
-		if left <= 0.0:
+		if left <= 0.0 or _recharge_step(left, whole) != before:
 			_recharged.append(key)
 	for key: StringName in _recharged:
-		_recharge.erase(key)
+		if float(_recharge[key]) <= 0.0:
+			_recharge.erase(key)
+			_recharge_whole.erase(key)
 		var parts: PackedStringArray = String(key).split("/", true, 1)
 		recharge_changed.emit(StringName(parts[0]), StringName(parts[1]))
 
 
+static func _recharge_step(left: float, whole: float) -> int:
+	return ceili(float(RECHARGE_STEPS) * left / whole - 0.000001) if whole > 0.0 and left > 0.0 else 0
+
+
+## Bag names hold no "/" (`ItemKinds.BAGS`), so the key splits back at its first.
 static func _recharge_key(bag: StringName, id: StringName) -> StringName:
 	return StringName("%s/%s" % [bag, id])
-
-
-func at_rest() -> bool:
-	return not _edited
 
 
 ## Say a change (`bag_changed`, `staff_changed`, `hands_changed`); after its start, it is no longer

@@ -14,7 +14,9 @@ extends ItemContent
 
 ## Its changes to the holder's run stats, applied in this order.
 @export var stat_changes: Array[StatChange] = []
-## What a use of it does (null: none, a passive relic): an active relic's, kept with a cooldown.
+## What a use of it does (null: none, a passive relic): an active relic's. **Set its `consumed` to
+## false** (an `ItemUse` is consumed by default, as a potion's drink is) and give it a `cooldown`, or
+## a use takes the relic, its stat changes with it.
 @export var active_use: ItemUse = null
 
 

@@ -129,6 +129,11 @@ func use(count: int, boxes: ViewBoxesScript = null) -> void:
 		if not is_instance_valid(_items[i]):
 			_drop_at(i)
 			continue
+		# An item drawn with another material since (a pool made anew): a reader no more, unless
+		# that one is watched too (then taken again, its copies with it).
+		if not _materials.has(_items[i].material):
+			_drop_at(i)
+			continue
 		for view in range(1, views):
 			if _copies[i][view - 1] == null:
 				_copies[i][view - 1] = _copy_of(_items[i], view)
@@ -193,11 +198,18 @@ func _scan(node: Node, material: Material) -> void:
 		_scan(child, material)
 
 
+## Reader `at` let go: its copies freed, and the item drawn as any of the world's again (the world's
+## layer, no box to cull by), so with the light gone every view draws it whole.
 func _drop_at(at: int) -> void:
 	for copy: Variant in _copies[at]:
 		var node := copy as CanvasItem
 		if node != null and is_instance_valid(node):
 			node.queue_free()
+	var item: CanvasItem = _items[at]
+	if is_instance_valid(item):
+		item.visibility_layer = WORLD_LAYER
+		if _culls[at] == 1:
+			item.set_instance_shader_parameter(CULL_BOX, Vector4.ZERO)
 	_items.remove_at(at)
 	_copies.remove_at(at)
 	_culls.remove_at(at)
@@ -230,6 +242,8 @@ func _copy_of(item: CanvasItem, view: int) -> CanvasItem:
 ## `copy` (view `view`'s) drawn as `item` is: the same place, z and look, just after it (and its
 ## copies for the views before).
 static func _follow(copy: CanvasItem, item: CanvasItem, view: int) -> void:
+	if copy.material != item.material:
+		copy.material = item.material
 	if copy.z_index != item.z_index:
 		copy.z_index = item.z_index
 	if copy.top_level != item.top_level:

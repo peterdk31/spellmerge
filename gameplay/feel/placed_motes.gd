@@ -117,6 +117,8 @@ func _bind(pool: MotesScript) -> void:
 		_node.top_level = true
 		_node.z_index = _z
 		_node.visible = false
+		# Its material before it is in the tree, so the light finds it a reader (`ViewReaders.take`).
+		_node.material = pool.draw_material()
 		add_child(_node)
 	if _node.material != pool.draw_material():
 		_node.material = pool.draw_material()

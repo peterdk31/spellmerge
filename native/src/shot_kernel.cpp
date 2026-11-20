@@ -63,6 +63,8 @@ constexpr int64_t PLACE_ASK = 255;
 // The draw regions' (`DrawRegions`, core/projectiles/draw_regions.gd): a row whose transform has a
 // part past this is a crosser (the performance pass, 2026-11-20).
 constexpr double REGION_SPAN_MOST = 128.0;
+// The most places drawn by region (`DrawRegions.MOST`): the hand-out's arrays are this size + 1.
+constexpr int64_t REGION_MOST = 64;
 constexpr int S_HELD = 2;
 constexpr int S_RETURNING = 3;
 constexpr int S_WAITING = 8;
@@ -1418,6 +1420,7 @@ const Constant CONSTANTS[] = {
 	{ "PLACE_CELL", (double)PLACE_CELL },
 	{ "PLACE_ASK", (double)PLACE_ASK },
 	{ "REGION_SPAN_MOST", (double)REGION_SPAN_MOST },
+	{ "REGION_MOST", (double)REGION_MOST },
 	{ "S_HELD", (double)S_HELD },
 	{ "S_RETURNING", (double)S_RETURNING },
 	{ "S_WAITING", (double)S_WAITING },
@@ -2731,7 +2734,7 @@ struct Regions {
 		const Vector2 origin = r->get(k.rg_origin);
 		origin_x = origin.x;
 		origin_y = origin.y;
-		return whole.n >= columns * lines && counts.n > places && fill.n > places;
+		return places >= 0 && places <= REGION_MOST && whole.n >= columns * lines && counts.n > places && fill.n > places;
 	}
 	// `DrawRegions.region_of`.
 	int64_t region_of(const float *row) const {
@@ -2771,9 +2774,10 @@ void ShotKernel::region_rows(Object *regions, const PackedFloat32Array &rows, in
 	ERR_FAIL_COND(current.size() <= r.places);
 	// Each region's buffer (the regions sized each for its count first), taken out of the list while
 	// written (`ptrw` then copies it only if the renderer still holds it) and put back after.
-	std::vector<PackedFloat32Array> held((size_t)(r.places + 1));
-	std::vector<float *> out((size_t)(r.places + 1), nullptr);
-	std::vector<int64_t> room((size_t)(r.places + 1), 0);
+	// Fixed arrays (no allocation a frame): at most REGION_MOST places (`load` checks it).
+	PackedFloat32Array held[REGION_MOST + 1];
+	float *out[REGION_MOST + 1] = {};
+	int64_t room[REGION_MOST + 1] = {};
 	for (int64_t region = 0; region <= r.places; region++) {
 		if (r.counts[region] == 0) {
 			continue;

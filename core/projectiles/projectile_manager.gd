@@ -682,7 +682,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"_draw_regions"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"_draw_regions", &"_no_rows"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -1051,6 +1051,8 @@ var _still_views: Array[StillShotView] = []
 ## batch a room under the batch's node, so a view draws only the rooms it shows (`draw_regions.gd`;
 ## the performance pass, 2026-11-20).
 var _draw_regions: DrawRegionsScript = DrawRegionsScript.new()
+## The rows of a batch with none this frame (kept: nothing is made a frame; never written).
+var _no_rows: PackedFloat32Array = PackedFloat32Array()
 ## The first batches' nodes by name: the hat ramps' bolts and runes, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
@@ -1368,7 +1370,7 @@ func native_constants() -> Dictionary:
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
 			"SPELL_MIX_HIGH": (mix >> 32) & 0xFFFFFFFF, "SPELL_MIX_LOW": mix & 0xFFFFFFFF,
 			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD,
-			"REGION_SPAN_MOST": DrawRegionsScript.SPAN_MOST})
+			"REGION_SPAN_MOST": DrawRegionsScript.SPAN_MOST, "REGION_MOST": DrawRegionsScript.MOST})
 	return constants
 
 
@@ -5490,7 +5492,7 @@ func update_draw(fraction: float = -1.0) -> void:
 		var mirror: MultiMesh = _mirrors[batch] if batch < _mirrors.size() else null
 		if mirror != null and mirror.instance_count != multimesh.instance_count:
 			mirror.instance_count = multimesh.instance_count
-		var rows: PackedFloat32Array = PackedFloat32Array()
+		var rows: PackedFloat32Array = _no_rows
 		if out > 0:
 			rows = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
 			if not by_room:

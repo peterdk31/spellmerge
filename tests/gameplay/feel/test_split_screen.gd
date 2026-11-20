@@ -161,6 +161,19 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 	light.use_views([] as Array[Viewport])
 	check_equal(light.view_count(), 0, "one picture again")
 	check(not light.readers.copy_of(light.apply, 1).visible, "the copies are hidden with one picture")
+	check(before.get_instance_shader_parameter(ViewReadersScript.CULL_BOX) is Vector4, "a reader that culls is told its view's box")
+	light.release()
+	# The light switched off: its readers drawn as any of the world's again, culled by no box.
+	root.remove_child(light)
+	check_equal(before.visibility_layer, ViewReadersScript.WORLD_LAYER, "a reader the light let go is on the world's layer again")
+	check_equal(before.get_instance_shader_parameter(ViewReadersScript.CULL_BOX), Vector4.ZERO, "and culls by no box")
+	# A reader whose material is changed to one the light does not read is let go too.
+	root.add_child(light)
+	light.use_views(_split.views())
+	before.material = ShaderMaterial.new()
+	light.use_views(_split.views())
+	check(not light.readers.items().has(before), "a reader drawn with another material is let go")
+	check_equal(before.visibility_layer, ViewReadersScript.WORLD_LAYER, "back on the world's layer")
 	light.release()
 
 

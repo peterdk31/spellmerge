@@ -24,6 +24,9 @@ extends RefCounted
 
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 
+## Drawing only: none of it is the simulation's state (core/sim/README.md).
+const VIEW_ONLY: bool = true
+
 ## Floats in a row (the manager's DRAW_STRIDE), and the floats of its transform's origin.
 const DRAW_STRIDE: int = 16
 const ROW_X: int = 3
@@ -122,15 +125,6 @@ func draw(batch: int, node: MultiMeshInstance2D, rows: PackedFloat32Array, count
 		if shown.multimesh.visible_instance_count != used:
 			shown.multimesh.visible_instance_count = used
 	_current = []
-
-
-## Every region of every batch hidden (no places any more, or nothing drawn).
-func hide_all() -> void:
-	for batch in _nodes.size():
-		for region in _nodes[batch].size():
-			var shown := _nodes[batch][region] as MultiMeshInstance2D
-			if shown != null:
-				shown.multimesh.visible_instance_count = 0
 
 
 ## The region the row at `i` of `rows` is drawn by: its place plus one, or 0 (a crosser). The rule

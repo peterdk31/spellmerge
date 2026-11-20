@@ -55,14 +55,14 @@ extends Node
 ##   screen is split each view draws the world through its own transform, so each has a buffer that
 ##   follows it (`use_views`: the light buffer the first view's, then one more a view, sharing its
 ##   world, so the lights are drawn once a view). What reads the light by the screen (the apply rect,
-##   and what `read_by` names: the lit-only motes, the mist) reads its own view's buffer, named by
-##   its view (`light_views.gdshaderinc`'s uniform, a copy of the material a view; the owner, 2026-11-20): each canvas item
-##   drawn with a reader's material is drawn once a view, a copy a view on that view's layer
-##   (`readers`, `view_readers.gd`). One material serves every view.
+##   and what `read_by` names: the lit-only motes, the mist) reads its own view's buffer
+##   (`readers`, `view_readers.gd`; the owner's decisions of 2026-11-20): the first two views draw
+##   the item itself, told apart in its shader by the transform and size each is drawn through, and
+##   the third and fourth each a copy of it on its own layer, whose material names its view
+##   (`light_views.gdshaderinc`).
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
-const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const LIGHT_SHADER: Shader = preload("res://gameplay/feel/light.gdshader")
 const APPLY_SHADER: Shader = preload("res://gameplay/feel/light_apply.gdshader")
@@ -169,8 +169,8 @@ var _readers: Dictionary = {}
 ## What reads the light by the screen, drawn once a view (the apply rect and every item drawn with a
 ## reader's material; `view_readers.gd`). Read only.
 var readers: ViewReadersScript = ViewReadersScript.new()
-## Each view's part of the world (`use_views`; null: none), what the readers that cull are told.
-var _seen: ViewBoxesScript = null
+## Whether the equal split's void quarter is drawn as one view more (`use_views`).
+var _void_view: bool = false
 ## A spot's colour by the texture it is read from (read once per texture).
 var _art_colours: Dictionary = {}
 ## The cue lights, by slot (CUE_LIGHTS of them, the next one `_next_cue`): where, how far they reach,
@@ -383,7 +383,7 @@ func release() -> void:
 func follow() -> void:
 	if _spots_dirty and is_inside_tree():
 		draw_spots()
-	readers.follow()
+	readers.follow(_views)
 	if _views.is_empty():
 		var view: Viewport = get_viewport()
 		if view == null:
@@ -410,19 +410,18 @@ static func _fit(buffer: SubViewport, view: Viewport, downscale: int) -> void:
 ## The views the light follows from now on, one buffer each (`views`, in the order the split screen
 ## lays them out, at most VIEWS_MOST; empty: the one picture, this node's viewport); the buffers past
 ## the first `extra_downscale` times smaller than their view each way (the fallback of a cheaper
-## light a view; DOWNSCALE: as the first). Nothing is made while they are the same. `seen` (null:
-## none) holds each view's part of the world, box `k` view `k`'s, and may name one view more than
-## `views` (the equal split's void quarter, which has no buffer: no light); the readers that cull are
-## told them (`readers`, `ViewReaders.use`).
-func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, seen: ViewBoxesScript = null) -> void:
-	_seen = seen
+## light a view; DOWNSCALE: as the first). Nothing is made while they are the same. `void_view`: the
+## equal split's void quarter is drawn too, one view more than `views` (it has no buffer: no light),
+## with its own copy of each reader (`readers`, `ViewReaders.use`).
+func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, void_view: bool = false) -> void:
+	_void_view = void_view
 	var downscale: int = maxi(extra_downscale, 1)
 	if downscale == _extra_downscale and views.size() == _views.size():
 		var same: bool = true
 		for k in views.size():
 			same = same and views[k] == _views[k]
 		if same:
-			# A reader come since (a motes chunk made in a fight) gets its copies; the boxes move.
+			# A reader come since (a motes chunk made in a fight) gets its copies.
 			_use_readers()
 			return
 	_views = views.slice(0, VIEWS_MOST)
@@ -455,9 +454,9 @@ func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, seen: V
 	follow()
 
 
-## The readers drawn once a view for the views now (and the boxes they cull by).
+## The readers drawn in each view for the views now (and the void quarter's).
 func _use_readers() -> void:
-	readers.use(maxi(_views.size(), _seen.count if _seen != null and _views.size() > 1 else 0), _seen)
+	readers.use(_views.size() + (1 if _void_view and _views.size() > 1 else 0))
 
 
 ## How many views the light follows (0: the one picture), and the buffer of view `k` (for tests).

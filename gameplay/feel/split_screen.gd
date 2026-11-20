@@ -15,7 +15,8 @@ extends Node
 ##   (`split_cell.gdshader`). A view keeps its node while it lives (its slot).
 ## - **Each view draws the world and its own readers of the light:** its canvas cull mask is the
 ##   world's layer and its own (`ViewReaders.view_mask`, by its place in `views()`, which is its light
-##   buffer's), so of each reader (the apply rect, the motes, the mist) it draws its own copy, whose
+##   buffer's), so of each reader (the apply rect, the motes, the mist) the first two views draw the
+##   reader itself (its shader tells them apart) and the third and fourth each its own copy, whose
 ##   material's uniform names its buffer; the void view is one view more, after them (no buffer: no
 ##   light in the void).
 ## - **The root stops drawing the world** while there is a view: its canvas cull mask drops the
@@ -385,8 +386,8 @@ func _show_void(quarter: int, screen: Vector2) -> void:
 	var zoom: float = maxf(camera.view_zoom(), 0.0001)
 	var origin: Vector2 = ((void_bounds.position - Vector2.ONE * VOID_AWAY) * zoom - Vector2(half) * 0.5).round()
 	_void_view.canvas_transform = Transform2D(0.0, Vector2(zoom, zoom), 0.0, -origin)
-	# One view more than those drawn (its readers after theirs: the light reads none there, and the
-	# motes cull by what it shows; Feel's spectacle hands the light its box after the views').
+	# One view more than those drawn (its readers' copies after theirs: the light reads none there;
+	# Feel's spectacle tells the light it is drawn, `use_views`).
 	var mask: int = ViewReadersScript.view_mask(mini(camera.views.count, ViewReadersScript.VIEWS_MOST - 1))
 	if _void_view.canvas_cull_mask != mask:
 		_void_view.canvas_cull_mask = mask

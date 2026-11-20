@@ -140,9 +140,8 @@ var _split_downscale: int = SpellLightScript.DOWNSCALE
 var tailless_motes: int = TaillessMotes.DEFAULT
 ## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
 var marks: MarksScript = null
-## `view_boxes`' boxes, and the light's readers' (`_reader_boxes`; kept: nothing is made a frame).
+## `view_boxes`' boxes (kept: nothing is made a frame).
 var _view_boxes: ViewBoxesScript = ViewBoxesScript.new()
-var _readers_seen: ViewBoxesScript = ViewBoxesScript.new()
 var floor_marks: bool = FloorMarks.default_on()
 ## Spell light (null with the setting off, or with no projectile manager), and the setting.
 var light: SpellLightScript = null
@@ -381,6 +380,8 @@ func step(now: float, table: ActorsScript = null) -> void:
 			_stirred_material = drawn
 			_stirred_version = stirs.version
 			stirs.hand_to(drawn)
+		# In a biome each room's motes are drawn by chunks of its own (the performance pass).
+		pool.use_places(projectiles.grid() if projectiles != null else null)
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
@@ -1003,7 +1004,7 @@ func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int 
 	_split_views = views
 	_split_downscale = extra_downscale
 	if light != null:
-		light.use_views(views, extra_downscale, _reader_boxes(views))
+		light.use_views(views, extra_downscale, _void_blank.has_area())
 
 
 ## The "Tailless motes" dev setting: the motes may write `TaillessMotes.frame_rows_of(births)`
@@ -1065,7 +1066,7 @@ func _make_light(on: bool) -> void:
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
 		add_child(light)
-		light.use_views(_split_views, _split_downscale, _reader_boxes(_split_views))
+		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
 	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own
@@ -1278,23 +1279,6 @@ func light_beams_begin() -> void:
 func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float, intensity: float = 1.0, reach: float = 1.0) -> void:
 	if light != null:
 		light.light_beam(i, path, points, player, look, core, fade, intensity, reach)
-
-
-## What each view shows for the light's readers that cull (the motes): with one picture the
-## picture's box (`view_boxes`); split, box `k` what view `k` of `views` draws (its canvas transform
-## over its size), then the equal split's void quarter's when it shows (its own view, after them).
-func _reader_boxes(views: Array[Viewport]) -> ViewBoxesScript:
-	if views.is_empty():
-		return view_boxes()
-	_readers_seen.count = 0
-	for view in views:
-		var drawn := Rect2()
-		if is_instance_valid(view):
-			drawn = view.canvas_transform.affine_inverse() * Rect2(Vector2.ZERO, view.get_visible_rect().size)
-		_readers_seen.add(drawn)
-	if views.size() > 1 and _void_blank.has_area():
-		_readers_seen.add(_void_blank)
-	return _readers_seen
 
 
 ## The parts of the world on screen now, a box a view (none outside a tree): what the mote sources,

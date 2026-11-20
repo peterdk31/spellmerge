@@ -12,6 +12,9 @@
 // pairs once, so GDScript looks up the kinds of each pair once (`card_kinds.gd`, a script); then
 // `give_off` picks a kind for each birth and writes its row. The settling motes' marks are handed
 // back in a list (`_settle_out`), since the mark layer is a script.
+//
+// And the motes drawn by room (the performance pass, 2026-11-20): `region_rows` copies the rows
+// written since the last step into their rooms' chunks, as `MoteRegions._hand` does.
 
 #pragma once
 
@@ -38,6 +41,12 @@ public:
 	// `Motes.give_off(given, count)`, with the kinds of pair p at `_pair_kinds[_pair_from[p]]`, of
 	// `_pair_size[p]`. Returns how many settles it handed back in `_settle_out`.
 	int64_t give_off(Object *motes, const PackedFloat32Array &given, int64_t count, bool has_marks);
+	// One line for each member of the motes' regions (`MoteRegions`) the hand-out reads that is
+	// missing or of another type, and for its numbers when they are not the kernel's.
+	PackedStringArray check_regions(Object *regions) const;
+	// `MoteRegions._hand(motes, from, count, now)`: the ring's rows from `from` handed to their
+	// rooms' chunks (gameplay/feel/mote_regions.gd). Returns how many rows were handed out.
+	int64_t region_rows(Object *regions, Object *motes, int64_t from, int64_t count, double now);
 	// At the module's end (register_types.cpp).
 	static void free_names();
 

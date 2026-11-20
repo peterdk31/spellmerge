@@ -399,8 +399,6 @@ func test_a_fighter_revives_a_downed_teammate_before_it_travels() -> void:
 	check(wizard.global_position.distance_to(mate.global_position) <= ReviveScript.NEAR + 4.0, "bot 1 stands by its downed teammate (%.0f px off)" % wizard.global_position.distance_to(mate.global_position))
 
 
-## Connected biomes CB3's crawl (the owner, 2026-11-19): a downed bot crawls toward the nearest
-## standing teammate, never into an enemy, and stops beside it; with nobody standing it lies still.
 ## Everything hurts everything: a bot never shoots through a teammate (the sweep's losing seeds of
 ## 2026-11-20 were mostly bolts in teammates' backs).
 func test_a_fighter_holds_fire_with_a_teammate_in_its_line_of_fire() -> void:
@@ -419,6 +417,30 @@ func test_a_fighter_holds_fire_with_a_teammate_in_its_line_of_fire() -> void:
 	mate.set_down(false)
 
 
+## Holding fire drops only the staffs that hurt and stay: a dash (its cast moves the caster) still goes.
+func test_holding_fire_keeps_a_cast_that_moves_the_caster() -> void:
+	var wizard := await _fighters_in_a_run() as Actor
+	if wizard == null:
+		return
+	var bot: BotScript = _bots[0]
+	bot.brain.setup(wizard, BotScript.PROFILE, BotScript.SEED)
+	bot.brain.think(1.0 / 60.0, bot.intent)
+	var moving: int = 0
+	var hurting: int = 0
+	for at in bot.brain.staff_count:
+		var sense: CastSense = bot.brain.senses[at]
+		if sense == null or sense.empty:
+			continue
+		if sense.moves_caster:
+			moving |= 1 << at
+		elif sense.harms():
+			hurting |= 1 << at
+	check(moving != 0 and hurting != 0, "the start staffs: a dash and a bolt")
+	check_equal(bot.held_fire(moving | hurting), moving, "the bolt is held, the dash goes")
+
+
+## Connected biomes CB3's crawl (the owner, 2026-11-19): a downed bot crawls toward the nearest
+## standing teammate, never into an enemy, and stops beside it; with nobody standing it lies still.
 func test_a_downed_bot_crawls_toward_its_nearest_standing_teammate() -> void:
 	var wizard := await _fighters_in_a_run() as Actor
 	var mate := _flow.call("get_wizard", 1) as Actor

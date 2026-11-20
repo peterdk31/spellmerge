@@ -295,16 +295,19 @@ func step(delta: float) -> void:
 	var way: Vector2 = Vector2.ZERO if brain.behaviour is ReviveScript else travel(wizard)
 	if way != Vector2.ZERO:
 		intent.move = way
-	if mate_in_line(wizard, intent.aim if intent.aim != Vector2.ZERO else wizard.aim, brain.distance if brain.target != null else INF):
+	var reach: float = INF
+	if brain.target != null:
+		reach = (brain.target.global_position + _offset_of(brain.target)).distance_to(wizard.global_position + wizard.body_offset)
+	if mate_in_line(wizard, intent.aim if intent.aim != Vector2.ZERO else wizard.aim, reach):
 		# Its spells hurt teammates too (everything hurts everything): it holds fire rather than shoot
-		# through one, as a person does.
-		intent.pressed_bits = 0
-		intent.held_bits = 0
+		# through one, as a person does; a cast that moves it (a dodge's dash) still goes.
+		intent.pressed_bits = held_fire(intent.pressed_bits)
+		intent.held_bits = held_fire(intent.held_bits)
 	send(intent)
 
 
 ## True when a standing teammate's body stands in `wizard`'s line of fire along `aim`, nearer than
-## `reach` (its target's distance; INF: any): within MATE_CLEAR of the line, in front of it. Before
+## `reach` (its target's distance, body to body; INF: any): within MATE_CLEAR of the line, in front of it. Before
 ## 2026-11-20 the bots shot through each other, and their bolts did more harm to teammates than the
 ## enemies did (the losing seeds of the sweep, tests/README.md, `bots/`).
 func mate_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
@@ -325,6 +328,22 @@ func mate_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
 		if absf(rel.cross(way)) < MATE_CLEAR:
 			return true
 	return false
+
+
+## `bits` (a staff a bit) less the staffs whose next cast hurts and does not move the caster (as the
+## brain last read them, `AIBrain.senses`): what it may still press with a teammate in its line.
+func held_fire(bits: int) -> int:
+	for at in brain.staff_count:
+		var sense: CastSense = brain.senses[at]
+		if sense != null and not sense.empty and sense.harms() and not sense.moves_caster:
+			bits &= ~(1 << at)
+	return bits
+
+
+## A body's hurt circle's middle from its feet (its `body_offset`; ZERO for a body that is no actor).
+static func _offset_of(body: Node2D) -> Vector2:
+	var as_actor := body as Actor
+	return as_actor.body_offset if as_actor != null else Vector2.ZERO
 
 
 ## Want `wanted` in the next frame: the walk (each axis full on or off, as the move keys), the aim

@@ -37,9 +37,9 @@ func want(brain: AIBrain) -> float:
 	if brain.profile.revives <= 0.0:
 		return 0.0
 	if brain.health_fraction < LOW and brain.target != null:
-		# Low with a fight on, it would be downed beside it; with none (the room cleared) nothing can
-		# down it there (playtest, 2026-11-20: a bot low after a fight walked on to the next and left
-		# its downed teammates behind).
+		# Low with a foe in sight it would be downed beside it; with none (the room cleared, or every
+		# foe out of sight; SAFE still keeps it from a foe by the one downed) it goes (playtest,
+		# 2026-11-20: a bot low after a fight walked on to the next and left its teammates down).
 		return 0.0
 	if brain.threat_time >= 0.0 and brain.threat_time < AIBrain.URGENT_TIME:
 		return 0.0

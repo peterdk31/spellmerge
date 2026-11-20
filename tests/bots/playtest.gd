@@ -60,6 +60,7 @@ var _sounds_seen: int = 0
 var _doubles: Dictionary = {}
 var _sound_counts: Dictionary = {}
 var _hits_now: Dictionary = {}
+## The tick a hit was last counted on (a frame a tick: `--fixed-fps 60`).
 var _hits_tick: int = -1
 var _hit_twice: Dictionary = {}
 
@@ -140,7 +141,8 @@ func take() -> void:
 		while not _shot_queue.is_empty():
 			var what: String = _shot_queue.pop_front()
 			save(await grab(), "playtest_%d_%d%s_%s" % [_seed, _players, "e" if _split == SplitScreenSetting.EQUAL else "", what])
-	var map: BiomeMap = (_flow.get("biome") as BiomeWorld).map
+	var world: BiomeWorld = _flow.get("biome") as BiomeWorld
+	var map: BiomeMap = world.map if world != null else null
 	print("PLAYTEST RESULT: %s, %d players, seed %d: %d of %d fights cleared, %d downs, %.0f game s, errors %d" % [
 		"WON" if _ended == 1 else ("LOST" if _ended == 0 else "TIMEOUT"), _players, _seed, _cleared, _fights, _downs, float(_ticks) / 60.0, _log.call("get_lines").size()])
 	var counts: Array = []
@@ -250,8 +252,9 @@ func _watch() -> void:
 				_queue_shot("stuck_p%d_%d" % [index + 1, _ticks])
 
 
-## The world's one-shots started this frame: counted by id, and an id started twice or more at one
-## place (within 12 px) in one frame noted as doubled.
+## The world's one-shots started this frame (Voices' own members, read by name: a playtest tool):
+## counted by id, and an id started twice or more at one place (within 12 px) in one frame noted as
+## doubled.
 func _listen() -> void:
 	if _audio == null:
 		return
@@ -263,9 +266,15 @@ func _listen() -> void:
 		return
 	var fresh: int = started - _sounds_seen
 	_sounds_seen = started
-	var ids: Array = voices.get("_voice_id")
-	var from: PackedFloat64Array = voices.get("_from")
-	var placed: Array = voices.get("_placed")
+	var got_ids: Variant = voices.get("_voice_id")
+	var got_from: Variant = voices.get("_from")
+	var got_placed: Variant = voices.get("_placed")
+	if not (got_ids is Array and got_from is PackedFloat64Array and got_placed is Array) or (got_placed as Array).size() != (got_ids as Array).size():
+		# Voices' members changed (this reads them by name), or its voices are flat (no place).
+		return
+	var ids: Array = got_ids
+	var from: PackedFloat64Array = got_from
+	var placed: Array = got_placed
 	var clock: float = float(voices.get("_clock"))
 	var now: Array[int] = []
 	for i in ids.size():

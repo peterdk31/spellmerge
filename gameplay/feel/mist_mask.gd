@@ -38,18 +38,11 @@ const DIAGONAL: float = 1.41421356
 ## is warned of: its edge is measured from every wall instead, low walls included.
 static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], warn: bool = false) -> Image:
 	var cell: float = cell_of(size)
-	var w: int = maxi(ceili(size.x / cell), 1)
-	var h: int = maxi(ceili(size.y / cell), 1)
-	var wall := PackedByteArray()
-	wall.resize(w * h)
-	var hole := PackedByteArray()
-	hole.resize(w * h)
-	_lay(wall, w, h, cell, walls)
-	_lay(hole, w, h, cell, holes)
-	# A wall wins where both cover a cell (RoomPlaces.hole_rects).
-	for i in w * h:
-		if wall[i] != 0:
-			hole[i] = 0
+	var cells: Array = _cells(size, walls, holes)
+	var w: int = cells[0]
+	var h: int = cells[1]
+	var wall: PackedByteArray = cells[2]
+	var hole: PackedByteArray = cells[3]
 	var outside: PackedByteArray = _wall_outside(wall, hole, w, h)
 	if outside.is_empty() and warn:
 		push_warning("MistMask: the room (%s px) has no void round it: its mist thickens toward every wall, the low walls in it too" % size)
@@ -76,6 +69,14 @@ static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], warn:
 ## Whether the mask of a room of `size` with `walls` and `holes` finds a void round it (`build` warns
 ## when it does not, with `warn`): open cells or holes, or walls, joined to the grid's edge.
 static func finds_void(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> bool:
+	var cells: Array = _cells(size, walls, holes)
+	return not _wall_outside(cells[2], cells[3], cells[0], cells[1]).is_empty()
+
+
+## The mask's grid of a room of `size`: its width and height in cells, and its wall and hole cells
+## (each a byte a cell: 1 where `walls` or `holes` cover the cell's middle; a wall wins where both
+## do, RoomPlaces.hole_rects), as [w, h, wall, hole].
+static func _cells(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> Array:
 	var cell: float = cell_of(size)
 	var w: int = maxi(ceili(size.x / cell), 1)
 	var h: int = maxi(ceili(size.y / cell), 1)
@@ -88,7 +89,7 @@ static func finds_void(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) 
 	for i in w * h:
 		if wall[i] != 0:
 			hole[i] = 0
-	return not _wall_outside(wall, hole, w, h).is_empty()
+	return [w, h, wall, hole]
 
 
 ## How many px a texel of the mask of a room of `size` covers: CELL, or more for a room wider than
@@ -200,7 +201,7 @@ static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, 
 
 
 ## The walls joined to the grid's edge through walls (four ways): the void of a room walled to its
-## edge, its rim (`_wall_outside`); empty when no wall touches the edge. Each is wall already.
+## edge, its rim (`_wall_outside`, which calls it when every edge cell is wall). Each is wall already.
 static func _rim_outside(wall: PackedByteArray, w: int, h: int) -> PackedByteArray:
 	var outside := PackedByteArray()
 	outside.resize(w * h)
@@ -214,8 +215,6 @@ static func _rim_outside(wall: PackedByteArray, w: int, h: int) -> PackedByteArr
 			outside[i] = 1
 			queue[count] = i
 			count += 1
-	if count == 0:
-		return PackedByteArray()
 	var at: int = 0
 	while at < count:
 		var i: int = queue[at]

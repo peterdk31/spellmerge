@@ -2,68 +2,47 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.2,
+	"seconds": 0.098,
 	"vary": {
 		"pitch": 0.05,
-		"time": 0.08,
-		"seed": 101
+		"time": 0.03,
+		"seed": 201
 	},
 	"layers": [
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 260,
-				"to": 120
+				"from": 400,
+				"to": 240
 			},
-			"length": 0.09,
+			"length": 0.041999999999999996,
+			"gain": -4,
 			"amp": {
-				"attack": 0.004,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -14,
-			"drive": 2.0
+			}
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 720,
-				"to": 480,
-				"q": 4.0
+				"type": "low",
+				"from": 800,
+				"q": 0.6,
+				"to": 296.0
 			},
-			"length": 0.1,
+			"length": 0.055999999999999994,
+			"gain": -3,
 			"amp": {
-				"attack": 0.004,
-				"shape": "perc",
-				"power": 2.2
-			},
-			"gain": 0
-		},
-		{
-			"source": "noise",
-			"filter": {
-				"type": "band",
-				"from": 380,
-				"to": 300,
-				"q": 5.0
-			},
-			"length": 0.12,
-			"amp": {
-				"attack": 0.005,
+				"attack": 0.008,
 				"shape": "perc",
 				"power": 2.0
-			},
-			"gain": -4
+			}
 		}
 	],
+	"notes": "An atom's cast: a small, high, muffled pop (a sine falling from 400 to 240 Hz in a puff of low-passed air), short and 2 dB under the other casts, as it is the smallest. It sits 10 dB under the family's level (gain -10): a cast comes every half second or so, so it stays soft under the fight.",
+	"gain": -10,
 	"fx": {
-		"reverb": {
-			"mix": 0.18,
-			"size": 0.7
-		},
-		"lowpass": 2800
-	},
-	"notes": "An atom's cast: a small, quick pop out of a narrow tube, the cast's thoomp made short and a little higher (a ring falling from 720 Hz, a sine from 260 to 120 Hz), so a stream of atoms is a soft patter. 5 dB under the family's level (gain -5): heard often, and short, so its peak stays under the limit.",
-	"gain": -5
+		"lowpass": 1300
+	}
 }

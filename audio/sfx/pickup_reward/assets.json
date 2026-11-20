@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reward/pickup_reward.sound.json",
-			"recipe_hash": "sha256:c99a27546b456eb41152fa06363971a6f61a851b415fe4f870cffed93288febf",
-			"audio_hash": "sha256:5a35227b51397c51e6e91ad4d564615320855a4af304c2bdf7335b75eeaf5b02",
-			"loudness": -19.3,
-			"peak": -6.2
+			"recipe_hash": "sha256:b7c229323fca7249bc35be9085c1f1b77ab70ab515d710f67244f13c0b1a3473",
+			"audio_hash": "sha256:0702079db2ffa909e8d1c07a7355a3f39c3d30629f9546ab855be81116ef0130",
+			"loudness": -25.3,
+			"peak": -12.2
 		},
 		{
 			"path": "audio/sfx/pickup_reward/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reward/pickup_reward.sound.json",
-			"recipe_hash": "sha256:c99a27546b456eb41152fa06363971a6f61a851b415fe4f870cffed93288febf",
-			"audio_hash": "sha256:36df992dab994bd78851f25d261bf7beceb26cfabb94c87348fa10ec12ffbbc1",
-			"loudness": -19.7,
-			"peak": -8.3
+			"recipe_hash": "sha256:b7c229323fca7249bc35be9085c1f1b77ab70ab515d710f67244f13c0b1a3473",
+			"audio_hash": "sha256:9131d0421d2259cc5374cdb1243236ab21a763e3035ad8ff9fa79ecb0af41c4d",
+			"loudness": -25.7,
+			"peak": -14.3
 		},
 		{
 			"path": "audio/sfx/pickup_reward/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reward/pickup_reward.sound.json",
-			"recipe_hash": "sha256:c99a27546b456eb41152fa06363971a6f61a851b415fe4f870cffed93288febf",
-			"audio_hash": "sha256:45953ea1683ed3f726094f9ca5f3a76ad181daf5d0d9b1c4e7c5b325d3459cf1",
-			"loudness": -20.7,
-			"peak": -7.5
+			"recipe_hash": "sha256:b7c229323fca7249bc35be9085c1f1b77ab70ab515d710f67244f13c0b1a3473",
+			"audio_hash": "sha256:07496c8237f78e2b6285fb630211e6d411eb942c7c83f5d2e731620f90a6bb41",
+			"loudness": -26.7,
+			"peak": -13.5
 		},
 		{
 			"path": "audio/sfx/pickup_reward/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pickup_reward/pickup_reward.sound.json",
-			"recipe_hash": "sha256:c99a27546b456eb41152fa06363971a6f61a851b415fe4f870cffed93288febf",
-			"audio_hash": "sha256:8cb1869cce07744ebee14c31e51547fed21bda73437ee38ad1139d1e8b46d64b",
-			"loudness": -20.3,
-			"peak": -6.7
+			"recipe_hash": "sha256:b7c229323fca7249bc35be9085c1f1b77ab70ab515d710f67244f13c0b1a3473",
+			"audio_hash": "sha256:a4088c595d0844fc509c8b602e64bc3e25ea06770b83961f597e3971b60f76f5",
+			"loudness": -26.3,
+			"peak": -12.7
 		}
 	]
 }

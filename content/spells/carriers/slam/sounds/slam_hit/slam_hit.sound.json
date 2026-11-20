@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.2,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 311
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 520,
+				"q": 0.6,
+				"to": 239.20000000000002
+			},
+			"length": 0.14400000000000002,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 95,
+				"to": 75.05
+			},
+			"length": 0.108,
+			"gain": -6,
+			"amp": {
+				"attack": 0.015,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 550,
+				"to": 236.5
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.108,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A slam's wave catching a body: the heaviest snow, long, with a firm low bump. It sits 6 dB under the family's level (gain -6): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -6,
+	"fx": {
+		"lowpass": 1200
+	}
+}

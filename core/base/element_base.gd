@@ -24,6 +24,10 @@ extends SpellComponent
 ## so a fire bolt sounds a bolt with a breath of flame. Its recipe is in the card's own
 ## `sounds/<id>/` folder (audio/README.md).
 @export var cast_hint: StringName = &""
+## Its quiet loop in a held carrier's sound (a sound id; empty: none): held under a live beam's hum
+## while a beam carrying this infusion is on (Feel's beam sounds, `gameplay/feel/beam_sounds.gd`), so
+## a fire beam hums with a low roar in it. Its recipe is in the card's own `sounds/<id>/` folder.
+@export var held_hint: StringName = &""
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 

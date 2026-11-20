@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
-			"recipe_hash": "sha256:8ac7d01139f12814957a81cc41287257e03cc72f44218bf98aeaf792a4c0fa0b",
-			"audio_hash": "sha256:d8b1164e71e4fcefcd5b281e73bba2994eda697be8f6371883160907518cd502",
-			"loudness": -20.5,
-			"peak": -4.8
+			"recipe_hash": "sha256:fba1c8f3891442255f7765d6e51e4bd53827fd6bf50ad1c1ccb0956be69da8e1",
+			"audio_hash": "sha256:b0038e0e63edf910f1f6c8904473b14b319057bce50346ec115e6c0def87d90d",
+			"loudness": -26.5,
+			"peak": -10.8
 		},
 		{
 			"path": "audio/sfx/hit_burst/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
-			"recipe_hash": "sha256:8ac7d01139f12814957a81cc41287257e03cc72f44218bf98aeaf792a4c0fa0b",
-			"audio_hash": "sha256:5e073b2ef15619c88b182426cc81678fd6d5f4c5e579ed2762db0f070a8a6720",
-			"loudness": -21.2,
-			"peak": -5.2
+			"recipe_hash": "sha256:fba1c8f3891442255f7765d6e51e4bd53827fd6bf50ad1c1ccb0956be69da8e1",
+			"audio_hash": "sha256:2e60ae571e5b78622d0c681e9a67aaaa40832149e995ff1691e60ac5703d77b1",
+			"loudness": -27.2,
+			"peak": -11.2
 		},
 		{
 			"path": "audio/sfx/hit_burst/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
-			"recipe_hash": "sha256:8ac7d01139f12814957a81cc41287257e03cc72f44218bf98aeaf792a4c0fa0b",
-			"audio_hash": "sha256:44c103aff83f1d6bc1995d7d053149e86c2cf0ea1dbbafc83aa5597315c7caed",
-			"loudness": -21.3,
-			"peak": -4.2
+			"recipe_hash": "sha256:fba1c8f3891442255f7765d6e51e4bd53827fd6bf50ad1c1ccb0956be69da8e1",
+			"audio_hash": "sha256:4526f0e86660d8fa31b5ec202a7c0bf301bb5efc3f822c5191f66630df938581",
+			"loudness": -27.3,
+			"peak": -10.2
 		},
 		{
 			"path": "audio/sfx/hit_burst/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
-			"recipe_hash": "sha256:8ac7d01139f12814957a81cc41287257e03cc72f44218bf98aeaf792a4c0fa0b",
-			"audio_hash": "sha256:581fd36ffd3a8200f6c94b7b9e87189e0c2aa169076ea360a171f3ee6ad3390a",
-			"loudness": -21.0,
-			"peak": -5.1
+			"recipe_hash": "sha256:fba1c8f3891442255f7765d6e51e4bd53827fd6bf50ad1c1ccb0956be69da8e1",
+			"audio_hash": "sha256:0b1d4b5d71624742d6fd49f251041922e1275d480cf92e82b9066b1433d0d8a2",
+			"loudness": -27.0,
+			"peak": -11.1
 		}
 	]
 }

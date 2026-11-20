@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['fire_hit']",
-			"recipe_hash": "sha256:6983a13697b5988b7dbfb03185017300e00cd81242fc7d951f3c33ccdd027835",
-			"audio_hash": "sha256:cbd5a2f20985a220ce2f90f5bf52263fa52a1a3b59dbad951364888eae9e26ef",
-			"loudness": -20.2,
-			"peak": -5.6
+			"recipe_hash": "sha256:e40e421e9cb4e4aaa5ce4661554598114ce3e3149a31354757be535a998113c6",
+			"audio_hash": "sha256:eee03b9490923918d2cb72c3caa65da9eb431470b51292dc134476b6c6288f68",
+			"loudness": -26.2,
+			"peak": -11.6
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_fire_hit/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['fire_hit']",
-			"recipe_hash": "sha256:6983a13697b5988b7dbfb03185017300e00cd81242fc7d951f3c33ccdd027835",
-			"audio_hash": "sha256:40a41dcd171e1f27367499161d3d10715bbb6e74eb4f45164dfffe05a379c2f5",
-			"loudness": -20.0,
-			"peak": -4.8
+			"recipe_hash": "sha256:e40e421e9cb4e4aaa5ce4661554598114ce3e3149a31354757be535a998113c6",
+			"audio_hash": "sha256:63858000b497106029b1f9cfaaaf329803a3adb9d902d5b6aecfaf3a6d141a31",
+			"loudness": -26.0,
+			"peak": -10.8
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_fire_hit/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['fire_hit']",
-			"recipe_hash": "sha256:6983a13697b5988b7dbfb03185017300e00cd81242fc7d951f3c33ccdd027835",
-			"audio_hash": "sha256:cb4d6fd97a739cf2dfc313dec5416bb9023ae685beec13022ec8c307db8f1814",
-			"loudness": -20.0,
-			"peak": -5.6
+			"recipe_hash": "sha256:e40e421e9cb4e4aaa5ce4661554598114ce3e3149a31354757be535a998113c6",
+			"audio_hash": "sha256:2d40ccaab6e1f95ae834242ba807bc2592a9cc83b1e118c730f05dbf8e5608b6",
+			"loudness": -26.0,
+			"peak": -11.6
 		},
 		{
 			"path": "tests/sound_room/fixtures/room_fire_hit/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['fire_hit']",
-			"recipe_hash": "sha256:6983a13697b5988b7dbfb03185017300e00cd81242fc7d951f3c33ccdd027835",
-			"audio_hash": "sha256:c7604528d8eda08b929a1541b6b44b217f6fcb39187c5ebc463cdef78d1e781d",
-			"loudness": -19.8,
-			"peak": -6.7
+			"recipe_hash": "sha256:e40e421e9cb4e4aaa5ce4661554598114ce3e3149a31354757be535a998113c6",
+			"audio_hash": "sha256:e9ae9b55351d1650790406f2bea6b826607363708ec38a9ed1038dec01be17d7",
+			"loudness": -25.8,
+			"peak": -12.7
 		}
 	]
 }

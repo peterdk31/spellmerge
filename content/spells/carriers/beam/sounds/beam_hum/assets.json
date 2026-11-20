@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/beam/sounds/beam_hum/beam_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/beam/sounds/beam_hum/beam_hum.sound.json",
+			"recipe_hash": "sha256:7f7f4628b90a3a5105d74a5dcac599ae7c28beb5d0297030c3e02f3ae95b90f6",
+			"audio_hash": "sha256:761f2ae72138d2241edee566a60812b46c9341a58f468c75db849f6c7d4bfa85",
+			"loudness": -24.0,
+			"peak": -13.9
+		}
+	]
+}

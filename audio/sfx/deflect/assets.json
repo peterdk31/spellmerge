@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/deflect/deflect.sound.json",
-			"recipe_hash": "sha256:ff48da7e1485243ce4f7e793acf19e769a29d7fdf3be9b77ce6cac4220a5e51d",
-			"audio_hash": "sha256:9ad28dfc61df9886b0be80832dff4aac34ac370cd4a806c470246e8f965be3f6",
-			"loudness": -21.6,
-			"peak": -4.7
+			"recipe_hash": "sha256:d6e059b6b980d2a6f1bd8db48fec178408a5341b735a53da4220c6f81913154c",
+			"audio_hash": "sha256:0d67805ca694c6f365b20f9175df69587481afd5b93893e39f789574879ac1ab",
+			"loudness": -27.6,
+			"peak": -10.7
 		},
 		{
 			"path": "audio/sfx/deflect/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/deflect/deflect.sound.json",
-			"recipe_hash": "sha256:ff48da7e1485243ce4f7e793acf19e769a29d7fdf3be9b77ce6cac4220a5e51d",
-			"audio_hash": "sha256:dc0fae060cc08cc48daaca2efdc2b3920e1674a1dfe5f5fa80759ac6efce47b5",
-			"loudness": -22.5,
-			"peak": -5.0
+			"recipe_hash": "sha256:d6e059b6b980d2a6f1bd8db48fec178408a5341b735a53da4220c6f81913154c",
+			"audio_hash": "sha256:ca5d41a2a6b332e56c1a0326f453805a4eae8c2863e2dcfb946a741d47affadd",
+			"loudness": -28.5,
+			"peak": -11.0
 		},
 		{
 			"path": "audio/sfx/deflect/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/deflect/deflect.sound.json",
-			"recipe_hash": "sha256:ff48da7e1485243ce4f7e793acf19e769a29d7fdf3be9b77ce6cac4220a5e51d",
-			"audio_hash": "sha256:861ea93b8d6b600109a1e37913381fbf0e7465d6ff1dc13457ceb5297cddaf0f",
-			"loudness": -22.2,
-			"peak": -5.0
+			"recipe_hash": "sha256:d6e059b6b980d2a6f1bd8db48fec178408a5341b735a53da4220c6f81913154c",
+			"audio_hash": "sha256:f36f7f0506cc6f6933b4baedc5c8e060cef776e437eb3973ed32520b364a8546",
+			"loudness": -28.2,
+			"peak": -11.0
 		},
 		{
 			"path": "audio/sfx/deflect/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/deflect/deflect.sound.json",
-			"recipe_hash": "sha256:ff48da7e1485243ce4f7e793acf19e769a29d7fdf3be9b77ce6cac4220a5e51d",
-			"audio_hash": "sha256:05ffa7edf6bc36b8204216905b49144a13f8824446a93183ed76c4ec98a6b4cf",
-			"loudness": -21.7,
-			"peak": -4.6
+			"recipe_hash": "sha256:d6e059b6b980d2a6f1bd8db48fec178408a5341b735a53da4220c6f81913154c",
+			"audio_hash": "sha256:71d946784f12f228aa9dae65c26c0454c697aa09bd24ba49580724459628a8aa",
+			"loudness": -27.7,
+			"peak": -10.6
 		}
 	]
 }

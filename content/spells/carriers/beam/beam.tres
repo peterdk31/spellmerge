@@ -26,3 +26,5 @@ staff_pose = Array[Dictionary]([{"phase": "hold", "at": 0.06, "push": -2, "stret
 cast_cue = &"cast_beam"
 look_shader = ExtResource("9_look")
 cast_sound = &"beam_cast"
+hit_sound = &"beam_hit"
+held_sound = &"beam_hum"

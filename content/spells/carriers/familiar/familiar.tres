@@ -26,3 +26,4 @@ shown_cue = &"conjure"
 end_cue = &"dismiss"
 look_shader = ExtResource("9_look")
 cast_sound = &"familiar_cast"
+hit_sound = &"familiar_hit"

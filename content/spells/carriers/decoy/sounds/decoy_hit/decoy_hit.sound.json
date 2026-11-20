@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.12000000000000001,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.03,
+		"seed": 305004
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 620,
+				"q": 0.6,
+				"to": 285.2
+			},
+			"length": 0.08,
+			"gain": -4,
+			"amp": {
+				"attack": 0.014,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 600,
+				"to": 258.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"q": 0.6
+			},
+			"length": 0.06,
+			"gain": -8,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"notes": "A decoy's hit: a snow with no low bump, a little coarser. It sits 10 dB under the family's level (gain -10): hits come many a second, and a short sound reads low on the meter, so this keeps it a soft patter under the casts.",
+	"gain": -10,
+	"fx": {
+		"lowpass": 1200
+	}
+}

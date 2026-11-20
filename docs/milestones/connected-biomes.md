@@ -549,6 +549,21 @@ Six changes the owner asked for on 2026-11-19, as built:
 2. **The camera follows a teleport at once:** with one player the camera goes with the wizard (as it does for the teleport spell); the vanish column is seen by the players whose views still show where it left. Should the camera pan in stages instead?
 3. **"Left the start room"** is read as a room past the start room entered; a step onto a bridge and back closes nothing. Should a bridge count?
 
+## Equal split screens (2026-11-19)
+
+The owner, 2026-11-19: a camera setting for equal-sized split screens, as an alternative to the Voronoi split (CB6). Built (gameplay/feel/README.md, "Equal panes"):
+
+- **A per-machine view option:** the pause menu's "Split screen: Dynamic / Equal" (Settings, Interface; `SplitScreenSetting` in core/settings, saved as `split_screen`, sent as `split_screen_changed`). Dynamic, the Voronoi split, is the default. It changes only this machine's view: no hash, no `SessionRules`, no `InputFrame`.
+- **The layout:** two players the halves, left and right (top and bottom when both corner panels are on one side: P1 and P3, or P2 and P4); three or four players the 2×2 quarters, each seat its own corner panel's (`equal_panes.gd`), the fourth quarter black with three (the void's black). So each player's corner panel, builder, inventory and reward menu sit in their own pane with no change to the HUD.
+- **Join when close:** the same one picture while everyone fits at the widest zoom and the same split and merge test as the Voronoi split; split, each seat has its own pane (no shared panes). The change is CB6's: the views start as the one picture, the dividers grow in a pixel a frame, each anchor eases to its pane's middle with its picture (at most 12 px a frame), the black quarter moves in from past its corner over 0.4 s (at least 3 frames) and out again before the merge ends.
+- **Close foes** (#872) are framed inside each pane, down to the widest zoom (0.5), the split zoom 1.0 otherwise.
+- **Tests:** `tests/gameplay/feel/test_split_equal.gd`, additions to `test_split_screen.gd`, `tests/hud/test_pause_menu.gd`, `test_feel_carrier_looks.gd` and `tests/core/test_events.gd`; screenshots `tests/screenshots/shot_split_equal.gd`.
+
+### Open questions for the owner
+
+1. Equal with three or four players: two players standing together while a third is far each keep their own pane (one pane a player, as asked), so their two panes show nearly the same place. Should two near each other share a pane instead (as the Dynamic split's groups do)?
+2. Two players whose corner panels are on one side (P1 and P3, after P2 left): the halves are top and bottom so each panel stays in its own pane. Keep that, or always left and right?
+
 ## Answered by the owner (2026-11-18)
 
 1. The plan: approved as written.

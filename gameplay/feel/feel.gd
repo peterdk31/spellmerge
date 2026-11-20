@@ -108,6 +108,9 @@ const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const HeldSoundsScript := preload("res://gameplay/feel/held_sounds.gd")
 const CastSoundsScript := preload("res://gameplay/feel/cast_sounds.gd")
+const HitRepeatsScript := preload("res://gameplay/feel/hit_repeats.gd")
+const BeamSoundsScript := preload("res://gameplay/feel/beam_sounds.gd")
+const CardSoundsScript := preload("res://gameplay/feel/card_sounds.gd")
 const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
@@ -212,6 +215,11 @@ const WALL_SPOT: float = 16.0
 ## one of the same frame before it was heard, and the rest stay free for kills, casts and cues.
 ## Four, a third of the voices (half of the eight there were before the casts' sounds and hints).
 const HIT_SOUNDS_PER_FRAME: int = 4
+## The hit kinds a carrier's own hit sound plays for (`CarrierCard.hit_sound`: a shot, a ray, a sweep,
+## a slam's wave and a pulse's ring); the rest keep their kind's.
+const CARD_SOUND_KINDS: Array[StringName] = [&"shot", &"ray", &"swing", &"burst"]
+## The quietest a dissolving beam's hum plays (decibels), before it ends.
+const BEAM_FADE_FLOOR: float = -24.0
 ## Room for sprites reacting to a hit made at first; every hit sprite flashes (owner,
 ## 2026-10-31: no limit on interactions), and the room doubles when a crowd needs more, up to the
 ## largest crowd seen, and is kept.
@@ -367,8 +375,7 @@ var registry: RegistryScript = null:
 			_numbers.registry = value
 		if _intro_sound != null:
 			_intro_sound.registry = value
-		if _cast_sounds != null:
-			_cast_sounds.registry = value
+		_card_sounds.registry = value
 		if _ambience != null:
 			_ambience.registry = value
 		_hearing.registry = value
@@ -444,6 +451,10 @@ var _hit_voice: int = -1
 ## What each held sound is for and when it ends (`held_sounds.gd`, boss plan OB15); Audio plays them.
 var _cast_sounds: CastSoundsScript = null
 var _held: HeldSoundsScript = null
+## The sounds the spell cards name, read once, shared by the cast sounds, the hits and the beams.
+var _card_sounds: CardSoundsScript = CardSoundsScript.new()
+## A live beam's hum and its infusions' loops (`beam_sounds.gd`).
+var _beam_sounds: BeamSoundsScript = null
 ## The room in play's sound under the music (atmosphere D, `room_ambience.gd`): which, and its accents.
 var _ambience: RoomAmbienceScript = null
 ## What the bodies sound of their own: their phases' held sounds and cues, and the music they and the
@@ -529,6 +540,8 @@ var _markers: TeammateMarkersScript = null
 ## The Voronoi split screen (connected biomes CB6, `split_screen.gd`): this machine's wizards in a
 ## view each group once they no longer fit in one picture. Stepped after the party camera.
 var split_screen: SplitScreenScript = null
+## How it splits (`SplitScreenSetting`; `set_split_mode`): the Voronoi split by default.
+var split_mode: int = SplitScreenSetting.DEFAULT
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
 var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
@@ -741,6 +754,11 @@ var _kind_frame: int = -1
 var _kind_own: bool = false
 ## The shot whose hit `hit_landed` announced (its `shot`, -1 for none): the one a hit's stop holds.
 var _kind_shot: int = -1
+## The carrier card whose hit `hit_landed` announced (its `card`, `&""` for none): its own hit sound
+## plays in place of its kind's (`CastSounds.hit_sound`).
+var _kind_card: StringName = &""
+## How much quieter a hit sound plays when it comes again soon (`hit_repeats.gd`).
+var _hit_repeats: HitRepeatsScript = HitRepeatsScript.new()
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
 ## How far past the picture's edge (world pixels) a hit or a cue still shakes and kicks the camera
@@ -846,7 +864,11 @@ func _ready() -> void:
 	_held.audio = audio
 	_cast_sounds = CastSoundsScript.new()
 	_cast_sounds.audio = audio
-	_cast_sounds.registry = registry
+	_card_sounds.registry = registry
+	_cast_sounds.cards = _card_sounds
+	_beam_sounds = BeamSoundsScript.new()
+	_beam_sounds.held = _held
+	_beam_sounds.cards = _card_sounds
 	_ambience = RoomAmbienceScript.new()
 	_ambience.name = "RoomAmbience"
 	_ambience.events = events
@@ -877,6 +899,7 @@ func _ready() -> void:
 	add_child(marker_layer)
 	split_screen = SplitScreenScript.new()
 	add_child(split_screen)
+	set_split_mode(split_mode)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	marker_layer.add_child(_markers)
@@ -1008,6 +1031,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
+	events.split_screen_changed.connect(set_split_mode)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -1442,6 +1466,12 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 		var look: Dictionary = found as Dictionary
 		shake *= look.get("shake", 1.0) as float
 		sound = look.get("sound", preset.hit_sound) as StringName
+		# A carrier's own hit (a shot, a ray, a sweep, a slam's wave) sounds as its card says; a
+		# reaction, a status and a heal keep their kind's.
+		if _kind_card != &"" and CARD_SOUND_KINDS.has(_kind):
+			var card_sound: StringName = _card_sounds.sound_of(_kind_card, CardSoundsScript.Use.HIT)
+			if card_sound != &"":
+				sound = card_sound
 		own = _kind_own
 	_kind_target = 0
 	var voice: int = _hit_voice
@@ -1478,12 +1508,13 @@ func _repeat_hit(id: int, target: Node, caster: int) -> bool:
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
-func _on_hit_landed(caster: int, target: Node, _amount: float, _position: Vector2, kind: StringName, shot: int) -> void:
+func _on_hit_landed(caster: int, target: Node, _amount: float, _position: Vector2, kind: StringName, shot: int, card: StringName) -> void:
 	if target == null:
 		return
 	_kind_target = target.get_instance_id()
 	_kind = kind
 	_kind_shot = shot
+	_kind_card = card
 	_kind_frame = Engine.get_physics_frames()
 	_kind_own = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and _actor_of(target) == caster
 
@@ -2658,6 +2689,14 @@ func _on_screen_shake_changed(enabled: bool) -> void:
 	shake_enabled = enabled
 
 
+## How this machine's screen splits (`SplitScreenSetting`: DYNAMIC, the Voronoi split, or EQUAL,
+## equal panes a player; the pause menu's "Split screen", `split_screen_changed`). View only.
+func set_split_mode(mode: int) -> void:
+	split_mode = SplitScreenSetting.snap(mode)
+	if split_screen != null:
+		split_screen.camera.set_equal(split_mode == SplitScreenSetting.EQUAL)
+
+
 ## Show a flash of the kind `id` (content/flashes) at `at`, aimed along `dir`, in the ramp of
 ## `core` (white: the colours of `ramp`, a caster's `Actors.ramp_of`: 0-3 a hat ramp, anything else
 ## from NONE up the enemy ramp) with the particles of the packed `look`, at `zoom`, for
@@ -3364,6 +3403,8 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 func _draw_live_beams(real_delta: float) -> void:
 	if _spectacle != null:
 		_spectacle.light_beams_begin()
+	if _beam_sounds != null:
+		_beam_sounds.new_frame()
 	var count: int = 0
 	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
 	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
@@ -3457,10 +3498,30 @@ func _draw_live_beams(real_delta: float) -> void:
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
+		_sound_beam(beams, i, caster, origin, fade)
 		_beam_motes(path, used, walked, end_at, end_dir, fade, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, int(beams.call("beam_tag", i)) if beams.has_method("beam_tag") else 0, real_delta)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if _spectacle != null:
 			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade, look.light_intensity, look.light_reach)
+
+
+## The sound of live beam `i` of `beams` (its card's hum and its infusions' loops, `beam_sounds.gd`)
+## for this frame, from its caster's body (else its `origin`): an enemy's ENEMY_CAST_VOLUME quieter,
+## as its cast is; a prop's none (the world's); as it dissolves (`fade`, 1 to 0) it fades with it,
+## down to BEAM_FADE_FLOOR.
+func _sound_beam(beams: Object, i: int, caster: int, origin: Vector2, fade: float) -> void:
+	if _beam_sounds == null or not beams.has_method(&"beam_elements"):
+		return
+	var table: ActorsScript = _actor_table()
+	var team: int = table.team_of(caster) if table != null else ActorsScript.TEAM_WIZARDS
+	if team == ActorsScript.TEAM_WORLD:
+		return
+	var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
+	var card: StringName = beams.call(&"beam_carrier_card", i) as StringName
+	var elements: Array[StringName] = beams.call(&"beam_elements", i)
+	var volume: float = ENEMY_CAST_VOLUME if team == ActorsScript.TEAM_ENEMIES else 0.0
+	volume += maxf(linear_to_db(maxf(fade, 0.0001)), BEAM_FADE_FLOOR)
+	_beam_sounds.hold(card, elements, caster, body, origin, volume)
 
 
 ## The motes a beam gives off over `seconds` (see BEAM_SPLASH_RATE), into the spectacle's births
@@ -3634,7 +3695,7 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 	if sound != &"" and _hit_sounds >= HIT_SOUNDS_PER_FRAME:
 		_hit_voice = -1
 		return
-	_hit_voice = _play(sound, position)
+	_hit_voice = _play(sound, position, _hit_repeats.volume(sound, _clock) if sound != &"" else 0.0)
 	if _hit_voice >= 0:
 		_hit_sounds += 1
 

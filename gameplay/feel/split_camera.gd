@@ -30,6 +30,18 @@ extends RefCounted
 ##   which grows in a whole pixel a drawn frame (DIVIDER_WIDTH of them) and shrinks out the same
 ##   way once the pictures meet.
 ##
+## - **Equal panes** (the owner, 2026-11-19; `equal`, the "Split screen: Equal" setting,
+##   `SplitScreenSetting`): the same one picture while everyone fits and the same easing, but once
+##   split each seat has a view of its own, laid on its pane (`equal_panes.gd`: halves for two,
+##   quarters for three or four, each seat's on its corner panel's side): its wizard drawn at its
+##   pane's middle and its anchor easing there with its picture (at most PANE_ANCHOR_STEP a frame,
+##   from where its wizard was drawn), so the bisectors between the anchors settle on the panes'
+##   edges. With three seats the
+##   fourth quarter is a blank (`blank_count`, `blank_anchor`): a site no view owns, which moves in
+##   from past its corner of the screen over BLANK_TIME as the screen splits and back out before
+##   the last views merge, so it grows and shrinks from its corner. Close foes are framed inside
+##   the pane. View only, like the rest: the mode is this machine's, never the simulation's.
+##
 ## A view keeps its slot (0 to VIEWS_MOST - 1) while it lives, so its drawing is the same node
 ## frame to frame (`slot_of`). Nothing is allocated after it is made.
 
@@ -38,6 +50,7 @@ const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
+const EqualPanesScript := preload("res://gameplay/feel/equal_panes.gd")
 
 const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
 ## A split view's zoom (1: the world at its own size, as one player sees it). The owner's to tune.
@@ -67,6 +80,14 @@ const SHRINK_FROM: float = 1.0
 ## A new view eases in over this many real seconds (its pull rising from none), so it sets off from
 ## the picture it split from gently rather than at the party camera's full pull.
 const EASE_IN: float = 0.4
+## How long the equal split's blank quarter takes to move in from past its corner, or back out (real
+## seconds).
+const BLANK_TIME: float = 0.4
+## The most of that way it moves in one drawn frame (Smooth: at least three frames).
+const BLANK_STEP_MOST: float = 1.0 / 3.0
+## The most an equal pane's anchor moves a drawn frame on its way to its pane's middle (screen
+## pixels; it eases with its picture, at least ANCHOR_STEP).
+const PANE_ANCHOR_STEP: float = 12.0
 
 ## A slot: free, a live view (its group's), or a view merging into another.
 const FREE: int = 0
@@ -77,6 +98,9 @@ const MERGING: int = 2
 var views: ScreenViewsScript = ScreenViewsScript.new()
 ## True while the screen is split (it merges once everyone fits again with room to spare).
 var split: bool = false
+## True: equal panes, a view a seat (`SplitScreenSetting.EQUAL`); false: the Voronoi split. Set by
+## `set_equal`.
+var equal: bool = false
 
 ## By slot: FREE, LIVE or MERGING; the seats it holds; where it looks (the camera's centre, its
 ## shake left out) and its zoom; its divider's width (whole pixels).
@@ -89,8 +113,10 @@ var _stage: PackedInt32Array = PackedInt32Array()
 ## camera's picture, or none). Only the line between a view and its kin grows or shrinks; its other
 ## lines were its kin's, drawn already.
 var _kin: PackedInt32Array = PackedInt32Array()
-## By slot: real seconds since it was made (its ease-in, EASE_IN).
+## By slot: real seconds since it was made (its ease-in, EASE_IN), and how much of the way to its
+## aim its picture eased this frame.
 var _age: PackedFloat32Array = PackedFloat32Array()
+var _pull: PackedFloat32Array = PackedFloat32Array()
 ## By view (as laid out in `views`): its slot.
 var _slot_of: PackedInt32Array = PackedInt32Array()
 ## By slot: the seats it held before this frame's groups were matched (where a new view starts).
@@ -122,6 +148,11 @@ var _group_slot: PackedInt32Array = PackedInt32Array()
 var _cells: VoronoiCellsScript = VoronoiCellsScript.new()
 ## The foes close to this machine's wizards this frame (null: none).
 var _foes: CloseFoesScript = null
+## The equal split's blank quarter: the seat whose quarter it is (-1: none), how far it has moved in
+## from its rest (0 out to 1 on its quarter's middle), and where its site is drawn now.
+var _blank_seat: int = -1
+var _blank_in: float = 0.0
+var _blank_at: Vector2 = Vector2.INF
 
 
 func _init() -> void:
@@ -133,6 +164,7 @@ func _init() -> void:
 	_kin.resize(VIEWS_MOST)
 	_kin.fill(-1)
 	_age.resize(VIEWS_MOST)
+	_pull.resize(VIEWS_MOST)
 	_slot_of.resize(VIEWS_MOST)
 	_held_before.resize(VIEWS_MOST)
 	_shown.resize(VIEWS_MOST)
@@ -160,6 +192,37 @@ func reset() -> void:
 		_born[slot] = 0
 	split = false
 	views.count = 0
+	_blank_seat = -1
+	_blank_in = 0.0
+	_blank_at = Vector2.INF
+
+
+## Equal panes (true) or the Voronoi split (false), from the next drawn frame. A change while split
+## eases over: every anchor walks to its new place and the groups regroup as a split does.
+func set_equal(on: bool) -> void:
+	if on == equal:
+		return
+	equal = on
+	for slot in VIEWS_MOST:
+		_anchored[slot] = 0
+
+
+## The number of blank sites now (0 or 1: the equal split's empty quarter with three seats).
+func blank_count() -> int:
+	return 1 if _blank_seat >= 0 and _blank_in > 0.0 else 0
+
+
+## Where blank site `blank` is drawn now (screen pixels; a site no view owns, so no view draws
+## nearer it than any view's anchor).
+func blank_anchor(_blank: int) -> Vector2:
+	return _blank_at
+
+
+## The width the cell shader is told for the divider between view `view` and the blank (whole
+## pixels): twice the view's own, since the shader draws half a line a side and no view draws the
+## blank's side, so the view draws the whole line; it grows in with the split, shrinks with the merge.
+func blank_divider(view: int) -> int:
+	return _stage[_slot_of[view]] * 2
 
 
 ## The slot of view `view` (0 to `views.count` - 1).
@@ -217,6 +280,7 @@ func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, scree
 		for slot in VIEWS_MOST:
 			if _state[slot] != FREE:
 				_state[slot] = MERGING
+	_step_blank(delta, screen)
 	_ease(delta, root_centre, root_zoom, limits, screen)
 	_publish(camera.offset, screen)
 
@@ -264,6 +328,9 @@ func _group() -> void:
 			continue
 		for b in range(a + 1, ActorsScript.SEATS):
 			if _group_of[b] < 0:
+				continue
+			if equal:
+				# Equal panes: a view a seat, never shared while split.
 				continue
 			var reach: float = LEAVE_REACH if _together(a, b) else JOIN_REACH
 			if _point[a].distance_to(_point[b]) < reach:
@@ -321,6 +388,12 @@ func _middle_of(held: int) -> Vector2:
 ## Each group's place on the screen: the groups' middles about the screen's middle, scaled by one
 ## factor (at most SPLIT_ZOOM) until the farthest is SITE_MARGIN from an edge.
 func _lay_sites(screen: Vector2) -> void:
+	if equal:
+		# Equal panes: each seat's at its pane's middle (each group is one seat).
+		for seat in ActorsScript.SEATS:
+			if _group_seats[seat] != 0:
+				_group_site[seat] = EqualPanesScript.site_of(seat, _present, screen)
+		return
 	var low := Vector2.INF
 	var high := -Vector2.INF
 	for seat in ActorsScript.SEATS:
@@ -445,11 +518,13 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		if _born[slot] != 0:
 			# Born this frame: drawn first as the picture it splits from, eased from the next.
 			_born[slot] = 0
+			_pull[slot] = 0.0
 			_stage[slot] = 1
 			continue
 		_age[slot] += maxf(delta, 0.0)
 		var rise: float = clampf(_age[slot] / EASE_IN, 0.0, 1.0)
 		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
+		_pull[slot] = pull
 		var group: int = _group_holding(slot)
 		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM, pull)
 		var aim: Vector2 = _centre[slot]
@@ -474,7 +549,10 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		if gap < SHRINK_FROM:
 			_stage[slot] = maxi(_stage[slot] - 1, 0)
 		var on_target: bool = into < 0 or _shown[slot].distance_to(_shown[into]) <= VoronoiCellsScript.MIN_GAP * 2.0
-		if _stage[slot] == 0 and gap < SETTLED and on_target:
+		# Back into the one picture only once the blank quarter has moved out (it is drawn while
+		# any view is).
+		var blank_out: bool = into >= 0 or _blank_in <= 0.0
+		if _stage[slot] == 0 and gap < SETTLED and on_target and blank_out:
 			if into >= 0:
 				# Its seats are its target's alone now: that view's anchor walks to them.
 				_anchored[into] = 0
@@ -512,6 +590,11 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 			if apart.length_squared() < 1.0:
 				continue
 			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
+		if equal and split:
+			# The empty quarter's edge, where it settles.
+			var blank: Vector2 = EqualPanesScript.blank_site(_present, screen) - site
+			if blank.is_finite() and blank.length_squared() >= 1.0:
+				zoom = _fit_along(zoom, way, blank.normalized(), blank.length() * 0.5)
 	var widest: float = PartyCameraScript.MIN_ZOOM
 	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
 		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
@@ -525,6 +608,27 @@ static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) 
 	if reach <= 0.0:
 		return zoom
 	return minf(zoom, maxf(room - FOE_MARGIN, 0.0) / reach)
+
+
+## The equal split's blank quarter moved on: in from its rest while split with three seats, out while
+## not (or before it moves to another quarter), at most BLANK_STEP_MOST of the way a drawn frame.
+func _step_blank(delta: float, screen: Vector2) -> void:
+	var want: int = EqualPanesScript.blank_seat(_present) if equal and split else -1
+	var step: float = minf(maxf(delta, 0.0) / BLANK_TIME, BLANK_STEP_MOST)
+	if want != _blank_seat:
+		_blank_in = maxf(_blank_in - step, 0.0)
+		if _blank_in <= 0.0:
+			_blank_seat = want
+	elif want >= 0:
+		_blank_in = minf(_blank_in + step, 1.0)
+	if _blank_seat < 0:
+		_blank_at = Vector2.INF
+		return
+	# Between its rest and its own quarter's middle, going in, out or turning back, so it never jumps.
+	var rest: Vector2 = EqualPanesScript.blank_rest(_blank_seat, screen)
+	var site: Vector2 = EqualPanesScript.quarter_site(_blank_seat, screen)
+	var t: float = _blank_in * _blank_in * (3.0 - 2.0 * _blank_in)
+	_blank_at = rest.lerp(site, t)
 
 
 ## The group (lowest seat) live slot `slot` shows, or -1.
@@ -582,6 +686,7 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 		var transform := Transform2D(0.0, Vector2(zoom, zoom), 0.0, screen * 0.5 - (_centre[slot] + offset) * zoom)
 		var held: int = _members[slot]
 		var own: Vector2 = screen * 0.5
+		var on_pane: bool = equal and _state[slot] == LIVE and _group_holding(slot) >= 0
 		# A live view's anchor leaves out the seats a view merging into it still holds: it moves to
 		# its whole group's middle once that view is gone, never across it.
 		var placed: int = held & ~_merging_into(slot) if _state[slot] == LIVE else held
@@ -589,12 +694,13 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 			placed = held
 		if placed != 0:
 			own = screen * 0.5 + (_middle_of(placed) - _centre[slot]) * zoom
-		views.set_view(count, held, transform, _anchor_of(slot, own))
+		var anchor: Vector2 = _pane_anchor(slot, own, screen) if on_pane else _anchor_of(slot, own)
+		views.set_view(count, held, transform, anchor)
 		_slot_of[count] = slot
 		count += 1
 	views.count = count
 	_apart(count)
-	_cells.fill(views)
+	_cells.fill(views, _blank_at if blank_count() > 0 else Vector2.INF)
 
 
 ## The seats held by the views merging into live slot `slot`.
@@ -625,6 +731,20 @@ func _anchor_of(slot: int, own: Vector2) -> Vector2:
 	_shown[slot] = _shown[slot].move_toward(aim, ANCHOR_STEP)
 	if _state[slot] == LIVE and _shown[slot].distance_to(own) < 0.5:
 		_anchored[slot] = 1
+	return _shown[slot]
+
+
+## Where live slot `slot`'s anchor is drawn this frame on equal panes: from where its wizard was
+## drawn (`drawn`, kept to the screen) when it was made, onto its pane's middle, eased as its
+## picture is (its pull this frame, so the cut follows the picture it cuts) and moving at least
+## ANCHOR_STEP and at most PANE_ANCHOR_STEP a frame.
+func _pane_anchor(slot: int, drawn: Vector2, screen: Vector2) -> Vector2:
+	var site: Vector2 = _group_site[_group_holding(slot)]
+	if not _shown[slot].is_finite():
+		_shown[slot] = drawn.clamp(Vector2.ZERO, screen)
+	var step: float = clampf(_shown[slot].distance_to(site) * _pull[slot], ANCHOR_STEP, PANE_ANCHOR_STEP)
+	_shown[slot] = _shown[slot].move_toward(site, step)
+	_anchored[slot] = 1 if _shown[slot] == site else 0
 	return _shown[slot]
 
 

@@ -27,3 +27,4 @@ staff_pose = Array[Dictionary]([{"phase": "wind", "at": 0.45, "turn": -55, "lift
 cast_cue = &"cast_bolt"
 end_cue = &"slam"
 cast_sound = &"slam_cast"
+hit_sound = &"slam_hit"

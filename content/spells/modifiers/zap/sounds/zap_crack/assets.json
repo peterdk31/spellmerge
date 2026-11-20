@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/modifiers/zap/sounds/zap_crack/zap_crack.sound.json",
-			"recipe_hash": "sha256:caae86180899486f224a49876768169d12f2aaa2fa51e96f0557807e47211484",
-			"audio_hash": "sha256:e2420bce8e65464e8b7aa91625a8a2e184accc9c50b45b8a9b24e517e857b02f",
-			"loudness": -24.3,
-			"peak": -5.0
+			"recipe_hash": "sha256:2aa9768b3ea24a7426f54d8ce02ea4d4e19c59baf5f8c00965acf2ea60ff6873",
+			"audio_hash": "sha256:48bf6a74c7be38d7179ab2e21b6aad4d2fe46e62f8de31addea14d5cf08ceb01",
+			"loudness": -30.3,
+			"peak": -11.0
 		},
 		{
 			"path": "content/spells/modifiers/zap/sounds/zap_crack/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/modifiers/zap/sounds/zap_crack/zap_crack.sound.json",
-			"recipe_hash": "sha256:caae86180899486f224a49876768169d12f2aaa2fa51e96f0557807e47211484",
-			"audio_hash": "sha256:1b5398da801e36d33e70c2e33287cfe14885a82eddf0b3e44b71bb6e2add3584",
-			"loudness": -24.7,
-			"peak": -5.4
+			"recipe_hash": "sha256:2aa9768b3ea24a7426f54d8ce02ea4d4e19c59baf5f8c00965acf2ea60ff6873",
+			"audio_hash": "sha256:1d5e95a8124b2c9dc9f1927bf1268c93ed2263834b951d7aa669a5d7ab1fae61",
+			"loudness": -30.7,
+			"peak": -11.4
 		},
 		{
 			"path": "content/spells/modifiers/zap/sounds/zap_crack/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/modifiers/zap/sounds/zap_crack/zap_crack.sound.json",
-			"recipe_hash": "sha256:caae86180899486f224a49876768169d12f2aaa2fa51e96f0557807e47211484",
-			"audio_hash": "sha256:2466c09072753cabaff170cf5e27f0f15e5106146812d768ec31a43a1ab707e9",
-			"loudness": -23.7,
-			"peak": -4.2
+			"recipe_hash": "sha256:2aa9768b3ea24a7426f54d8ce02ea4d4e19c59baf5f8c00965acf2ea60ff6873",
+			"audio_hash": "sha256:f0e295d1c0603772e37a6acc4f77ddd9bd160a7960920ce788b0a8a1498ec1a8",
+			"loudness": -29.7,
+			"peak": -10.2
 		},
 		{
 			"path": "content/spells/modifiers/zap/sounds/zap_crack/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "content/spells/modifiers/zap/sounds/zap_crack/zap_crack.sound.json",
-			"recipe_hash": "sha256:caae86180899486f224a49876768169d12f2aaa2fa51e96f0557807e47211484",
-			"audio_hash": "sha256:1c2fa77c07eb74b9a80aab51e99a03d83a6ff4f76da7f6bce0175498ef286537",
-			"loudness": -23.3,
-			"peak": -4.3
+			"recipe_hash": "sha256:2aa9768b3ea24a7426f54d8ce02ea4d4e19c59baf5f8c00965acf2ea60ff6873",
+			"audio_hash": "sha256:f08579a86f84b16e15ccc268e33dc1b63b1744b54656f8efbf39d052e87371e1",
+			"loudness": -29.3,
+			"peak": -10.3
 		}
 	]
 }

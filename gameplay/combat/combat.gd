@@ -949,7 +949,7 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 	var left: float = _take(row, by, amount, quiet)
 	# Nobody hears a quiet hit that does not kill (a wizard's went to it directly, `_take`).
 	if events != null and not (quiet and left != 0.0):
-		events.hit_landed.emit(by, node, amount, where, kind, _slot)
+		events.hit_landed.emit(by, node, amount, where, kind, _slot, profile.card if profile != null else &"")
 		events.damage_dealt.emit(by, node, amount, where)
 		# Its stop (online-ready N4): the attacker, this body (its row is its actor id) and the shot.
 		hit_stop.hit(by, row, kind, _slot)
@@ -1093,7 +1093,7 @@ func take_fall(target: Variant) -> void:
 	kit.health.lose(amount, EventsScript.NO_PLAYER)
 	var left: float = kit.health.health
 	if events != null:
-		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1)
+		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1, &"")
 		events.damage_dealt.emit(EventsScript.NO_PLAYER, kit, amount, where)
 		kit.damaged.emit(EventsScript.NO_PLAYER, amount, &"")
 	if left == 0.0 and _same(row, kit):
@@ -1164,7 +1164,7 @@ func _heal(by: int, row: int, amount: float) -> bool:
 			_health[row] = minf(_health[row] + amount, _max_health[row])
 	var where: Vector2 = _position_of(node)
 	if events != null:
-		events.hit_landed.emit(by, node, amount, where, KIND_HEAL, _slot)
+		events.hit_landed.emit(by, node, amount, where, KIND_HEAL, _slot, &"")
 		events.heal_dealt.emit(by, node, amount, where)
 	return true
 

@@ -1,0 +1,48 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 1.6,
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 380,
+				"to": 520,
+				"curve": "arch",
+				"q": 0.7
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 110,
+				"to": 116,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -8
+		},
+		{
+			"source": "sine",
+			"pitch": 165,
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"lowpass": 1200
+	},
+	"notes": "A beam held on: a soft, low hum of air (noise low-passed at about 450 Hz, breathing slowly) over a faint low tone at 110 Hz; no buzz, nothing over 1.2 kHz. Its infusions' loops play under it."
+}

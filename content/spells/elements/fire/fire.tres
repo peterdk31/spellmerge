@@ -17,3 +17,4 @@ damage_scale = 1.0
 tint = Color(0.8784, 0.3490, 0.1843, 1)
 look_id = &"embers"
 cast_hint = &"fire_hint"
+held_hint = &"fire_hum"

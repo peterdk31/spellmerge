@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/lightning/sounds/lightning_hum/lightning_hum.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/lightning/sounds/lightning_hum/lightning_hum.sound.json",
+			"recipe_hash": "sha256:d92522b6c1619b2b60ab4204e34888e63b4d526cfc53001dd086f34fd88b2e46",
+			"audio_hash": "sha256:d7964f1b5ddd6c49a406763831569ad93752375fa7e5df29abd383b2279dc056",
+			"loudness": -28.0,
+			"peak": -8.4
+		}
+	]
+}

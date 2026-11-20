@@ -17,3 +17,4 @@ damage_scale = 1.0
 tint = Color(0.3098, 0.8392, 0.8627, 1)
 look_id = &"flecks"
 cast_hint = &"frost_hint"
+held_hint = &"frost_hum"

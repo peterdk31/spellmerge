@@ -156,7 +156,7 @@ func take() -> void:
 			var rack: StaffItem = BuildsScript.rack_of(bot.build)
 			if not rack_shot and rack != null and BotScript.HubScript.holds_rack_staff(wizard, rack):
 				rack_shot = true
-				_say("P%d took the rack's %s" % [bot.player + 1, rack.display_name])
+				_say("P%d took the rack's %s" % [bot.player + 1, rack.id])
 				_queue_shot("hub_rack")
 		if bool(_flow.call("is_stone_lit")) and not _kinds_shot.has(&"hub_stone"):
 			_kinds_shot[&"hub_stone"] = true

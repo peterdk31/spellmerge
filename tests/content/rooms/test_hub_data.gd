@@ -308,18 +308,22 @@ func test_joiners_arrive_beside_the_altar() -> void:
 ## The rack (items I6): the Wild star, and under it one row of the premade builds RACK_STEP apart,
 ## the two showcase builds of crypt rework CR-S at its ends, and under that a second row of the
 ## builds added on 2026-11-20 (RACK_ROW_2), RACK_STEP below the first and starting half a step in,
-## each on open floor: a body taking one stands clear of every hole, the stone, the altar and the yard.
+## and a third row (RACK_ROW_3) RACK_STEP below that, three steps in (right of the crack under the
+## first row's start), each on open floor: a body taking one stands clear of every hole, the stone, the altar and the yard.
 const RACK_STEP: float = 64.0
 const RACK_ROW: Array[StringName] = [&"patient_sentry", &"glacier_engine", &"hammer_of_the_faithless", &"corpse_bloom", &"death_from_every_sky", &"the_mutiny", &"frostfire_cascade"]
 const RACK_ROW_2: Array[StringName] = [&"prism_crown", &"choir_of_wisps", &"meteor_orchard", &"maelstrom_heart", &"hall_of_mirrors", &"thunderclap_gauntlet"]
+const RACK_ROW_3: Array[StringName] = [&"starfall_engine", &"gravity_well", &"cascade_of_cascades", &"rune_minefield", &"mirror_tempest", &"meteor_monsoon"]
 
 
-func test_the_rack_is_two_rows_on_open_floor() -> void:
+func test_the_rack_is_three_rows_on_open_floor() -> void:
 	var places: RoomPlaces = _room().places()
 	var row: Array[Vector2] = []
 	var ids: Array[StringName] = []
 	var row_2: Array[Vector2] = []
 	var ids_2: Array[StringName] = []
+	var row_3: Array[Vector2] = []
+	var ids_3: Array[StringName] = []
 	for i in places.placed.size():
 		var item := places.placed[i] as StaffItem
 		if item == null:
@@ -336,12 +340,19 @@ func test_the_rack_is_two_rows_on_open_floor() -> void:
 		elif RACK_ROW_2.has(item.id):
 			row_2.append(at)
 			ids_2.append(item.id)
+		elif RACK_ROW_3.has(item.id):
+			row_3.append(at)
+			ids_3.append(item.id)
 	check_equal(ids, RACK_ROW, "the premade builds lie in one row, in this order")
 	_check_row(ids, row)
 	check_equal(ids_2, RACK_ROW_2, "the second row's builds lie in one row, in this order")
 	_check_row(ids_2, row_2)
 	if not row.is_empty() and not row_2.is_empty():
 		check_equal(row_2[0] - row[0], Vector2(RACK_STEP * 0.5, RACK_STEP), "the second row starts a step under the first, half a step in")
+	check_equal(ids_3, RACK_ROW_3, "the third row's builds lie in one row, in this order")
+	_check_row(ids_3, row_3)
+	if not row.is_empty() and not row_3.is_empty():
+		check_equal(row_3[0] - row[0], Vector2(RACK_STEP * 3.0, RACK_STEP * 2.0), "the third row starts two steps under the first, three steps in")
 
 
 ## Each of `ids`, lying at `row` (in the same order), RACK_STEP right of the one before it.

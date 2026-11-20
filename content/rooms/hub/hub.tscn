@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=32 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/hub/hub_ground.tscn" id="3_ground"]
@@ -20,6 +20,12 @@
 [ext_resource type="Resource" path="res://content/items/staffs/maelstrom_heart/maelstrom_heart.tres" id="28_maelstrom_heart"]
 [ext_resource type="Resource" path="res://content/items/staffs/hall_of_mirrors/hall_of_mirrors.tres" id="29_hall_of_mirrors"]
 [ext_resource type="Resource" path="res://content/items/staffs/thunderclap_gauntlet/thunderclap_gauntlet.tres" id="30_thunderclap_gauntlet"]
+[ext_resource type="Resource" path="res://content/items/staffs/starfall_engine/starfall_engine.tres" id="31_starfall_engine"]
+[ext_resource type="Resource" path="res://content/items/staffs/gravity_well/gravity_well.tres" id="32_gravity_well"]
+[ext_resource type="Resource" path="res://content/items/staffs/cascade_of_cascades/cascade_of_cascades.tres" id="33_cascade_of_cascades"]
+[ext_resource type="Resource" path="res://content/items/staffs/rune_minefield/rune_minefield.tres" id="34_rune_minefield"]
+[ext_resource type="Resource" path="res://content/items/staffs/mirror_tempest/mirror_tempest.tres" id="35_mirror_tempest"]
+[ext_resource type="Resource" path="res://content/items/staffs/meteor_monsoon/meteor_monsoon.tres" id="36_meteor_monsoon"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -168,6 +174,36 @@ item = ExtResource("29_hall_of_mirrors")
 position = Vector2(768, 848)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("30_thunderclap_gauntlet")
+
+[node name="StarfallEngine" type="Node2D" parent="Items"]
+position = Vector2(608, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("31_starfall_engine")
+
+[node name="GravityWell" type="Node2D" parent="Items"]
+position = Vector2(672, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("32_gravity_well")
+
+[node name="CascadeOfCascades" type="Node2D" parent="Items"]
+position = Vector2(736, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("33_cascade_of_cascades")
+
+[node name="RuneMinefield" type="Node2D" parent="Items"]
+position = Vector2(800, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("34_rune_minefield")
+
+[node name="MirrorTempest" type="Node2D" parent="Items"]
+position = Vector2(864, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("35_mirror_tempest")
+
+[node name="MeteorMonsoon" type="Node2D" parent="Items"]
+position = Vector2(928, 912)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("36_meteor_monsoon")
 
 [node name="Zones" type="Node2D" parent="."]
 

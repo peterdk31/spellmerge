@@ -161,7 +161,7 @@ The web's tick stays at 10.9 to 12.0 ms in every row.
 **The fallbacks, in the order to try them** (for the owner's targets, decision 31):
 
 1. **Light a view at a lower price:** the light off past two views, or a light buffer at half its size a view past the first; light was a quarter of the frame at four views.
-2. **Draw a view's own room's shots only:** cull the batches by the rooms a view shows (per-room batches, or a view's cull mask over room layers), so a split across rooms does not draw each fight in every view.
+2. **Draw a view's own room's shots only:** cull the batches by the rooms a view shows (per-room batches, or a view's cull mask over room layers), so a split across rooms does not draw each fight in every view. **Done** (the owner's decision of 2026-11-20, after the performance pass #885; "Per-room batches, per-view culling" below).
 3. **Smaller views:** a SubViewport the size of its cell's box, not the screen's, so four views fill about one screen of pixels instead of four (the cell's camera offset moves with it).
 4. **Fewer motes a view:** a step down the mote ring when split; little on the desktop, about a fifth of the frame in the browser, so on the web it comes second.
 
@@ -250,7 +250,7 @@ The Voronoi camera (2026-11-18; gameplay/feel/README.md, "The split screen"). `s
 - **The light done right** (CB1's finding). A buffer a view, each drawn before the view that reads it (`RenderingServer.viewport_set_parent_viewport`, so its light is this frame's, not a frame behind): the game's light buffer follows the first view and each other view gets one sharing its world (`SpellLight.use_views`), so the lights are drawn once a view. What reads the light by the screen (the apply rect, the lit-only motes, the mist) finds the view it is drawn in by its canvas matrix in the shader (`light_views.gdshaderinc`, the nearest of the views' transforms SpellLight writes each frame) and reads that view's buffer: one material and one draw a view, no copies of the apply rect on visibility layers (CB1's suggestion), which would have needed a copy of every mote batch and the mist too.
 - **The HUD** (decision 28). The corner panels are on the HUD's canvas layer, so they stay in the screen's corners, drawn once over the views. The edge markers are in screen pixels now: only for a teammate in no view's cell, on the line from the nearest view's anchor, at that view's own edge (the screen's or a divider), never in another player's cell. Each player's item hint follows that player's own view and hides while the item is outside its cell (another machine's player's, the view that shows the item).
 - **What reads the picture by the screen** reads the views published on the root viewport while split (`ScreenViews`, core/display): the mouse's place in the world (through the aiming seat's own view, so its aim never flips as the cursor crosses a divider), a body's looks on screen (in any cell), the mote sources and Feel's picture (the box round every view's; what shakes the screen is checked against each view's cell, and the cover's and the ambience's focus is the first view's middle, not the void between). The mote sources and the air's motes still give off over that box, which can hold rooms no view shows: to cull them a view at a time is left for the GPU run (the cost is motes spent where nobody looks). Sound still hears from the world camera's middle: sound from this machine's rooms is CB12's.
-- **The fallbacks and the targets** (decision 31; the owner's answer of 2026-11-19: 16.7 ms a frame on the desktop and 33 ms on the web build with four views, to be tuned from a GPU run). A frame-time budget (`split_budget.gd`) climbs CB1's ladder while the screen is split and the frames' average runs over the target for a second: a cheaper light a view (the buffers past the first view's twice as small again each way), then half the motes, then a quarter; back down a rung after three seconds under three quarters of the target; nothing with one view. **How the targets should be met:** CB1 measured four views at about 3.3 times one view's GPU time, so on a GPU where the unsplit fight draws in about 5 ms (desktop) or 10 ms (web) four views fit as they are; above that the rungs take off up to about a quarter of the frame on the web (light and motes there save about 20% each) and less on the desktop (the light most of it). If a GPU run shows four views still over, the next rungs are CB1's others, kept for then: the light off past two views, a view's own room's shots only (per-room batches now that CB3 has rooms), and views the size of their cell.
+- **The fallbacks and the targets** (decision 31; the owner's answer of 2026-11-19: 16.7 ms a frame on the desktop and 33 ms on the web build with four views, to be tuned from a GPU run). A frame-time budget (`split_budget.gd`) climbs CB1's ladder while the screen is split and the frames' average runs over the target for a second: a cheaper light a view (the buffers past the first view's twice as small again each way), then half the motes, then a quarter; back down a rung after three seconds under three quarters of the target; nothing with one view. **How the targets should be met:** CB1 measured four views at about 3.3 times one view's GPU time, so on a GPU where the unsplit fight draws in about 5 ms (desktop) or 10 ms (web) four views fit as they are; above that the rungs take off up to about a quarter of the frame on the web (light and motes there save about 20% each) and less on the desktop (the light most of it). If a GPU run shows four views still over, the next rungs are CB1's others, kept for then: the light off past two views (a view's own room's shots only and views the size of their cell are done: "Per-room batches, per-view culling" below, and the performance pass #885).
 - **The camera's limits** are still the room's (Flow's); CB3 moves them to the biome's bounds, and the views keep to whatever the world camera's limits are. Inside one room nothing splits unless the room is wider than the widest picture (the hub is: 1600 × 1088).
 - **Tests:** `tests/gameplay/feel/test_split_camera.gd` (1 to 4 seats in the twelve-room biome's rooms, groups, the cells covering the screen and holding their wizards, a split starting as the picture drawn, a merge ending on it with the divider a pixel a frame, this machine's seats only, slots kept), a wizard leaving a shared view and three views of which one merges, each checked pixel by pixel for no jump), `test_split_screen.gd` (the divider's width in whole pixels wherever its line is, the views drawing the world, the root its layers, published and put back; the light's buffers and readers; each item hint in its own view), `tests/core/test_screen_views.gd`, `test_teammate_markers.gd` (a teammate in another view, or in none).
 
@@ -662,3 +662,38 @@ The owner decided on 2026-11-20 (#883, the playtest polish pass); view only, the
 - Run themes (a flooded or burning crypt).
 - A corner minimap (the Y map replaces it).
 - The hub's move to the ground drawn at layout.
+
+### Per-room batches, per-view culling (the owner's decision of 2026-11-20, after #885)
+
+The performance pass (#885) left three steps for the owner, who took all three on 2026-11-20 (the
+owner accepts that the split's air then looks as thick as the single picture's):
+
+- **A view draws only the rooms it shows** (CB1's fallback 2). The batches are never culled by a
+  stale box (core/README.md): a batch may have a box of its own only if it is never stale
+  (`Batches.box_of`, a room's rect grown by its instances' reach). In a biome the projectile
+  manager hands each draw batch's rows, every frame, to a batch a place (`DrawRegions`,
+  core/projectiles/draw_regions.gd, in the native kernel too: `ShotKernel.region_counts`,
+  `region_rows`): a shot whose 32 px square lies wholly in one place is drawn by that place's batch,
+  whose box is the place grown by 320 px; a shot at a mouth, over a bridge's lip, outside every place
+  or of a long quad is a crosser, drawn by a small batch whose box is the world. The batch's own node
+  then draws none; its light mirror and still shots' views take the rows whole, as before. The
+  ground cover's batches take their room's box. The floor marks have a layer a place (each the size
+  of its place, masked to the floor its place holds, a stamp drawn into each layer it reaches), so a
+  wide biome's marks are no longer cut at 4,096 px and only rooms with new stamps render. The motes
+  are one ring written in time order (a chunk holds every fight's motes), so they are not cut into
+  rooms: instead each view's copy of the motes' batches (below) is told the box of the world its
+  view draws and the vertex stage folds away a mote that cannot reach it before working out its
+  flight (`Motes.may_reach` its line on the CPU, held to every flight by a test); the one picture's
+  root draws them culled by its own box too.
+- **Per-view culling:** the mote sources, the room's and each kind's air, the void's air and the
+  bodies' shadows work near each view's own box (`ViewBoxes`, `ScreenViews.view_world_box`), not the
+  box round every view; the air over the views is as thick as over one picture (a point over two
+  overlapping views counted once).
+- **Views named by a uniform:** what reads the light by the screen (the apply rect, the motes, the
+  mist) is drawn once a view: the item itself for the first view, a copy a view past it on that
+  view's visibility layer, each naming its light buffer by the instance uniform `light_view_id`
+  (`ViewReaders`); each view's SubViewport draws the world's layer and its own. No transform is
+  matched. The equal split's void quarter is one view more, reading no light.
+
+The numbers are in docs/LOG.md (2026-11-20, "Per-room batches").
+

@@ -2,16 +2,14 @@ extends "res://tests/support/suite.gd"
 ## Each view's own part of the world (`ViewBoxes`, gameplay/feel/view_boxes.gd; the performance pass,
 ## the owner's decision of 2026-11-20): split, the air, the mote sources and the shadows work by each
 ## view's box, not one box round them all; a point picked over the boxes is as likely anywhere they
-## cover, overlap or not, so the air over two views is as thick as over one picture; and a mote the
-## motes' shader folds away in a view (`Motes.may_reach`, its cull line for line) could never have
-## been drawn there.
+## cover, overlap or not, so the air over two views is as thick as over one picture. (The motes are
+## drawn by room since the performance pass's follow-up: `test_mote_regions.gd`.)
 
 const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
-const RegistryScript := preload("res://core/registry/registry.gd")
 
 const FRAME: float = 1.0 / 60.0
 
@@ -111,39 +109,3 @@ func test_the_air_over_two_views_is_as_thick_as_over_one_and_only_there() -> voi
 	var ratio: float = float(given[1]) / float(maxi(given[0], 1))
 	check(ratio > 1.8 and ratio < 2.2, "two views of the same size give off twice one's: each as thick (%d, %d)" % [given[0], given[1]])
 
-
-func test_a_mote_folded_away_in_a_view_could_not_be_drawn_there() -> void:
-	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
-	registry.scan()
-	var kinds: Array[MoteKind] = []
-	for found: Resource in registry.get_all(&"motes"):
-		if found is MoteKind and (found as MoteKind).problems().is_empty():
-			kinds.append(found)
-	check(kinds.size() > 10, "the game's mote kinds")
-	var motes: MotesScript = own(MotesScript.new(1024, 0, kinds)) as MotesScript
-	root.add_child(motes)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 2026
-	var folded: int = 0
-	var wrong: int = 0
-	for n in 4000:
-		var k: int = rng.randi_range(0, motes.kinds().size() - 1)
-		var kind: MoteKind = motes.kinds()[k]
-		var from := Vector2(rng.randf_range(-400.0, 400.0), rng.randf_range(-400.0, 400.0))
-		var vel: Vector2 = Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(kind.speed.x, maxf(kind.speed.y, kind.speed.x))
-		var vz: float = rng.randf_range(kind.up.x, maxf(kind.up.y, kind.up.x))
-		var h0: float = rng.randf_range(0.0, 20.0)
-		var seed: float = rng.randf()
-		var box := Rect2(rng.randf_range(-300.0, 300.0), rng.randf_range(-300.0, 300.0), 120.0, 80.0)
-		for step in 12:
-			var t: float = kind.life.y * float(step) / 11.0
-			if motes.may_reach(from, vel, h0, vz, t, k, box):
-				continue
-			folded += 1
-			var at: Vector3 = motes.flight(from, vel, h0, vz, t, k, seed)
-			var seen := Vector2(at.x, at.y - at.z)
-			# Its pixels, its glow and the stirs reach a few pixels round where it is.
-			if box.grow(16.0).has_point(seen):
-				wrong += 1
-	check(folded > 1000, "many motes are folded away (%d)" % folded)
-	check_equal(wrong, 0, "none of them could be seen in the view")

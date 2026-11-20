@@ -30,7 +30,12 @@ extends Node2D
 ## time a mote lands in it). `step` uploads only the chunks written since the last frame, so a
 ## burst of 300 motes uploads one or two chunks (64 KB each), never the whole ring; a chunk whose
 ## motes are all gone (by the longest life each of its bursts could give) is hidden and costs no
-## vertices. Nothing is allocated while playing, past a chunk's first use. A mote costs the CPU
+## vertices.
+##
+## **In a biome the motes are drawn by room** (`use_places`, `regions`, `mote_regions.gd`; the
+## performance pass, the owner's decision of 2026-11-20): the ring's chunks
+## draw nothing, and `step` copies each row written into a chunk of its room's, boxed to the room,
+## so a view draws only the rooms it shows. The ring and what writes it are the same either way. Nothing is allocated while playing, past a chunk's first use. A mote costs the CPU
 ## about 2.3 us in a fight (its share of the shot's shed and its row; P1c, docs/DECISIONS.md), so
 ## at most FRAME_ROWS are written between two steps: a burst past that is cut short, and a shed
 ## once they are used up costs next to nothing (a storm's flood of hits stays within its budget).
@@ -60,11 +65,10 @@ const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const NativeScript := preload("res://core/native/native.gd")
+const MoteRegionsScript := preload("res://gameplay/feel/mote_regions.gd")
 
 ## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
 const CHUNK: int = 1024
-## How far past its flight's reach a mote may still be drawn (px; `mote.gdshader`'s, `may_reach`).
-const CULL_PAD: float = 48.0
 ## Floats in a row: the transform (8), the colour (4) and the custom data (4).
 const DRAW_STRIDE: int = 16
 ## Where a row's numbers are (mote.gdshader's header says where it reads each): the velocity
@@ -207,8 +211,9 @@ var _cards: Object = null
 var _look_kinds: Dictionary[int, PackedInt32Array] = {}
 ## The next row a mote takes.
 var _next: int = 0
-## Per chunk: its batch (null until its first mote), its rows, written since the last upload, and
-## the clock time its last mote is gone by (its birth plus the longest life its burst could give).
+## Per chunk: its batch (null until it is first drawn), its rows (empty until its first mote),
+## written since the last upload, and the clock time its last mote is gone by (its birth plus the
+## longest life its burst could give).
 var _nodes: Array[MultiMeshInstance2D] = []
 var _buffers: Array[PackedFloat32Array] = []
 var _dirty: PackedByteArray = PackedByteArray()
@@ -261,6 +266,11 @@ var lit_steps: Vector4 = DEFAULT_LIT_STEPS
 var _mesh: ArrayMesh = null
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## The motes drawn by room while the room grid has places (`use_places`; `mote_regions.gd`): the
+## ring's chunks then draw nothing, and the rows written since the last step (`_serial` past
+## `_handed`) are handed to their rooms' chunks at each step. Read only.
+var regions: MoteRegionsScript = null
+var _handed: int = 0
 ## The native kernel (`MoteKernel`, native/README.md): the trails' births written in C++, the same
 ## to the bit, or null to write them here. `native` switches it.
 var native: bool = true:
@@ -319,6 +329,7 @@ func _init(cap: int, z: int, kinds: Array[MoteKind], table: RampTableScript = nu
 	_table = table if table != null else RampTableScript.new()
 	_material.set_shader_parameter(&"ramp_table", _table.texture())
 	_take_kinds(kinds)
+	regions = MoteRegionsScript.new(_cap, CHUNK, self, _material, _mesh, _z)
 	_birth_pair.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
 	_pair_key.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
 	_pair_from.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
@@ -354,6 +365,8 @@ func set_native(on: bool) -> void:
 	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
 	if not _kernel.call(&"configure", numbers):
 		wrong.append("the motes' numbers")
+	# The regions' copy of the row, against the numbers just configured.
+	wrong.append_array(_kernel.call(&"check_regions", regions))
 	if not wrong.is_empty():
 		push_error("Motes: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		_kernel = null
@@ -687,7 +700,7 @@ func _ready_chunks() -> void:
 	var row: int = _next
 	while left > 0:
 		var c: int = row / CHUNK
-		if _nodes[c] == null:
+		if _buffers[c].is_empty():
 			_chunk(c)
 		var span: int = mini(mini(CHUNK, _cap - c * CHUNK) - (row - c * CHUNK), left)
 		left -= span
@@ -829,7 +842,7 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		var c: int = row / CHUNK
 		if c != chunk:
 			chunk = c
-			if _nodes[c] == null:
+			if _buffers[c].is_empty():
 				_chunk(c)
 			buffer = _buffers[c]
 			_dirty[c] = 1
@@ -936,17 +949,45 @@ func step(now: float) -> void:
 	if _marks != null:
 		_marks.forget_settles_before(_serial - _cap)
 	_material.set_shader_parameter(&"sim_time", now)
+	if regions.is_on():
+		# By room: the rows written since the last step handed to their rooms' chunks.
+		var count: int = mini(_serial - _handed, _cap)
+		_handed = _serial
+		if count > 0:
+			regions.hand_out(self, posmod(_next - count, _cap), count, now, _kernel)
+		regions.step(now)
+		return
 	for c in _nodes.size():
-		var node: MultiMeshInstance2D = _nodes[c]
-		if node == null:
+		if _buffers[c].is_empty():
 			continue
+		var node: MultiMeshInstance2D = _nodes[c]
 		if _dirty[c] == 1:
 			_dirty[c] = 0
+			if node == null:
+				node = _ring_node(c)
 			node.multimesh.buffer = _buffers[c]
 			uploads += 1
 			node.visible = true
-		elif node.visible and now > _until[c]:
+		elif node != null and node.visible and now > _until[c]:
 			node.visible = false
+
+
+## The motes drawn by the room they fly in while `grid` (null: none) has places (`regions`, the
+## performance pass: a view draws only the rooms it shows), else by the ring's chunks. Run every
+## frame before `step`; nothing changes while the places are the same. A change hands every row
+## of the ring out again (or shows the ring's chunks again) at the next step.
+func use_places(grid: RoomGrid) -> void:
+	if not regions.fit(grid):
+		return
+	if regions.is_on():
+		_handed = _serial - mini(_serial, _cap)
+		for node in _nodes:
+			if node != null:
+				node.visible = false
+	else:
+		for c in _nodes.size():
+			if not _buffers[c].is_empty() and _now <= _until[c]:
+				_dirty[c] = 1
 
 
 ## A shader parameter of the motes' material (for tests).
@@ -964,16 +1005,18 @@ func draw_quad() -> Mesh:
 	return _mesh
 
 
-## Chunks with a batch made, and those drawn now (for tests).
+## The ring's chunks with rows made; with `regions` on, the rooms' chunks drawn now.
 func chunks_made() -> int:
 	var made: int = 0
-	for node in _nodes:
-		if node != null:
+	for buffer in _buffers:
+		if not buffer.is_empty():
 			made += 1
 	return made
 
 
 func chunks_shown() -> int:
+	if regions.is_on():
+		return regions.chunks_shown()
 	var shown: int = 0
 	for node in _nodes:
 		if node != null and node.visible:
@@ -1067,18 +1110,6 @@ func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int,
 	var phase: float = seed * 6.2832
 	ground.x += kind.wobble * (sin(tm * kind.wobble_rate + phase) - sin(phase))
 	return Vector3(ground.x, ground.y, maxf(h, 0.0))
-
-
-## Whether a mote of kind `k` thrown from `from` (`flight`'s numbers) may be drawn in `box` (a
-## view's part of the world) at age `t`: `mote.gdshader`'s cull (its CULL_PAD, CULL_PAD here), line
-## for line. A mote it says no to is folded away in that view before its flight is worked out; a
-## test holds every flight to it.
-func may_reach(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int, box: Rect2) -> bool:
-	var kind: MoteKind = _kinds[k]
-	var spread: float = vel.length() * t + 2.0 * absf(kind.wobble) + CULL_PAD
-	var g: float = kind.gravity
-	var rise: float = h0 + absf(vz) * t + (vz * vz / (2.0 * g) if g > 0.0 else -0.5 * g * t * t)
-	return from.x + spread >= box.position.x and from.x - spread <= box.end.x and from.y + spread >= box.position.y and from.y - spread - rise <= box.end.y
 
 
 func _kind_of(buffer: PackedFloat32Array, i: int) -> int:
@@ -1191,28 +1222,33 @@ func kind_numbers(k: int) -> Array[Vector4]:
 	return numbers
 
 
-## Chunk `c`'s rows, making its batch the first time.
+## Chunk `c`'s rows, made the first time (every row with no life: folded away).
 func _chunk(c: int) -> PackedFloat32Array:
+	if _buffers[c].is_empty():
+		var buffer := PackedFloat32Array()
+		buffer.resize(mini(CHUNK, _cap - c * CHUNK) * DRAW_STRIDE)
+		_buffers[c] = buffer
+	return _buffers[c]
+
+
+## Chunk `c`'s batch, made the first time it is drawn (by the ring: no places).
+func _ring_node(c: int) -> MultiMeshInstance2D:
 	if _nodes[c] == null:
-		var rows: int = mini(CHUNK, _cap - c * CHUNK)
 		var multimesh: MultiMesh = BatchesScript.multimesh()
 		multimesh.use_colors = true
 		multimesh.use_custom_data = true
 		multimesh.mesh = _mesh
-		multimesh.instance_count = rows
-		var buffer := PackedFloat32Array()
-		# Every row starts with no life: folded away.
-		buffer.resize(rows * DRAW_STRIDE)
-		_buffers[c] = buffer
+		multimesh.instance_count = mini(CHUNK, _cap - c * CHUNK)
 		var node := MultiMeshInstance2D.new()
 		node.multimesh = multimesh
+		# Its material before it is in the tree, so the light finds it a reader (`ViewReaders.take`).
 		node.material = _material
 		node.top_level = true
 		node.z_index = _z
 		node.visible = false
 		add_child(node)
 		_nodes[c] = node
-	return _buffers[c]
+	return _nodes[c]
 
 
 ## One quad: the shader places its corners (a vertex's UV is its corner).

@@ -124,7 +124,7 @@ var _place_mixed: PackedByteArray = PackedByteArray()
 ## pass, 2026-11-20: it walked every place twice).
 var _place_touched: PackedByteArray = PackedByteArray()
 ## By PLACE_CELL square, what `place_at` answers for every point in it (`whole_places`): 0 no place,
-## a place plus one (up to 254) when the square lies wholly in the place `place_at` finds there, or
+## a place plus one (places 0 to 253; a later one is always asked) when the square lies wholly in the place `place_at` finds there, or
 ## WHOLE_ASK when its points may differ; worked out when first asked after the places changed.
 var _place_whole: PackedByteArray = PackedByteArray()
 var _whole_due: bool = true

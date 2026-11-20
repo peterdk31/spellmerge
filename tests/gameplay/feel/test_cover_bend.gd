@@ -163,6 +163,17 @@ func test_a_body_beside_the_piece_walks_the_edge_cell_its_feet_reach() -> void:
 	check_equal(cover.walked_at(edge), 6.0, "a foot a pixel onto the piece walks its edge cell")
 
 
+## The footprint's reach each way (the walk's quick test of a body off the piece) is FOOTPRINT's.
+func test_the_footprints_reach_is_its_feet() -> void:
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for foot in CoverScript.FOOTPRINT:
+		low = low.min(foot)
+		high = high.max(foot)
+	check_equal(CoverScript.FOOT_REACH_LOW, low, "the least of each way")
+	check_equal(CoverScript.FOOT_REACH_HIGH, high, "the most")
+
+
 func test_a_states_trampled_frames_ride_in_its_rows() -> void:
 	var cover: CoverScript = _cover()
 	var rows: PackedFloat32Array = cover.rows_of(&"test_grass")

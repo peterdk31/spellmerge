@@ -145,7 +145,9 @@ func _map() -> BiomeMap:
 	return biome.get(&"map") as BiomeMap if biome != null else null
 
 
-## `count` fight rooms of `map`, the largest first (by their rects' area), each once.
+## `count` fight rooms of `map` far apart (the largest first, then each the room farthest from
+## those taken, by their rects' middles), so wizards put in them part into a view each: rooms side
+## by side can fit one picture, the party camera zoomed out over them.
 func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
 	var biome: Object = _flow.get(&"biome")
 	var fights: Array[int] = []
@@ -154,10 +156,24 @@ func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
 			fights.append(room)
 	fights.sort_custom(func(a: int, b: int) -> bool: return (biome.call(&"room_rect", a) as Rect2).get_area() > (biome.call(&"room_rect", b) as Rect2).get_area())
 	var out := PackedInt32Array()
-	for room in fights.slice(0, count):
-		out.append(room)
-	if out.is_empty():
+	if fights.is_empty():
 		out.append(0)
+		return out
+	out.append(fights[0])
+	while out.size() < mini(count, fights.size()):
+		var best: int = -1
+		var best_far: float = -1.0
+		for room in fights:
+			if out.has(room):
+				continue
+			var middle: Vector2 = (biome.call(&"room_rect", room) as Rect2).get_center()
+			var nearest: float = INF
+			for taken in out:
+				nearest = minf(nearest, middle.distance_to((biome.call(&"room_rect", taken) as Rect2).get_center()))
+			if nearest > best_far:
+				best_far = nearest
+				best = room
+		out.append(best)
 	return out
 
 
@@ -315,6 +331,9 @@ func _report_more(label: String) -> void:
 	var by_views: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 	for i in frames:
 		by_views[clampi(_frame_views[i], 0, 4)] += 1
+	var row: Dictionary = rows[scenarios[_current]]
+	if row.get("spread", "apart") == "apart" and by_views[4] < frames / 2:
+		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew fewer than 4 views (%s): not a four-way split" % [label, str(by_views)])
 	print("BENCH: biome frames %s frame: avg %.2f ms, p95 %.2f ms, worst %.2f ms over %d frames, %.2f views a frame (frames by views 0-4: %s)" % [label, total / float(frames), sorted[int(float(frames - 1) * 0.95)], sorted[frames - 1], frames, float(views) / float(frames), str(by_views)])
 	var kinds: Array = _gpu_by_kind.keys()
 	kinds.sort_custom(func(a: String, b: String) -> bool: return _gpu_by_kind[a] > _gpu_by_kind[b])

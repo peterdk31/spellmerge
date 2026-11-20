@@ -93,9 +93,9 @@ func test_a_split_draws_the_world_in_views_and_the_hud_on_the_root() -> void:
 	for view in laid.count:
 		var shown: SubViewport = _split.views()[view] as SubViewport
 		check(shown.world_2d == root.world_2d, "view %d draws the root's world" % view)
-		var box: Rect2i = SplitScreenScript.view_box(laid, view, root.get_visible_rect().size)
-		check_equal(shown.canvas_transform, laid.to_screen[view].translated(-Vector2(box.position)), "view %d draws through its own transform, from its box's corner" % view)
-		check_equal(shown.size, box.size, "view %d is its box's size" % view)
+		var cell := _split.get_node(NodePath("Views/Cell%d" % _split.camera.slot_of(view))) as TextureRect
+		check_equal(shown.canvas_transform, laid.to_screen[view].translated(-cell.position), "view %d draws through its own transform, from its box's corner" % view)
+		check_equal(Vector2(shown.size), cell.size, "view %d is its box's size" % view)
 		check_equal(shown.canvas_cull_mask, SplitScreenScript.WORLD_LAYER, "view %d draws the world's layer" % view)
 	# Merged again: everything put back.
 	far.global_position = Vector2(60.0, 0.0)
@@ -197,7 +197,7 @@ func test_a_view_draws_only_its_cells_box() -> void:
 				check_equal(Vector2i(cell.size), shown.size, "%s: its rect is its box" % what)
 				check(box.position.x % SplitScreenScript.BOX_SNAP == 0 and box.position.y % SplitScreenScript.BOX_SNAP == 0, "%s: its box is snapped (%s)" % [what, box])
 				if equal and count == 4:
-					check(box.size.x <= int(screen.x * 0.5) + SplitScreenScript.BOX_SNAP * 2 and box.size.y <= int(screen.y * 0.5) + SplitScreenScript.BOX_SNAP * 2, "%s: a quarter pane draws about a quarter (%s)" % [what, box])
+					check(box.size.x * box.size.y * 2 < int(screen.x * screen.y), "%s: a quarter pane draws under half the screen's pixels (%s)" % [what, box])
 				if view == twin:
 					check_equal(box, Rect2i(Vector2i.ZERO, Vector2i(screen)), "%s: the twin's view draws the whole screen" % what)
 					continue
@@ -210,6 +210,14 @@ func test_a_view_draws_only_its_cells_box() -> void:
 				var own_at: Vector2 = material.get_shader_parameter(&"own")
 				var before: int = int(material.get_shader_parameter(&"before_mask"))
 				var kept_outside: int = 0
+				# The ring just outside the box less the light's pad: no kept pixel there or past it.
+				# (Sides on the screen's edge have no pad: the screen ends there.)
+				var pad: int = SplitScreenScript.BOX_PAD
+				var left: int = box.position.x + (pad if box.position.x > 0 else 0)
+				var top: int = box.position.y + (pad if box.position.y > 0 else 0)
+				var right: int = box.end.x - (pad if box.end.x < int(screen.x) else 0)
+				var bottom: int = box.end.y - (pad if box.end.y < int(screen.y) else 0)
+				box = Rect2i(left, top, right - left, bottom - top)
 				var ring := box.grow(1).intersection(Rect2i(Vector2i.ZERO, Vector2i(screen)))
 				for x in range(ring.position.x, ring.end.x):
 					for y: int in [ring.position.y, ring.end.y - 1]:
@@ -220,6 +228,21 @@ func test_a_view_draws_only_its_cells_box() -> void:
 						if not box.has_point(Vector2i(x, y)) and SplitScreenScript.cell_pixel(Vector2(x, y) + Vector2(0.5, 0.5), own_at, others, widths, before) >= 0:
 							kept_outside += 1
 				check_equal(kept_outside, 0, "%s: no pixel of its cell outside its box %s" % [what, box])
+
+
+## A view's box keeps its size while its cell's needs move a little inside it, and is made again
+## (with half BOX_SLACK of room each way) once they leave it or it has more than BOX_SLACK to spare.
+func test_a_views_box_keeps_its_size_while_its_cell_moves_a_little() -> void:
+	var screen := Vector2(640.0, 360.0)
+	var needed := Rect2i(304, 0, 336, 360)
+	var made: Rect2i = SplitScreenScript.kept_box(Rect2i(), needed, screen)
+	check(made.encloses(needed), "a new box holds what its cell needs")
+	check_equal(made, Rect2i(288, 0, 352, 360), "with half the slack of room, within the screen")
+	check_equal(SplitScreenScript.kept_box(made, Rect2i(296, 0, 344, 360), screen), made, "a divider moved 8 px: the same box")
+	check_equal(SplitScreenScript.kept_box(made, Rect2i(312, 0, 328, 360), screen), made, "and back the other way")
+	check(SplitScreenScript.kept_box(made, Rect2i(280, 0, 360, 360), screen) != made, "past its edge: made again")
+	check(SplitScreenScript.kept_box(made, Rect2i(400, 0, 240, 360), screen) != made, "with far more room than it needs: made again, smaller")
+	check_equal(SplitScreenScript.kept_box(made, Rect2i(0, 0, 640, 360), screen), Rect2i(0, 0, 640, 360), "the whole screen is the whole screen")
 
 
 ## A fresh split screen and actor table, for a test that lays out several splits.

@@ -153,3 +153,25 @@ func test_a_world_with_no_places_has_none() -> void:
 	var out := PackedByteArray([1, 1])
 	mgr.shot_places(mgr.grid(), out)
 	check_equal(out.size(), 0, "no place, no byte")
+
+
+## The squares' table is worked out again after the places change, after it was read (places
+## cleared, the grid sized again, new places).
+func test_the_squares_follow_the_places_after_they_change() -> void:
+	var mgr: ManagerScript = _manager(true)
+	var grid: RoomGrid = mgr.grid()
+	grid.add_place(Rect2(0.0, 0.0, 640.0, 384.0))
+	check_equal(grid.place_at(Vector2(100.0, 100.0)), 0, "the first room")
+	check(grid.whole_places().has(1), "a square wholly in it")
+	grid.clear_places()
+	check_equal(grid.whole_places().size(), 0, "no places, no squares")
+	grid.size_to(Rect2(-100.0, -100.0, 2000.0, 1000.0))
+	grid.add_place(Rect2(1000.0, 200.0, 300.0, 300.0))
+	var whole: PackedByteArray = grid.whole_places()
+	var square: int = floori((100.0 + 100.0) / RoomGrid.PLACE_CELL) * grid.place_columns() + floori((100.0 + 100.0) / RoomGrid.PLACE_CELL)
+	check_equal(whole[square], 0, "where the old room was is no place now")
+	mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 10.0)
+	mgr.spawn(0, Vector2(1100.0, 300.0), Vector2.ZERO, 10.0)
+	var out := PackedByteArray()
+	mgr.shot_places(grid, out)
+	check_equal(out, PackedByteArray([1]), "the shot in the new room keeps it awake; the one where the old was, none")

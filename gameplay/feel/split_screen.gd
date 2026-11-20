@@ -31,6 +31,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
+const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
 
 ## The visibility layer of the world's canvas items (the default), and the one the root keeps.
@@ -41,8 +42,9 @@ const LAYER: int = 5
 ## The divider's colour (the void's dark).
 const DIVIDER_COLOUR := Color(0.05, 0.04, 0.09)
 ## The uniforms of the cell shader naming the other views and the divider towards each.
-const OTHER_UNIFORMS: Array[StringName] = [&"other_0", &"other_1", &"other_2"]
-const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divider_2"]
+## Up to four: three other views and the equal split's blank quarter (or a fourth view merging).
+const OTHER_UNIFORMS: Array[StringName] = [&"other_0", &"other_1", &"other_2", &"other_3"]
+const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divider_2", &"divider_3"]
 
 ## The frame-time budget: which of CB1's fallbacks the split's frames need now.
 var budget: SplitBudgetScript = SplitBudgetScript.new()
@@ -52,6 +54,9 @@ var camera: SplitCameraScript = SplitCameraScript.new()
 
 var _root: Viewport = null
 var _layer: CanvasLayer = null
+## Under the cells, over the whole screen: what the equal split's blank quarter shows (no view
+## draws there), the void's black. Shown only while there is a blank.
+var _blank: ColorRect = null
 ## By slot: its view and the rect that shows it (made as needed).
 var _views: Array[SubViewport] = []
 var _cells: Array[TextureRect] = []
@@ -75,6 +80,13 @@ func _ready() -> void:
 	_layer.name = "Views"
 	_layer.layer = LAYER
 	add_child(_layer)
+	_blank = ColorRect.new()
+	_blank.name = "Blank"
+	_blank.color = VoidBackdropScript.COLOUR
+	_blank.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_blank.visibility_layer = SCREEN_LAYER
+	_blank.visible = false
+	_layer.add_child(_blank)
 
 
 func _exit_tree() -> void:
@@ -151,6 +163,9 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D,
 		if used & (1 << slot) == 0 and _views[slot] != null:
 			_views[slot].render_target_update_mode = SubViewport.UPDATE_DISABLED
 			_cells[slot].visible = false
+	_blank.visible = camera.blank_count() > 0
+	if _blank.visible:
+		_blank.size = screen
 	_keep_shown(laid)
 	if laid.is_split():
 		ScreenViewsScript.publish(_root, laid)
@@ -181,6 +196,14 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2) -> vo
 		material.set_shader_parameter(DIVIDER_UNIFORMS[others], float(camera.divider_between(view, other)))
 		if other < view:
 			before |= 1 << others
+		others += 1
+	# The equal split's blank quarter: a site no view owns, its part of the screen left to the
+	# root's dark (the world is not drawn there while split).
+	for blank in camera.blank_count():
+		if others >= OTHER_UNIFORMS.size():
+			break
+		material.set_shader_parameter(OTHER_UNIFORMS[others], camera.blank_anchor(blank))
+		material.set_shader_parameter(DIVIDER_UNIFORMS[others], float(camera.blank_divider(view)))
 		others += 1
 	material.set_shader_parameter(&"others", others)
 	material.set_shader_parameter(&"before_mask", before)
@@ -239,6 +262,8 @@ func _stop() -> void:
 		return
 	_drawing = false
 	_root.canvas_cull_mask = _mask_before
+	if _blank != null:
+		_blank.visible = false
 	if is_inside_tree() and get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.disconnect(_on_node_added)
 	for slot in ScreenViewsScript.VIEWS_MOST:

@@ -71,7 +71,10 @@ extends PanelContainer
 ##   `sound_volume_changed`, `ambience_volume_changed`, `ui_volume_changed`), which Audio eases its
 ##   bus to (`Music`, `SFX`, `Ambience`, `UI`; heard on `AudioVolumes.share_of`'s curve, 0% silent).
 ## - **Interface** tab: "Screen shake: On" (or Off; melee I6: `screen_shake_changed`, saved as
-##   `screen_shake`), "Damage numbers: On" (or Off; props W5: `damage_numbers_changed`, which feel
+##   `screen_shake`), "Split screen: Dynamic" (or Equal; the owner, 2026-11-19: `SplitScreenSetting`,
+##   `accept` steps to the next mode, saved as `split_screen` and sent as `split_screen_changed`,
+##   which feel lays its split views out by: the Voronoi split, or equal panes a player; this
+##   machine's view only), "Damage numbers: On" (or Off; props W5: `damage_numbers_changed`, which feel
 ##   applies to every actor's numbers, saved as `damage_numbers`), "Show FPS: Off" (or On; owner,
 ##   2026-11-02: saved as `show_fps`, sending `show_fps_changed`, which `hud/panels` applies to its
 ##   frame rate readout, `hud/widgets/fps_counter.gd`, and reads once after binding the menu), the
@@ -150,6 +153,7 @@ const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
 const SHAKE_TEXT: String = "Screen shake: %s"
 ## The saved setting that holds the choice.
 const SHAKE_SETTING: StringName = &"screen_shake"
+const SPLIT_TEXT: String = "Split screen: %s"
 const NUMBERS_TEXT: String = "Damage numbers: %s"
 const NUMBERS_SETTING: StringName = &"damage_numbers"
 const SHOT_CAP_TEXT: String = "Max shots: %d"
@@ -221,6 +225,8 @@ var reload_on_button: bool = true
 var effect_slots: int = EffectSlots.DEFAULT
 ## The "Screen shake" setting (see the top): on by default.
 var screen_shake: bool = true
+## The "Split screen" setting (see the top): `SplitScreenSetting.DEFAULT` (Dynamic) by default.
+var split_screen: int = SplitScreenSetting.DEFAULT
 ## The "Damage numbers" setting (see the top): on by default.
 var damage_numbers: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
@@ -282,6 +288,7 @@ var display: Node = null
 var _volume_bars: Array[HSlider] = []
 @onready var _volume_rows: Array[Button] = _add_volumes()
 @onready var _shake: Button = _add_setting(Tab.INTERFACE, "ScreenShake", SHAKE_TEXT % "On")
+@onready var _split: Button = _add_setting(Tab.INTERFACE, "SplitScreen", SPLIT_TEXT % SplitScreenSetting.word_of(split_screen))
 @onready var _numbers: Button = _add_setting(Tab.INTERFACE, "DamageNumbers", NUMBERS_TEXT % "On")
 @onready var _fps: Button = _add_setting(Tab.INTERFACE, "ShowFps", FPS_TEXT % "Off")
 @onready var _ring_style: Button = _add_setting(Tab.INTERFACE, "RingStyle", RING_TEXT % "Every card")
@@ -317,6 +324,7 @@ func _fit_widths() -> void:
 	needs[_ring_style] = maxf(needs[_ring_style], _width_of(_ring_style, _worded(RING_TEXT, RING_WORDS)))
 	needs[_put_style] = maxf(needs[_put_style], _width_of(_put_style, _worded(PUT_TEXT, ["Push right", "Replace"])))
 	needs[_reload_style] = maxf(needs[_reload_style], _width_of(_reload_style, _worded(RELOAD_TEXT, ["Button", "Next cast"])))
+	needs[_split] = maxf(needs[_split], _width_of(_split, _worded(SPLIT_TEXT, SplitScreenSetting.WORDS)))
 	for on_page: int in _pages:
 		var widest: float = 0.0
 		if on_page == Page.SETTINGS:
@@ -379,6 +387,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScri
 	if save == null:
 		save = SaveFile.new()
 	_load_shake()
+	_load_split()
 	_load_numbers()
 	_load_shot_cap()
 	_load_mote_cap()
@@ -825,6 +834,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_tailless_motes(TaillessMotes.STOPS[(TaillessMotes.index_of(tailless_motes) + 1) % TaillessMotes.STOPS.size()])
 	elif control == _shake:
 		_set_shake(not screen_shake)
+	elif control == _split:
+		_set_split((split_screen + 1) % SplitScreenSetting.WORDS.size())
 	elif control == _numbers:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
@@ -850,6 +861,26 @@ func _load_shake() -> void:
 	_mark_focus()
 	if not screen_shake and _events != null:
 		_events.screen_shake_changed.emit(false)
+
+
+## Read the saved "Split screen" mode and show it; feel is told only when it is not the default
+## (the default is feel's own).
+func _load_split() -> void:
+	split_screen = SplitScreenSetting.snap(int(save.get_setting(SplitScreenSetting.KEY, SplitScreenSetting.DEFAULT)))
+	_split.set_meta(BASE_TEXT_META, SPLIT_TEXT % SplitScreenSetting.word_of(split_screen))
+	_mark_focus()
+	if split_screen != SplitScreenSetting.DEFAULT and _events != null:
+		_events.split_screen_changed.emit(split_screen)
+
+
+## The "Split screen" mode set to `mode`: shown, saved and sent.
+func _set_split(mode: int) -> void:
+	split_screen = SplitScreenSetting.snap(mode)
+	_split.set_meta(BASE_TEXT_META, SPLIT_TEXT % SplitScreenSetting.word_of(split_screen))
+	_mark_focus()
+	save.set_setting(SplitScreenSetting.KEY, split_screen)
+	if _events != null:
+		_events.split_screen_changed.emit(split_screen)
 
 
 ## Read the saved "Damage numbers" choice and show it; feel is told only when it is off (on is

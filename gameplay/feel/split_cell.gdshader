@@ -10,7 +10,8 @@ shader_type canvas_item;
 // void's dark. A pixel is either the view's or the divider's: no blur. `SplitScreen.divider_pixels`
 // is this rule on the CPU, for the tests.
 
-// The screen's size (pixels), this view's anchor and up to three others' (screen pixels), how
+// The screen's size (pixels), this view's anchor and up to four others' (screen pixels: the other
+// views', and the equal split's blank quarter's, a site no view owns), how
 // many others there are, which of them come before this view (a bit each: ties go to them), and
 // the divider's width towards each (whole pixels; 0: none).
 uniform vec2 screen_size = vec2(640.0, 360.0);
@@ -18,23 +19,25 @@ uniform vec2 own = vec2(0.0);
 uniform vec2 other_0 = vec2(0.0);
 uniform vec2 other_1 = vec2(0.0);
 uniform vec2 other_2 = vec2(0.0);
+uniform vec2 other_3 = vec2(0.0);
 uniform int others = 0;
 uniform int before_mask = 0;
 uniform float divider_0 = 0.0;
 uniform float divider_1 = 0.0;
 uniform float divider_2 = 0.0;
+uniform float divider_3 = 0.0;
 uniform vec4 divider_colour : source_color = vec4(0.05, 0.04, 0.09, 1.0);
 
 void fragment() {
 	// The pixel's middle, in screen pixels.
 	vec2 p = (floor(UV * screen_size) + 0.5);
 	bool line = false;
-	for (int k = 0; k < 3; k++) {
+	for (int k = 0; k < 4; k++) {
 		if (k >= others) {
 			break;
 		}
-		vec2 a = k == 0 ? other_0 : (k == 1 ? other_1 : other_2);
-		float width = k == 0 ? divider_0 : (k == 1 ? divider_1 : divider_2);
+		vec2 a = k == 0 ? other_0 : (k == 1 ? other_1 : (k == 2 ? other_2 : other_3));
+		float width = k == 0 ? divider_0 : (k == 1 ? divider_1 : (k == 2 ? divider_2 : divider_3));
 		vec2 normal = a - own;
 		float length_of = length(normal);
 		if (length_of < 0.0001) {

@@ -401,6 +401,24 @@ func test_a_fighter_revives_a_downed_teammate_before_it_travels() -> void:
 
 ## Connected biomes CB3's crawl (the owner, 2026-11-19): a downed bot crawls toward the nearest
 ## standing teammate, never into an enemy, and stops beside it; with nobody standing it lies still.
+## Everything hurts everything: a bot never shoots through a teammate (the sweep's losing seeds of
+## 2026-11-20 were mostly bolts in teammates' backs).
+func test_a_fighter_holds_fire_with_a_teammate_in_its_line_of_fire() -> void:
+	var wizard := await _fighters_in_a_run() as Actor
+	var mate := _flow.call("get_wizard", 1) as Actor
+	if wizard == null or mate == null:
+		return
+	mate.global_position = wizard.global_position + Vector2(64.0, 4.0)
+	check(_bots[0].mate_in_line(wizard, Vector2.RIGHT, INF), "a teammate straight ahead is in the line")
+	check(_bots[0].mate_in_line(wizard, Vector2.RIGHT, 96.0), "and nearer than the target")
+	check(not _bots[0].mate_in_line(wizard, Vector2.RIGHT, 40.0), "past the target it is not")
+	check(not _bots[0].mate_in_line(wizard, Vector2.LEFT, INF), "behind it is not")
+	check(not _bots[0].mate_in_line(wizard, Vector2.DOWN, INF), "aside it is not")
+	mate.set_down(true)
+	check(not _bots[0].mate_in_line(wizard, Vector2.RIGHT, INF), "a downed teammate does not stop it")
+	mate.set_down(false)
+
+
 func test_a_downed_bot_crawls_toward_its_nearest_standing_teammate() -> void:
 	var wizard := await _fighters_in_a_run() as Actor
 	var mate := _flow.call("get_wizard", 1) as Actor

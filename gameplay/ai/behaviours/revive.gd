@@ -2,7 +2,7 @@ extends AIBehaviour
 ## A teammate is downed (`AIBrain.downed_mate`, the nearest): walk to it and stand beside it, so
 ## the coop rule revives it (a standing teammate near enough for long enough; gameplay/coop), when
 ## that is safe enough: no foe within SAFE of the one downed (`AIBrain.foe_within`; a bot never
-## walks into a crowd to revive), its own health not under LOW, and no shot about to hit it (an
+## walks into a crowd to revive), its own health not under LOW while a fight is on, and no shot about to hit it (an
 ## urgent dodge goes first). With the fight over (no target) it wants it most; with a fight on,
 ## more than a ready attack, and it fires the best ready staff that hurts the target from where it
 ## walks or stands (`AIBrain.can_fire`), never one that would carry it off: one that moves its
@@ -16,7 +16,7 @@ extends AIBehaviour
 const NEAR: float = 20.0
 ## No foe this near the one downed (pixels), or it stays out of it.
 const SAFE: float = 96.0
-## Under this share of its health it does not go (it would be downed beside it).
+## Under this share of its health it does not go while a fight is on (it would be downed beside it).
 const LOW: float = 0.3
 ## Its want with no fight on, and with one on (above a ready fight's, about 0.8-1.15, and an
 ## urgent dodge of the bot's, 1.12).
@@ -36,7 +36,10 @@ func want(brain: AIBrain) -> float:
 	brain.memo[index] = -1.0
 	if brain.profile.revives <= 0.0:
 		return 0.0
-	if brain.health_fraction < LOW:
+	if brain.health_fraction < LOW and brain.target != null:
+		# Low with a fight on, it would be downed beside it; with none (the room cleared) nothing can
+		# down it there (playtest, 2026-11-20: a bot low after a fight walked on to the next and left
+		# its downed teammates behind).
 		return 0.0
 	if brain.threat_time >= 0.0 and brain.threat_time < AIBrain.URGENT_TIME:
 		return 0.0

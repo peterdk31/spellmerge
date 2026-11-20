@@ -55,7 +55,7 @@ A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx
 {"path": "audio/sfx/cast/variants/1.ogg", "origin": "ai", "author": "Claude", "license": "CC-BY-SA-4.0",
  "tier": "good", "tool": "tools/sound.py (procedural synthesis, generator 1)",
  "prompt": "audio/sfx/cast/cast.sound.json", "recipe_hash": "sha256:...", "audio_hash": "sha256:...",
- "loudness": -20.1, "peak": -6.2}
+ "loudness": -29.1, "peak": -13.2}
 ```
 
 A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. The bake fails a sound that is off its family's level, over its peak, or too loud above 2 kHz (its top; docs/STYLE.md, "Sound"); the fix it names is the recipe's. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.

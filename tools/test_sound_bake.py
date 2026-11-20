@@ -199,7 +199,7 @@ class BakeTest(unittest.TestCase):
     def test_gain_places_the_level_off_the_target(self) -> None:
         self.bake(self.write(dict(BLIP, gain=-3, notes="a blip, quieter: it is heard under every step")))
         for entry in self.entries("audio/sfx/blip").values():
-            self.assertAlmostEqual(entry["loudness"], -23.0, delta=1.0)
+            self.assertAlmostEqual(entry["loudness"], -29.0, delta=1.0)
 
     def test_a_variant_unlike_the_others_fails(self) -> None:
         # Each variant a quarter of the one before: far apart in level, though silent at both ends.

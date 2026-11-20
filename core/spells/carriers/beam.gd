@@ -13,9 +13,9 @@ extends Carrier
 ## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
 ## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
+const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
 ## What `beam_elements` gives for a beam with no spell.
 const NO_ELEMENTS: Array[StringName] = []
-const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near", &"_gate_outs"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).

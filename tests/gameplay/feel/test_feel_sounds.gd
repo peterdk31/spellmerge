@@ -670,3 +670,55 @@ func test_a_beam_hums_with_its_infusions_loops_under_it() -> void:
 	check(not held.is_held(4, &"fire_hum"), "no loop without its hum")
 	held.audio.step_world(BeamSoundsScript.RENEW + 0.5)
 	check(not held.is_held(3, &"beam_hum"), "with no hold after RENEW, the hum has ended")
+
+
+## A beam runtime of one live beam: its card and its infusions (`CarrierBeam`'s getters Feel reads).
+class OneBeam:
+	extends RefCounted
+	var card: StringName = &"beam"
+	var elements: Array[StringName] = [&"fire"]
+
+	func beam_carrier_card(_at: int) -> StringName:
+		return card
+
+	func beam_elements(_at: int) -> Array[StringName]:
+		return elements
+
+
+func test_feel_sounds_a_beam_by_its_caster_and_its_fade() -> void:
+	var feel: FeelScript = _world()
+	_know([&"beam_hum", &"fire_hum"])
+	var beams := OneBeam.new()
+	var wizard: Actor = fx.wizard(1, Vector2.ZERO)
+	var enemy: Actor = fx.imp(Vector2(40, 0))
+	var prop: int = fx.actors.open(ActorsScript.TEAM_WORLD, 0)
+	var held: HeldSoundsScript = feel.held_sounds()
+	feel._beam_sounds.new_frame()
+	feel._sound_beam(beams, 0, wizard.id, Vector2.ZERO, 1.0)
+	feel._sound_beam(beams, 0, enemy.id, Vector2(40, 0), 1.0)
+	feel._sound_beam(beams, 0, prop, Vector2(80, 0), 1.0)
+	check(held.is_held(wizard.id, &"beam_hum") and held.is_held(wizard.id, &"fire_hum"), "a wizard's beam hums with its fire under it")
+	check_equal(held.volume_of(wizard.id, &"beam_hum"), 0.0, "at its own level")
+	check_equal(held.volume_of(wizard.id, &"fire_hum"), BeamSoundsScript.HINT_VOLUME, "its infusion's loop under it")
+	check_equal(held.volume_of(enemy.id, &"beam_hum"), FeelScript.ENEMY_CAST_VOLUME, "an enemy's quieter, as its cast")
+	check(not held.is_held(prop, &"beam_hum"), "a prop's beam (the world's) hums not at all")
+	feel._beam_sounds.new_frame()
+	feel._sound_beam(beams, 0, wizard.id, Vector2.ZERO, 0.5)
+	check(is_equal_approx(held.volume_of(wizard.id, &"beam_hum"), linear_to_db(0.5)), "a dissolving beam's hum fades with it")
+
+
+func test_the_beams_hold_at_most_their_share_of_the_held_slots_a_frame() -> void:
+	var held: HeldSoundsScript = _held()
+	_know([&"beam_hum", &"fire_hum", &"frost_hum"])
+	var sounds := BeamSoundsScript.new()
+	sounds.held = held
+	sounds.registry = reg
+	var holds: int = 0
+	for caster in BeamSoundsScript.MOST_HOLDS:
+		holds += sounds.hold(&"beam", [&"fire", &"frost"] as Array[StringName], caster, null, Vector2.ZERO)
+	check_equal(holds, BeamSoundsScript.MOST_HOLDS, "a frame's beams hold MOST_HOLDS sounds, no more (review finding: past it they took each other's slots)")
+	check_equal(sounds.hold(&"beam", [] as Array[StringName], 99, null, Vector2.ZERO), 0, "the next beam is silent this frame")
+	sounds.new_frame()
+	check_equal(sounds.hold(&"beam", [&"fire"] as Array[StringName], 0, null, Vector2.ZERO), 2, "a new frame: room again")
+	check_equal(sounds.hold(&"beam", [&"frost", &"fire"] as Array[StringName], 0, null, Vector2.ZERO), 2, "a caster's second beam: its hum and one more loop")
+	check_equal(sounds.hold(&"beam", [&"frost"] as Array[StringName], 0, null, Vector2.ZERO), 1, "past MOST_HINTS a caster, its hum alone (review finding: the most was a beam's)")

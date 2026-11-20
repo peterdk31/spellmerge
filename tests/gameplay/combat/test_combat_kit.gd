@@ -26,6 +26,8 @@ var _wizards: Array[Actor] = []
 var _next_tag: int = 0
 ## Each event as an array of its arguments.
 var _landed: Array = []
+## The `card` of each `hit_landed`, in order.
+var _cards: Array[StringName] = []
 var _hurt: Array = []
 var _kills: Array = []
 var _reactions: Array = []
@@ -52,9 +54,12 @@ func before_each() -> void:
 	_combat._ready()
 	_wizards.clear()
 	_next_tag = 0
+	_cards.clear()
 	for list: Array in [_landed, _hurt, _kills, _reactions, _blocked, _healed, _applied, _cues]:
 		list.clear()
-	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int, _card: StringName) -> void: _landed.append([p, t, a, k]))
+	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int, card: StringName) -> void:
+		_landed.append([p, t, a, k])
+		_cards.append(card))
 	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
 	_bus.kill_landed.connect(func(p: int, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _kills.append([p, t, tag]))
 	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _reactions.append([p, id, t, tag]))
@@ -150,6 +155,18 @@ func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2(200.0, 0.0), "pushed away from the hit")
 	_combat.consume_knockback(_wizards[0], 1.0)
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2.ZERO, "the push fades like an enemy's")
+
+
+func test_a_spell_hit_names_its_carrier_card_and_contact_names_none() -> void:
+	# Feel sounds a carrier's own hit from the card `hit_landed` names (docs/milestones/sound.md,
+	# "Hits by carrier"): combat forwards the profile's.
+	var enemy := _enemy(Vector2.ZERO)
+	var profile := _profile(3)
+	profile.card = &"bolt"
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile), -1)
+	check_equal(_cards, [&"bolt"] as Array[StringName], "a spell's hit names its profile's card")
+	_combat.hit(0, enemy, 2.0)
+	check_equal(_cards, [&"bolt", &""] as Array[StringName], "a hit of no spell (contact) names none")
 
 
 func test_an_enemy_hit_has_the_kind_of_its_profile() -> void:

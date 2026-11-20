@@ -1,12 +1,16 @@
 extends Node
 ## The 4-bot smoke test as a node: four bots join on virtual devices and play the
-## run's first fight through the real input path: the crypt's biome (connected biomes CB8), from its
-## start room over a bridge to the nearest fight (the bots travel, tests/bots/bot.gd). Bots 1-3
-## fight; bot 4 opens its builder with B (`back`) as the run starts and idles in it the whole run
-## (the full builder, fights included). Bots 1-3 also build: as the run starts each sets its starting
-## build (`BotScript.build_drawn`, tests/bots/bot_builds.gd: a fighter's strong staff and a dash drawn
-## from the run's dice, and bot 2's mend staff), each staff with `staff_cards_requested` from a bag
-## stocked for it (`BuildsScript.stock`, put back when the node goes), and their brains (the
+## run's first fight through the real input path. They start in the hub (the owner, 2026-11-20,
+## after #886; `Frames.record` of `hub_requested`), as players do: each bot plays its hub errand
+## (tests/bots/bot_hub.gd): bots 1-3 draw their starting builds from the hub's dice
+## (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and bot 2's three staffs: its
+## mend, a dash and the rack's Wild star taken with A and rebuilt as an attack), each staff set with
+## `staff_cards_requested` from a bag stocked for it (`BuildsScript.stock`, put back when the node
+## goes), and all four walk onto the teleporter stone, where bot 1 presses A once it is lit: the run
+## starts from the stone and every wizard carries its loadout in. The run is the crypt's biome
+## (connected biomes CB8), from its start room over a bridge to the nearest fight (the bots travel,
+## tests/bots/bot.gd). Bots 1-3 fight; bot 4 opens its builder with B (`back`) as the run starts and
+## idles in it the whole run (the full builder, fights included), and the fighters' brains (the
 ## enemies' AI, tests/bots/bot.gd) play what they built.
 ##
 ## It passes only if
@@ -17,8 +21,9 @@ extends Node
 ##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
 ##    stands still and can be downed; it is not checked for that, and
 ##    a close while it was downed is printed as a note, not a failure, and
-##  - every fighter's build went through (each staff holds the cards of the bot's build) and no
-##    `build_refused` arrived, and
+##  - every fighter carried its build into the run (each staff holds the cards of the bot's build,
+##    the mender's rack staff on a hand, as the run starts and at the end) and no `build_refused`
+##    arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
 ##    starts after the autoloads load, so errors during startup are not covered).
@@ -47,10 +52,11 @@ extends Node
 ## with its failures instead of quitting, and rides no performance probe.
 ##
 ## Reproducibility: the fight is the same, tick by tick, on every start. Each bot's brain is
-## seeded by its slot, each build drawn from the run's dice, and the run's seed (`Sim.run_seed`), which makes
-## the map and every roll of the fight (`Sim.chance`), is dealt from REPLAY_SEED: the node starts
-## the run by recording it (`Frames.record`, Play recorded), and the replay's seed deals its runs'
-## seeds (`ReplayTape.next_run_seed`). Frame pacing changes only how many ticks fit in TIME_LIMIT's
+## seeded by its slot, each build drawn from the hub's dice, and the hub's and the run's seeds
+## (`Sim.run_seed`), which make the builds, the map and every roll of the fight (`Sim.chance`), are
+## dealt from REPLAY_SEED: the node starts the hub by recording it (`Frames.record`), and the
+## replay's seed deals its runs' seeds (`ReplayTape.next_run_seed`: the hub's first, the stone's
+## run's next). Frame pacing changes only how many ticks fit in TIME_LIMIT's
 ## game seconds (the unit runs are `--fixed-fps 60`). Started with Play alone, a run takes a random
 ## seed (`SimSeed.fresh`), and about one seed in eleven made a fight the bots lose (a fighter
 ## downed and never revived, as the bots did not revive then, or a stalemate past TIME_LIMIT), which
@@ -132,6 +138,8 @@ var _idler_downed_at_close: bool = false
 ## the run seed it dealt.
 var _replay_seed: int = REPLAY_SEED
 var _run_seed: int = 0
+## True once the run from the stone started (its start room entered).
+var _in_run: bool = false
 ## The run played and its scaling, put back when the node goes.
 var _run: RunDefinition = null
 var _run_scaling: RunScaling = null
@@ -170,16 +178,16 @@ func _ready() -> void:
 		if not bot.join(index, mode, _input, _flow):
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
+		# The hub's errand: the fighters build for a team of IDLER, bot 1 starts the run.
+		bot.plan_hub(IDLER if index != IDLER else 0, index == 0)
 		_bots.append(bot)
 	# Game time runs at real speed: the game never scales the engine's time (online-ready N4).
-	# Play, recorded: the replay's seed deals the run's (the class doc, "Reproducibility").
-	# Both argument lists, as the main menu reads them (a web page's come without `--`).
+	# The hub, recorded: the replay's seed deals the hub's and the run's (the class doc,
+	# "Reproducibility"). Both argument lists, as the main menu reads them (a web page's come without `--`).
 	var wanted: int = replay_seed_wanted if replay_seed_wanted >= 0 else replay_seed_of(OS.get_cmdline_user_args() + OS.get_cmdline_args())
-	var replay: Replay = _frames.call("record", &"play_requested", 0, wanted) as Replay
+	var replay: Replay = _frames.call("record", &"hub_requested", 0, wanted) as Replay
 	_replay_seed = replay.run_seed
-	var tick: Node = root.get_node_or_null("Tick")
-	_run_seed = int(tick.get("sim").get("run_seed")) if tick != null else 0
-	print("SMOKE: %s" % _seeds_text())
+	print("SMOKE: the hub, replay seed %d" % _replay_seed)
 	_started = true
 
 
@@ -264,15 +272,21 @@ func _watch_builder() -> void:
 
 
 func _on_room_entered(_room_id: StringName, room: int) -> void:
-	# The run's start: its start room (a biome's later rooms are entered as the bots walk on).
-	if _stopped or room != EventsScript.FIRST_ROOM:
+	# The run's start: its start room (a biome's later rooms are entered as the bots walk on; the
+	# hub, entered first, is no run's).
+	if _stopped or room != EventsScript.FIRST_ROOM or _flow.get(&"mode") != _flow.get(&"MODE_RUN") or _in_run:
 		return
+	_in_run = true
 	_entered += 1
-	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
+	var tick: Node = get_tree().root.get_node_or_null("Tick")
+	_run_seed = int(tick.get("sim").get("run_seed")) if tick != null else 0
+	print("SMOKE: room_entered from the hub's stone (%.1f game seconds), %s" % [_elapsed, _seeds_text()])
 	_bots[IDLER].open_builder()
 	for index in IDLER:
-		if not _bots[index].build_drawn(IDLER):
-			_builds_failed.append("bot %d could not build a spell" % (index + 1))
+		var wizard := _flow.call("get_wizard", index) as Actor
+		var bot: BotScript = _bots[index]
+		if bot.build.is_empty() or not bot.holds_build(wizard):
+			_builds_failed.append("bot %d did not carry its build into the run (%s)" % [index + 1, bot.build.get("name", "none drawn")])
 
 
 func _on_room_cleared(_room_id: StringName, room: int) -> void:
@@ -314,6 +328,8 @@ static func counts_as_a_fight(life: RoomLife, room: int) -> bool:
 ## The failures of the finished run.
 func _check() -> Array[String]:
 	var failed: Array[String] = _failures.duplicate()
+	if not _in_run:
+		failed.append("the run never started from the hub's stone (the bots' errands: %s)" % _errands_text())
 	if _cleared == 0:
 		if failed.is_empty():
 			failed.append("room_cleared was never received")
@@ -400,6 +416,14 @@ func _finish(failed: Array[String]) -> void:
 		print("SMOKE builds: " + _built_text())
 		print("SMOKE seeds: " + _seeds_text())
 		get_tree().quit(1)
+
+
+## Where each bot's hub errand stands (`bot_hub.gd`'s stage), for a run that never started.
+func _errands_text() -> String:
+	var parts: Array[String] = []
+	for bot in _bots:
+		parts.append("bot %d %s" % [bot.player + 1, BotScript.HubScript.Stage.keys()[bot.hub.stage] if bot.hub != null else "none"])
+	return "; ".join(parts)
 
 
 ## The staffs the fighters built, for the OK line.

@@ -1,20 +1,30 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the bots' starting builds (tests/bots/bot_builds.gd) and the mend bot (tests/bots/bot.gd,
-## `build_drawn`, `foe_in_line`): every build of the table is valid by the card rules on the starter
-## staffs (no card wasted, one cast a staff, the attack hurts, the dash moves its caster, the mend
-## heals and hurts nobody), the bag builds each, the draw is the run's dice (the same seed the same
-## builds), only P2 of a team of two or more mends, and in a run the mend bot heals a hurt teammate
-## and holds its heal while a foe stands in its line of fire.
+## `build_drawn`, `foe_in_line`): every build of the table is valid by the card rules on the staffs
+## it goes on (the starter staffs, and the mender's rack staff: no card wasted, one cast a staff, the
+## attack hurts, the dash moves its caster, the mend heals and hurts nobody), the bag builds each,
+## the draw is the run's dice (the same seed the same builds), only P2 of a team of two or more
+## mends, and in a run the mend bot heals a hurt teammate with its heal, dashes from a shot with its
+## dash, and holds its heal while a foe stands in its line of fire. Its rack staff is put on its LB
+## here as the hub's rack would give it (tests/bots/test_bot_hub.gd takes it from the rack).
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const BuildsScript := preload("res://tests/bots/bot_builds.gd")
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The replay seed a run of these tests is recorded with, so its run seed (and the builds drawn from
 ## it) are the same on every start.
 const REPLAY_SEED: int = 11
 ## Physics frames the mend bot is given to heal (its staff ready, a bolt's flight).
 const HEAL_FRAMES: int = 150
+## The mender's hands (bot_builds.gd, MENDER): the heal on RB, the dash on RT, the attack on LB.
+const HEAL_HAND: int = 0
+const DASH_HAND: int = 1
+const ATTACK_HAND: int = 2
+## Physics frames the mend bot is given to dash from the shots fired at it, and how often one comes.
+const DODGE_FRAMES: int = 120
+const SHOT_EVERY: int = 15
 
 var _input: Node
 var _flow: Node
@@ -45,14 +55,18 @@ func after_each() -> void:
 	await commands_applied()
 
 
-## The starter staff of Play on hand `number` (Flow's STARTER_HEADS, RB's and RT's).
-func _staff(number: int) -> StaffBase:
-	return root.get_node("Registry").call("get_resource", &"wizard", FlowScript.STARTER_HEADS[number]) as StaffBase
+## The staff `build` sets hand `hand` of: Play's starter (Flow's STARTER_HEADS, RB's and RT's), or
+## past them its rack staff's.
+func _staff(build: Dictionary, hand: int) -> StaffBase:
+	if hand >= FlowScript.START_HANDS:
+		var rack: StaffItem = BuildsScript.rack_of(build)
+		return rack.staff if rack != null else null
+	return root.get_node("Registry").call("get_resource", &"wizard", FlowScript.STARTER_HEADS[hand]) as StaffBase
 
 
-## The compiled staff of `cards` on the starter staff `number`.
-func _compiled(cards: Array[StringName], number: int) -> CompiledStaff:
-	return root.get_node("Spells").call("compile_staff", cards, _staff(number)) as CompiledStaff
+## The compiled staff of `build`'s hand `hand`.
+func _compiled(build: Dictionary, hand: int) -> CompiledStaff:
+	return root.get_node("Spells").call("compile_staff", BuildsScript.cards_of(build, hand), _staff(build, hand)) as CompiledStaff
 
 
 # --- The table ---------------------------------------------------------------------------------
@@ -60,12 +74,13 @@ func _compiled(cards: Array[StringName], number: int) -> CompiledStaff:
 
 func test_every_build_is_valid_by_the_card_rules() -> void:
 	for build: Dictionary in BuildsScript.all():
-		var staffs: Array = build["staffs"]
-		check_equal(staffs.size(), FlowScript.START_HANDS, "%s: a staff for each starter staff (RB, RT)" % build["name"])
-		for number in staffs.size():
+		var hands: int = BuildsScript.hands_of(build)
+		var rack: StaffItem = BuildsScript.rack_of(build)
+		check_equal(hands, FlowScript.START_HANDS + (1 if rack != null else 0), "%s: a staff for each starter staff (RB, RT) and its rack staff (LB)" % build["name"])
+		for number in hands:
 			var cards: Array[StringName] = BuildsScript.cards_of(build, number)
-			var compiled: CompiledStaff = _compiled(cards, number)
-			check(cards.size() <= _staff(number).slots, "%s staff %d fits the starter staff's %d slots" % [build["name"], number, _staff(number).slots])
+			var compiled: CompiledStaff = _compiled(build, number)
+			check(cards.size() <= _staff(build, number).slots, "%s staff %d fits its staff's %d slots" % [build["name"], number, _staff(build, number).slots])
 			check(compiled != null and not compiled.is_empty(), "%s staff %d casts" % [build["name"], number])
 			if compiled == null:
 				continue
@@ -74,24 +89,41 @@ func test_every_build_is_valid_by_the_card_rules() -> void:
 
 
 ## What the brain reads of each build: the fighters dash on RB and hurt on RT; the mender heals on
-## RB, hurting nobody, and hurts on RT.
+## RB, hurting nobody, dashes on RT and hurts on LB (the owner, 2026-11-20: heal, dash and attack).
 func test_each_build_has_the_staffs_its_bot_plays() -> void:
 	for build: Dictionary in BuildsScript.all():
-		var first: CastSense = _compiled(BuildsScript.cards_of(build, 0), 0).casts[0].sense
-		var second: CastSense = _compiled(BuildsScript.cards_of(build, 1), 1).casts[0].sense
+		var first: CastSense = _compiled(build, 0).casts[0].sense
+		var second: CastSense = _compiled(build, 1).casts[0].sense
 		if build == BuildsScript.MENDER:
+			var third: CastSense = _compiled(build, 2).casts[0].sense
 			check(first.heals and not first.harms(), "the mender's RB heals and hurts nobody")
 			check(first.reach > 0.0, "and is aimed (it reaches a teammate along a line)")
-		else:
-			check(first.moves_caster, "%s: RB dashes" % build["name"])
+			check(second.moves_caster, "the mender's RT dashes")
+			check(third.harms() and not third.heals and not third.moves_caster, "the mender's LB hurts")
+			continue
+		check(first.moves_caster, "%s: RB dashes" % build["name"])
 		check(second.harms() and not second.heals and not second.moves_caster, "%s: RT hurts" % build["name"])
+
+
+func test_only_the_mender_takes_a_rack_staff_and_it_lies_in_the_hub() -> void:
+	for build: Dictionary in BuildsScript.FIGHTERS:
+		check(BuildsScript.rack_of(build) == null, "%s takes no rack staff" % build["name"])
+	var rack: StaffItem = BuildsScript.rack_of(BuildsScript.MENDER)
+	check(rack != null and rack.problems().is_empty(), "the mender's rack staff is a valid premade staff")
+	var hub: Node = (load("res://content/rooms/hub/hub.tscn") as PackedScene).instantiate()
+	var laid: bool = false
+	for stand_in: Node in hub.get_node("Items").get_children():
+		if stand_in.get(&"item") == rack:
+			laid = true
+	hub.free()
+	check(laid, "and the hub's scene lays it on its rack")
 
 
 func test_the_bag_builds_every_build() -> void:
 	var bag: Array[StringName] = BuildsScript.bag()
 	for build: Dictionary in BuildsScript.all():
 		var left: Array[StringName] = bag.duplicate()
-		for number in (build["staffs"] as Array).size():
+		for number in BuildsScript.hands_of(build):
 			for id: StringName in BuildsScript.cards_of(build, number):
 				check(left.has(id), "%s: the bag holds its %s" % [build["name"], id])
 				left.erase(id)
@@ -152,6 +184,8 @@ func _built_pair() -> Array:
 	if first == null or mender == null or _bots.size() < 2:
 		check(false, "the run started with two bots' wizards")
 		return []
+	# The mender's rack staff on its free hand (LB), as the hub's rack gives it (Play has no rack).
+	check(mender.inventory.put_on_hand(BuildsScript.RACK_STAFF.stack(), mender.inventory.free_hand()), "the mender holds its rack staff")
 	for bot in _bots:
 		check(bot.build_drawn(2), "P%d draws its build" % (bot.player + 1))
 	await commands_applied()
@@ -190,13 +224,77 @@ func test_the_mend_bot_heals_a_hurt_teammate() -> void:
 			elif target is Actor and (target as Actor).team() != mender.team():
 				foes[0] += amount
 	_events.connect("hit_landed", on_hit)
+	var heal_presses: int = 0
 	for i in HEAL_FRAMES:
 		first.global_position = mender.global_position + Vector2(60.0, 0.0)
 		await physics_frame
+		if _bots[1].intent.pressed_bits & (1 << HEAL_HAND) != 0:
+			heal_presses += 1
 	_events.disconnect("hit_landed", on_hit)
+	check(heal_presses > 0, "the mend bot pressed its heal (RB) for its hurt teammate")
 	check(healed[0] > 0.0, "the mend bot's heals landed on its teammate (%.0f health)" % healed[0])
 	check(first.health.health > before, "its teammate has more health (%.0f, was %.0f)" % [first.health.health, before])
 	check_equal(foes[0], 0.0, "and no foe was healed")
+
+
+## The third staff (the owner, 2026-11-20): shots flying at the mender make it get away with its
+## dash (RT), the staff whose next cast moves it, and it never heals the foe that shoots.
+func test_the_mend_bot_dashes_from_a_shot() -> void:
+	var pair: Array = await _built_pair()
+	if pair.is_empty():
+		return
+	var first: Actor = pair[0]
+	var mender: Actor = pair[1]
+	_bots[0].mode = BotScript.Mode.IDLER
+	first.global_position = mender.global_position + Vector2(0.0, 90.0)
+	# A foe far off to own the shots (a shot of the enemies' team is one to dodge).
+	var foe := (load("res://content/enemies/crypt_mite/crypt_mite.tscn") as PackedScene).instantiate() as Actor
+	(_flow.get(&"world") as Node2D).add_child(foe)
+	await physics_frame
+	var dashes: int = 0
+	var heals: int = 0
+	for i in DODGE_FRAMES:
+		foe.global_position = mender.global_position + Vector2(-400.0, -200.0)
+		if i % SHOT_EVERY == 0:
+			mender.projectiles.spawn(foe.id, mender.global_position + mender.body_offset + Vector2(-90.0, 0.0), Vector2(260.0, 0.0), 2.0, 4.0, ProjectilesScript.ACTOR_LAYERS)
+		await physics_frame
+		var bits: int = _bots[1].intent.pressed_bits
+		if bits & (1 << DASH_HAND) != 0:
+			dashes += 1
+		if bits & (1 << HEAL_HAND) != 0:
+			heals += 1
+	foe.queue_free()
+	check(dashes > 0, "the mend bot dashed (RT) from the shots flying at it")
+	check_equal(heals, 0, "and pressed no heal with nobody hurt")
+
+
+## Out of reach of a hurt teammate and with no shot coming, the mend bot fights with its attack
+## (LB, the rack staff), never with the heal.
+func test_the_mend_bot_attacks_with_its_rack_staff() -> void:
+	var pair: Array = await _built_pair()
+	if pair.is_empty():
+		return
+	var first: Actor = pair[0]
+	var mender: Actor = pair[1]
+	_bots[0].mode = BotScript.Mode.IDLER
+	first.global_position = mender.global_position + Vector2(0.0, 90.0)
+	var foe := (load("res://content/enemies/crypt_mite/crypt_mite.tscn") as PackedScene).instantiate() as Actor
+	(_flow.get(&"world") as Node2D).add_child(foe)
+	var attacks: int = 0
+	var heals: int = 0
+	for i in HEAL_FRAMES:
+		if is_instance_valid(foe) and not foe.is_down():
+			foe.global_position = mender.global_position + Vector2(110.0, 0.0)
+		await physics_frame
+		var bits: int = _bots[1].intent.pressed_bits | _bots[1].intent.held_bits
+		if bits & (1 << ATTACK_HAND) != 0:
+			attacks += 1
+		if bits & (1 << HEAL_HAND) != 0:
+			heals += 1
+	if is_instance_valid(foe):
+		foe.queue_free()
+	check(attacks > 0, "the mend bot fought the foe with its attack (LB)")
+	check_equal(heals, 0, "and never pressed its heal at it")
 
 
 ## A heal heals whatever it hits: with a foe on its line of fire the mend bot holds the heal (and

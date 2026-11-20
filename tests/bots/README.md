@@ -1,24 +1,36 @@
 # Bots
 
-The bots that play headless runs for the smoke tests, the seed sweep and the playtest reports. The whole folder is described in [tests/README.md](../README.md) (`bots/`); this page is the bots' builds and their mend staff.
+The bots that play headless runs for the smoke tests, the seed sweep and the playtest reports. The whole folder is described in [tests/README.md](../README.md) (`bots/`); this page is the bots' hub errand, their builds and their mend staff.
 
 ## Files
 
 - `bot.gd`: one bot, one seat (a `FrameSource`: it fills its seat's input frames as a gamepad would). A fighter plays by the enemies' own AI (`AIBrain`) with `bot_profile.tres`; an idler stands still and opens its builder.
 - `bot_builds.gd`: the bots' starting builds (below).
-- `bot_route.gd`: the walk over the wall grid between rooms.
+- `bot_hub.gd`: a bot's errand in the hub before a run (below).
+- `bot_route.gd`: the walk over the wall grid between rooms (and in the hub).
 - `staff_fuzzer.gd`: seeded random staffs (`build_random`, the spell fuzz test).
 - `playtest.gd`: a whole crypt biome played by 1-4 fighters, with a report.
-- Tests: `test_bot.gd`, `test_bot_builds.gd`, `test_bot_travel.gd`, `test_room_balance.gd`, `test_spell_fuzz.gd`.
+- Tests: `test_bot.gd`, `test_bot_builds.gd`, `test_bot_hub.gd`, `test_bot_travel.gd`, `test_room_balance.gd`, `test_spell_fuzz.gd`.
+
+## The hub
+
+The owner, 2026-11-20 (after #886): the bots' runs start in the hub, where each bot takes a staff from the hub's rack as a player would, and the run starts through the hub's own run start. No game rule is the bots' own: everything here is a player's way.
+
+- **The runners start the hub:** the smoke runner (and the sweep through it) and the playtest record `hub_requested` (`Frames.record`), not `play_requested`. The replay seed deals the hub's seed and then the run's (`ReplayTape.next_run_seed`), so the builds, drawn in the hub, and the run are the same on every start. The run seed a runner prints is the run's, read as its start room is entered.
+- **The errand** (`bot_hub.gd`, `bot.plan_hub(team, starter)`; fighters and the idler alike): a bot draws its build from the hub's dice, walks to the rack staff its build names (`bot_builds.gd`, `rack`; found by its staff and cards in `Items.lying`, as a person knows it by its look and name) and presses A (`take`) once it is the item in reach (`Items.near_of`, the hint), sets its build (`send_build`), and walks onto the teleporter stone, each seat to its own corner of it (`spot_on`). The starter (P1) presses A (`accept`) once the stone is lit. The HUD's panels turn those presses into the commands `item_take_requested` and `run_requested`, as a gamepad's. The walk is the route's field over the hub's walls and holes (`bot_route.gd`), round a wall toward the point where the field has no way (a prop's ground, the stone's). The brain plays nothing in the hub (the training dummies are no fight).
+- **The run takes the whole player along** (Flow's run from the stone, items I4): every staff, its cards and its hand, so the rack staff and the builds are in the run. The runners check it as the run starts (the smoke test fails a bot that did not carry its build in; the playtest says `P2 carried ...`).
+- **Once:** after the party departs, the errand is done; a later hub (a lost run's end) is stood in as a room with no fight.
 
 ## Starting builds
 
 The owner, 2026-11-20 (on #883): the test bots get more powerful staffs, and a bot can carry a mend staff to heal its allies.
 
-- **The table** (`bot_builds.gd`) is the bots' own, never player content. A build is the cards of each starter staff by number (RB's and RT's staff, 6 slots each), as a person would set them in the builder before the first fight. `FIGHTERS` puts a strong attack on RT (a homing, bigger bolt; a homing split bolt; a faster, overcharged bolt; a beam) and a dash on RB, so the brain fights with RT and dodges with RB. `MENDER` puts the heal on RB (mend on an overcharged, faster bolt) and a fighter's homing bigger bolt on RT. The owner allowed bots a third staff (heal, dash and attack; on #886), within the game's rules: in Play a wizard holds only the two starter staffs (`Flow.START_HANDS`; Play's start takes no loadout along), and a third comes only from the hub's rack or one found in a run. Heal and dash, the owner's other choice, lost 11 of the sweep's 60 seeds against heal and attack's 2, so the mender keeps its attack until the owner chooses.
-- **The draw:** a fighter's build comes from the run's dice (`Sim.chance_int`, purpose `bot_build`, its seat the key, its one roll the counter 0). The same run seed gives the same builds on every machine and every replay. In a team of two or more fighting bots, P2 (`MEND_SEAT`) carries `MENDER` instead (P2 fights in every run the bots play: the 4-bot smoke test's idler is P4).
-- **Building:** `bot.build_drawn(team)` sends each staff as one `staff_cards_requested`, as the builder does, from the wizard's card bag. A run the bots play with these builds starts with `bot_builds.bag()` as Play's bag (`stock`, which returns the old bag for the caller to put back): the smoke runner, the sweep (through it) and the playtest do this. `holds_build(wizard)` says whether the staffs hold the build.
-- **Valid:** `test_bot_builds.gd` compiles every build on the starter staffs: no card wasted, one cast a staff, the attack hurts, the dash moves its caster, the mend heals and hurts nobody, and the bag builds each.
+- **The table** (`bot_builds.gd`) is the bots' own, never player content. A build is the rack staff it takes in the hub (`rack`; none for most) and the cards of the staff on each hand (RB, RT, then LB, where a taken staff goes), as a person would set them in the builder before a run; a hand past the build's list keeps its cards. `FIGHTERS` puts a strong attack on RT (a homing, bigger bolt; a homing split bolt; a faster, overcharged bolt; a beam) and a dash on RB, so the brain fights with RT and dodges with RB. `MENDER` (the owner, on #886 and 2026-11-20: heal, dash and attack) takes the hub's Wild star from the rack and holds three staffs: the heal on RB (mend on an overcharged, faster bolt), a dash on RT, and on LB the Wild star rebuilt as a fighter's homing bigger bolt (`MENDER_ATTACK`).
+- **Only the mender takes a rack staff.** Every rack staff but the Wild star is built on the `dev` staff (no mana cost, no cooldown): one would win every fight and the sweep would measure nothing, and there is one Wild star. So the fighters walk straight to the stone. The Wild star is rebuilt rather than used as it is (lightning, chain, split) so the mender's attack is a fighter's and the before/after numbers compare a dash added, not a stronger attack.
+- **Picking the staff:** the brain plays every hand by what each staff casts next (`CastSense`), never by its button, so the mender heals with RB (the `heal ally` behaviour, a hurt teammate in reach), gets away with RT (an urgent dodge or escape taps whichever staff's next cast moves its caster), and otherwise fights with LB. `test_bot_builds.gd` checks each on a mender built in a run.
+- **The draw:** a fighter's build comes from the dice of the run under way when it is drawn, the hub's (`Sim.chance_int`, purpose `bot_build`, its seat the key, its one roll the counter 0). The same replay seed gives the same builds on every machine and every replay. In a team of two or more fighting bots, P2 (`MEND_SEAT`) carries `MENDER` instead (P2 fights in every run the bots play: the 4-bot smoke test's idler is P4).
+- **Building:** `bot.draw(team)` picks the build, `send_build()` sends each hand's staff as one `staff_cards_requested` (by the number of the staff on that hand), as the builder does, from the wizard's card bag; `build_drawn(team)` is both (a test's run with no hub). A run the bots play with these builds starts with `bot_builds.bag()` as Play's bag, which the hub hands out too (`stock`, which returns the old bag for the caller to put back): the smoke runner, the sweep (through it) and the playtest do this. `holds_build(wizard)` says whether the staffs hold the build, the rack staff on a hand.
+- **Valid:** `test_bot_builds.gd` compiles every build on the staffs it goes on (the starters, the rack staff's): no card wasted, one cast a staff, the attack hurts, the dash moves its caster, the mend heals and hurts nobody, and the bag builds each.
 
 ## The mend staff
 
@@ -37,7 +49,7 @@ The owner, 2026-11-20 (on #883): the test bots get more powerful staffs, and a b
 ## Validate
 
 ```sh
-godot --headless --path . --script res://tests/support/run.gd -- res://tests/bots/test_bot_builds.gd res://tests/bots/test_bot.gd
+godot --headless --path . --script res://tests/support/run.gd -- res://tests/bots/test_bot_builds.gd res://tests/bots/test_bot_hub.gd res://tests/bots/test_bot.gd
 godot --headless --fixed-fps 60 --path . --script res://tests/smoke/four_bot_smoke.gd
 godot --headless --fixed-fps 60 --path . --script res://tests/smoke/four_bot_sweep.gd -- --seeds=1-60
 godot --headless --fixed-fps 60 --path . --script res://tests/bots/playtest.gd -- --players=2 --seed=11

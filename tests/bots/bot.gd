@@ -38,10 +38,17 @@ extends FrameSource
 ## holds its seat (the reward menu opens again on a refusal) it closes it with `back`, as a person would.
 ## Idler: stands still; it only opens its builder.
 ##
+## The hub (the owner, 2026-11-20, after #886): a bot told its errand (`plan_hub`) plays the hub
+## before a run, fighter and idler alike (`bot_hub.gd`): it draws its build (from the hub's dice),
+## walks to the rack staff the build names and takes it with A (`take`), sets its build, walks onto
+## the teleporter stone, and the starter presses A (`accept`) once the stone is lit, so the run starts
+## through the hub's own run start and its loadout (the rack staff, the builds) goes along. Its brain
+## plays nothing in the hub (the training dummies are no fight).
+##
 ## Starting builds (the owner, 2026-11-20): `build_drawn(team)` sets the build drawn for its seat
 ## (bot_builds.gd: a fighter's strong staff on RT and a dash on RB, from the run's dice; in a team
-## of two or more, P2's mend staff on RB and a fighter's on RT), each staff as one
-## `staff_cards_requested`, as the builder sends it. Its brain reads its teammates' health from a
+## of two or more, P2's mend on RB, a dash on RT and the hub's rack staff rebuilt as an attack on
+## LB), each staff as one `staff_cards_requested`, as the builder sends it. Its brain reads its teammates' health from a
 ## team board of the bot's own (`_report_mates`, as a person reads the health bars), so the AI's
 ## `heal ally` behaviour casts a heal at the most hurt teammate it reaches along a clear line; a
 ## heal heals whatever it hits, so the bot holds every heal while a foe's body stands near its line
@@ -63,6 +70,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RouteScript := preload("res://tests/bots/bot_route.gd")
 const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const HubScript := preload("res://tests/bots/bot_hub.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
@@ -145,6 +153,13 @@ var _board: TeamBoard = TeamBoard.new()
 var _board_slots: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 ## How many `staff_change_requested` events the bot has sent.
 var requests_sent: int = 0
+## Its errand in the hub (`plan_hub`; null: it stands there), the team its build is drawn for there
+## (0: it sets none), and whether it is the one that starts the run.
+var hub: HubScript = null
+var _hub_team: int = 0
+var _starter: bool = false
+## The wizard its errand is for (a new one starts it again).
+var _hub_wizard: Actor = null
 
 
 ## `input` is the `PlayerInput` autoload and `flow` the `Flow` autoload. Takes the
@@ -174,8 +189,7 @@ func use_flow(flow: Node) -> void:
 
 ## Press and release `back` (B) once: in play it opens the builder.
 func tap_back() -> void:
-	_input.call("send_virtual", player, &"back", 1.0)
-	_input.call("send_virtual", player, &"back", 0.0)
+	tap(&"back")
 
 
 ## Build a random staff into staff 3, slot by slot. The cards are chosen from the wizard's bag
@@ -212,40 +226,101 @@ func build_random(build_seed: int) -> bool:
 	return true
 
 
-## Build the starting build drawn for its seat in a team of `team` fighting bots (bot_builds.gd,
-## `pick`: from the run's dice, so the same run seed builds the same staffs), each staff as one
-## `staff_cards_requested`, as the builder sends it. The cards come from the wizard's bag (a run
-## stocked with `BuildsScript.bag()`); one it lacks is refused (`build_refused`), as a person's
-## would be. Returns false when the bot has no wizard or no run's dice.
+## Build the starting build drawn for its seat in a team of `team` fighting bots (`draw`, then
+## `send_build`). Returns false when the bot has no wizard or no run's dice.
 func build_drawn(team: int) -> bool:
-	var root: Node = _flow.get_tree().root
-	var events: Node = root.get_node_or_null("Events")
-	var tick: Node = root.get_node_or_null("Tick")
-	var wizard := _flow.call("get_wizard", player) as Actor
+	return draw(team) and send_build()
+
+
+## Draw the starting build for its seat in a team of `team` fighting bots (bot_builds.gd, `pick`:
+## from the dice of the run under way, the hub's or a run's, so the same seed draws the same build)
+## into `build`. False with no run's dice.
+func draw(team: int) -> bool:
+	var tick: Node = _flow.get_tree().root.get_node_or_null("Tick")
 	var sim: Sim = tick.get(&"sim") as Sim if tick != null else null
-	if events == null or sim == null or wizard == null or wizard.caster == null:
+	if sim == null:
 		return false
 	build = BuildsScript.pick(sim, player, team)
-	for number in (build["staffs"] as Array).size():
-		events.emit_signal("staff_cards_requested", player, number, BuildsScript.cards_of(build, number), wizard.key())
-		requests_sent += 1
 	return true
 
 
-## True when `wizard`'s staffs hold the cards of its last `build_drawn`, staff by staff (each
-## staff's slots past the build's cards empty).
+## Set `build` on the wizard's staffs, hand by hand (the staff on each hand by its number), each as
+## one `staff_cards_requested`, as the builder sends it. A hand past the build's list keeps its
+## cards. The cards come from the wizard's bag (a run stocked with `BuildsScript.bag()`); one it
+## lacks is refused (`build_refused`), as a person's would be. Returns false when the bot has no
+## build or no wizard, or a hand of the build holds no staff.
+func send_build() -> bool:
+	var events: Node = _flow.get_tree().root.get_node_or_null("Events")
+	var wizard := _flow.call("get_wizard", player) as Actor
+	if build.is_empty() or events == null or wizard == null or wizard.caster == null or wizard.inventory == null:
+		return false
+	var hands: PackedInt32Array = wizard.inventory.hands()
+	var all_set: bool = true
+	for hand in BuildsScript.hands_of(build):
+		var number: int = hands[hand] if hand < hands.size() else Inventory.NO_STAFF
+		if number == Inventory.NO_STAFF:
+			all_set = false
+			continue
+		events.emit_signal("staff_cards_requested", player, number, BuildsScript.cards_of(build, hand), wizard.key())
+		requests_sent += 1
+	return all_set
+
+
+## True when `wizard`'s staffs hold the cards of its last build, hand by hand (each staff's slots
+## past the build's cards empty), and a rack staff in the build is on a hand.
 func holds_build(wizard: Actor) -> bool:
 	if build.is_empty() or wizard == null or wizard.inventory == null:
 		return false
-	for number in (build["staffs"] as Array).size():
-		var want: Array[StringName] = BuildsScript.cards_of(build, number)
-		var has: Array[StringName] = wizard.inventory.cards_of(number)
+	var rack: StaffItem = BuildsScript.rack_of(build)
+	if rack != null and not HubScript.holds_rack_staff(wizard, rack):
+		return false
+	var hands: PackedInt32Array = wizard.inventory.hands()
+	for hand in BuildsScript.hands_of(build):
+		if hand >= hands.size() or hands[hand] == Inventory.NO_STAFF:
+			return false
+		var want: Array[StringName] = BuildsScript.cards_of(build, hand)
+		var has: Array[StringName] = wizard.inventory.cards_of(hands[hand])
 		for slot in has.size():
 			if has[slot] != (want[slot] if slot < want.size() else &""):
 				return false
 		if has.size() < want.size():
 			return false
 	return true
+
+
+## Play the hub before a run (`bot_hub.gd`): draw a build for a team of `team` fighting bots and set
+## it there (0: none, as an idler or a playtest's `--plain`), and start the run from the stone when
+## `starter`. Call it before the hub starts; each new wizard in the hub does it again.
+func plan_hub(team: int, starter: bool) -> void:
+	hub = HubScript.new()
+	_hub_team = team
+	_starter = starter
+	_hub_wizard = null
+
+
+## Press and release `action` once on its virtual device, as a gamepad's button.
+func tap(action: StringName) -> void:
+	_input.call("send_virtual", player, action, 1.0)
+	_input.call("send_virtual", player, action, 0.0)
+
+
+## One step of the hub's errand for `wizard`: the walk, a tap, the build when its turn comes.
+func _step_hub(wizard: Actor) -> void:
+	_release()
+	if wizard != _hub_wizard:
+		_hub_wizard = wizard
+		hub.reset()
+		build = {}
+		if _hub_team > 0:
+			draw(_hub_team)
+	if hub.stage == HubScript.Stage.BUILD:
+		if not build.is_empty():
+			send_build()
+		hub.built()
+	var items: Node = _flow.get_node_or_null(^"/root/Items")
+	_wanted.set_move(_axes(hub.step(player, wizard, build, _starter, _flow, items)))
+	if hub.tap != &"":
+		tap(hub.tap)
 
 
 ## The wizard's card bag, one entry a copy.
@@ -335,9 +410,16 @@ func pick_reward() -> void:
 ## One step: the brain thinks for the wizard and the bot wants what it wants (`send`). An idler
 ## does nothing. The frames service calls it each tick (`fill_frame`).
 func step(delta: float) -> void:
+	var wizard := _flow.call("get_wizard", player) as Actor
+	if hub != null:
+		if _flow.get(&"mode") != _flow.get(&"MODE_HUB"):
+			hub.left_hub()
+		elif hub.stage != HubScript.Stage.DONE:
+			if wizard != null and not wizard.is_down():
+				_step_hub(wizard)
+			return
 	if mode == Mode.IDLER:
 		return
-	var wizard := _flow.call("get_wizard", player) as Actor
 	if wizard != null and _flow.get("world") != null and wizard.is_downed():
 		# Downed (not falling or spawning in): it crawls.
 		_release()
@@ -489,10 +571,15 @@ static func _offset_of(body: Node2D) -> Vector2:
 ## (ZERO keeps it, and the wizard aims where it walks), a press per pressed staff and the button
 ## held per held staff. A press waits for the frame, so none is lost.
 func send(wanted: ActorIntent) -> void:
-	_wanted.set_move(Vector2(signi(roundi(wanted.move.x * 1.5)), signi(roundi(wanted.move.y * 1.5))).limit_length(1.0))
+	_wanted.set_move(_axes(wanted.move))
 	_wanted.set_aim(wanted.aim)
 	_wanted.held_bits = wanted.held_bits
 	_wanted.pressed_bits |= wanted.pressed_bits
+
+
+## `move` as the four move keys: each axis full on or off.
+static func _axes(move: Vector2) -> Vector2:
+	return Vector2(signi(roundi(move.x * 1.5)), signi(roundi(move.y * 1.5))).limit_length(1.0)
 
 
 ## The way to walk to the nearest fight still to come (unit length), or ZERO: in a fight under way,

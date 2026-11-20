@@ -9,7 +9,9 @@ extends CanvasLayer
 ## **What it shows:** every room the party has entered (the floor's light stone) and every room only
 ## shown (the run stat `map_reveal`: the stone's shadow), each in its own shape (its floor at
 ## MAP_CELL world pixels a map pixel, read once from the grid as the biome is laid); each bridge with a
-## seen room at an end; each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
+## seen room at an end, and the room at its other end in the stone's shadow too, so no bridge ends in
+## the dark (the owner, 2026-11-20: "There should be no dead ends!"; a secret room not yet found, and
+## its bridge, stay undrawn); each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
 ## drawn bridge leads to (their mouth tells it already, `mouth_symbols.gd`), with a reward room's
 ## type under it (`reward_glyphs.gd`, the owner's ask of 2026-11-19), rising with it; and every wizard, a dot in
 ## its hat colour. **A player's own sense** (the run stat `secret_sense`, told for each seat by
@@ -321,13 +323,40 @@ func places() -> int:
 	return _rects.size()
 
 
-## True when the map draws place `place` now (a room seen, a bridge with a seen room at an end).
+## True when the map draws place `place` now: a room seen, or led to by a bridge drawn (in the shown
+## room's shadow); a bridge with a seen room at one end and a room the map may draw at the other. So
+## no bridge on the map ends in the dark (the owner, 2026-11-20: "There should be no dead ends!"): a
+## secret room not yet found is never drawn for its bridge, and so neither is its bridge.
 func draws(place: int) -> bool:
 	if place < 0 or place >= _rects.size():
 		return false
-	if _room[place] != 0:
-		return _level(place) >= SHOWN
-	return _level(_ends[place * 2]) >= SHOWN or _level(_ends[place * 2 + 1]) >= SHOWN
+	if _room[place] == 0:
+		return _bridge_drawn(place)
+	if _level(place) >= SHOWN:
+		return true
+	if not _may_draw(place):
+		return false
+	for other in _rects.size():
+		if _room[other] == 0 and (_ends[other * 2] == place or _ends[other * 2 + 1] == place) and _bridge_drawn(other):
+			return true
+	return false
+
+
+## True when bridge `bridge` is drawn: a seen room at one end, a room the map may draw at the other.
+func _bridge_drawn(bridge: int) -> bool:
+	var a: int = _ends[bridge * 2]
+	var b: int = _ends[bridge * 2 + 1]
+	return (_level(a) >= SHOWN and _may_draw(b)) or (_level(b) >= SHOWN and _may_draw(a))
+
+
+## True when room `room` may be drawn for a bridge leading to it: seen, or no secret room still
+## hidden (its rock not broken).
+func _may_draw(room: int) -> bool:
+	if room < 0 or room >= _rects.size():
+		return false
+	if _level(room) >= SHOWN or _secret[room] == 0:
+		return true
+	return pieces != null and pieces.is_opened(room)
 
 
 ## True when the map draws room `place`'s symbol now (seen, or led to by a drawn bridge).

@@ -185,8 +185,7 @@ func test_a_staffs_mana_shows_on_its_own_row() -> void:
 	panel.set_staff_plan(2, {"cards": [&"bolt"], "casts": [{"slots": PackedInt32Array([0])}]}, icons)
 	await process_frame
 	var line: MeterLineScript = panel.staff_row(2).mana_line()
-	# The quick-use cross always beside the rows (the owner, 2026-11-20) leaves a one-card row the rest.
-	check(line.size.x >= 24.0, "the line runs under the cards, got %s" % line.size)
+	check(line.size.x >= 40.0, "the line runs under the cards, got %s" % line.size)
 	check(line.position.y >= panel.staff_row(2).BOX_HEIGHT, "under the cards' frames")
 	check(not line.visible, "no line before the staff's mana is told")
 	panel.set_staff_mana(2, 30.0, 120.0)

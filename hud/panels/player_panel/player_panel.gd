@@ -35,6 +35,10 @@ const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
+## The staff rows' least width: all of a 96 px panel inside its 4 px margins, as before the quick-use
+## cross stood beside them always, so a short staff still shows whole and the panel grows by the
+## cross instead (inside a quarter pane of the Equal split).
+const STAFFS_WIDTH: float = 88.0
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
@@ -123,6 +127,9 @@ func _ready() -> void:
 	_staffs.reparent(_lower, false)
 	_staffs.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_staffs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_staffs.custom_minimum_size.x = STAFFS_WIDTH
+	# No staff told yet: no rows (and no width held for them) until one is.
+	_staffs.visible = false
 	_quick = QuickCrossScript.new()
 	_quick.name = "QuickCross"
 	_quick.size_flags_vertical = Control.SIZE_SHRINK_BEGIN

@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/hub/hub_ground.tscn" id="3_ground"]
@@ -14,6 +14,12 @@
 [ext_resource type="Resource" path="res://content/items/staffs/the_mutiny/the_mutiny.tres" id="22_the_mutiny"]
 [ext_resource type="Resource" path="res://content/items/staffs/frostfire_cascade/frostfire_cascade.tres" id="23_frostfire_cascade"]
 [ext_resource type="Resource" path="res://content/items/staffs/patient_sentry/patient_sentry.tres" id="24_patient_sentry"]
+[ext_resource type="Resource" path="res://content/items/staffs/prism_crown/prism_crown.tres" id="25_prism_crown"]
+[ext_resource type="Resource" path="res://content/items/staffs/choir_of_wisps/choir_of_wisps.tres" id="26_choir_of_wisps"]
+[ext_resource type="Resource" path="res://content/items/staffs/meteor_orchard/meteor_orchard.tres" id="27_meteor_orchard"]
+[ext_resource type="Resource" path="res://content/items/staffs/maelstrom_heart/maelstrom_heart.tres" id="28_maelstrom_heart"]
+[ext_resource type="Resource" path="res://content/items/staffs/hall_of_mirrors/hall_of_mirrors.tres" id="29_hall_of_mirrors"]
+[ext_resource type="Resource" path="res://content/items/staffs/thunderclap_gauntlet/thunderclap_gauntlet.tres" id="30_thunderclap_gauntlet"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -132,6 +138,36 @@ item = ExtResource("22_the_mutiny")
 position = Vector2(800, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("23_frostfire_cascade")
+
+[node name="PrismCrown" type="Node2D" parent="Items"]
+position = Vector2(448, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("25_prism_crown")
+
+[node name="ChoirOfWisps" type="Node2D" parent="Items"]
+position = Vector2(512, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("26_choir_of_wisps")
+
+[node name="MeteorOrchard" type="Node2D" parent="Items"]
+position = Vector2(576, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("27_meteor_orchard")
+
+[node name="MaelstromHeart" type="Node2D" parent="Items"]
+position = Vector2(640, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("28_maelstrom_heart")
+
+[node name="HallOfMirrors" type="Node2D" parent="Items"]
+position = Vector2(704, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("29_hall_of_mirrors")
+
+[node name="ThunderclapGauntlet" type="Node2D" parent="Items"]
+position = Vector2(768, 848)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("30_thunderclap_gauntlet")
 
 [node name="Zones" type="Node2D" parent="."]
 

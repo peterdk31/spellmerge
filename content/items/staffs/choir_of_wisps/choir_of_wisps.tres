@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StaffItem" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/staff_item.gd" id="1_item"]
+[ext_resource type="Resource" path="res://content/wizard/staffs/dev/dev.tres" id="2_dev"]
+
+[resource]
+script = ExtResource("1_item")
+id = &"choir_of_wisps"
+display_name = "Choir of Wisps"
+staff = ExtResource("2_dev")
+cards = Array[StringName]([&"triple", &"on_near", &"familiar", &"homing", &"fire", &"bolt", &"on_near", &"familiar", &"frost", &"spray", &"on_near", &"familiar", &"chain", &"lightning", &"bolt"])

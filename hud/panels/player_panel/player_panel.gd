@@ -386,7 +386,6 @@ func _refresh_rows() -> void:
 	# The cross always shows, an empty one too; while a menu is open the whole row hides with the
 	# staff rows.
 	_lower.visible = not _menu_open
-	_quick.modulate.a = 0.0 if _menu_open else 1.0
 
 
 func _refresh_status() -> void:

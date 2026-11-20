@@ -182,6 +182,10 @@ var _quick_glyphs: Array[ActionGlyphScript] = []
 ## clock that steps it.
 var _shade: Dictionary = {}
 var _shade_clock: float = 0.0
+## The ring of items' ids in the order they came onto it while this bag is open (one gone stays
+## remembered): an item that runs out (bound, so kept on the ring with 0), or is gone a moment as its
+## binding moves, keeps its place instead of jumping to the end (Smooth).
+var _item_order: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -512,7 +516,7 @@ func _sound(id: StringName) -> void:
 ## (`bag_use_requested`: a potion drunk). Nothing on a ring with nothing to enter.
 func enter_pointed() -> void:
 	var entry: Dictionary = pointed()
-	if _layer == Layer.ITEMS and _item_usable(entry) and int(entry["count"]) > 0:
+	if _layer == Layer.ITEMS and _events != null and _item_usable(entry) and int(entry["count"]) > 0:
 		_sound(UiSounds.CHOOSE)
 		_events.bag_use_requested.emit(index, _bag, entry["item"], _mirror.body)
 		return
@@ -704,14 +708,16 @@ func _show_layer() -> void:
 				_entries.append({"card": id, "count": _mirror.count_of(_bag, id)})
 		else:
 			_layer = Layer.ITEMS
-			for id: StringName in _mirror.ids_in(_bag):
-				_entries.append({"item": id, "count": _mirror.count_of(_bag, id)})
+			var ids: Array[StringName] = _mirror.ids_in(_bag)
 			for slot in QUICK_ACTIONS.size():
 				var bound: StringName = _mirror.quick_id(slot)
-				if bound != &"" and _mirror.quick_slot_of(_bag, bound) == slot and entry_of("item", bound) == NONE:
-					_entries.append({"item": bound, "count": 0})
+				if bound != &"" and _mirror.quick_slot_of(_bag, bound) == slot and not ids.has(bound):
+					ids.append(bound)
 			if not was_items:
 				_shade.clear()
+				_item_order.clear()
+			for id: StringName in _kept_order(ids):
+				_entries.append({"item": id, "count": _mirror.count_of(_bag, id)})
 			_keep_shades()
 	var places := PackedInt32Array()
 	var widths := PackedFloat32Array()
@@ -996,7 +1002,8 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 		var number: String = str(int(data["count"]))
 		var badge := Rect2(rect.end - Vector2(_text_width(number) + 2.0, 8.0), Vector2(_text_width(number) + 2.0, 8.0))
 		draw_rect(badge, OUTLINE)
-		_text(number, badge.position + Vector2(1.0, -1.0), DIM if none_left else TEXT)
+		var stage: int = int(_shade.get(data["item"], 0)) if data.has("item") else 0
+		_text(number, badge.position + Vector2(1.0, -1.0), TEXT.lerp(DIM, float(stage) / float(GREY_STAGES)))
 	if picked:
 		_frame(rect.grow(1.0), GOLD)
 		_frame(rect.grow(2.0), GOLD)
@@ -1032,7 +1039,7 @@ func _content() -> RegistryScript:
 ## True when the item entry `entry` of the bag entered is tagged usable (`ItemKinds.usable`): A uses
 ## it, a d-pad arm binds it.
 func _item_usable(entry: Dictionary) -> bool:
-	return entry.has("item") and _events != null and ItemKinds.usable(_bag, StringName(entry["item"]), _content())
+	return entry.has("item") and ItemKinds.usable(_bag, StringName(entry["item"]), _content())
 
 
 ## The tint of an item's icon at shade `stage` (0 its own colours ... GREY_STAGES greyed): whole steps.
@@ -1048,6 +1055,18 @@ func _shade_wanted(entry: Dictionary) -> int:
 ## Item `id`'s shade drawn on the ring (0 its icon ... GREY_STAGES greyed; for tests).
 func shade_of(id: StringName) -> int:
 	return int(_shade.get(id, 0))
+
+
+## `ids` in the order the ring has shown them, each new one remembered after them in its own order.
+func _kept_order(ids: Array[StringName]) -> Array[StringName]:
+	for id: StringName in ids:
+		if not _item_order.has(id):
+			_item_order.append(id)
+	var out: Array[StringName] = []
+	for id: StringName in _item_order:
+		if ids.has(id):
+			out.append(id)
+	return out
 
 
 ## The ring of items laid out anew: an item already on it keeps the shade it is drawn in (it steps on

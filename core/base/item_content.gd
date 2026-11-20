@@ -17,7 +17,9 @@ extends Resource
 ## from the bag (the inventory's A, `bag_use_requested`) and can be bound to a d-pad arm
 ## (`Inventory.bind_quick`, auto-bound as it is taken). Only a tagged item is; nothing infers it
 ## from the kind (`ItemKinds.usable`). The potions are, today: a new item becomes bindable by this
-## tag alone, its use the player controller's (`tests/gameplay/player/test_usable_items.gd` uses every tagged one).
+## tag alone, and what using it does is the player controller's (`_use_item`: a potion is drunk),
+## so a tagged class it has no use for yet needs one there; `tests/gameplay/player/test_usable_items.gd`
+## uses every tagged item and fails for one it cannot use.
 @export var usable: bool = false
 
 

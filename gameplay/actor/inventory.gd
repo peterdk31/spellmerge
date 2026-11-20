@@ -77,6 +77,9 @@ enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_D
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
+## Not state: the content registry it reads an item's usable tag from (a service).
+const DERIVED: Array[StringName] = [&"registry"]
+
 ## A bag with no limit.
 const UNLIMITED: int = -1
 ## No staff (a hand that holds none, a number nobody has).
@@ -127,6 +130,9 @@ var _carried_kept: int = 0
 ## By quick-use slot: the bag and the id of the item bound to it (`&""`: none).
 var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
 var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
+## The content registry (`ItemKinds.usable` reads an item's tag from it): set by its body's controller
+## (`PlayerController`) or `take_loadout`; null: the registry autoload.
+var registry: RegistryScript = null
 
 
 func _init() -> void:
@@ -194,19 +200,21 @@ func loadout() -> PlayerLoadout:
 ## `registry` has of its id; one it has none of is left out; cards past its slots are cut, as
 ## `ItemStack.of_staff` cuts them), on the hands the loadout puts them on
 ## or else in the staff bag, every pool full. A bag it has not, and a hand past HANDS, hold nothing.
-func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
+func take_loadout(loadout: PlayerLoadout, in_registry: Node) -> void:
 	cards_given = true
 	_staffs_given = true
 	_hands.fill(null)
 	_next_number = HANDS
 	# What it carried from the start is gone with the bags (`carried_kept`: 0 from now on).
 	_carried_kept = 0
+	if registry == null:
+		registry = in_registry as RegistryScript
 	for bag: StringName in _bags:
 		_stacks(bag).clear()
 	for slot in QUICK_SLOTS:
 		var bag: StringName = loadout.quick_bag(slot)
 		var id: StringName = loadout.quick_id(slot)
-		var bound: bool = _bags.has(bag) and ItemKinds.usable(bag, id, registry as RegistryScript)
+		var bound: bool = _bags.has(bag) and ItemKinds.usable(bag, id, _registry())
 		_quick_bags[slot] = bag if bound else &""
 		_quick_ids[slot] = id if bound else &""
 	for bag: StringName in loadout.bags():
@@ -225,7 +233,7 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 			stack.count = counts[at]
 			_put(stack)
 	for number: int in loadout.staff_numbers():
-		var base: StaffBase = staff_content(registry, loadout.staff_id(number))
+		var base: StaffBase = staff_content(in_registry, loadout.staff_id(number))
 		if base == null:
 			continue
 		var stack := ItemStack.of_staff(base, loadout.staff_cards(number))
@@ -267,12 +275,12 @@ func set_staff_mana(number: int, mana: float) -> void:
 		stack.mana = clampf(mana, 0.0, stack.staff.max_mana if stack.staff != null else mana)
 
 
-## The staff `registry` has of the id `id` in the staff kind's content folders, or null.
-static func staff_content(registry: Node, id: StringName) -> StaffBase:
-	if registry == null or id == &"":
+## The staff `content_registry` has of the id `id` in the staff kind's content folders, or null.
+static func staff_content(content_registry: Node, id: StringName) -> StaffBase:
+	if content_registry == null or id == &"":
 		return null
 	for folder: StringName in ItemKinds.content_of(ItemKinds.STAFF):
-		var found: Resource = registry.call(&"get_resource", folder, id) as Resource
+		var found: Resource = content_registry.call(&"get_resource", folder, id) as Resource
 		if ItemKinds.is_content(ItemKinds.STAFF, found):
 			return found as StaffBase
 	return null
@@ -302,14 +310,14 @@ func hand_cards() -> Array:
 # --- Bags -------------------------------------------------------------------------------
 
 ## The dev bag (the hub's, and a wizard's given none): DEV_COPIES of every card
-## `registry` finds in the card kind's content folders, card id to copies, in the registry's order.
-static func dev_cards(registry: Node) -> Dictionary:
+## `content_registry` finds in the card kind's content folders, card id to copies, in the registry's order.
+static func dev_cards(content_registry: Node) -> Dictionary:
 	var out: Dictionary = {}
-	if registry == null:
+	if content_registry == null:
 		return out
 	for folder: StringName in ItemKinds.content_of(ItemKinds.CARD):
-		for id: StringName in registry.call(&"get_ids", folder):
-			if ItemKinds.is_content(ItemKinds.CARD, registry.call(&"get_resource", folder, id) as Resource):
+		for id: StringName in content_registry.call(&"get_ids", folder):
+			if ItemKinds.is_content(ItemKinds.CARD, content_registry.call(&"get_resource", folder, id) as Resource):
 				out[id] = DEV_COPIES
 	return out
 
@@ -515,10 +523,12 @@ func bind_quick(slot: int, bag: StringName, id: StringName) -> Refusal:
 	return Refusal.NONE
 
 
-## The content registry (the autoload; `ItemKinds.usable` reads an item's tag from it), or null
-## outside the tree: then nothing is usable.
+## The content registry `ItemKinds.usable` reads an item's tag from: `registry`, else the autoload
+## (null outside the tree with none set: then nothing is usable).
 func _registry() -> RegistryScript:
-	return get_node_or_null(^"/root/Registry") as RegistryScript if is_inside_tree() else null
+	if registry == null and is_inside_tree():
+		registry = get_node_or_null(^"/root/Registry") as RegistryScript
+	return registry
 
 
 func _set_quick(slot: int, bag: StringName, id: StringName) -> void:

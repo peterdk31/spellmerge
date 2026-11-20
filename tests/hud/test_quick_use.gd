@@ -235,7 +235,7 @@ func test_a_bound_potion_with_none_left_stays_greyed_on_the_ring() -> void:
 		shades.append(inventory.shade_of(&"healing"))
 	check_equal(_wizard.inventory.count_of(POTIONS, &"healing"), 0, "drunk from the ring: none left")
 	var at: int = inventory.entry_of("item", &"healing")
-	check(at != InventoryScript.NONE, "bound up, it stays on the ring")
+	check_equal(at, 0, "bound up, it stays on the ring, in its own place (Smooth: never jumps to the end)")
 	check_equal(int(inventory.entries()[at]["count"]), 0, "with its count 0")
 	var seen: Array[int] = []
 	for shade in shades:

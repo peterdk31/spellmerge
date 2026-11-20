@@ -314,6 +314,9 @@ func _watch(body: Actor) -> void:
 		inventory.staff_changed.connect(_on_owned_staff_changed)
 		inventory.hands_changed.connect(_on_hands_changed)
 		inventory.quick_changed.connect(_on_quick_changed)
+	if inventory != null and registry != null:
+		# The same content its use reads (`_use_item`), so what binds is what is used.
+		inventory.registry = registry
 
 
 func _unwatch(body: Actor) -> void:

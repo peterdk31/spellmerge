@@ -587,8 +587,7 @@ func _panel_source() -> String:
 	source = source.replace("events.quick_use_requested.emit(player, slot)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/quick_slots.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/map_legend.gd")
-	# The cross's own signal to its panel (that it takes room now) is no event.
-	source += FileAccess.get_file_as_string("res://hud/widgets/quick_cross.gd").replace("shown_changed.emit()", "")
+	source += FileAccess.get_file_as_string("res://hud/widgets/quick_cross.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/item_hints.gd")
 	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")

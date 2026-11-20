@@ -36,6 +36,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `quick_bind_requested` | `hud` (the inventory's d-pad on a usable item: binds that arm's quick-use slot; a command, the owner's of 2026-11-20) | `player` |
 | `quick_use_requested` | `hud` (a d-pad arm in play, the Y map not held: one of the item bound there used; a command) | `player` |
 | `quick_bound` | `player` (what each quick-use slot of the body a seat shows is bound to, after `inventory_announced` and on every change) | `hud` (the corner panel's cross, the inventory) |
+| `item_recharging` | `player` (an item of the body a seat shows recharges after a use, an active relic's cooldown: seconds left of the whole, at its start, after `inventory_announced` and 0 when ready) | `hud` (the cross's and the ring's fill) |
 | `inventory_refused` | `player` | `hud` (the inventory's note) |
 | `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |

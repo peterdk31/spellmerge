@@ -16,12 +16,18 @@ extends Control
 ##   X drops it on the ground.
 ## - **Cards:** the kinds the bag holds, then (A or RT) a kind's cards with their counts; X drops one.
 ## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
-##   A uses the one pointed at where its kind can be used (a potion is drunk: `bag_use_requested`,
-##   the owner's of 2026-11-19) and X drops one where its kind can be dropped (`ItemKinds.can`).
-##   A d-pad arm (`quick_*`; 1-4 on the keyboard) binds the usable item pointed at to that arm's
-##   quick-use slot, as a hand's button puts a staff on a hand (`quick_bind_requested`; the owner,
-##   2026-11-20): bound on another arm it moves, bound on that arm already it is let go. Each item
-##   bound shows its arm's glyph beside it on the ring, and the hint row says "Bind".
+##   A uses the one pointed at where it has a use (`ItemKinds.usable`; a potion is drunk:
+##   `bag_use_requested`, the owner's of 2026-11-19) and X drops one where its kind can be dropped
+##   (`ItemKinds.can`). A d-pad arm (`quick_*`; 1-4 on the keyboard) binds the usable item pointed
+##   at to that arm's quick-use slot, as a hand's button puts a staff on a hand
+##   (`quick_bind_requested`; the owner, 2026-11-20): bound on another arm it moves, bound on that
+##   arm already it is let go. Each item bound shows its arm's glyph beside it on the ring, and the
+##   hint row says "Bind". **An item bound with none left stays on the ring** (the owner,
+##   2026-11-20), after the ones held, its icon greyed and its count 0, so it can be let go or bound
+##   to another arm there; it leaves the ring as it is let go. Its icon greys and fills again through
+##   GREY_STAGES shades (Smooth). An item recharging after a use (an active relic's cooldown,
+##   `item_recharging`) has a shutter over its icon sinking a whole row at a time (`RechargeShutter`),
+##   and Use is dimmed until it is ready.
 ## - **The column:** the HP bar, then the four hands, each its button's glyph, its staff's head and
 ##   numbers (`NUMBERS`), and while a staff is pointed at an arrow beside each number of every other
 ##   hand's staff: up or down as the pointed staff's number is higher or lower, green where that is
@@ -47,6 +53,7 @@ const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
 const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
+const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
 
 const NONE: int = -1
 const PLAYER_COUNT: int = 4
@@ -114,6 +121,11 @@ const NOTE_TIME: float = 1.4
 const OPEN_VERB: String = "Open"
 const USE_VERB: String = "Use"
 const BIND_VERB: String = "Bind"
+## An item with none left (bound, so on the ring) is drawn in this shade, reached through GREY_STAGES
+## whole steps of the tint at GREY_FPS (Smooth), as the panel's cross greys its slot.
+const GREY: Color = Color(0.32, 0.31, 0.38, 1.0)
+const GREY_STAGES: int = 3
+const GREY_FPS: float = 20.0
 const DROP_VERB: String = "Drop"
 const BACK_VERB: String = "Back"
 const CLOSE_VERB: String = "Close"
@@ -169,6 +181,22 @@ var _hand_glyphs: Array[ActionGlyphScript] = []
 var _ring_glyphs: Array[ActionGlyphScript] = []
 ## On a ring of items, each quick-use slot's arm glyph beside the item bound to it.
 var _quick_glyphs: Array[ActionGlyphScript] = []
+## By item id on the ring of items: its shade drawn (0 its icon ... GREY_STAGES greyed), and the
+## clock that steps it.
+var _shade: Dictionary = {}
+var _shade_clock: float = 0.0
+## The ring of items' ids in the order they came onto it while this bag is open (one gone stays
+## remembered): an item that runs out (bound, so kept on the ring with 0), or is gone a moment as its
+## binding moves, keeps its place instead of jumping to the end (Smooth).
+var _item_order: Array[StringName] = []
+## Items recharging after a use (`item_recharging`: an active relic's cooldown, told by the
+## simulation at each sixteenth): "bag/id" -> the shutter rows told (of ICON_SIZE); drawn as a shutter
+## over the item's icon. The ring keeps no clock for it.
+var _charges: Dictionary = {}
+## By "bag/id": the shutter rows drawn, stepping a row a frame toward those told (Smooth), and the
+## clock that steps them.
+var _charge_rows: Dictionary = {}
+var _charge_clock: float = 0.0
 
 
 func _ready() -> void:
@@ -212,6 +240,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_events.owned_staff_changed.connect(_on_owned_staff_changed)
 		_events.hands_changed.connect(_on_hands_changed)
 		_events.quick_bound.connect(_on_quick_bound)
+		_events.item_recharging.connect(_on_item_recharging)
 		_events.inventory_refused.connect(_on_inventory_refused)
 		_events.player_stats_changed.connect(_on_stats_changed)
 	if _ui_focus != null:
@@ -380,6 +409,8 @@ func step(delta: float) -> void:
 	if _note_left > 0.0:
 		_note_left -= delta
 		_dirty = true
+	_step_shades(delta)
+	_step_charges(delta)
 	if _menu.pointed_for(_clock) < POP_TIME:
 		_dirty = true
 	if _dirty:
@@ -498,7 +529,7 @@ func _sound(id: StringName) -> void:
 ## (`bag_use_requested`: a potion drunk). Nothing on a ring with nothing to enter.
 func enter_pointed() -> void:
 	var entry: Dictionary = pointed()
-	if _layer == Layer.ITEMS and _item_can(entry, ItemKinds.USE):
+	if _layer == Layer.ITEMS and _events != null and _item_usable(entry) and int(entry["count"]) > 0:
 		_sound(UiSounds.CHOOSE)
 		_events.bag_use_requested.emit(index, _bag, entry["item"], _mirror.body)
 		return
@@ -547,7 +578,7 @@ func put_on_hand(hand: int) -> void:
 ## go when it is bound there already: the simulation's rule, `quick_bind_requested`).
 func bind_pointed(slot: int) -> void:
 	var entry: Dictionary = pointed()
-	if _layer != Layer.ITEMS or _events == null or not _item_can(entry, ItemKinds.USE):
+	if _layer != Layer.ITEMS or _events == null or not _item_usable(entry):
 		return
 	_sound(UiSounds.CHOOSE)
 	_events.quick_bind_requested.emit(index, slot, _bag, entry["item"], _mirror.body)
@@ -559,7 +590,7 @@ func drop_pointed() -> void:
 	if entry.is_empty() or _events == null:
 		return
 	if _layer == Layer.ITEMS:
-		if _item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE):
+		if int(entry["count"]) > 0 and (_item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE)):
 			_sound(UiSounds.CHOOSE)
 			_events.bag_drop_requested.emit(index, _bag, entry["item"], NONE, _mirror.body)
 		return
@@ -577,6 +608,8 @@ func drop_pointed() -> void:
 func _on_inventory_announced(player: int, body: int) -> void:
 	if player != index:
 		return
+	_charges.clear()
+	_charge_rows.clear()
 	_mirror.clear(body)
 	_refill()
 
@@ -606,7 +639,8 @@ func _on_quick_bound(player: int, slot: int, bag: StringName, id: StringName) ->
 	if player != index:
 		return
 	_mirror.hear_quick(slot, bag, id)
-	_changed()
+	# An item with none left is on the ring only while bound.
+	_refill()
 
 
 func _on_inventory_refused(player: int, reason: String) -> void:
@@ -665,6 +699,7 @@ func _refill() -> void:
 
 ## Lay the ring out for the layer the bag and kind entered say.
 func _show_layer() -> void:
+	var was_items: bool = _layer == Layer.ITEMS
 	_entries.clear()
 	if _bag == &"":
 		_layer = Layer.BAGS
@@ -688,8 +723,17 @@ func _show_layer() -> void:
 				_entries.append({"card": id, "count": _mirror.count_of(_bag, id)})
 		else:
 			_layer = Layer.ITEMS
-			for id: StringName in _mirror.ids_in(_bag):
+			var ids: Array[StringName] = _mirror.ids_in(_bag)
+			for slot in QUICK_ACTIONS.size():
+				var bound: StringName = _mirror.quick_id(slot)
+				if bound != &"" and _mirror.quick_slot_of(_bag, bound) == slot and not ids.has(bound):
+					ids.append(bound)
+			if not was_items:
+				_shade.clear()
+				_item_order.clear()
+			for id: StringName in _kept_order(ids):
 				_entries.append({"item": id, "count": _mirror.count_of(_bag, id)})
+			_keep_shades()
 	var places := PackedInt32Array()
 	var widths := PackedFloat32Array()
 	for at in _entries.size():
@@ -719,9 +763,10 @@ func _refresh_hints() -> void:
 	var first: String = OPEN_VERB
 	if _layer == Layer.ITEMS:
 		first = USE_VERB
-		can_enter = _item_can(entry, ItemKinds.USE)
-		can_drop = _item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE)
-	var can_bind: bool = _layer == Layer.ITEMS and _item_can(entry, ItemKinds.USE)
+		var held: bool = entry.has("item") and int(entry["count"]) > 0
+		can_enter = held and _item_usable(entry) and not recharging(entry["item"])
+		can_drop = held and (_item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE))
+	var can_bind: bool = _layer == Layer.ITEMS and _item_usable(entry)
 	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB, BIND_VERB]
 	var live: Array[bool] = [can_enter, can_drop, true, true, can_bind]
 	_menu.set_hints(verbs, live)
@@ -982,13 +1027,17 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 	elif data.has("item"):
 		var item_icon: Texture2D = _look(data["item"])["icon"] as Texture2D
 		if item_icon != null and size >= SMALL_ICON:
-			var side: float = minf(ICON_SIZE, rect.size.x - 2.0)
-			draw_texture_rect(item_icon, Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side)), false)
-	if data.has("count") and int(data["count"]) > 1 and not data.has("kind"):
+			var side: float = floorf(minf(ICON_SIZE, rect.size.x - 2.0))
+			var icon_rect := Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side))
+			draw_texture_rect(item_icon, icon_rect, false, shade_tint(int(_shade.get(data["item"], 0))))
+			RechargeShutter.draw(self, icon_rect, recharge_rows(data["item"]))
+	var none_left: bool = data.has("item") and int(data["count"]) == 0
+	if data.has("count") and (int(data["count"]) > 1 or none_left) and not data.has("kind"):
 		var number: String = str(int(data["count"]))
 		var badge := Rect2(rect.end - Vector2(_text_width(number) + 2.0, 8.0), Vector2(_text_width(number) + 2.0, 8.0))
 		draw_rect(badge, OUTLINE)
-		_text(number, badge.position + Vector2(1.0, -1.0), TEXT)
+		var stage: int = int(_shade.get(data["item"], 0)) if data.has("item") else 0
+		_text(number, badge.position + Vector2(1.0, -1.0), TEXT.lerp(DIM, float(stage) / float(GREY_STAGES)))
 	if picked:
 		_frame(rect.grow(1.0), GOLD)
 		_frame(rect.grow(2.0), GOLD)
@@ -1011,9 +1060,129 @@ func _bag_word(bag: StringName) -> String:
 
 ## How item `id` of the bag entered looks (`ItemLooks`: its name, icon and description).
 func _look(id: StringName) -> Dictionary:
+	return ItemLooks.of(ItemKinds.kind_in(_bag, id), id, _content(), _spells)
+
+
+## The registry, found as it is first needed (null outside the tree).
+func _content() -> RegistryScript:
 	if _registry == null and is_inside_tree():
 		_registry = get_node_or_null("/root/Registry") as RegistryScript
-	return ItemLooks.of(ItemKinds.kind_in(_bag, id), id, _registry, _spells)
+	return _registry
+
+
+## True when the item entry `entry` of the bag entered has a use (`ItemKinds.usable`): A uses
+## it, a d-pad arm binds it.
+func _item_usable(entry: Dictionary) -> bool:
+	return entry.has("item") and ItemKinds.usable(_bag, StringName(entry["item"]), _content())
+
+
+## The tint of an item's icon at shade `stage` (0 its own colours ... GREY_STAGES greyed): whole steps.
+static func shade_tint(stage: int) -> Color:
+	return Color.WHITE.lerp(GREY, float(clampi(stage, 0, GREY_STAGES)) / float(GREY_STAGES))
+
+
+## The shade an entry's icon is going to: greyed with none left.
+func _shade_wanted(entry: Dictionary) -> int:
+	return GREY_STAGES if int(entry.get("count", 1)) == 0 else 0
+
+
+## Item `id`'s shade drawn on the ring (0 its icon ... GREY_STAGES greyed; for tests).
+func shade_of(id: StringName) -> int:
+	return int(_shade.get(id, 0))
+
+
+func _on_item_recharging(player: int, bag: StringName, id: StringName, left: float, whole: float) -> void:
+	if player != index:
+		return
+	var key: String = "%s/%s" % [bag, id]
+	var shut: int = RechargeShutter.rows(left, whole, int(ICON_SIZE))
+	if shut > 0:
+		_charges[key] = shut
+	else:
+		_charges.erase(key)
+	if not _open:
+		# Not shown: drawn as it stands when it is.
+		_charge_rows[key] = shut
+	_dirty = true
+
+
+## The shutter rows drawn over item `id` of the bag entered (0: none; for tests).
+func recharge_rows(id: StringName) -> int:
+	return int(_charge_rows.get("%s/%s" % [_bag, id], 0))
+
+
+## True while item `id` of the bag entered recharges (its Use is dimmed).
+func recharging(id: StringName) -> bool:
+	return _charges.has("%s/%s" % [_bag, id])
+
+
+## Each shutter's drawn rows a row nearer what was told at GREY_FPS (Smooth: it drops in and sinks by
+## whole rows, never jumps).
+func _step_charges(delta: float) -> void:
+	var moving: bool = false
+	for key: String in _charges:
+		if int(_charge_rows.get(key, 0)) != int(_charges[key]):
+			moving = true
+	for key: String in _charge_rows:
+		if not _charges.has(key) and int(_charge_rows[key]) != 0:
+			moving = true
+	if not moving:
+		_charge_clock = 0.0
+		return
+	_charge_clock += delta
+	while _charge_clock >= 1.0 / GREY_FPS:
+		_charge_clock -= 1.0 / GREY_FPS
+		for key: String in _charges:
+			if not _charge_rows.has(key):
+				_charge_rows[key] = 0
+		for key: String in _charge_rows:
+			var at: int = int(_charge_rows[key])
+			_charge_rows[key] = at + signi(int(_charges.get(key, 0)) - at)
+	_dirty = true
+
+
+## `ids` in the order the ring has shown them, each new one remembered after them in its own order.
+func _kept_order(ids: Array[StringName]) -> Array[StringName]:
+	for id: StringName in ids:
+		if not _item_order.has(id):
+			_item_order.append(id)
+	var out: Array[StringName] = []
+	for id: StringName in _item_order:
+		if ids.has(id):
+			out.append(id)
+	return out
+
+
+## The ring of items laid out anew: an item already on it keeps the shade it is drawn in (it steps on
+## from there), one new to it is drawn as it stands.
+func _keep_shades() -> void:
+	var kept: Dictionary = {}
+	for entry: Dictionary in _entries:
+		var id: StringName = entry["item"]
+		kept[id] = int(_shade.get(id, _shade_wanted(entry)))
+	_shade = kept
+
+
+## Each icon's shade a step nearer its wanted one at GREY_FPS (Smooth: greying and filling again pass
+## the shades between).
+func _step_shades(delta: float) -> void:
+	if _layer != Layer.ITEMS:
+		return
+	var moving: bool = false
+	for entry: Dictionary in _entries:
+		if int(_shade.get(entry["item"], 0)) != _shade_wanted(entry):
+			moving = true
+	if not moving:
+		_shade_clock = 0.0
+		return
+	_shade_clock += delta
+	while _shade_clock >= 1.0 / GREY_FPS:
+		_shade_clock -= 1.0 / GREY_FPS
+		for entry: Dictionary in _entries:
+			var id: StringName = entry["item"]
+			var at: int = int(_shade.get(id, 0))
+			_shade[id] = at + signi(_shade_wanted(entry) - at)
+	_dirty = true
 
 
 ## True when the item entry `entry` of the bag entered is of a kind that can be `action`ed.

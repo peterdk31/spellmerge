@@ -38,6 +38,14 @@ extends FrameSource
 ## holds its seat (the reward menu opens again on a refusal) it closes it with `back`, as a person would.
 ## Idler: stands still; it only opens its builder.
 ##
+## Starting builds (the owner, 2026-11-20): `build_drawn(team)` sets the build drawn for its seat
+## (bot_builds.gd: a fighter's strong staff on RT and a dash on RB, from the run's dice; in a team
+## of two or more, P2's mend staff on RB and a fighter's on RT), each staff as one
+## `staff_cards_requested`, as the builder sends it. Its brain reads its teammates' health from a
+## team board of the bot's own (`_report_mates`, as a person reads the health bars), so the AI's
+## `heal ally` behaviour casts a heal at the most hurt teammate it reaches along a clear line; a
+## heal heals whatever it hits, so the bot holds every heal while a foe's body stands near its line
+## of fire out to the heal's whole reach (`foe_in_line`, `held_heal`).
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
 ## start, so RT keeps its `bolt` and the room is still cleared; LB is an empty hand since items I2) with the same `staff_change_requested` events a person sends (slot by slot, from the
 ## card bag of the wizard, never more copies than it holds). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
@@ -54,6 +62,7 @@ const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RouteScript := preload("res://tests/bots/bot_route.gd")
+const BuildsScript := preload("res://tests/bots/bot_builds.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
@@ -85,6 +94,14 @@ const CRAWL_SHY: float = 64.0
 ## How near a teammate's body may be to its line of fire before it holds fire (pixels: a body's
 ## hurt circle and a bolt's width, with a margin).
 const MATE_CLEAR: float = 16.0
+## How near a foe's body may be to a heal's line of fire, out to the heal's whole reach (a heal that
+## misses flies on), before it holds the heal (pixels: a body's hurt circle, a bolt's width and the
+## aim's error, with a margin).
+const FOE_CLEAR: float = 24.0
+## How near the caster a foe's body holds a heal whichever way it is aimed (pixels: a shot leaves at
+## the staff's tip, ahead of the body, and a foe pressed against the caster is hit as it leaves; a
+## bone husk on top of the mender took a heal in the playtest of 2026-11-20).
+const FOE_CLOSE: float = 32.0
 
 var player: int = 0
 var mode: Mode = Mode.FIGHTER
@@ -117,6 +134,14 @@ var _events: Node = null
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
+## The build of the last `build_drawn` (bot_builds.gd: its name and its staffs' cards; empty before).
+var build: Dictionary = {}
+## The team board its brain reads its teammates' health from (`AIBrain.hurt_mate`, the `heal ally`
+## behaviour): its own, filled each step with what it sees of its teammates (`_report_mates`), as a
+## person reads their health bars. The bots' own, never the AI area's, so it changes no simulation
+## state. Its slot on it for each seat's wizard.
+var _board: TeamBoard = TeamBoard.new()
+var _board_slots: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 ## How many `staff_change_requested` events the bot has sent.
 var requests_sent: int = 0
 
@@ -183,6 +208,42 @@ func build_random(build_seed: int) -> bool:
 		built_cards.append(card)
 		events.emit_signal("staff_change_requested", player, BUILD_STAFF, slot, built_cards[slot], wizard.key())
 		requests_sent += 1
+	return true
+
+
+## Build the starting build drawn for its seat in a team of `team` fighting bots (bot_builds.gd,
+## `pick`: from the run's dice, so the same run seed builds the same staffs), each staff as one
+## `staff_cards_requested`, as the builder sends it. The cards come from the wizard's bag (a run
+## stocked with `BuildsScript.bag()`); one it lacks is refused (`build_refused`), as a person's
+## would be. Returns false when the bot has no wizard or no run's dice.
+func build_drawn(team: int) -> bool:
+	var root: Node = _flow.get_tree().root
+	var events: Node = root.get_node_or_null("Events")
+	var tick: Node = root.get_node_or_null("Tick")
+	var wizard := _flow.call("get_wizard", player) as Actor
+	var sim: Sim = tick.get(&"sim") as Sim if tick != null else null
+	if events == null or sim == null or wizard == null or wizard.caster == null:
+		return false
+	build = BuildsScript.pick(sim, player, team)
+	for number in (build["staffs"] as Array).size():
+		events.emit_signal("staff_cards_requested", player, number, BuildsScript.cards_of(build, number), wizard.key())
+		requests_sent += 1
+	return true
+
+
+## True when `wizard`'s staffs hold the cards of its last `build_drawn`, staff by staff (each
+## staff's slots past the build's cards empty).
+func holds_build(wizard: Actor) -> bool:
+	if build.is_empty() or wizard == null or wizard.inventory == null:
+		return false
+	for number in (build["staffs"] as Array).size():
+		var want: Array[StringName] = BuildsScript.cards_of(build, number)
+		var has: Array[StringName] = wizard.inventory.cards_of(number)
+		for slot in has.size():
+			if has[slot] != (want[slot] if slot < want.size() else &""):
+				return false
+		if has.size() < want.size():
+			return false
 	return true
 
 
@@ -288,7 +349,11 @@ func step(delta: float) -> void:
 		# A new wizard (a new run): a fresh brain for it.
 		intent.clear()
 		brain.setup(wizard, PROFILE, SEED + player)
+		brain.board = _board
+		_board.clear()
+		_board_slots.fill(-1)
 		_forget_rewards()
+	_report_mates(wizard, delta)
 	intent.begin_step()
 	brain.think(delta, intent)
 	# A revive under way (the brain's `revive` behaviour) goes first: it would walk off its teammate.
@@ -303,7 +368,23 @@ func step(delta: float) -> void:
 		# through one, as a person does; a cast that moves it (a dodge's dash) still goes.
 		intent.pressed_bits = held_fire(intent.pressed_bits)
 		intent.held_bits = held_fire(intent.held_bits)
+	if foe_in_line(wizard, intent.aim if intent.aim != Vector2.ZERO else wizard.aim, heal_reach()):
+		# A heal heals whatever it hits, friend or foe: never one along a line a foe stands near, nor
+		# with a foe pressed against it.
+		intent.pressed_bits = held_heal(intent.pressed_bits)
+		intent.held_bits = held_heal(intent.held_bits)
 	send(intent)
+
+
+## Its board hears how each standing teammate is (its own reports are its brain's) and moves on
+## by `delta`.
+func _report_mates(wizard: Actor, delta: float) -> void:
+	_board.step(delta)
+	for seat in 4:
+		var mate := _flow.call("get_wizard", seat) as Actor
+		if seat == player or mate == null or not mate.is_inside_tree() or mate.is_down():
+			continue
+		_board_slots[seat] = _board.report(wizard.team(), mate.id, mate.global_position, AIBrain.health_of(mate), _board_slots[seat])
 
 
 ## True when a standing teammate's body stands in `wizard`'s line of fire along `aim`, nearer than
@@ -321,13 +402,66 @@ func mate_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
 		var mate := _flow.call("get_wizard", seat) as Actor
 		if mate == null or not mate.is_inside_tree() or mate.is_down():
 			continue
-		var rel: Vector2 = mate.global_position + mate.body_offset - from
-		var ahead: float = rel.dot(way)
-		if ahead <= 0.0 or ahead > reach:
-			continue
-		if absf(rel.cross(way)) < MATE_CLEAR:
+		if _near_line(from, way, mate.global_position + mate.body_offset, reach, MATE_CLEAR):
 			return true
 	return false
+
+
+## True when a foe's body (an open actor of another team than `wizard`'s, standing, dying or
+## spawning in) stands within FOE_CLEAR of `wizard`'s line of fire along `aim`, ahead of it and
+## nearer than `reach` (INF: any; 0: none), or within FOE_CLOSE of it any way round. A heal held for
+## one never lands on a foe. A prop (the world's team) counts too: a heal is wasted on one.
+func foe_in_line(wizard: Actor, aim: Vector2, reach: float) -> bool:
+	if aim == Vector2.ZERO or reach <= 0.0:
+		return false
+	var table := _flow.get_node_or_null(^"/root/Actors") as ActorsScript
+	if table == null:
+		return false
+	var way: Vector2 = aim.normalized()
+	var from: Vector2 = wizard.global_position + wizard.body_offset
+	if _ids.size() < ActorsScript.ACTORS:
+		_ids.resize(ActorsScript.ACTORS)
+	var count: int = table.open_ids(_ids)
+	for at in count:
+		var id: int = _ids[at]
+		if table.team_of(id) == wizard.team():
+			continue
+		var foe := table.node_of(id) as Node2D
+		if foe == null or not foe.is_inside_tree():
+			continue
+		var body: Vector2 = foe.global_position + _offset_of(foe)
+		if from.distance_squared_to(body) < FOE_CLOSE * FOE_CLOSE or _near_line(from, way, body, reach, FOE_CLEAR):
+			return true
+	return false
+
+
+## True when `point` lies ahead of `from` along the unit `way`, no farther along it than `reach`,
+## and within `clear` of the line.
+static func _near_line(from: Vector2, way: Vector2, point: Vector2, reach: float, clear: float) -> bool:
+	var rel: Vector2 = point - from
+	var ahead: float = rel.dot(way)
+	return ahead > 0.0 and ahead <= reach and absf(rel.cross(way)) < clear
+
+
+## The farthest a ready heal of its staffs flies (its next cast's reach, as the brain last read
+## them, `AIBrain.senses`, and a little more), or 0 with none that heals.
+func heal_reach() -> float:
+	var most: float = 0.0
+	for at in brain.staff_count:
+		var sense: CastSense = brain.senses[at]
+		if sense != null and not sense.empty and sense.heals:
+			most = maxf(most, maxf(sense.reach, sense.close_reach) + FOE_CLEAR)
+	return most
+
+
+## `bits` (a staff a bit) less the staffs whose next cast heals: what it may still press with a foe
+## near its line of fire.
+func held_heal(bits: int) -> int:
+	for at in brain.staff_count:
+		var sense: CastSense = brain.senses[at]
+		if sense != null and not sense.empty and sense.heals:
+			bits &= ~(1 << at)
+	return bits
 
 
 ## `bits` (a staff a bit) less the staffs whose next cast hurts and does not move the caster (as the

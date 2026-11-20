@@ -10,7 +10,10 @@ extends "res://tests/support/screenshot.gd"
 ## `long fight` (over LONG_FIGHT seconds); at the end `PLAYTEST RESULT`, the world's sounds started
 ## (`sounds`, and `doubled sound`: one id started twice at one place in one frame), `one body hit
 ## twice in a frame by one caster's card`, and every error logged. The arguments are in tests/README.md
-## (`bots/`). With `--shots` (on a display) it saves screenshots as `playtest_<seed>_<players>_<what>`
+## (`bots/`). The bots start with the builds drawn for them (tests/bots/bot_builds.gd: a fighter's
+## strong staff and a dash, and with two or more P2's mend staff), and `PLAYTEST heals` says what each
+## bot's heals gave to teammates and to foes; `--plain` plays the starter staffs instead and `--build`
+## the smoke test's old random staffs. With `--shots` (on a display) it saves screenshots as `playtest_<seed>_<players>_<what>`
 ## at the first room of each kind, the first reward offer, the boss's intro, every stuck spot and long
 ## fight, and with `--every=S` one every S game seconds.
 ##
@@ -20,6 +23,8 @@ extends "res://tests/support/screenshot.gd"
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 const STUCK_TICKS: int = 600
 const STUCK_MOVE: float = 24.0
@@ -32,6 +37,8 @@ var _limit: float = DEFAULT_LIMIT
 var _shots: bool = false
 var _sturdy: bool = false
 var _build: bool = false
+var _plain: bool = false
+var _bag_had: Array[StringName] = []
 var _built: bool = false
 var _split: int = SplitScreenSetting.DYNAMIC
 var _bots: Array[BotScript] = []
@@ -63,6 +70,12 @@ var _hits_now: Dictionary = {}
 ## The tick a hit was last counted on (a frame a tick: `--fixed-fps 60`).
 var _hits_tick: int = -1
 var _hit_twice: Dictionary = {}
+## The heals the bots' spells landed: by seat, health given to a teammate (itself too), to the
+## world's bodies (a prop: `Actors.TEAM_WORLD`) and to a foe, and how many heals each.
+var _healed_mates: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
+var _healed_foes: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
+var _healed_world: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
+var _heals: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 
 
 func _init() -> void:
@@ -85,6 +98,8 @@ func take() -> void:
 			_sturdy = true
 		elif arg == "--build":
 			_build = true
+		elif arg == "--plain":
+			_plain = true
 		elif arg == "--split=equal":
 			_split = SplitScreenSetting.EQUAL
 	_flow = root.get_node("Flow")
@@ -113,6 +128,8 @@ func take() -> void:
 	_events.connect("boss_intro_opened", func(_a: int, _n: String, _l: String, _i: Resource, page: int, _f: bool) -> void: _intro_page = page; _intro_wait = 150; _queue_shot("boss_intro"))
 	_events.connect("boss_intro_paged", func(page: int) -> void: _intro_page = page; _intro_wait = 90)
 	_events.connect("boss_intro_closed", func(_a: int) -> void: _intro_page = -1)
+	if not _plain and not _build:
+		_bag_had = BuildsScript.stock(_flow)
 	var frames: Node = root.get_node("Frames")
 	frames.call("record", &"play_requested", 0, _seed)
 	var tick: Node = root.get_node("Tick")
@@ -153,6 +170,9 @@ func take() -> void:
 		print("PLAYTEST one body hit twice in a frame by one caster's card: %s, %d times" % [what, _hit_twice[what]])
 	for id: StringName in _doubles:
 		print("PLAYTEST doubled sound: %s, %d times two or more at one place in one frame" % [id, _doubles[id]])
+	for seat in _bots.size():
+		if _heals[seat] > 0:
+			print("PLAYTEST heals: P%d healed %d times, %.0f health to teammates, %.0f to props, %.0f to foes" % [seat + 1, _heals[seat], _healed_mates[seat], _healed_world[seat], _healed_foes[seat]])
 	for line: String in _log.call("get_lines"):
 		print("PLAYTEST error: " + line)
 	if _ended < 0 and map != null:
@@ -162,6 +182,8 @@ func take() -> void:
 	OS.remove_logger(_log)
 	for bot in _bots:
 		bot.leave()
+	if not _plain and not _build:
+		_flow.set(&"play_bag", _bag_had)
 
 
 ## A report line, with the game time.
@@ -187,11 +209,15 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 			if life.fights[r].has_enemies():
 				_fights += 1
 	_say("entered room %d (%s, %s)" % [room, map.room_templates[room], kind])
-	if room == 0 and _build and not _built:
+	if room == 0 and not _plain and not _built:
 		_built = true
 		for index in _bots.size():
-			_bots[index].build_random(2026 + index)
-			_say("P%d built %s" % [index + 1, _bots[index].built_cards])
+			if _build:
+				_bots[index].build_random(2026 + index)
+				_say("P%d built %s" % [index + 1, _bots[index].built_cards])
+			else:
+				_bots[index].build_drawn(_bots.size())
+				_say("P%d built %s %s" % [index + 1, _bots[index].build["name"], _bots[index].build["staffs"]])
 	_started_at[room] = _ticks
 	if not _kinds_shot.has(kind):
 		_kinds_shot[kind] = true
@@ -296,8 +322,11 @@ func _listen() -> void:
 
 ## A body hit twice in one frame by one caster's card of one kind (a step's hits of one spell on one
 ## body are one hit: the owner, 2026-11-17; two casts of one card are two spells).
-func _on_hit_landed(caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int, card: StringName) -> void:
-	if kind == &"status" or kind == &"heal":
+func _on_hit_landed(caster: int, target: Node, amount: float, _at: Vector2, kind: StringName, _shot: int, card: StringName) -> void:
+	if kind == &"heal":
+		_count_heal(caster, target, amount)
+		return
+	if kind == &"status":
 		return
 	if _hits_tick != _ticks:
 		_hits_tick = _ticks
@@ -307,3 +336,21 @@ func _on_hit_landed(caster: int, target: Node, _amount: float, _at: Vector2, kin
 		var what: String = "%s %s" % [kind, card]
 		_hit_twice[what] = int(_hit_twice.get(what, 0)) + 1
 	_hits_now[key] = true
+
+
+## A heal of the actor `caster` on `target`: counted for the bot whose wizard cast it, as given to a
+## teammate (its own team), to a prop (the world's team) or to a foe.
+func _count_heal(caster: int, target: Node, amount: float) -> void:
+	for seat in _bots.size():
+		var wizard := _flow.call("get_wizard", seat) as Actor
+		if wizard == null or wizard.id != caster:
+			continue
+		var body := target as Actor
+		_heals[seat] += 1
+		if body != null and body.team() == wizard.team():
+			_healed_mates[seat] += amount
+		elif body != null and body.team() == ActorsScript.TEAM_WORLD:
+			_healed_world[seat] += amount
+		else:
+			_healed_foes[seat] += amount
+		return

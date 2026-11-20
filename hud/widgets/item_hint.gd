@@ -26,14 +26,6 @@ const OPEN: String = "Open"
 const REWARD_NAME: String = "reward"
 ## A note's words (`show_note`): at a shut key door with no key of one's own (the owner, 2026-11-19).
 const NEEDS_KEY: String = "Needs a key"
-## At an unvisited room's doorway (`room_reroll_shown`, the owner's of 2026-11-19): X rerolls it, and
-## the words a refused reroll shows instead (none held; nothing valid fits there).
-const REROLL_ROOM: String = "Reroll room"
-const NO_ROOM_REROLLS: String = "No room rerolls"
-const NOTHING_FITS: String = "Nothing else fits"
-const SOMEONE_INSIDE: String = "Someone is inside"
-## The button a room reroll's note shows (X).
-const REROLL_ACTION: StringName = &"alternate"
 ## The item number a note is shown as (it names no item: A does nothing for it; never a real
 ## item's, so no other hint stacks with it).
 const NOTE: int = -2
@@ -70,8 +62,6 @@ var _line: String = ""
 var _icons: Array[Texture2D] = []
 ## True while it shows a note (`show_note`): words alone, no button.
 var _note: bool = false
-## The action a note's button shows (`show_note`'s `action`; empty: words alone).
-var _note_action: StringName = &""
 ## Seconds of the refused shake left.
 var _shake_left: float = 0.0
 ## Where its owner put it, before the shake.
@@ -121,20 +111,16 @@ func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) ->
 	queue_redraw()
 
 
-## Show `words` alone for `player` (no button: A does nothing for it), as item NOTE; with `action`,
-## that action's button before them (X's "Reroll room").
-func show_note(player: int, words: String, action: StringName = &"") -> void:
+## Show `words` alone for `player` (no button: A does nothing for it), as item NOTE.
+func show_note(player: int, words: String) -> void:
 	_player = player
 	_item = NOTE
 	_view = {}
 	_shake_left = 0.0
 	_note = true
-	_note_action = action
 	visible = true
 	if _glyph != null:
-		_glyph.visible = action != &""
-		if action != &"":
-			_glyph.show_action(player, action)
+		_glyph.visible = false
 	_title = words
 	_line = ""
 	_icons.clear()
@@ -175,7 +161,7 @@ static func tooltip_line(view: Dictionary) -> String:
 
 ## A take of `item` was refused: shake red (nothing for another item).
 func refuse(item: int) -> void:
-	if item != _item or (_item < 0 and not _note):
+	if item != _item or _item < 0:
 		return
 	_shake_left = SHAKE_TIME
 	queue_redraw()
@@ -205,7 +191,7 @@ func _shake_offset() -> Vector2:
 
 ## The room the button's glyph takes before the words (with its gap); none for a note.
 func _glyph_width() -> float:
-	if _note and _note_action == &"":
+	if _note:
 		return -GAP
 	return _glyph.custom_minimum_size.x if _glyph != null else 10.0
 

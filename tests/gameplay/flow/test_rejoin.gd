@@ -115,3 +115,48 @@ func test_what_was_kept_is_hashed_and_saved_by_a_snapshot() -> void:
 	var back := flow.get_wizard(SEAT) as Actor
 	check(back != null and PlayerController.loadout_of(back).equals(left_with), "after the restore it comes back with the same")
 	check_equal(back.inventory.staff_mana(), left_mana, "and the same mana")
+
+
+# --- Joining only while the party is in the start room (the owner, 2026-11-19) ------------------
+
+func test_a_join_waits_for_the_runs_end_once_a_player_left_the_start_room() -> void:
+	check(flow.start_run(0), "the run starts")
+	tick.run(DT)
+	check(not JoinGate.closed(flow.life), "in the start room: open")
+	var told: Array = []
+	var hear := func(seat: int, held: bool) -> void: told.append([seat, held])
+	root.get_node("Events").join_held.connect(hear)
+	# A player has left the start room: another room entered.
+	flow.life.set_flag(1, RoomLife.ENTERED, true)
+	check(JoinGate.closed(flow.life), "closed once a room past the start room was entered")
+	input.add_virtual_device(SEAT)
+	tick.run(DT)
+	tick.run(DT)
+	check(flow.get_wizard(SEAT) == null, "a new player gets no wizard")
+	check(flow.joins.is_held(SEAT), "it waits")
+	check(told.has([SEAT, true]), "and its panel is told why")
+	var hash_held: int = SimHash.areas({"Flow": flow})["Flow"]
+	var held := Snapshot.take(tick.state_areas(), root)
+	flow.joins.release(SEAT)
+	check(SimHash.areas({"Flow": flow})["Flow"] != hash_held, "who waits is in Flow's hash")
+	check(held.restore(tick.state_areas(), root).is_empty(), "restored")
+	check(flow.joins.is_held(SEAT), "a snapshot keeps who waits")
+	# A returning player waits too: seat 0 leaves and comes back.
+	flow._on_player_left(0)
+	flow._on_player_joined(0)
+	check(flow.get_wizard(0) == null and flow.joins.is_held(0), "a returning player waits as well")
+	# The run ends: the next world has their wizards.
+	flow.stop_run()
+	check(flow.joins.held == 0, "a run's end lets them in")
+	check(flow.start_run(0), "a new run")
+	check(flow.get_wizard(SEAT) != null, "the player who waited plays")
+	root.get_node("Events").join_held.disconnect(hear)
+
+
+func test_a_held_seat_that_leaves_waits_no_more() -> void:
+	check(flow.start_run(0), "the run starts")
+	flow.life.set_flag(1, RoomLife.ENTERED, true)
+	flow._on_player_joined(SEAT)
+	check(flow.joins.is_held(SEAT), "held")
+	flow._on_player_left(SEAT)
+	check(not flow.joins.is_held(SEAT), "it left: held no more")

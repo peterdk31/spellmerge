@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Tests for the rerolls (the owner, 2026-11-19: "room reroll" and "reward reroll", two currencies in
-## each player's currency bag, used with X): every player's wizard starts a run with one of each (the
-## run stats `start_room_rerolls` and `start_reward_rerolls`, once a run, changed by a rule change);
+## Tests for the reward rerolls (the owner, 2026-11-19: a currency in each player's currency bag, used
+## with X; the room reroll gone the same day): every player's wizard starts a run with one (the run
+## stat `start_reward_rerolls`, once a run, changed by a rule change);
 ## a reward reroll (`reward_reroll_requested`, a command) spends one and rolls only that player's
 ## offer again, as many choices from the same table, under its own counted purpose (so a seat's
 ## later offers are as they were), refused with none held; the counters and the offer's table are
@@ -75,26 +75,26 @@ func _reroll(seat: int, offer: int) -> void:
 	_tick()
 
 
-func test_every_player_starts_a_run_with_one_of_each_once() -> void:
+func test_every_player_starts_a_run_with_one_reward_reroll_once() -> void:
 	var one: Actor = _world.wizard(0)
 	var two: Actor = _world.wizard(1, Vector2(40, 0))
 	_tick()
 	_tick()
 	for body: Actor in [one, two]:
-		check_equal(_held(body, RerollBase.ROOM), 1, "one room reroll")
 		check_equal(_held(body, RerollBase.REWARD), 1, "one reward reroll")
-	check_equal(ItemKinds.kind_in(BAG, RerollBase.ROOM), ItemKinds.REROLL, "a reroll kind's stack in the currency bag")
+		check_equal(_held(body, &"room_reroll"), 0, "no room reroll (the owner, 2026-11-19: rewards only)")
+	check_equal(ItemKinds.kind_in(BAG, RerollBase.REWARD), ItemKinds.REROLL, "a reroll kind's stack in the currency bag")
+	check_equal(ItemKinds.RULES[ItemKinds.REROLL]["ids"], [RerollBase.REWARD], "the room reroll is no item any more")
 	check(ItemKinds.can(ItemKinds.REROLL, ItemKinds.DROP), "droppable like other currency")
-	check_equal(RunStats.base_of(&"start_room_rerolls"), 1.0, "a run stat, 1 for now")
+	check(not RunStats.ROWS.has(&"start_room_rerolls"), "no room reroll stat")
 	check_equal(RunStats.base_of(&"start_reward_rerolls"), 1.0, "a run stat, 1 for now")
 
 
 func test_a_rule_change_gives_more_or_none() -> void:
-	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_reward_rerolls", 2.0), StatChange.make(&"start_room_rerolls", -1.0)] as Array[StatChange])
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_reward_rerolls", 2.0)] as Array[StatChange])
 	var body: Actor = _world.wizard(0)
 	_tick()
 	check_equal(_held(body, RerollBase.REWARD), 3, "the stat's changes")
-	check_equal(_held(body, RerollBase.ROOM), 0, "and none at 0")
 
 
 func test_a_reward_reroll_spends_one_and_changes_only_that_players_offer() -> void:
@@ -170,13 +170,13 @@ func test_the_same_seed_rerolls_the_same_and_through_a_snapshot() -> void:
 	check_equal(_rewards._rerolls[0], 3, "the rerolls counted are state")
 
 
-func test_a_shop_sells_both_rerolls_and_its_shelf_rolls_anew_when_rerolled() -> void:
+func test_a_shop_sells_the_reward_reroll() -> void:
 	var table := _world.registry.get_resource(&"rewards", &"shelf") as RewardTable
 	var sold: Dictionary = {}
 	for entry: RewardEntry in table.entries:
 		if entry.kind == ItemKinds.REROLL:
 			sold[entry.id] = entry.price
-	check_equal(sold, {RerollBase.ROOM: 10, RerollBase.REWARD: 8}, "the shelf's table sells a room reroll and a reward reroll (the owner, 2026-11-19)")
+	check_equal(sold, {RerollBase.REWARD: 8}, "the shelf's table sells a reward reroll (the owner, 2026-11-19), no room reroll")
 	var seen: bool = false
 	var spots := PackedVector2Array([Vector2(300, 0), Vector2(320, 0), Vector2(340, 0)])
 	for room in 12:
@@ -185,22 +185,3 @@ func test_a_shop_sells_both_rerolls_and_its_shelf_rolls_anew_when_rerolled() -> 
 		if (item["choice"] as Dictionary)["kind"] == ItemKinds.REROLL:
 			seen = true
 	check(seen, "some shelf stocks a reroll")
-	# A shop rerolled before it opens rolls its shelf anew (the same seed, the same rooms).
-	var plain: Array = []
-	var rerolled: Array = []
-	for pass_rerolled in [false, true]:
-		_rewards.free()
-		_rewards = _make(7)
-		for room in range(30, 36):
-			if pass_rerolled:
-				_world.bus.room_rerolled.emit(room, &"shop")
-			_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots, FAR)
-		var ids: Array = []
-		for item: Dictionary in _rewards.shelf():
-			ids.append([(item["choice"] as Dictionary)["kind"], (item["choice"] as Dictionary)["id"]])
-		if pass_rerolled:
-			rerolled = ids
-		else:
-			plain = ids
-	check(plain != rerolled, "a rerolled shop's shelf is rolled anew")
-	check_equal(_rewards._room_rerolls[30], 1, "a room's rerolls counted, state")

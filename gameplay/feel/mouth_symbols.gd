@@ -18,11 +18,8 @@ extends Node2D
 ## on its bridge, but not from inside the room it leads into, and sinks out the same way once none is
 ## (the owner, 2026-11-19); its light dims and brightens with its rows.
 ##
-## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) is drawn as it stands; a room
-## rerolled (`turn`, Feel's of `room_rerolled`; the owner, 2026-11-19) turns its signs over: a mouth
-## into it showing its old kind's symbol sinks that out a row a frame at FPS, then its new kind's
-## rises in the same way, never a jump, its light dimming out and brightening in with the rows. Whole pixels;
-## nothing fades.
+## **Smooth** (docs/STYLE.md): a biome laid (a new one, a restore's) is drawn as it stands. Whole
+## pixels; nothing fades.
 ##
 ## A child of Feel, top level (world space), over the mouths' looks and under the bodies. Feel steps it
 ## once a frame (`step`).
@@ -74,19 +71,7 @@ var _near: PackedByteArray = PackedByteArray()
 var _read_mouths: int = -1
 var _read_world: int = -1
 var _read_places: int = -1
-## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a room
-## reroll's) has its mouths' signs read again alone (`_reread`), every other sign as it stands.
-var _read_versions: PackedInt32Array = PackedInt32Array()
-var _read_relaid: int = -1
 var _clock: float = 0.0
-## The rooms rerolled whose mouths' signs turn over at the next read, and by mouth the new symbol
-## waiting while the old one sinks out (`_turning` 1; its pixels and shades).
-var _turn_rooms: Dictionary = {}
-var _turning: PackedByteArray = PackedByteArray()
-var _next_pixels: Array[PackedByteArray] = []
-var _next_shades: Array[PackedColorArray] = []
-var _next_glyphs: Array = []
-var _next_glyph_shades: Array = []
 
 
 func _ready() -> void:
@@ -132,8 +117,6 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 	if found != _read_mouths or world_now != _read_world or places != _read_places:
 		_read_places = places
 		_read(grid, found, world_now, table, seats_here)
-	elif pieces != null and pieces.relaid() != _read_relaid:
-		_reread(pieces.changed_since(_read_versions, places))
 	if _rows.is_empty():
 		return
 	_see(table, seats_here, grid)
@@ -147,20 +130,10 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 		advance()
 
 
-## Room `room` was rerolled (`room_rerolled`): its mouths' signs turn over as the world is read again.
-func turn(room: int) -> void:
-	_turn_rooms[room] = true
-
-
-## True while mouth `mouth`'s old sign sinks out before its new one rises (for tests).
-func is_turning(mouth: int) -> bool:
-	return mouth >= 0 and mouth < _turning.size() and _turning[mouth] != 0
-
-
 ## True while a symbol still rises or sinks.
 func is_moving() -> bool:
 	for mouth in _rows.size():
-		if _rows[mouth] != _wanted(mouth) or (_turning[mouth] != 0):
+		if _rows[mouth] != _wanted(mouth):
 			return true
 	return false
 
@@ -169,13 +142,6 @@ func is_moving() -> bool:
 func advance() -> void:
 	for mouth in _rows.size():
 		var was: int = _rows[mouth]
-		if _turning[mouth] != 0 and _rows[mouth] == 0:
-			# The old sign is out: the new one takes its place and rises from here.
-			_turning[mouth] = 0
-			_pixels[mouth] = _next_pixels[mouth]
-			_shades[mouth] = _next_shades[mouth]
-			_glyph_pixels[mouth] = _next_glyphs[mouth]
-			_glyph_shades[mouth] = _next_glyph_shades[mouth]
 		_rows[mouth] += signi(_wanted(mouth) - _rows[mouth])
 		if _rows[mouth] != was:
 			# Its light dims and brightens with its rows (made again only while a sign moves).
@@ -183,44 +149,7 @@ func advance() -> void:
 	queue_redraw()
 
 
-## The mouths into the rooms of `changed` (laid again alone: a room reroll's) read again: a sign
-## showing sinks out and its room's new one rises (Smooth), one not showing is the new one at once.
-## Every other mouth is left as it stands.
-func _reread(changed: PackedInt32Array) -> void:
-	_read_relaid = pieces.relaid()
-	_read_versions = pieces.versions()
-	for mouth in _rows.size():
-		var room: int = mouths.room_of(mouth)
-		if not changed.has(room):
-			continue
-		var kind: RoomKind = pieces.kind_of(room)
-		var pixels: PackedByteArray = kind.symbol_pixels() if kind != null else PackedByteArray()
-		var shades: PackedColorArray = KindSymbolScript.shades_of(kind)
-		var type: RewardType = pieces.type_of(room) if kind != null else null
-		var glyphs: Array[PackedByteArray] = []
-		var glyph_shades: Array[PackedColorArray] = []
-		var element: Resource = pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null
-		RewardGlyphsScript.glyphs_of(type, element, glyphs, glyph_shades)
-		if _rows[mouth] > 0:
-			# Showing: the old sign sinks out first (its kind and its reward type's glyphs alike).
-			_next_pixels[mouth] = pixels
-			_next_shades[mouth] = shades
-			_next_glyphs[mouth] = glyphs
-			_next_glyph_shades[mouth] = glyph_shades
-			_turning[mouth] = 1
-			continue
-		_pixels[mouth] = pixels
-		_shades[mouth] = shades
-		_glyph_pixels[mouth] = glyphs
-		_glyph_shades[mouth] = glyph_shades
-		_light(mouth)
-	_turn_rooms.clear()
-	queue_redraw()
-
-
 func _wanted(mouth: int) -> int:
-	if _turning[mouth] != 0:
-		return 0
 	return RoomKind.SYMBOL_SIDE if _near[mouth] != 0 and not _pixels[mouth].is_empty() else 0
 
 
@@ -258,25 +187,6 @@ func _see(table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
 func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seats_here: int) -> void:
 	_read_mouths = found
 	_read_world = world_now
-	_read_relaid = pieces.relaid() if pieces != null else 0
-	_read_versions = pieces.versions() if pieces != null else PackedInt32Array()
-	# A rerolled room's mouths keep their old sign and rows to sink out (the same mouths, read again).
-	var old_pixels: Array[PackedByteArray] = []
-	var old_shades: Array[PackedColorArray] = []
-	var old_glyphs: Array = []
-	var old_glyph_shades: Array = []
-	if _pixels.size() == found:
-		old_pixels = _pixels.duplicate()
-		old_shades = _shades.duplicate()
-		old_glyphs = _glyph_pixels.duplicate()
-		old_glyph_shades = _glyph_shades.duplicate()
-	var old_rows: PackedInt32Array = _rows.duplicate()
-	_turning.resize(found)
-	_turning.fill(0)
-	_next_pixels.resize(found)
-	_next_shades.resize(found)
-	_next_glyphs.resize(found)
-	_next_glyph_shades.resize(found)
 	_pixels.clear()
 	_shades.clear()
 	_glyph_pixels.clear()
@@ -310,22 +220,7 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		_glyph_at[mouth] = glyphs_beside(_at[mouth], across)
 	_see(table, seats_here, grid)
 	for mouth in found:
-		if not old_pixels.is_empty() and _turn_rooms.has(mouths.room_of(mouth)) and mouth < old_rows.size() and old_rows[mouth] > 0:
-			# A rerolled room's sign turns over (its kind and its reward type's glyphs alike).
-			_next_pixels[mouth] = _pixels[mouth]
-			_next_shades[mouth] = _shades[mouth]
-			_next_glyphs[mouth] = _glyph_pixels[mouth]
-			_next_glyph_shades[mouth] = _glyph_shades[mouth]
-			_pixels[mouth] = old_pixels[mouth]
-			_shades[mouth] = old_shades[mouth]
-			_glyph_pixels[mouth] = old_glyphs[mouth]
-			_glyph_shades[mouth] = old_glyph_shades[mouth]
-			_rows[mouth] = old_rows[mouth]
-			_turning[mouth] = 1
-			continue
-		# The same mouths read again (a reroll's lay): a sign mid-play keeps its rows and plays on.
-		_rows[mouth] = old_rows[mouth] if not old_pixels.is_empty() and mouth < old_rows.size() and old_pixels[mouth] == _pixels[mouth] and old_glyphs[mouth] == _glyph_pixels[mouth] else _wanted(mouth)
-	_turn_rooms.clear()
+		_rows[mouth] = _wanted(mouth)
 	for light in _lights:
 		if light != null:
 			light.queue_free()
@@ -337,8 +232,8 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 
 
 ## The light spot on mouth `mouth`'s sign made again in its kind's light, as bright as the share of
-## its rows shown (none when it tells nothing or shows no row), so a sign turning over dims its
-## light out and the new one's in by its rows (Smooth). Made only as a world is read or a sign
+## its rows shown (none when it tells nothing or shows no row), so a sign rising or sinking
+## brightens or dims its light by its rows (Smooth). Made only as a world is read or a sign
 ## moves, never in a still frame.
 func _light(mouth: int) -> void:
 	if _lights[mouth] != null:

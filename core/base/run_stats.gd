@@ -20,8 +20,8 @@ extends RefCounted
 ## - `secret_sense`: how far from a room the party entered a secret room shows on this player's own
 ##   map, in pixels (rectangle to rectangle; CB9's map, the owner's answer of 2026-11-19).
 ## - `fountain_pool`: what a fountain's pool is multiplied by (CB11).
-## - `start_room_rerolls`, `start_reward_rerolls`: the room rerolls and reward rerolls put into a
-##   player's currency bag as a run starts (`RerollBase`; the owner, 2026-11-19: 1 of each for now).
+## - `start_reward_rerolls`: the reward rerolls put into a player's currency bag as a run starts
+##   (`RerollBase`; the owner, 2026-11-19: 1 for now).
 const ROWS: Dictionary = {
 	&"reward_choices": {"base": 3.0, "low": 1.0, "high": 4.0, "whole": true},
 	&"start_coins": {"base": 0.0, "low": 0.0, "high": 999.0, "whole": true},
@@ -29,7 +29,6 @@ const ROWS: Dictionary = {
 	&"map_reveal": {"base": 0.0, "low": 0.0, "high": 99.0, "whole": true},
 	&"secret_sense": {"base": 0.0, "low": 0.0, "high": 1024.0, "whole": false},
 	&"fountain_pool": {"base": 1.0, "low": 0.0, "high": 10.0, "whole": false},
-	&"start_room_rerolls": {"base": 1.0, "low": 0.0, "high": 99.0, "whole": true},
 	&"start_reward_rerolls": {"base": 1.0, "low": 0.0, "high": 99.0, "whole": true},
 }
 

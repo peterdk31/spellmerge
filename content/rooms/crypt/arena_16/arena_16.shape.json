@@ -1,0 +1,78 @@
+{
+	"about": "The crypt's Urn gallery (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark a row of burial urns across its north half, broken in the middle where the way north runs, two pillars at its ends. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_16_ground.tscn and its art from this.",
+	"size": [
+		832,
+		384
+	],
+	"seed": 149,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 27,
+		"pins": [
+			[
+				0,
+				160,
+				40,
+				224
+			],
+			[
+				792,
+				160,
+				832,
+				224
+			],
+			[
+				384,
+				0,
+				448,
+				40
+			],
+			[
+				384,
+				344,
+				448,
+				384
+			]
+		],
+		"bays": [
+			[
+				192,
+				348,
+				20
+			],
+			[
+				672,
+				36,
+				19
+			],
+			[
+				36,
+				96,
+				18
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	}
+}

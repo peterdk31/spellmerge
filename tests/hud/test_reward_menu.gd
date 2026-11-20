@@ -460,15 +460,15 @@ func test_x_with_no_reward_reroll_says_why_and_changes_nothing() -> void:
 	check_equal(_hud.get_reward(1).title_text(), "", "another seat's refusal is not this one's")
 
 
-func test_the_panel_counts_each_reroll() -> void:
-	var ids: Array[StringName] = [CoinBase.ID, RerollBase.ROOM, RerollBase.REWARD]
-	_bus.bag_changed.emit(0, &"currency", ids, PackedInt32Array([2, 1, 3]), -1)
+func test_the_panel_counts_the_reward_rerolls() -> void:
+	var ids: Array[StringName] = [CoinBase.ID, RerollBase.REWARD]
+	_bus.bag_changed.emit(0, &"currency", ids, PackedInt32Array([2, 3]), -1)
 	var panel: Node = _hud.get_panel(0)
-	check_equal(panel.room_reroll_count().shown_count(), 1, "its room rerolls")
 	check_equal(panel.reward_reroll_count().shown_count(), 3, "its reward rerolls")
 	check_equal(_hud.get_panel(1).reward_reroll_count().shown_count(), 0, "each panel its own body's")
-	check(panel.room_reroll_count().playing() != 0, "played in, never one jump (Smooth)")
-	check(panel.key_count().get_index() < panel.room_reroll_count().get_index() and panel.room_reroll_count().get_index() < panel.reward_reroll_count().get_index(), "after the keys, on the purse row")
+	check(panel.reward_reroll_count().playing() != 0, "played in, never one jump (Smooth)")
+	check(panel.key_count().get_index() < panel.reward_reroll_count().get_index(), "after the keys, on the purse row")
+	check(not panel.has_method(&"room_reroll_count") and panel.get_node_or_null("PurseRow/RoomRerolls") == null, "no room reroll count (the room rerolls are gone, the owner's of 2026-11-19)")
 	panel.reward_reroll_count().advance(1.0)
 	_bus.bag_changed.emit(0, &"currency", [CoinBase.ID] as Array[StringName], PackedInt32Array([2]), -1)
 	check_equal(panel.reward_reroll_count().playing(), 4, "the last one spent sinks out (Play.LEAVE)")

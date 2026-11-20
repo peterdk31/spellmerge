@@ -580,7 +580,6 @@ func _panel_source() -> String:
 	source = source.replace("events.online_open_requested.emit(player)", "")
 	source = source.replace("events.item_take_requested.emit(player, _item_hints.item_of(player))", "")
 	source = source.replace("events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))", "")
-	source = source.replace("events.room_reroll_requested.emit(player)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/item_hints.gd")
 	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
@@ -590,7 +589,7 @@ func _panel_source() -> String:
 
 ## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
 ## `run_requested` (A on the hub's lit stone), `item_take_requested` (A by an item),
-## `shelf_buy_requested` (A at a shop's item), `room_reroll_requested` (X at a doorway) and
+## `shelf_buy_requested` (A at a shop's item) and
 ## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd); the corner panel
 ## itself sends nothing. (Tested in test_quick.gd.)
 func test_the_panel_scripts_send_only_the_player_intents() -> void:
@@ -626,3 +625,17 @@ func test_a_new_body_hides_the_mana_lines_until_its_mana_comes() -> void:
 	check(not line.visible, "another body shown: the last body's mana is not shown for it")
 	_bus.staff_mana_changed.emit(0, 1, 20.0, 80.0)
 	check(line.visible and is_equal_approx(line.share(), 0.25), "the new body's mana shows when it comes")
+
+
+## A seat that joined while the run could not be joined (the owner, 2026-11-19): its panel says WAIT
+## in the health number's place and why under it, until it is let in.
+func test_a_held_join_says_why_on_its_panel() -> void:
+	var panel: PlayerPanelScript = _panel()
+	await process_frame
+	panel.set_join_held(true)
+	check_equal(panel.status_text(), PlayerPanelScript.WAIT_TEXT, "WAIT in the number's place")
+	var note := panel.find_child("JoinHeld", true, false) as Label
+	check(note != null and note.visible and note.text.contains("start room"), "and why: the party left the start room")
+	panel.set_join_held(false)
+	check_equal(panel.status_text(), "", "let in: no word")
+	check(not note.visible, "no note")

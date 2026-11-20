@@ -1,10 +1,9 @@
 extends Control
 ## A seat's count of one currency (the owner, 2026-11-19): a small picture and the number of that
 ## item in the currency bag of the body the seat drives, beside a corner panel's coins
-## (`player_panel.gd`'s purse row). First the keys (a brass key, `KEY`); the room rerolls and the
-## reward rerolls are two more of it (`picture` and `material` set as it is made: `ROOM_REROLL` in
-## Ice, `REWARD_REROLL` in Void). Each is each body's own (picked up and spent by it), so each panel
-## shows its own count; `panels.gd` tells it from the bag (`bag_changed`), a possessed foe's while
+## (`player_panel.gd`'s purse row). First the keys (a brass key, `KEY`); the reward rerolls are one
+## more of it (`picture` and `material` set as it is made: `REWARD_REROLL` in Void). Each is each
+## body's own (picked up and spent by it), so each panel shows its own count; `panels.gd` tells it from the bag (`bag_changed`), a possessed foe's while
 ## possessing.
 ##
 ## Smooth (docs/STYLE.md): the count never changes in one jump. The key and its number slide up into
@@ -38,8 +37,6 @@ enum Play { NONE, APPEAR, GAIN, SPEND, LEAVE }
 ## The pictures, drawn from the control's left, a row a string: `d` the material's shadow, `m` its
 ## base, `l` its light, `.` nothing (7 × 5). The key: a ring bow, a shaft and two teeth.
 const KEY: PackedStringArray = [".......", "mlm....", "mdmmmmm", "mmm..dd", "......d"]
-## A room reroll: a doorway and a turning arrow beside it.
-const ROOM_REROLL: PackedStringArray = [".lll.l.", "lmmml.l", "lmdml.l", "lmdml.l", "lmdml.."]
 ## A reward reroll: a card with a mark and a turning arrow beside it.
 const REWARD_REROLL: PackedStringArray = ["lllll.l", "lmdmm.l", "ldddm.l", "lmdmm..", "lmmmm.."]
 const ICON_SIZE: Vector2i = Vector2i(7, 5)

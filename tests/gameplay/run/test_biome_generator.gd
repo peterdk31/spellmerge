@@ -349,9 +349,9 @@ func test_the_crypt_is_made() -> void:
 	check_equal(crypt.biome_problems(content, shapes), PackedStringArray(), "the validator names the crypt makeable")
 	var rules: MapRules = crypt.biomes[0]
 	check(rules.fights_on_way == 4 and rules.styles.size() == 4, "the crypt's fights on the way and styles are decisions 4's and 5's")
-	# Connected biomes CB11: decision 1's fixed kinds are back, and its counts as far as the
-	# templates allow (8 to 12 rooms, a scale depth of 8).
-	check(rules.rooms_min == 8 and rules.rooms_max == 12 and rules.scale_depth == 8, "decision 1's 8 to 12 rooms and a scale depth of 8")
+	# Connected biomes CB11: decision 1's fixed kinds are back; the owner, 2026-11-19: more rooms,
+	# 12 to 16 (a scale depth of 8).
+	check(rules.rooms_min == 12 and rules.rooms_max == 16 and rules.scale_depth == 8, "the owner's 12 to 16 rooms and a scale depth of 8")
 	var least: Dictionary = {}
 	for rule: KindRule in rules.kinds:
 		least[rule.kind] = rule.least
@@ -371,6 +371,7 @@ func test_the_crypt_is_made() -> void:
 		check(map.rooms() >= rules.rooms_min + 1 and map.rooms() <= rules.rooms_max + 1, "seed %d: %d rooms and the start room" % [seed_value, map.rooms() - 1])
 		for kind: StringName in [&"reward", &"shop", &"secret"]:
 			check(map.room_kinds.has(kind), "seed %d: a %s room (a fixed kind)" % [seed_value, kind])
+		check_equal(map.room_kinds.count(&"shop"), 1, "seed %d: exactly one shop" % seed_value)
 		check(map.room_kinds.count(&"fight") >= 4, "seed %d: four fights at least" % seed_value)
 		for kind: StringName in [&"fountain", &"treasure", &"challenge"]:
 			if map.room_kinds.has(kind):
@@ -404,6 +405,9 @@ func test_a_challenge_room_takes_its_slot_before_the_treasure_rooms() -> void:
 	var content: RunContent = registry.run_content()
 	var shapes: Dictionary = registry.piece_shapes(&"crypt")
 	var rules: MapRules = crypt.biomes[0]
+	# Slots short, as the crypt's were at 8 to 12 rooms (12 to 16 now, the owner's of 2026-11-19).
+	rules.rooms_min = 8
+	rules.rooms_max = 12
 	var chance_rooms: int = 0
 	var fixed: int = 0
 	for rule: KindRule in rules.kinds:
@@ -577,6 +581,31 @@ func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
 	check(not first.enemies_of(0).is_empty(), "filled with its fight")
 	check_equal(first.problems(_biome.shapes), PackedStringArray(), "a sound map")
 	check_equal(BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(2)).room_templates, first.room_templates, "the same room for any seed")
+
+
+## Exactly one shop in every crypt biome (the owner, 2026-11-19), over a sweep of 30 seeds and player
+## counts, with its 12 to 16 rooms and the generator's rules kept (the boss deepest, at least 4 fights
+## on every way to it).
+func test_every_crypt_biome_has_exactly_one_shop() -> void:
+	var registry: Node = root.get_node("Registry")
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var rules: MapRules = crypt.biomes[0]
+	var counts: Dictionary = {}
+	for seed_value in range(100, 130):
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value), 1 + seed_value % 4)
+		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
+		if not map.is_made():
+			continue
+		check_equal(map.room_kinds.count(&"shop"), 1, "seed %d: exactly one shop" % seed_value)
+		var past_start: int = map.rooms() - 1
+		check(past_start >= rules.rooms_min and past_start <= rules.rooms_max, "seed %d: %d rooms past the start room, 12 to 16" % [seed_value, past_start])
+		counts[past_start] = true
+		var boss: int = map.room_kinds.find(&"boss")
+		check(BiomeGenerator.fights_on_way(map, content, boss) >= rules.fights_on_way, "seed %d: 4 fights on every way to the boss" % seed_value)
+		check_equal(BiomeGenerator.rule_problems(map, rules, content, shapes), PackedStringArray(), "seed %d: every rule kept" % seed_value)
+	check(counts.size() >= 3, "the room count varies over the sweep: %s" % [counts.keys()])
 
 
 ## The crypt's walkways (connected biomes CB13: straight ones every 32 px both ways and corner ones)

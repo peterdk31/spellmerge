@@ -48,10 +48,6 @@ var _as_stands: bool = false
 var _textures: Array[ImageTexture] = []
 var _laid_places: int = -1
 var _laid_world: int = -1
-## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a
-## room reroll's) is read again alone, the rest as they stand.
-var _laid_versions: PackedInt32Array = PackedInt32Array()
-var _laid_relaid: int = -1
 var _clock: float = 0.0
 
 
@@ -116,8 +112,6 @@ func step(delta: float, grid: RoomGrid) -> void:
 	var places: int = grid.places() if grid != null else 0
 	if places != _laid_places or _laid_world != _world_now():
 		_lay(grid, places)
-	elif pieces != null and pieces.relaid() != _laid_relaid:
-		_relay(grid, pieces.changed_since(_laid_versions, places))
 	if _as_stands:
 		_as_stands = false
 		for place in _rects.size():
@@ -160,8 +154,6 @@ func _wanted(place: int) -> int:
 func _lay(grid: RoomGrid, places: int) -> void:
 	_laid_places = places
 	_laid_world = _world_now()
-	_laid_relaid = pieces.relaid() if pieces != null else 0
-	_laid_versions = pieces.versions() if pieces != null else PackedInt32Array()
 	_rects.clear()
 	_room.resize(places)
 	_stage.resize(places)
@@ -169,16 +161,6 @@ func _lay(grid: RoomGrid, places: int) -> void:
 		_rects.append(grid.place_rect(place))
 		_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
 		_stage[place] = _wanted(place)
-	queue_redraw()
-
-
-## The places of `changed` read again alone (their rectangles; their dark plays on from where it is).
-func _relay(grid: RoomGrid, changed: PackedInt32Array) -> void:
-	_laid_relaid = pieces.relaid()
-	_laid_versions = pieces.versions()
-	for place in changed:
-		_rects[place] = grid.place_rect(place)
-		_room[place] = 0 if pieces.is_walkway(place) else 1
 	queue_redraw()
 
 

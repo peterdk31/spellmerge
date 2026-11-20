@@ -134,6 +134,7 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
 const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
@@ -555,6 +556,8 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
 var _unseen: UnseenDarkScript = null
+## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
+var _teleports: TeleportLooksScript = null
 ## The black void under a biome's slabs (`void_backdrop.gd`; the owner, 2026-11-19).
 var _void: VoidBackdropScript = null
 ## Each room's own light tinted by its kind (`room_tints.gd`; CB12b), onto the spell light.
@@ -930,6 +933,10 @@ func _ready() -> void:
 	_unseen.pieces = _hearing
 	add_child(_unseen)
 	_unseen.bind(events)
+	_teleports = TeleportLooksScript.new()
+	_teleports.name = "TeleportLooks"
+	add_child(_teleports)
+	_teleports.bind(events)
 	_tints = RoomTintsScript.new()
 	_tints.pieces = _hearing
 	_tints.bind(events)
@@ -1029,7 +1036,6 @@ func _ready() -> void:
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
-	events.room_rerolled.connect(_on_room_rerolled)
 	events.main_menu_requested.connect(_on_main_menu_requested)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
@@ -1164,6 +1170,9 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_mouth_symbols.step(real_delta, table, seats_here, grid)
 	if _unseen != null:
 		_unseen.step(real_delta, grid)
+	if _teleports != null:
+		_teleports.table = table
+		_teleports.step(real_delta)
 	if _void != null:
 		_void.step(grid, projectiles.bounds() if grid != null else Rect2())
 	if _tints != null:
@@ -2557,6 +2566,11 @@ func lock_looks() -> LockLooksScript:
 	return _locks
 
 
+## Where a teleported wizard left (for tests).
+func teleport_looks() -> TeleportLooksScript:
+	return _teleports
+
+
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
 
@@ -2572,12 +2586,6 @@ func room_tints() -> RoomTintsScript:
 
 
 ## What each mouth tells of the room behind it and the held Y map (for tests; connected biomes CB9).
-## A room was rerolled (`room_rerolled`): the signs at its mouths turn over (Smooth).
-func _on_room_rerolled(room: int, _kind: StringName) -> void:
-	if _mouth_symbols != null:
-		_mouth_symbols.turn(room)
-
-
 func mouth_symbols() -> MouthSymbolsScript:
 	return _mouth_symbols
 

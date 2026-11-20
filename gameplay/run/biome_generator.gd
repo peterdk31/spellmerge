@@ -106,9 +106,8 @@ static func generate(definition: RunDefinition, content: RunContent, shapes: Dic
 ## bridge; at least `fights_on_way` fights on every way from the start room to the boss; no bridge
 ## from a kind a room may not follow (`not_after`); each template hosting its room's kind, and none
 ## twice (the start room's excepted); every room's slab GAP clear of every other's. With `whole` false (a map still growing), the counts (of rooms
-## and of each line) are not checked. With `capped` false (a room reroll's map, the owner's decision
-## of 2026-11-19) a line's `max_per_run` is not checked, only its `least` (the fixed kinds there).
-static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, shapes: Dictionary, whole: bool = true, capped: bool = true) -> PackedStringArray:
+## and of each line) are not checked.
+static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, shapes: Dictionary, whole: bool = true) -> PackedStringArray:
 	var found := PackedStringArray()
 	if not map.is_made():
 		found.append("no map: %s" % "; ".join(map.not_made))
@@ -170,7 +169,7 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 		var of_kind: int = int(counts.get(rule.kind, 0))
 		if not whole:
 			break
-		if of_kind < rule.least or (capped and rule.max_per_run > 0 and of_kind > rule.max_per_run):
+		if of_kind < rule.least or (rule.max_per_run > 0 and of_kind > rule.max_per_run):
 			found.append("%d rooms of '%s'; at least %d%s." % [of_kind, rule.kind, rule.least, (", %d at most" % rule.max_per_run) if rule.max_per_run > 0 else ""])
 	var fights: int = fights_on_way(map, content, deepest)
 	if fights < rules.fights_on_way:
@@ -290,164 +289,6 @@ static func _fill_one(map: BiomeMap, room: int, definition: RunDefinition, rules
 		for at in enemies.size():
 			cards.append(rules.elite_cards[dice.below(Step.FILL, rules.elite_cards.size())] if at < elites else &"")
 	return [scale, enemies, cards, definition.biome_room_scale(rules, depth, 1)]
-
-
-# --- A room reroll (the owner, 2026-11-19) ----------------------------------------------------
-
-## What a room reroll's rolls are named by, and the rolls a room's reroll counter keys apart.
-const REROLL_PURPOSE: StringName = &"room_reroll"
-const REROLL_KEYS: int = 256
-
-## `map` with its room `room` rerolled (the owner, 2026-11-19: "rerolls what lies behind that
-## doorway: its kind and contents"), its `roll`th reroll this run, by `sim`'s chance
-## (REROLL_PURPOSE): a new kind, template and mirroring, placed so that every bridge that reaches it
-## still meets one of its sockets where it did, and filled again as its kind fills (the same depth,
-## so the same scale). Only what keeps the map valid is a candidate: any kind of the biome's lines
-## with the same door as the room's kind has (the owner, 2026-11-19: a treasure room stays a
-## treasure room, a challenge a challenge; the rest are the kinds that open freely), not the start
-## room's kind, a template the biome holds nowhere else, inside the biome's area as it is laid (its
-## bounds never move), and every rule of `problems` and `rule_problems` still kept but a line's
-## `max_per_run` (the owner, 2026-11-19: a reroll may break a kind's count, as long as every fixed
-## kind, `least`, is still there; the boss deepest, fights enough on every way, rooms apart, sockets
-## that meet). A candidate the same as the room (template, mirroring and kind) is one only when its
-## kind fights (its foes are rolled again), is a shop (its shelf is rolled again as it opens,
-## gameplay/rewards) or a reward room (its reward type is rolled again, `roll_type`; a kind with no
-## `typed_rewards` has none). The most change wins: a candidate of another kind if there is one,
-## else of another template, else the rest. Among other kinds the kind is picked first, by weight
-## (`kind_weight`: its line's `weight` over one more than the rooms of it the biome holds already, so
-## a kind the biome holds less of is likelier, and a kind with many templates or mirrorings is no
-## likelier for it), then one of its candidates evenly; in the other tiers one candidate evenly.
-## Null when there is none: the reroll is refused. A pure function, as `generate`.
-static func reroll_room(definition: RunDefinition, content: RunContent, shapes: Dictionary, sim: Sim, players: int, map: BiomeMap, room: int, roll: int) -> BiomeMap:
-	if definition == null or definition.biomes.is_empty() or content == null or sim == null or map == null or room <= 0 or room >= map.rooms():
-		return null
-	var rules: MapRules = definition.biomes[0]
-	var now: RoomKind = content.kind(map.room_kinds[room])
-	var shape_now: PieceShape = map.room_shape(room, shapes)
-	if now == null or shape_now == null:
-		return null
-	var area: Rect2 = _area_of(map, shapes)
-	var joined: Array[Vector4i] = []
-	for bridge in map.bridges():
-		for end in 2:
-			if map.end_room(bridge, end) == room:
-				var socket: int = map.end_socket(bridge, end)
-				var at: Vector2 = map.room_places[room] + shape_now.socket_at[socket]
-				joined.append(Vector4i(bridge, end, roundi(at.x), roundi(at.y)))
-	var facings := PackedInt32Array()
-	for row: Vector4i in joined:
-		facings.append(shape_now.socket_facing[map.end_socket(row.x, row.y)])
-	# The candidates by how much they change: another kind (by kind, in the table's order), another
-	# template, the rest.
-	var kinds_found: Array[KindRule] = []
-	var by_kind: Dictionary = {}
-	var same_kind: Array = [[], []]
-	for rule: KindRule in rules.biome_lines(content, shapes):
-		var kind: RoomKind = content.kind(rule.kind)
-		if kind == null or kind.door != now.door or rule.kind == rules.start_kind:
-			continue
-		for host: RoomBase in rules.biome_templates(content, shapes, rule.kind, joined.size()):
-			if host.id != map.room_templates[room] and map.room_templates.has(host.id):
-				continue
-			for mirror: int in PieceShape.MIRRORINGS:
-				if host.id == map.room_templates[room] and mirror == map.room_mirrors[room] and rule.kind == map.room_kinds[room] and not kind.fills_with_enemies() and kind.fill != RoomKind.FILL_SHOP and not kind.typed_rewards:
-					continue
-				var made: BiomeMap = _refit(map, room, host.id, mirror, rule.kind, (shapes[host.id] as PieceShape).mirrored(mirror), joined, facings)
-				if made == null or not area.encloses(made.room_shape(room, shapes).rect_at(made.room_places[room])):
-					continue
-				if made.problems(shapes).is_empty() and rule_problems(made, rules, content, shapes, true, false).is_empty():
-					if rule.kind != map.room_kinds[room]:
-						if not by_kind.has(rule.kind):
-							kinds_found.append(rule)
-							by_kind[rule.kind] = []
-						(by_kind[rule.kind] as Array).append(made)
-					else:
-						(same_kind[0 if host.id != map.room_templates[room] else 1] as Array).append(made)
-	var dice := MapDice.new(sim, REROLL_PURPOSE, roll * REROLL_KEYS + room, Step.size())
-	var found: Array = []
-	if not kinds_found.is_empty():
-		var weights := PackedFloat32Array()
-		for rule: KindRule in kinds_found:
-			weights.append(kind_weight(map, room, rule))
-		found = by_kind[kinds_found[dice.pick(Step.KINDS, weights)].kind] as Array
-	else:
-		found = same_kind[0] if not (same_kind[0] as Array).is_empty() else same_kind[1]
-	if found.is_empty():
-		return null
-	var picked: BiomeMap = found[dice.below(Step.PLACE, found.size())] as BiomeMap
-	var filled: Array = _fill_one(picked, room, definition, rules, content, players, dice)
-	picked.refill_room(room, filled[0], filled[1], filled[2], filled[3])
-	# A reward room's type is rolled again (the owner, 2026-11-19), any other kind's is none.
-	var picked_kind: RoomKind = content.kind(picked.room_kinds[room])
-	var type: RewardType = RewardType.new()
-	if picked_kind != null and picked_kind.typed_rewards:
-		type = roll_type(content.reward_table(picked_kind.rewards), content.cards, dice)
-	if not type.is_any() or room < picked.room_reward_items.size():
-		picked.type_room(room, type)
-	return picked
-
-
-## How likely a room reroll of `map`'s room `room` turns it into a room of `rule`'s kind, against
-## the other kinds that fit: the line's `weight` over one more than the rooms of that kind the biome
-## holds besides `room`.
-static func kind_weight(map: BiomeMap, room: int, rule: KindRule) -> float:
-	var held: int = 0
-	for other in range(1, map.rooms()):
-		if other != room and map.room_kinds[other] == rule.kind:
-			held += 1
-	return rule.weight / float(1 + held)
-
-
-## A copy of `map` with room `room` as template `template` mirrored `mirror` (its shape `shape`) of
-## kind `kind`, placed so that each bridge end of `joined` (bridge, end, the world point its socket
-## was at), facing as `facings` says, meets a socket of the new shape there; null when one meets none.
-static func _refit(map: BiomeMap, room: int, template: StringName, mirror: int, kind: StringName, shape: PieceShape, joined: Array[Vector4i], facings: PackedInt32Array) -> BiomeMap:
-	if joined.is_empty():
-		return null
-	var first: Vector2 = Vector2(joined[0].z, joined[0].w)
-	for anchor in shape.sockets():
-		if shape.socket_facing[anchor] != facings[0]:
-			continue
-		var place: Vector2 = first - shape.socket_at[anchor]
-		var sockets := PackedInt32Array()
-		var taken: Dictionary = {}
-		for at in joined.size():
-			var point: Vector2 = Vector2(joined[at].z, joined[at].w)
-			var meets: int = -1
-			for socket in shape.sockets():
-				if not taken.has(socket) and shape.socket_facing[socket] == facings[at] and (place + shape.socket_at[socket]).round() == point:
-					meets = socket
-					break
-			if meets < 0:
-				break
-			taken[meets] = true
-			sockets.append(meets)
-		if sockets.size() != joined.size():
-			continue
-		var made: BiomeMap = map.copy()
-		made.room_templates[room] = template
-		made.room_mirrors[room] = mirror
-		made.room_places[room] = place
-		made.room_kinds[room] = kind
-		for at in joined.size():
-			made.bridge_ends[joined[at].x * BiomeMap.END_FIELDS + joined[at].y * 2 + 1] = sockets[at]
-		made.work_out_depths()
-		return made
-	return null
-
-
-## What `map`'s pieces cover together (BiomeWorld's area): a reroll keeps inside it.
-static func _area_of(map: BiomeMap, shapes: Dictionary) -> Rect2:
-	var whole := Rect2()
-	for room in map.rooms():
-		var shape: PieceShape = map.room_shape(room, shapes)
-		if shape != null:
-			whole = shape.rect_at(map.room_places[room]) if room == 0 else whole.merge(shape.rect_at(map.room_places[room]))
-	for bridge in map.bridges():
-		var shape: PieceShape = map.bridge_shape(bridge, shapes)
-		if shape != null:
-			whole = whole.merge(shape.rect_at(map.bridge_places[bridge]))
-	return whole
 
 
 ## Step 7: each room of a kind with `typed_rewards` its reward type, rolled from its kind's table.

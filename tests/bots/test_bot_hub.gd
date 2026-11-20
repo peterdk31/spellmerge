@@ -142,3 +142,24 @@ func test_only_the_wild_star_is_the_rack_staff() -> void:
 	check(not HubScript.is_rack_staff(same_staff_other_cards, rack), "a star staff with other cards is not")
 	var sentry: StaffItem = load("res://content/items/staffs/patient_sentry/patient_sentry.tres") as StaffItem
 	check(not HubScript.is_rack_staff(sentry.stack(), rack), "another premade staff is not")
+
+
+## Regression (the review of 2026-11-20): the stone lights once every wizard is in its area, so a bot
+## still walking to its corner departs with the party; its errand is done all the same, never begun
+## again in a later hub.
+func test_leaving_the_hub_from_any_stage_ends_the_errand() -> void:
+	for stage: HubScript.Stage in [HubScript.Stage.RACK, HubScript.Stage.BUILD, HubScript.Stage.STONE, HubScript.Stage.WAIT]:
+		var errand := HubScript.new()
+		errand.stage = stage
+		errand.left_hub()
+		check_equal(errand.stage, HubScript.Stage.DONE, "left from %s" % HubScript.Stage.keys()[stage])
+
+
+## A bot whose errand has not begun (Flow still idle before the hub starts) is not done by it.
+func test_an_errand_not_begun_is_not_ended_by_an_idle_flow() -> void:
+	var bot := BotScript.new()
+	bot.use_flow(_flow)
+	bot.plan_hub(2, true)
+	_flow.call("stop_run")
+	bot.step(1.0 / 60.0)
+	check_equal(bot.hub.stage, HubScript.Stage.RACK, "the errand waits for the hub")

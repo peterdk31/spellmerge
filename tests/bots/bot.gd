@@ -143,7 +143,8 @@ var _events: Node = null
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
-## The build of the last `build_drawn` (bot_builds.gd: its name and its staffs' cards; empty before).
+## The build of the last `draw` (bot_builds.gd: its name, its rack staff and its staffs' cards; empty
+## before, and while a hub errand with no build to draw runs).
 var build: Dictionary = {}
 ## The team board its brain reads its teammates' health from (`AIBrain.hurt_mate`, the `heal ally`
 ## behaviour): its own, filled each step with what it sees of its teammates (`_report_mates`), as a
@@ -413,7 +414,8 @@ func step(delta: float) -> void:
 	var wizard := _flow.call("get_wizard", player) as Actor
 	if hub != null:
 		if _flow.get(&"mode") != _flow.get(&"MODE_HUB"):
-			hub.left_hub()
+			if _hub_wizard != null:
+				hub.left_hub()
 		elif hub.stage != HubScript.Stage.DONE:
 			if wizard != null and not wizard.is_down():
 				_step_hub(wizard)

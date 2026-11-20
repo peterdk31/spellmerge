@@ -27,7 +27,8 @@ extends Node
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
 ##    starts after the autoloads load, so errors during startup are not covered).
-## If the run is not cleared within TIME_LIMIT game seconds the test fails.
+## If the run does not start within HUB_LIMIT game seconds in the hub, or is not cleared within
+## TIME_LIMIT game seconds of its start, the test fails.
 ##
 ## The run is played unscaled (the run definition's `scaling` off while the test runs, run
 ## generation RG5): three of its four seats fight, so a room scaled for four players would test
@@ -90,16 +91,20 @@ const BuildsScript := preload("res://tests/bots/bot_builds.gd")
 const PLAYERS: int = 4
 ## The index of the bot that idles in its builder (bot 4).
 const IDLER: int = 3
-## The seed of the replay the run is recorded into, which deals the run's seed (see the class doc;
-## 11: it was 8 for a while, since the crypt's longer treasure line laid seed 11's map with a corner
-## walkway out of the start room the bots' travel could not cross; they walk every walkway since
-## 2026-11-19, tests/bots/bot_route.gd, and win it again). Changing it, or content that changes how
+## The seed of the replay the hub is recorded into, which deals the hub's seed and then the run's
+## (see the class doc; 11: it was 8 for a while, since the crypt's longer treasure line laid seed
+## 11's map with a corner walkway out of the start room the bots' travel could not cross; they walk
+## every walkway since 2026-11-19, tests/bots/bot_route.gd, and win it again. Since the bots start
+## in the hub, 2026-11-20, the run is the replay's second and seed 11 lays another map; the bots win
+## it too, so the pin stays). Changing it, or content that changes how
 ## this run's fight goes, can make the run end otherwise: a failure then is the same on every start.
 const REPLAY_SEED: int = 11
 ## The argument that plays another replay seed (`--replay-seed=N`; 0: a random one).
 const REPLAY_SEED_ARGUMENT: String = "--replay-seed="
-## Game seconds allowed for the room to be cleared.
+## Game seconds allowed for the room to be cleared, from the run's start (the hub's time not counted).
 const TIME_LIMIT: float = 120.0
+## Game seconds allowed in the hub for the bots to start the run from the stone.
+const HUB_LIMIT: float = 60.0
 ## Frames to let the world settle after the room is cleared, then the checks run.
 const SETTLE_FRAMES: int = 30
 
@@ -123,6 +128,8 @@ var _entered: int = 0
 var _casts: int = 0
 var _downed: Array[bool] = [false, false, false, false]
 var _elapsed: float = 0.0
+## Game seconds in the hub before the run started.
+var _in_hub: float = 0.0
 var _settle: int = -1
 var _started: bool = false
 var _logging: bool = false
@@ -203,6 +210,16 @@ static func replay_seed_of(args: PackedStringArray) -> int:
 	return REPLAY_SEED
 
 
+## The seed of the run from the stone (0 before it started).
+func run_seed() -> int:
+	return _run_seed
+
+
+## True once the run from the stone started.
+func in_run() -> bool:
+	return _in_run
+
+
 ## The seeds, for the result lines.
 func _seeds_text() -> String:
 	return "replay seed %d (run seed %d; played again with %s%d)" % [_replay_seed, _run_seed, REPLAY_SEED_ARGUMENT, _replay_seed]
@@ -247,6 +264,11 @@ func _stop_logging() -> void:
 func _process(delta: float) -> void:
 	if not _started:
 		return
+	if not _in_run:
+		_in_hub += delta
+		if _in_hub > HUB_LIMIT:
+			_finish(_check())
+		return
 	_elapsed += delta
 	_watch_builder()
 	# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
@@ -280,7 +302,7 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 	_entered += 1
 	var tick: Node = get_tree().root.get_node_or_null("Tick")
 	_run_seed = int(tick.get("sim").get("run_seed")) if tick != null else 0
-	print("SMOKE: room_entered from the hub's stone (%.1f game seconds), %s" % [_elapsed, _seeds_text()])
+	print("SMOKE: room_entered from the hub's stone (after %.1f game seconds in the hub), %s" % [_in_hub, _seeds_text()])
 	_bots[IDLER].open_builder()
 	for index in IDLER:
 		var wizard := _flow.call("get_wizard", index) as Actor
@@ -329,9 +351,9 @@ static func counts_as_a_fight(life: RoomLife, room: int) -> bool:
 func _check() -> Array[String]:
 	var failed: Array[String] = _failures.duplicate()
 	if not _in_run:
-		failed.append("the run never started from the hub's stone (the bots' errands: %s)" % _errands_text())
+		failed.append("the run never started from the hub's stone within %d game seconds (the bots' errands: %s)" % [int(HUB_LIMIT), _errands_text()])
 	if _cleared == 0:
-		if failed.is_empty():
+		if failed.is_empty() and _in_run:
 			failed.append("room_cleared was never received")
 	elif _cleared != 1:
 		failed.append("room_cleared was received %d times, expected once" % _cleared)

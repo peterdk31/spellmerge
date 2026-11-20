@@ -35,6 +35,8 @@ extends RefCounted
 ## Every build is valid by the card rules (tests/bots/test_bot_builds.gd: no card wasted, one cast
 ## a staff, the attack hurts, the dash moves its caster, the mend heals and hurts nobody).
 
+const FlowScript := preload("res://gameplay/flow/flow.gd")
+
 ## The roll's purpose (`Sim.chance_int`).
 const PURPOSE: StringName = &"bot_build"
 ## The seat of the mender in a team of MEND_TEAM or more: P2, a fighter in every run the bots play
@@ -49,7 +51,6 @@ const FIGHTERS: Array[Dictionary] = [
 	{"name": "lance", "staffs": [[&"dash"], [&"faster", &"overcharge", &"bolt"]]},
 	{"name": "beam", "staffs": [[&"dash"], [&"beam"]]},
 ]
-const FlowScript := preload("res://gameplay/flow/flow.gd")
 ## The hands a wizard starts with (RB and RT); a rack staff goes on the next.
 const START_HANDS: int = FlowScript.START_HANDS
 ## The rack staff the mender takes: the hub's Wild star (on a star staff, as the starters).

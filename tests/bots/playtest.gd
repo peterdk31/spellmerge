@@ -66,6 +66,9 @@ var _cleared: int = 0
 var _boss_cleared: bool = false
 var _fights: int = 0
 var _downs: int = 0
+## True once the run from the stone entered its start room, and the tick it did.
+var _run_started: bool = false
+var _run_tick: int = 0
 var _downs_by: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _shot_queue: Array[String] = []
 var _every: int = 0
@@ -144,7 +147,7 @@ func take() -> void:
 	var tick: Node = root.get_node("Tick")
 	print("PLAYTEST start in the hub: %d players, replay seed %d, split %d" % [_players, _seed, _split])
 	var rack_shot: bool = false
-	while _flow.get("mode") != _flow.get("MODE_RUN") and float(_ticks) / 60.0 < HUB_LIMIT:
+	while not _run_started and float(_ticks) / 60.0 < HUB_LIMIT:
 		await process_frame
 		_ticks += 1
 		# In the hub: a shot as the rack's staff is taken and one as the party stands on the stone.
@@ -162,12 +165,13 @@ func take() -> void:
 		while not _shot_queue.is_empty():
 			var what: String = _shot_queue.pop_front()
 			save(await grab(), "playtest_%d_%d%s_%s" % [_seed, _players, "e" if _split == SplitScreenSetting.EQUAL else "", what])
-	if _flow.get("mode") != _flow.get("MODE_RUN"):
+	if not _run_started:
 		_say("the run never started from the hub's stone")
 		_ended = 0
 	else:
 		_say("the run started from the hub's stone, run seed %d" % int(tick.get("sim").get("run_seed")))
-	while _ended < 0 and float(_ticks) / 60.0 < _limit:
+	# `--limit` counts the run's time, not the hub's.
+	while _ended < 0 and float(_ticks - _run_tick) / 60.0 < _limit:
 		await process_frame
 		_ticks += 1
 		if _flow.get("mode") != _flow.get("MODE_RUN"):
@@ -246,6 +250,9 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 		for r in map.rooms():
 			if life.fights[r].has_enemies():
 				_fights += 1
+	if room == 0 and not _run_started:
+		_run_started = true
+		_run_tick = _ticks
 	_say("entered room %d (%s, %s)" % [room, map.room_templates[room], kind])
 	if room == 0 and not _plain and not _built:
 		_built = true

@@ -10,19 +10,22 @@ extends RefCounted
 ##
 ## The stages, in order (`stage`):
 ## - RACK: with a rack staff in its build (`BuildsScript.rack_of`), walk to where it lies and press
-##   `take` once it is the item in reach (again every RETRY ticks while it is not taken yet). Taken
-##   (one of its hands holds it), or no longer lying there (taken by another): on to BUILD.
+##   `take` once it is the item in reach (again every RETRY ticks while it is not taken yet, at most
+##   TAKE_TRIES times). Taken (one of its hands holds it), no longer lying there (taken by another)
+##   or refused every time: on to BUILD.
 ## - BUILD: the bot sets its build (`bot.gd`, `send_build`: each staff as one `staff_cards_requested`,
 ##   as the builder does), then STONE. A bot with no build (an idler, a playtest's `--plain`) has
 ##   nothing to set.
 ## - STONE: walk onto the stone, to its own spot there (`spot_on`: the four seats' spots apart, so
 ##   nobody shoves another off), then WAIT.
-## - WAIT: stand there. The starter (one bot of the party, `starter`) presses `accept` while the stone
-##   is lit (every wizard of the hub on it), again every RETRY ticks until the party departs.
-## - DONE: the party left the hub (a run started; `left_hub`). A later hub (the run's end) is
-##   played as a bot plays a room with no fight: the runners are over by then.
+## - WAIT: stand there (shoved off the stone, back to STONE). The starter (one bot of the party,
+##   `starter`) presses `accept` while the stone is lit (every wizard of the hub on it), again every
+##   RETRY ticks until the party departs.
+## - DONE: the party left the hub (a run started; `left_hub`, from any stage). A later hub (the
+##   run's end) is played as a bot plays a room with no fight: the runners are over by then.
 ##
-## Nothing is allocated per step once it found its rack staff (`lying` is read until then).
+## Bot code: while it walks to the rack it reads the ground's rows each step (`Items.lying`, a copy);
+## nothing after that.
 
 enum Stage { RACK, BUILD, STONE, WAIT, DONE }
 
@@ -39,6 +42,8 @@ const SPOT_REACH: float = 6.0
 const SPOT_APART: float = 18.0
 ## Ticks between two presses of one button that changed nothing yet (a take, a start).
 const RETRY: int = 30
+## Presses of `take` before it gives the rack staff up (a take refused: no free hand).
+const TAKE_TRIES: int = 5
 ## The route's names for its two walks (`bot_route.gd`, `aim`'s `key`).
 const KEY_RACK: int = -2
 const KEY_STONE: int = -3
@@ -56,6 +61,7 @@ var _item: int = NO_ITEM
 var _item_at: Vector2 = Vector2.ZERO
 var _route: RouteScript = RouteScript.new()
 var _since_tap: int = RETRY
+var _takes: int = 0
 
 
 ## Start the errand afresh (a new hub, a new wizard).
@@ -65,6 +71,7 @@ func reset() -> void:
 	_item = NO_ITEM
 	_route.reset()
 	_since_tap = RETRY
+	_takes = 0
 
 
 ## One step of the errand for the wizard of `seat` with `build` (empty: none): the way to walk (unit
@@ -86,16 +93,20 @@ func step(seat: int, wizard: Actor, build: Dictionary, starter: bool, flow: Node
 				stage = Stage.WAIT
 			return way
 		Stage.WAIT:
+			var stone: Rect2 = stone_area(flow)
+			if not stone.grow(-SPOT_REACH).has_point(wizard.global_position):
+				# Shoved off the stone (a teammate walking to its corner): back to its spot.
+				stage = Stage.STONE
+				return Vector2.ZERO
 			if starter and bool(flow.call("is_stone_lit")) and _since_tap >= RETRY:
 				_press(&"accept")
 	return Vector2.ZERO
 
 
-## Out of the hub: once it waited on the stone, the party departed and the errand is done (a hub
-## before that, left some other way, is begun again when it is back).
+## Out of the hub once its errand began: the party departed (the stone lights as every wizard is in
+## its area, so a bot still walking to its corner departs too) and the errand is done.
 func left_hub() -> void:
-	if stage == Stage.WAIT:
-		stage = Stage.DONE
+	stage = Stage.DONE
 
 
 ## The bot set its build (or had none to set): on to the stone.
@@ -129,10 +140,16 @@ func _to_rack(seat: int, wizard: Actor, build: Dictionary, items: Node) -> Vecto
 			stage = Stage.BUILD
 			return Vector2.ZERO
 	if int(items.call("near_of", seat)) == _item:
-		if _since_tap >= RETRY:
+		if _takes >= TAKE_TRIES:
+			# Refused every time (no free hand): the build goes on without it.
+			stage = Stage.BUILD
+		elif _since_tap >= RETRY:
+			_takes += 1
 			_press(&"take")
 		return Vector2.ZERO
-	return _walk(wizard, _item_at, RACK_REACH, KEY_RACK)
+	# Close enough but another item is the one in reach: on to the staff's own spot.
+	var reach: float = RACK_REACH if wizard.global_position.distance_to(_item_at) > RACK_REACH else 1.0
+	return _walk(wizard, _item_at, reach, KEY_RACK)
 
 
 ## True while its item still lies on the ground (read through `near_of`'s numbers would need it in

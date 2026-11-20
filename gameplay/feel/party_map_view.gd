@@ -37,7 +37,7 @@ extends CanvasLayer
 ##
 ## **A cleared room** (the owner, 2026-11-20, #883): a room with a fight (`KindSymbol.shows_cleared`)
 ## that is cleared (Feel's room hearing, `rooms_cleared`) shows its symbol in the calm cleared look
-## (`kind_symbol.gd`: dimmed, a small check), as its doorway signs do; on an open map it steps in a
+## (`kind_symbol.gd`: dimmed, a check across it), as its doorway signs do; on an open map it steps in a
 ## stage a frame at FPS, with every map shut (or told again after a restore) drawn as it stands.
 ##
 ## **Told to the HUD:** each seat's frame and whether it is fully open (`map_frame_shown`, as either

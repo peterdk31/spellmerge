@@ -67,7 +67,7 @@ func take() -> void:
 	await settle(2)
 	image = await grab()
 	save(image, "reveal_midway")
-	save_crop(image, on_screen(west_mouth + Vector2(24.0, 0.0)), "reveal_midway_crop", Vector2i(64, 40))
+	save_crop(image, on_screen(west_mouth + Vector2(-112.0, 0.0)), "reveal_midway_crop", Vector2i(64, 40))
 	feel.process_mode = Node.PROCESS_MODE_INHERIT
 	await settle(40)
 	if symbols.cleared_of(into_west) != KindSymbolLook.CLEARED_STAGES:

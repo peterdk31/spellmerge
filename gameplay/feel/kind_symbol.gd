@@ -6,11 +6,12 @@ extends RefCounted
 ## at once (docs/STYLE.md, "Smooth"). Nothing is allocated.
 ##
 ## **The cleared look** (the owner, 2026-11-20, #883): a fight's, a challenge's or a boss's room
-## once cleared (`shows_cleared`) tells it calmly: its symbol dimmed a shade and a small check
-## (CHECK, in CHECK_COLOUR) over its lower right. It comes in by CLEARED_STAGES, a stage a frame
-## (`draw`'s `cleared`): the lit pixels step down to the base (1), the base to the shadow (2), and the
-## check is drawn a pixel a stage along its stroke (1 ... CLEARED_STAGES), so nothing changes in one
-## jump and the symbol keeps its own shape throughout; whole pixels, never a fade.
+## once cleared (`shows_cleared`) tells it calmly: its symbol dimmed to its shadow and a check
+## (CHECK, in CHECK_COLOUR, with a dark edge) across it. It comes in by CLEARED_STAGES, a stage a
+## frame (`draw`'s `cleared`): the lit pixels step down to the base (DIM_LIT), the base to the shadow
+## (DIM_BASE), the lit pixels on to the shadow (DIM_ALL), and the check is drawn a pixel a stage along
+## its stroke (1 ... CLEARED_STAGES), so nothing changes in one jump and the symbol keeps its own
+## shape throughout; whole pixels, never a fade.
 
 ## The light when a kind names none (the mouths' own).
 const DEFAULT_LIGHT: StringName = &"spark"
@@ -18,13 +19,15 @@ const DEFAULT_LIGHT: StringName = &"spark"
 const EDGES: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]
 ## The cleared look's stages (0 none ... all) and its check, in symbol pixels (x, row of the 7 × 7
 ## box), in the order its stroke is drawn: the short arm down, then the long arm up.
-const CLEARED_STAGES: int = 5
-const CHECK: Array[Vector2i] = [Vector2i(2, 4), Vector2i(3, 5), Vector2i(4, 4), Vector2i(5, 3), Vector2i(6, 2)]
+const CLEARED_STAGES: int = 7
+const CHECK: Array[Vector2i] = [Vector2i(0, 3), Vector2i(1, 4), Vector2i(2, 5), Vector2i(3, 4), Vector2i(4, 3), Vector2i(5, 2), Vector2i(6, 1)]
 ## The check's colour: the leaf's light, a calm green (docs/STYLE.md's palette).
 const CHECK_COLOUR: Color = Color("a0ad55")
-## The cleared look's stage from which the lit pixels are drawn in the base, and the base in the shadow.
+## The cleared look's stages from which the lit pixels are drawn in the base, the base in the
+## shadow, and the lit pixels in the shadow too.
 const DIM_LIT: int = 1
 const DIM_BASE: int = 2
+const DIM_ALL: int = 3
 
 
 ## True when a room of `kind` shows the cleared look once cleared: one with a fight (enemies,
@@ -73,9 +76,12 @@ static func draw(canvas: CanvasItem, pixels: PackedByteArray, shades: PackedColo
 
 
 ## The colour a symbol pixel (`RoomKind.SYMBOL_LIT` or `SYMBOL_BASE`) is drawn in, in `shades`
-## (shadow, base, light), at the cleared look's stage `cleared`: dimmed a shade from DIM_LIT and DIM_BASE.
+## (shadow, base, light), at the cleared look's stage `cleared`: a shade down at a time (DIM_LIT,
+## DIM_BASE, DIM_ALL), to the shadow.
 static func colour_of(pixel: int, shades: PackedColorArray, cleared: int) -> Color:
 	if pixel == RoomKind.SYMBOL_LIT:
+		if cleared >= DIM_ALL:
+			return shades[0]
 		return shades[1] if cleared >= DIM_LIT else shades[2]
 	return shades[0] if cleared >= DIM_BASE else shades[1]
 

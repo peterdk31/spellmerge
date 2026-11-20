@@ -198,7 +198,7 @@ func test_the_cleared_look_dims_the_symbol_and_draws_a_check_in_stages() -> void
 		check_equal(KindSymbolScript.check_shown(stage) - KindSymbolScript.check_shown(stage - 1), 1, "stage %d draws one more pixel of the check" % stage)
 		last_lit = lit
 		last_base = base
-	check_equal(last_lit, shades[1], "cleared: lit pixels in the base")
+	check_equal(last_lit, shades[0], "cleared: lit pixels in the shadow")
 	check_equal(last_base, shades[0], "the base in the shadow")
 	check_equal(KindSymbolScript.check_shown(KindSymbolScript.CLEARED_STAGES), KindSymbolScript.CHECK.size(), "the whole check at the end")
 	for pixel: Vector2i in KindSymbolScript.CHECK:
@@ -243,7 +243,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 			stages.append(symbols.cleared_of(into_west))
 		var light: Marker2D = symbols.light_of(into_west)
 		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
-	check_equal(stages, [1, 2, 3, 4, 5] as Array[int], "it steps to the cleared look a stage at a time, while its sign rises")
+	check_equal(stages, [1, 2, 3, 4, 5, 6, 7] as Array[int], "it steps to the cleared look a stage at a time, while its sign rises")
 	check(is_equal_approx(strengths[strengths.size() - 1], MouthSymbolsScript.LIGHT_STRENGTH * MouthSymbolsScript.CLEARED_LIGHT), "its light dimmed (%s)" % [strengths])
 	for i in range(1, strengths.size()):
 		check(strengths[i] <= strengths[i - 1] + MouthSymbolsScript.LIGHT_STRENGTH / RoomKind.SYMBOL_SIDE + 0.0001, "and never jumps")
@@ -267,7 +267,7 @@ func test_a_cleared_rooms_doorway_signs_and_map_symbol_show_it_cleared() -> void
 	while view.is_moving():
 		view.advance()
 		court.append(view.cleared_of(EAST))
-	check_equal(court, [1, 2, 3, 4, 5] as Array[int], "open, the court's symbol steps to it a stage a frame")
+	check_equal(court, [1, 2, 3, 4, 5, 6, 7] as Array[int], "open, the court's symbol steps to it a stage a frame")
 
 
 ## After a restore the cleared look is drawn as it stands, either way, nothing played in.

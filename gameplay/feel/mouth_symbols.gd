@@ -20,7 +20,7 @@ extends Node2D
 ##
 ## **Cleared** (the owner, 2026-11-20, #883): once the room a mouth leads into is cleared (Feel's room
 ## hearing, `rooms_cleared`) and its kind has a fight (`KindSymbol.shows_cleared`), its sign steps to
-## the calm cleared look (`kind_symbol.gd`: the symbol dimmed a shade, a small check drawn along its
+## the calm cleared look (`kind_symbol.gd`: the symbol dimmed to its shadow, a check drawn across it along its
 ## stroke), a stage a frame at FPS through `KindSymbol.CLEARED_STAGES`, and its light dims with it
 ## (to CLEARED_LIGHT of its own); on every mouth into that room.
 ##

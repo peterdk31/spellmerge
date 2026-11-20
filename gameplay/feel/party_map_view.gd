@@ -117,8 +117,10 @@ var _reopen: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 ## only when the split changes under it or it no longer fits.
 var _laid_views: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _laid_view: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
-## By seat: the room picked on its map (`map_pick_changed`; -1 none) and its outline's stage.
+## By seat: the room outlined on its map, the room picked next (`map_pick_changed`; -1 none: the
+## outline steps out of the old room before it steps into the new) and the outline's stage.
 var _pick: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _pick_next: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _pick_stage: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By place: the stone's shade drawn (0 none, 1 shadow, 2 base, 3 light) and its symbol's rows shown.
 var _shade: PackedInt32Array = PackedInt32Array()
@@ -169,19 +171,21 @@ func bind(events: Node) -> void:
 		events.map_pick_changed.connect(_on_map_pick_changed)
 
 
-## The room seat `seat` picked on its map (the HUD's `map_pick_changed`): its outline steps in from
-## nothing (a new pick's from its corners again), never a jump.
+## The room seat `seat` picked on its map (the HUD's `map_pick_changed`): the old outline steps out
+## to nothing, then the new one steps in (from its corners), never a jump.
 func _on_map_pick_changed(seat: int, room: int) -> void:
-	if seat < 0 or seat >= ActorsScript.SEATS or room == _pick[seat]:
+	if seat < 0 or seat >= ActorsScript.SEATS:
 		return
-	_pick[seat] = room
-	_pick_stage[seat] = 0
-	for map in _maps:
-		map.queue_redraw()
+	_pick_next[seat] = room
 
 
-## The room seat `seat` has picked and its outline's stage (for tests).
+## The room seat `seat` has picked (the one outlined next) and its outline's stage (for tests).
 func pick_of(seat: int) -> int:
+	return _pick_next[seat]
+
+
+## The room seat `seat`'s outline is drawn round now (for tests).
+func outlined_of(seat: int) -> int:
 	return _pick[seat]
 
 
@@ -339,7 +343,7 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 ## True while an opening still opens or closes, or a piece's look still changes on an open map.
 func is_moving() -> bool:
 	for seat in ActorsScript.SEATS:
-		if _stage[seat] != _stage_wanted(seat) or _pick_stage[seat] != _pick_wanted(seat):
+		if _stage[seat] != _stage_wanted(seat) or _pick_stage[seat] != _pick_wanted(seat) or (_pick[seat] != _pick_next[seat] and _pick_wanted_next(seat) > 0):
 			return true
 	if _any_open():
 		for place in _shade.size():
@@ -357,6 +361,8 @@ func advance() -> void:
 		_stage[seat] += signi(_stage_wanted(seat) - _stage[seat])
 		if _stage[seat] == 0:
 			_reopen[seat] = 0
+		if _pick_stage[seat] == 0 and _pick[seat] != _pick_next[seat]:
+			_pick[seat] = _pick_next[seat]
 		_pick_stage[seat] += signi(_pick_wanted(seat) - _pick_stage[seat])
 	for place in _shade.size():
 		_shade[place] += signi(_shade_wanted(place) - _shade[place])
@@ -376,9 +382,17 @@ func _sense_wanted(at: int) -> int:
 	return _sensed[at] if at < _sensed.size() else 0
 
 
-## A picked room's outline is drawn while its map is open and the room is one of the map's.
+## A picked room's outline is drawn while its map is open, the room is one of the map's and no
+## other room is picked next (then it steps out first).
 func _pick_wanted(seat: int) -> int:
-	return PICK_STAGES if _stage[seat] > 0 and _pick[seat] >= 0 and _pick[seat] < _rects.size() else 0
+	if _pick[seat] != _pick_next[seat]:
+		return 0
+	return _pick_wanted_next(seat)
+
+
+func _pick_wanted_next(seat: int) -> int:
+	var room: int = _pick_next[seat]
+	return PICK_STAGES if _stage[seat] > 0 and room >= 0 and room < _rects.size() else 0
 
 
 func _stage_wanted(seat: int) -> int:

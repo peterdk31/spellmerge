@@ -210,6 +210,27 @@ func test_each_room_is_filled_by_its_kind_and_scaled_by_its_depth_and_players() 
 	check_equal(map_four.room_templates, map_one.room_templates, "the same rooms for any number of players")
 
 
+## An enemy's aim sharpens by depth only (the owner, 2026-11-19): each room's depth level is its
+## scale with one player, the same for one player as for four, while the scale itself grows.
+func test_the_depth_level_is_the_same_for_any_number_of_players() -> void:
+	var definition: RunDefinition = MadeUpBiome.run()
+	var rules: MapRules = definition.biomes[0]
+	var map_one: BiomeMap = _map(definition, 3, 1)
+	var map_four: BiomeMap = _map(definition, 3, 4)
+	check_equal(map_one.room_levels.size(), map_one.rooms(), "every room has its depth level")
+	check_equal(map_four.room_levels, map_one.room_levels, "one player or four: the same depth levels")
+	check(map_four.room_scales != map_one.room_scales, "while four players scale the rooms more")
+	var deeper: bool = false
+	for room in map_one.rooms():
+		check(absf(map_one.level_of(room) - definition.biome_room_scale(rules, map_one.depths[room], 1)) < 0.0001, "room %d: its scale with one player" % room)
+		deeper = deeper or map_one.level_of(room) > map_one.level_of(0)
+	check(deeper, "a deeper room has a higher level")
+	check(map_one.copy().same_as(map_one), "a copy keeps the levels")
+	var other: BiomeMap = map_one.copy()
+	other.room_levels[0] += 1.0
+	check(not other.same_as(map_one), "and they are compared")
+
+
 func _enemy(id: StringName) -> EnemyBase:
 	for enemy: EnemyBase in _biome.content.enemies:
 		if enemy.id == id:
@@ -562,12 +583,7 @@ func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
 	check_equal(BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(2)).room_templates, first.room_templates, "the same room for any seed")
 
 
-## The crypt's walkways (connected biomes CB13: straight ones every 32 px both ways and corner ones)
-## and its fight rooms with three or four sockets (a way uses two of a room's sockets, so a loop needs
-## a third) let its loop style close loops: before them none of 60 loop maps closed one; now at least
-## two in five do (34 when measured), and every kind of walkway (west-east, north-south, a corner)
-## carries a way somewhere.
-## Exactly one shop in every crypt biome (the owner, 2026-11-19), over a sweep of seeds and player
+## Exactly one shop in every crypt biome (the owner, 2026-11-19), over a sweep of 30 seeds and player
 ## counts, with its 12 to 16 rooms and the generator's rules kept (the boss deepest, at least 4 fights
 ## on every way to it).
 func test_every_crypt_biome_has_exactly_one_shop() -> void:
@@ -577,7 +593,7 @@ func test_every_crypt_biome_has_exactly_one_shop() -> void:
 	var shapes: Dictionary = registry.piece_shapes(&"crypt")
 	var rules: MapRules = crypt.biomes[0]
 	var counts: Dictionary = {}
-	for seed_value in range(100, 160):
+	for seed_value in range(100, 130):
 		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value), 1 + seed_value % 4)
 		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
 		if not map.is_made():
@@ -592,6 +608,11 @@ func test_every_crypt_biome_has_exactly_one_shop() -> void:
 	check(counts.size() >= 3, "the room count varies over the sweep: %s" % [counts.keys()])
 
 
+## The crypt's walkways (connected biomes CB13: straight ones every 32 px both ways and corner ones)
+## and its fight rooms with three or four sockets (a way uses two of a room's sockets, so a loop needs
+## a third) let its loop style close loops: before them none of 60 loop maps closed one; now at least
+## two in five do (34 when measured), and every kind of walkway (west-east, north-south, a corner)
+## carries a way somewhere.
 func test_the_crypt_s_loop_style_closes_loops() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()

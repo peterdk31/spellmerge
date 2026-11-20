@@ -50,6 +50,9 @@ var depths: PackedInt32Array = PackedInt32Array()
 ## budget, the boss's one boss), room by room in `room_enemies`, room `r`'s ending at
 ## `room_enemy_ends[r]` (`enemies_of`).
 var room_scales: PackedFloat32Array = PackedFloat32Array()
+## Each room's depth level, once filled: its scale with one player (`RunScaling`, by its depth only),
+## which an enemy's aim sharpens by (`AimTuning`; the owner, 2026-11-19); `level_of`.
+var room_levels: PackedFloat32Array = PackedFloat32Array()
 var room_enemy_ends: PackedInt32Array = PackedInt32Array()
 var room_enemies: Array[StringName] = []
 ## Each enemy's elite card (connected biomes CB11, decision 24), by the same index as `room_enemies`:
@@ -128,11 +131,18 @@ func elites_of(room: int) -> Array[StringName]:
 	return out
 
 
+## Room `room`'s depth level (`room_levels`; 0: none, as a map filled before them).
+func level_of(room: int) -> float:
+	return room_levels[room] if room >= 0 and room < room_levels.size() else 0.0
+
+
 ## Room `room`'s fill: its scale, its enemies and their elite cards (`elite_cards` by the same index,
 ## empty or short: no elite past its end; rooms filled in order, from room 0).
-func fill_room(room: int, scale: float, enemies: Array[StringName], elite_cards: Array[StringName] = []) -> void:
+func fill_room(room: int, scale: float, enemies: Array[StringName], elite_cards: Array[StringName] = [], level: float = 0.0) -> void:
 	room_scales.resize(room + 1)
 	room_scales[room] = scale
+	room_levels.resize(room + 1)
+	room_levels[room] = level
 	for at in enemies.size():
 		room_elites.append(elite_cards[at] if at < elite_cards.size() else &"")
 	room_enemies.append_array(enemies)
@@ -182,7 +192,7 @@ func work_out_depths() -> void:
 
 ## True when `other` is the same map, row for row.
 func same_as(other: BiomeMap) -> bool:
-	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_reward_items == other.room_reward_items and room_reward_card_kinds == other.room_reward_card_kinds and room_reward_elements == other.room_reward_elements and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
+	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_levels == other.room_levels and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_reward_items == other.room_reward_items and room_reward_card_kinds == other.room_reward_card_kinds and room_reward_elements == other.room_reward_elements and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
 
 
 ## A copy, row for row.
@@ -192,6 +202,7 @@ func copy() -> BiomeMap:
 	out.style = style
 	out.not_made = not_made.duplicate()
 	out.room_scales = room_scales.duplicate()
+	out.room_levels = room_levels.duplicate()
 	out.room_enemy_ends = room_enemy_ends.duplicate()
 	out.room_enemies = room_enemies.duplicate()
 	out.room_elites = room_elites.duplicate()

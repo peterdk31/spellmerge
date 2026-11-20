@@ -261,26 +261,34 @@ static func _start_alone(definition: RunDefinition, rules: MapRules, content: Ru
 ## Step 6: each room its scale (its depth, the run's players) and its enemies, as its kind fills.
 static func _fill(map: BiomeMap, definition: RunDefinition, rules: MapRules, content: RunContent, players: int, dice: MapDice) -> void:
 	for room in map.rooms():
-		var depth: int = map.depths[room]
-		var scale: float = definition.biome_room_scale(rules, depth, players)
-		var enemies: Array[StringName] = []
-		var elites: int = 0
-		var fill: StringName = content.kind(map.room_kinds[room]).fill
-		match fill:
-			RoomKind.FILL_ENEMIES, RoomKind.FILL_ELITES:
-				enemies = RoomFill.spend(content.enemy_pool(rules.biome, depth), RunScaling.scaled_budget(rules.room_budget, scale), dice, Step.FILL)
-				if fill == RoomKind.FILL_ELITES:
-					elites = enemies.size()
-				elif rules.elite_depth >= 0 and depth >= rules.elite_depth and dice.roll(Step.FILL) < rules.elite_chance:
-					elites = 1
-			RoomKind.FILL_BOSS:
-				var bosses: Array[EnemyBase] = content.boss_pool(rules.biome, depth)
-				enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
-		var cards: Array[StringName] = []
-		if elites > 0 and not rules.elite_cards.is_empty():
-			for at in enemies.size():
-				cards.append(rules.elite_cards[dice.below(Step.FILL, rules.elite_cards.size())] if at < elites else &"")
-		map.fill_room(room, scale, enemies, cards)
+		var filled: Array = _fill_one(map, room, definition, rules, content, players, dice)
+		map.fill_room(room, filled[0], filled[1], filled[2], filled[3])
+
+
+## Room `room`'s fill as step 6 rolls it: [its scale, its enemies, their elite cards, its depth's
+## level: its scale with one player, which an enemy's aim sharpens by (`AimTuning`; the owner,
+## 2026-11-19: depth only, never the players)].
+static func _fill_one(map: BiomeMap, room: int, definition: RunDefinition, rules: MapRules, content: RunContent, players: int, dice: MapDice) -> Array:
+	var depth: int = map.depths[room]
+	var scale: float = definition.biome_room_scale(rules, depth, players)
+	var enemies: Array[StringName] = []
+	var elites: int = 0
+	var fill: StringName = content.kind(map.room_kinds[room]).fill
+	match fill:
+		RoomKind.FILL_ENEMIES, RoomKind.FILL_ELITES:
+			enemies = RoomFill.spend(content.enemy_pool(rules.biome, depth), RunScaling.scaled_budget(rules.room_budget, scale), dice, Step.FILL)
+			if fill == RoomKind.FILL_ELITES:
+				elites = enemies.size()
+			elif rules.elite_depth >= 0 and depth >= rules.elite_depth and dice.roll(Step.FILL) < rules.elite_chance:
+				elites = 1
+		RoomKind.FILL_BOSS:
+			var bosses: Array[EnemyBase] = content.boss_pool(rules.biome, depth)
+			enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
+	var cards: Array[StringName] = []
+	if elites > 0 and not rules.elite_cards.is_empty():
+		for at in enemies.size():
+			cards.append(rules.elite_cards[dice.below(Step.FILL, rules.elite_cards.size())] if at < elites else &"")
+	return [scale, enemies, cards, definition.biome_room_scale(rules, depth, 1)]
 
 
 ## Step 7: each room of a kind with `typed_rewards` its reward type, rolled from its kind's table.

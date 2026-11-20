@@ -148,3 +148,22 @@ func test_a_teleport_is_the_same_after_a_snapshot_restore() -> void:
 		tick.run(DT)
 	check_equal(_wizard(0).position, at_once, "the same place")
 	check_equal(SimHash.whole(SimHash.areas(tick.state_areas())), hash_once, "the same state")
+
+
+func test_nowhere_while_down_or_on_a_bridge_into_a_fight() -> void:
+	var map: BiomeMap = _start(1)
+	_into(map, 0, WEST, RoomSocket.Facing.EAST)
+	var wizard: Actor = _wizard(0)
+	check(MapTeleport.may_go(wizard, wizard, flow.life, map), "standing in a cleared room: it may go")
+	wizard.spawn(0.5, MapTeleport.ARRIVE_STYLE)
+	check(not MapTeleport.may_go(wizard, wizard, flow.life, map), "down (spawning in, falling or downed): never")
+	wizard.spawn(0.0, &"")
+	# On a bridge whose end room is in a fight.
+	var bridge: int = 0
+	wizard.room = flow.life.rooms() + bridge
+	check(MapTeleport.may_go(wizard, wizard, flow.life, map), "on a bridge with no fight at either end: it may go")
+	var end: int = map.end_room(bridge, 1)
+	flow.life.set_flag(end, RoomLife.STARTED, true)
+	flow.life.set_flag(end, RoomLife.CLEARED, false)
+	check(not MapTeleport.may_go(wizard, wizard, flow.life, map), "on a bridge into a fight under way: never")
+	check_equal(MapTeleport.rooms_for(wizard, wizard, flow.life, map), 0, "no rooms then")

@@ -8,7 +8,7 @@ extends RefCounted
 ## - **While the map is held** (`map` held, its input not captured by a menu: the map's own rule,
 ##   `party_map_view.gd`) and there is a room to go to, the pick is the room picked last if it still
 ##   may be, else the first; a flick of the stick or the D-pad (`menu_move` past FLICK from below
-##   REST) moves it to the nearest room that way (within a half turn's cone, CONE, its middle's way
+##   REST) moves it to the nearest room that way (within CONE, 60 degrees either side, of its middle's way
 ##   from the picked one's), so the wizard keeps walking while its player picks; A (`take`) sends
 ##   `map_teleport_requested(seat, room)` once a press, and the map's A does nothing else.
 ## - **Told to the view** (`map_pick_changed`, Feel draws it on that seat's map) as it changes, -1 as
@@ -26,7 +26,7 @@ const MAP_ACTION: StringName = &"map"
 ## A flick: the stick past FLICK, from below REST.
 const FLICK: float = 0.6
 const REST: float = 0.3
-## How far off a flick's way a room may lie and still be its next (the cosine of the cone's half).
+## How far off a flick's way a room may lie and still be its next (the cosine of the cone's half: 60°).
 const CONE: float = 0.5
 
 var events: EventsScript = null
@@ -98,15 +98,6 @@ static func next_room(rooms: PackedInt32Array, at: PackedVector2Array, from: int
 			best_distance = distance
 			best = rooms[at_room]
 	return best
-
-
-## Nothing picked for any seat (the HUD's room left).
-func clear() -> void:
-	for seat in SEATS:
-		_rooms[seat] = PackedInt32Array()
-		_at[seat] = PackedVector2Array()
-		_set_pick(seat, NONE)
-		_last[seat] = NONE
 
 
 func _set_pick(seat: int, room: int) -> void:

@@ -470,12 +470,12 @@ func poll() -> void:
 		# The open Y map's pick: A there teleports (the owner, 2026-11-19) and does nothing else.
 		var map_held: bool = _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and _map_picker.holds(player, input)
 		var map_took: bool = _map_picker.poll(player, map_held, input.get_move(player), start_now or take_now)
-		if input.is_joined(player) and not map_took:
+		if input.is_joined(player):
 			if _boss_intro.is_open():
 				# A is the intro's while it is open (it asks whether the pause menu is).
 				if start_now and not had_menu and not _has_menu(player):
 					_boss_intro.press(player)
-			elif (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
+			elif not map_took and (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
 				if _stone_lit:
 					if start_now:
 						events.run_requested.emit(player)

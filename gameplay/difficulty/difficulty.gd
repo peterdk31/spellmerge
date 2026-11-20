@@ -6,10 +6,12 @@ extends Node
 ## level (`level`) and, as Flow stands an enemy or a boss
 ## (`enemy_standing`, the body not yet in the tree), sets the body's `Actor.stat_scale` to it (an
 ## elite's, connected biomes CB11, ELITE_HEALTH times it), so its data's health is multiplied by it
-## when the body applies its data. Power, spell size and a boss's
+## when the body applies its data, and its `Actor.room_level` to the room's depth level
+## (`depth_level`, `run_room_leveled`: the room's scale with one player), which its AI's aim sharpens
+## by (`AimTuning`; the owner, 2026-11-19: by depth only, so more players never aim it better). Power, spell size and a boss's
 ## adds join the same scale as the boss plan's OB7 and OB13 land; a difficulty setting later is one
 ## more factor of the level. The room's scale is not `difficulty_changed`: that event is kept for the
-## setting's level, which the enemies' skill follows (enemy AI AI10), never the room's depth. Areas never call each other: this area knows the run and Flow by these
+## setting's level, which the enemies' skill follows (enemy AI AI10). Areas never call each other: this area knows the run and Flow by these
 ## events only.
 ##
 ## The level is the run's state (hashed, saved in snapshots): a run's start renews it to 1
@@ -31,6 +33,9 @@ var events: EventsScript = null
 ## How much harder the room the party is in is than the run's first room with one player (1: as
 ## the data says).
 var level: float = 1.0
+## The depth level of that room (`run_room_leveled`: its scale with one player, its depth only; 1:
+## as the data says): how sharp its enemies aim.
+var depth_level: float = 1.0
 
 
 func _ready() -> void:
@@ -42,6 +47,7 @@ func _ready() -> void:
 		push_warning("Difficulty: the Events autoload is missing, so nothing is scaled.")
 		return
 	events.run_room_scaled.connect(_on_run_room_scaled)
+	events.run_room_leveled.connect(_on_run_room_leveled)
 	events.enemy_standing.connect(_on_enemy_standing)
 
 
@@ -58,9 +64,18 @@ func _on_run_room_scaled(scale: float) -> void:
 	level = scale
 
 
-## An enemy or a boss is about to stand in the room: it takes the room's level (an elite's times
-## ELITE_HEALTH).
+## The room's depth level `room_level` (`run_room_leveled`): its enemies' aim's.
+func _on_run_room_leveled(room_level: float) -> void:
+	if not (room_level > 0.0) or not is_finite(room_level):
+		push_warning("Difficulty: a room's depth level of %s, so it stays %s." % [room_level, depth_level])
+		return
+	depth_level = room_level
+
+
+## An enemy or a boss is about to stand in the room: it takes the room's depth level (its `room_level`,
+## which its AI's aim sharpens by) and its health by it (`stat_scale`, an elite's times ELITE_HEALTH).
 func _on_enemy_standing(enemy: Node) -> void:
 	var actor := enemy as Actor
 	if actor != null:
+		actor.room_level = depth_level
 		actor.stat_scale = level * (ELITE_HEALTH if actor.is_elite() else 1.0)

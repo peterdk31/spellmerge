@@ -542,6 +542,14 @@ func test_the_picked_room_is_outlined_on_its_players_open_map_in_stages() -> voi
 	check_equal(stages, [1, 2, 3] as Array[int], "its outline steps in a stage a frame (Smooth)")
 	check_equal(view.pick_stage_of(1), 0, "nothing on the other player's map")
 	events.map_pick_changed.emit(0, WEST)
-	check_equal(view.pick_stage_of(0), 0, "a new pick steps in again from nothing")
+	var turning: Array = []
+	while view.is_moving():
+		view.advance()
+		turning.append([view.outlined_of(0), view.pick_stage_of(0)])
+	check_equal(turning, [[0, 2], [0, 1], [0, 0], [WEST, 1], [WEST, 2], [WEST, 3]], "a new pick: the old outline steps out, then the new one in (never a jump)")
 	events.map_pick_changed.emit(0, -1)
-	check(not view.is_moving() or view.pick_stage_of(0) == 0, "no pick: no outline")
+	var going: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		going.append(view.pick_stage_of(0))
+	check_equal(going, [2, 1, 0] as Array[int], "no pick: the outline steps out")

@@ -72,19 +72,28 @@ func _ask(seat: int, item: int) -> void:
 	_world.bus.item_take_requested.emit(seat, item)
 
 
+## The Wild star's cards in its staff's slots, the open ones empty (a starter head has 6 slots since
+## 2026-11-20; the item lists only the cards it holds).
+func _wild_cards() -> Array[StringName]:
+	var cards: Array[StringName] = WILD_STAR.cards.duplicate()
+	while cards.size() < WILD_STAR.staff.slots:
+		cards.append(&"")
+	return cards
+
+
 func test_a_room_lays_what_it_places_one_copy_each() -> void:
 	var bolt: SpellComponent = _world.registry.get_resource(&"spells", &"bolt") as SpellComponent
 	_world.bus.room_items_placed.emit(&"test_room", 0, [WILD_STAR, bolt, StaffCards.new()] as Array[Resource], PackedVector2Array([Vector2(10, 0), Vector2(40, 0), Vector2(70, 0)]))
 	var lying: Array[GroundItem] = _items.lying()
 	check_equal(lying.size(), 2, "the staff and the card lie there; what is no item does not")
 	check_equal([lying[0].number, lying[0].at, lying[0].stack.kind, lying[0].stack.id], [0, Vector2(10, 0), ItemKinds.STAFF, &"star"], "the premade staff is its staff")
-	check_equal(lying[0].stack.cards, WILD_STAR.cards, "with its cards")
+	check_equal(lying[0].stack.cards, _wild_cards(), "with its cards, its open slots empty")
 	check_equal(lying[0].stack.mana, WILD_STAR.staff.max_mana, "its pool full")
 	check_equal([lying[1].number, lying[1].stack.kind, lying[1].stack.id, lying[1].stack.count], [1, ItemKinds.CARD, &"bolt", 1], "the card, one copy")
 	check_equal(_ground, [[0, false], [1, false]], "each was said as it was laid")
 	var view: Dictionary = _items.view_of(lying[0])
 	check_equal(view["name"], "Wild star", "the premade staff is shown by its own name")
-	check_equal([view["slots"], view["cards"]], [WILD_STAR.staff.slots, WILD_STAR.cards], "with its numbers and cards")
+	check_equal([view["slots"], view["cards"]], [WILD_STAR.staff.slots, _wild_cards()], "with its numbers and cards")
 	check_equal(_items.view_of(lying[1])["name"], _world.spells.component_name(&"bolt"), "the card by its name")
 	check(_items.view_of(lying[1])["icon"] == _world.spells.component_icon(&"bolt"), "and its icon")
 	check(_items.view_of(lying[1])["icon"] != null, "it has one")
@@ -128,7 +137,7 @@ func test_a_staff_goes_on_a_free_hand_else_into_the_bag() -> void:
 	_tick()
 	check_equal(body.inventory.hands()[1], 4, "onto RT, the free hand")
 	check(body.caster.holds(1), "its Caster holds it")
-	check_equal(body.caster.cards_of(1), WILD_STAR.cards, "with its cards")
+	check_equal(body.caster.cards_of(1), _wild_cards(), "with its cards")
 	_ask(0, second)
 	_tick()
 	check_equal(body.inventory.copies(STAFFS), 1, "the next into the staff bag: no hand is free")
@@ -369,7 +378,7 @@ func test_a_recordings_ground_is_laid_again_as_it_was() -> void:
 	var lying: Array[GroundItem] = _items.lying()
 	check_equal(lying.size(), 2, "what the registry has none of is left out")
 	check_equal([lying[0].stack.id, lying[0].title, lying[0].stack.mana, lying[0].at], [&"star", "Wild star", 12.5, Vector2(4, 5)], "the staff as it lay")
-	check_equal(lying[0].stack.cards, [&"bolt", &"fire", &"", &""] as Array[StringName], "with its cards in its slots")
+	check_equal(lying[0].stack.cards, [&"bolt", &"fire", &"", &"", &"", &""] as Array[StringName], "with its cards in its slots")
 	check(lying[0].stack.staff == WILD_STAR.staff, "its staff found by its id")
 	check(_items.ground_now().equals(ground) == false, "the missing card is not said to lie there")
 

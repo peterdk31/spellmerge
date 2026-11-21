@@ -7,7 +7,10 @@ extends Node2D
 ## state, connected biomes CB9: a room shown on the map but never entered stays dark), so a machine
 ## that joins mid-run (a restore, told `again`) draws the rooms entered before it came lit, as they
 ## stand, never played in. An unvisited room's place is covered whole in the void's black
-## (`VoidBackdrop.COLOUR`): nothing in it shows, so it is one with the void round it. Once visited it
+## (`VoidBackdrop.COLOUR`): nothing in it shows, so it is one with the void round it, and the void's
+## motes drift over it as over the void (the owner, 2026-11-21: an unseen room looks like the
+## background, its motes drifting about): what it covers whole is told to the spectacle
+## (`void_covers`), which gives the void's motes off there too and draws them over it. Once visited it
 ## opens by **shrinking blocks** (docs/STYLE.md, "Smooth"): the place is cut into BLOCK px squares,
 ## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 8, 6, 4, 2,
 ## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. Fine
@@ -78,6 +81,10 @@ var _built_at: PackedInt32Array = PackedInt32Array()
 var _bands: Array[PackedInt32Array] = []
 ## The room hearing's `done_again` read last (a restore: drawn as it stands).
 var _read_again: int = 0
+## What it covers whole now, one rectangle a place (`void_covers`): the void shows there, so the
+## void's motes are given off and drawn over them too (the owner, 2026-11-21). The one array, kept and
+## written again only when a stage changes.
+var _void_rects: Array[Rect2] = []
 var _laid_places: int = -1
 var _laid_world: int = -1
 var _clock: float = 0.0
@@ -195,7 +202,7 @@ func step(delta: float, grid: RoomGrid) -> void:
 		for place in _rects.size():
 			_stage[place] = _wanted(place)
 			_build[place] = _build_wanted(place)
-		queue_redraw()
+		_changed()
 	if _rects.is_empty():
 		return
 	if not is_moving():
@@ -225,7 +232,7 @@ func advance() -> void:
 		var wanted: int = _build_wanted(place)
 		# Frames since found: the first frame after it is frame 1 (its nearest band a stage in).
 		_build[place] = HIDDEN if wanted == HIDDEN else mini(maxi(_build[place], 0) + 1, wanted)
-	queue_redraw()
+	_changed()
 
 
 ## A secret room's bridge's build wanted: HIDDEN while its room is not opened, else whole.
@@ -266,6 +273,24 @@ func _lay(grid: RoomGrid, places: int) -> void:
 		if _room[place] == 0:
 			_lay_secret_bridge(place)
 		_build[place] = _build_wanted(place)
+	_changed()
+
+
+## The rectangles the dark covers whole now (each unvisited room's, each hidden secret room's
+## bridge's: `covered_of`), where an unseen room is the void itself: the spectacle gives the void's
+## motes off over them and draws them over the dark (`Spectacle.void_air`, `void_pool`). The same
+## array every call, written again when a stage changes; read only.
+func void_covers() -> Array[Rect2]:
+	return _void_rects
+
+
+## A stage changed: drawn again, and what it covers whole read again.
+func _changed() -> void:
+	_void_rects.clear()
+	for place in _rects.size():
+		var covered: Rect2 = covered_of(place)
+		if covered.has_area():
+			_void_rects.append(covered)
 	queue_redraw()
 
 

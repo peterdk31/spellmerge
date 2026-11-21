@@ -43,9 +43,17 @@ const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const KindAirScript := preload("res://gameplay/feel/kind_air.gd")
-## The void's air (`void_air`) and the most of the motes' ring it may hold at once.
+## The void's air (`void_air`) and the most of the motes' ring it may hold at once (in a pool of its
+## own, `void_pool`, of twice that many rows, the air filling at most VOID_POOL_SHARE of it).
 const VOID_AIR: MoteSource = preload("res://gameplay/feel/presets/void_air.tres")
 const VOID_SHARE: float = 1.0 / 32.0
+const VOID_POOL_SHARE: float = 0.5
+## The void's own pool's fewest rows (a Minimal ring's share is 64 already).
+const VOID_POOL_LEAST: int = 64
+## The void's motes draw over the dark of the unvisited rooms (`unseen_dark.gd`'s Z, 20), so they
+## drift on over a room nobody has entered as over the void round it (the owner, 2026-11-21), and
+## under the labels (22).
+const VOID_MOTE_Z: int = 21
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
@@ -126,6 +134,14 @@ var still_motes: StillMotesScript = StillMotesScript.new()
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
 ## Read only.
 var pool: MotesScript = null
+## The void's motes (`void_air`, `void_blank_air`), a pool of their own of the void's kind alone, made
+## and freed with `pool` (`use_motes`): drawn at VOID_MOTE_Z, over the dark of the unvisited rooms,
+## so the void's drift crosses a room nobody has entered as if it were not there, while the room's
+## own motes (in `pool`, under the dark) stay hidden. Not lit only: it reads no light. Read only.
+var void_pool: MotesScript = null
+## The rectangles the dark covers whole (`set_void_covers`: `UnseenDark.void_covers`), where the void
+## gives its motes off too. Read only.
+var void_covers: Array[Rect2] = []
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
@@ -208,6 +224,8 @@ var _feet_count: int = 0
 ## The pool's material the stirs were last handed to, and their `version` then.
 var _stirred_material: ShaderMaterial = null
 var _stirred_version: int = -1
+var _void_stirred_material: ShaderMaterial = null
+var _void_stirred_version: int = -1
 ## No owners for a light's rows (the room's spots: nobody carries them).
 var _no_owners: PackedInt32Array = PackedInt32Array()
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
@@ -226,8 +244,9 @@ var air: AirMotesScript = AirMotesScript.new(_ramp_table)
 var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 ## What drifts in the void between a biome's slabs (the owner, 2026-11-19: the void is black "with
 ## some motes emitted"): `VOID_AIR`'s sparse motes (not lit only: the void has no light), given off
-## over the view outside every place of the grid, within VOID_SHARE of the motes' ring, under the
-## motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
+## over the view outside every place of the grid and over the dark of the unvisited rooms (an unseen
+## room is the void, the owner, 2026-11-21: `void_covers`), into `void_pool`, within VOID_SHARE of
+## the motes' ring, under the motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
 var void_air: AirMotesScript = AirMotesScript.new(_ramp_table)
 ## The same void's motes over the world the equal split's blank quarter shows (the owner,
 ## 2026-11-20; `set_void_blank`, the split screen's void view, past the biome's corner), so the blank
@@ -383,6 +402,14 @@ func step(now: float, table: ActorsScript = null) -> void:
 		# In a biome each room's motes are drawn by chunks of its own (the performance pass).
 		pool.use_places(projectiles.grid() if projectiles != null else null)
 		pool.step(now)
+	if void_pool != null:
+		var void_drawn: ShaderMaterial = void_pool.draw_material()
+		if void_drawn != _void_stirred_material or stirs.version != _void_stirred_version:
+			_void_stirred_material = void_drawn
+			_void_stirred_version = stirs.version
+			stirs.hand_to(void_drawn)
+		void_pool.use_places(projectiles.grid() if projectiles != null else null)
+		void_pool.step(now)
 	if marks != null:
 		marks.step(now)
 	if light != null:
@@ -942,6 +969,7 @@ func use_motes(motes: MotesScript) -> void:
 		pool = null
 	pool = motes
 	mote_cap = motes.cap() if motes != null else 0
+	_make_void_pool(mote_cap)
 	if motes != null:
 		pool.name = "Motes"
 		pool.density = mote_density * split_share
@@ -960,6 +988,37 @@ func use_motes(motes: MotesScript) -> void:
 		pool.use_cards(cards if pool.has_card_kinds() else null)
 	_take_surface_kinds()
 	_surface_source = _ramp_table.source(_surface_colors)
+
+
+## The void's own pool for a ring of `cap` rows (none for 0): VOID_SHARE of it, twice over, of the
+## void's mote kind alone.
+func _make_void_pool(cap: int) -> void:
+	if void_pool != null:
+		void_pool.queue_free()
+		remove_child(void_pool)
+		void_pool = null
+	if cap <= 0:
+		return
+	var kinds: Array[MoteKind] = []
+	for kind: MoteKind in _mote_kinds():
+		if kind.id == VOID_AIR.kind:
+			kinds.append(kind)
+	void_pool = MotesScript.new(void_cap_of(cap), VOID_MOTE_Z, kinds, _ramp_table)
+	void_pool.name = "VoidMotes"
+	void_pool.density = mote_density * split_share
+	add_child(void_pool)
+	void_pool.step(_clock)
+
+
+## The void pool's rows for a ring of `cap` rows.
+static func void_cap_of(cap: int) -> int:
+	return maxi(ceili(float(cap) * VOID_SHARE / VOID_POOL_SHARE), VOID_POOL_LEAST)
+
+
+## The rectangles the dark of the unvisited rooms covers whole (`UnseenDark.void_covers`; the same
+## array each frame: nothing is made), where the void's motes are given off too.
+func set_void_covers(covers: Array[Rect2]) -> void:
+	void_covers = covers
 
 
 ## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made
@@ -988,6 +1047,8 @@ func set_mote_density(density: float) -> float:
 	mote_density = MoteDensity.snap(density)
 	if pool != null:
 		pool.density = mote_density * split_share
+	if void_pool != null:
+		void_pool.density = mote_density * split_share
 	return mote_density
 
 
@@ -1001,6 +1062,8 @@ func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int 
 		split_share = next_share
 		if pool != null:
 			pool.density = mote_density * split_share
+		if void_pool != null:
+			void_pool.density = mote_density * split_share
 	_split_views = views
 	_split_downscale = extra_downscale
 	if light != null:
@@ -1229,14 +1292,15 @@ func _free_faded() -> void:
 		_free_mist()
 
 
-## The void's motes owed since the last frame (`void_air`), over `view` outside the grid's places;
-## none outside a biome (a grid with no places).
+## The void's motes owed since the last frame (`void_air`, into `void_pool`), over `view` outside the
+## grid's places or over the dark of an unvisited room (`void_covers`); none outside a biome (a grid
+## with no places).
 func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
-	var void_pool: MotesScript = pool if motes_on() and ambient_particles and in_biome else null
-	void_air.give_off_in(now, void_pool, seen, Rect2(), VOID_SHARE, grid if in_biome else null)
-	void_blank_air.give_off(now, void_pool if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_SHARE, grid if in_biome else null)
+	var into: MotesScript = void_pool if motes_on() and ambient_particles and in_biome else null
+	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
+	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
 
 
 ## The world rect the equal split's blank quarter shows the void of (`SplitScreen.void_rect`; empty:

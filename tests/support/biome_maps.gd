@@ -7,6 +7,7 @@ extends RefCounted
 
 const ROOM_FOLDER: StringName = &"rooms"
 const BRIDGE: StringName = &"crypt_bridge"
+const SEAM: StringName = &"crypt_seam"
 const FIRST: StringName = &"arena_01"
 const MIDDLE: StringName = &"arena_02"
 const LAST: StringName = &"arena_03"
@@ -34,6 +35,45 @@ static func split(registry: Object, mirrors: Array[int] = [0, 0, 0], templates: 
 		map.add_room(row.room_templates[room], row.room_places[room], row.room_mirrors[room], kind)
 	for bridge in row.bridges():
 		map.add_bridge(row.bridge_templates[bridge], row.bridge_places[bridge], row.bridge_mirrors[bridge], order.find(row.end_room(bridge, 0)), row.end_socket(bridge, 0), order.find(row.end_room(bridge, 1)), row.end_socket(bridge, 1))
+	map.work_out_depths()
+	return map
+
+
+## The owner's secret ways (2026-11-20): the nave the start room (room 0) and a secret room (room 1,
+## `secret`) standing wall to wall against its west wall, joined by the crypt's seam (bridge 0) from
+## the nave's west socket to the secret room's east socket, their rectangles touching.
+static func wall_secret(registry: Object, secret: StringName = &"crypt_secret_a") -> BiomeMap:
+	var nave: PieceShape = shape(registry, MIDDLE)
+	var room: PieceShape = shape(registry, secret)
+	var seam: PieceShape = shape(registry, SEAM)
+	var joint: Vector2 = nave.socket_at[nave.socket_facing.find(RoomSocket.Facing.WEST)]
+	var seam_at: Vector2 = joint - seam.socket_at[seam.socket_facing.find(RoomSocket.Facing.EAST)]
+	var far: Vector2 = seam_at + seam.socket_at[seam.socket_facing.find(RoomSocket.Facing.WEST)]
+	var room_at: Vector2 = far - room.socket_at[room.socket_facing.find(RoomSocket.Facing.EAST)]
+	# Moved so the map's corner is at (0, 0).
+	var by := Vector2(-room_at.x, maxf(0.0, -room_at.y))
+	var map := BiomeMap.new()
+	map.biome = &"crypt"
+	map.add_room(MIDDLE, by, 0, &"start")
+	map.add_room(secret, room_at + by, 0, &"secret")
+	map.add_bridge(SEAM, seam_at + by, 0, 0, nave.socket_facing.find(RoomSocket.Facing.WEST), 1, room.socket_facing.find(RoomSocket.Facing.EAST))
+	# A seam's socket 0 meets the room its own socket 0 faces: swap the ends where it is the other.
+	if seam.socket_facing[0] != RoomSocket.Facing.EAST:
+		var ends: PackedInt32Array = map.bridge_ends
+		map.bridge_ends = PackedInt32Array([ends[2], ends[3], ends[0], ends[1]])
+	map.work_out_depths()
+	return map
+
+
+## The owner's secret ways (2026-11-20): the nave the start room (room 0) and a secret room (room 1,
+## `secret`) east of it across the dark with no bridge, reached by a rune in the nave (rune 0).
+static func rune_secret(registry: Object, secret: StringName = &"crypt_secret_a") -> BiomeMap:
+	var nave: PieceShape = shape(registry, MIDDLE)
+	var map := BiomeMap.new()
+	map.biome = &"crypt"
+	map.add_room(MIDDLE, Vector2.ZERO, 0, &"start")
+	map.add_room(secret, Vector2(nave.size.x + 128.0, 0.0), 0, &"secret")
+	map.add_rune(0, 1)
 	map.work_out_depths()
 	return map
 

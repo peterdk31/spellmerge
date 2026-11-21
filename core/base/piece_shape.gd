@@ -48,6 +48,8 @@ const BRIDGE_JOINTS_META: StringName = &"bridge_joints"
 ## The template's id (`RoomBase.id`), whether it is a walkway, and its mirroring.
 var id: StringName = &""
 var walkway: bool = false
+## Whether it is a seam (`RoomBase.seam`: a wall-to-wall join's doorway, a walkway of its own kind).
+var seam: bool = false
 var mirror: int = 0
 ## Its size from (0, 0), in pixels.
 var size: Vector2 = Vector2.ZERO
@@ -100,6 +102,7 @@ static func of_room(room: RoomBase, mirror: int = 0) -> PieceShape:
 	if layout == null:
 		return null
 	var shape: PieceShape = of(layout, room.id, room.walkway)
+	shape.seam = room.walkway and room.seam
 	layout.free()
 	return shape.mirrored(mirror)
 
@@ -137,6 +140,7 @@ func mirrored(by: int) -> PieceShape:
 	var out := PieceShape.new()
 	out.id = id
 	out.walkway = walkway
+	out.seam = seam
 	out.mirror = mirror ^ by
 	out.size = size
 	for rect: Rect2 in walls:

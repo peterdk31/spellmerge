@@ -192,6 +192,7 @@ const EVENTS: Dictionary = {
 	&"gather_door_shown": [["door", TYPE_INT], ["rule", TYPE_STRING_NAME], ["area", TYPE_RECT2], ["gathered", TYPE_INT], ["standing", TYPE_INT], ["held", TYPE_BOOL], ["open", TYPE_BOOL]],
 	&"key_door_shown": [["door", TYPE_INT], ["area", TYPE_RECT2], ["open", TYPE_BOOL]],
 	&"secret_rock_shown": [["rock", TYPE_INT], ["area", TYPE_RECT2], ["element", TYPE_STRING_NAME], ["broken", TYPE_BOOL]],
+	&"secret_rune_shown": [["rune", TYPE_INT], ["at", TYPE_VECTOR2], ["back_at", TYPE_VECTOR2], ["element", TYPE_STRING_NAME], ["found", TYPE_BOOL]],
 	&"key_shown": [["key", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
 	&"key_needed_shown": [["player", TYPE_INT], ["at", TYPE_VECTOR2], ["needed", TYPE_BOOL]],
 	&"hub_changed": [["in_hub", TYPE_BOOL]],
@@ -223,7 +224,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"rooms_opened", &"rooms_rewards_left", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"secret_rune_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"rooms_opened", &"rooms_rewards_left", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

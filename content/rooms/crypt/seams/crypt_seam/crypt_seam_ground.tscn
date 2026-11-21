@@ -1,0 +1,60 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_seam/crypt_seam_ground_floor.png" id="1_floor"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_seam/crypt_seam_ground_under.png" id="2_under"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_seam/crypt_seam_ground_glow.png" id="3_glow"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdd"]
+blend_mode = 1
+
+[sub_resource type="Resource" id="MoteSource_rim1"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 7.5
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="RectangleShape2D" id="Box_64x32"]
+size = Vector2(64, 32)
+
+[node name="Floor" type="Sprite2D"]
+z_index = -2
+texture_filter = 1
+texture = ExtResource("1_floor")
+centered = false
+metadata/ground_inputs = "1bbcd20975b6d5c1"
+
+[node name="Glow" type="Sprite2D" parent="."]
+material = SubResource("GlowAdd")
+z_as_relative = false
+z_index = -1
+texture_filter = 2
+scale = Vector2(2, 2)
+texture = ExtResource("3_glow")
+centered = false
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Underside" type="Sprite2D" parent="Walls"]
+z_as_relative = false
+z_index = -2
+texture_filter = 1
+texture = ExtResource("2_under")
+centered = false
+
+[node name="W1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(32, 16)
+shape = SubResource("Box_64x32")
+
+[node name="W2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(32, 112)
+shape = SubResource("Box_64x32")
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(0.5, 32.5, 6.5, 32.5, 12.5, 32.5, 18.5, 32.5, 24.5, 32.5, 30.5, 32.5, 36.5, 32.5, 42.5, 32.5, 48.5, 32.5, 54.5, 32.5, 60.5, 32.5, 63.5, 35.5, 63.5, 41.5, 63.5, 47.5, 63.5, 53.5, 63.5, 59.5, 63.5, 65.5, 63.5, 71.5, 63.5, 77.5, 63.5, 83.5, 63.5, 89.5, 63.5, 95.5, 57.5, 95.5, 51.5, 95.5, 45.5, 95.5, 39.5, 95.5, 33.5, 95.5, 27.5, 95.5, 21.5, 95.5, 15.5, 95.5, 9.5, 95.5, 3.5, 95.5, 0.5, 92.5, 0.5, 86.5, 0.5, 80.5, 0.5, 74.5, 0.5, 68.5, 0.5, 62.5, 0.5, 56.5, 0.5, 50.5, 0.5, 44.5, 0.5, 38.5)
+metadata/mote_source = SubResource("MoteSource_rim1")

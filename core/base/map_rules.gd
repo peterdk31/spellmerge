@@ -18,6 +18,11 @@ extends Resource
 
 ## The most rooms a biome's map may hold (the editor's range; a rule change may not pass it either).
 const MOST_ROOMS: int = 32
+## The ways a secret room is reached (`secret_ways`, by index).
+const SECRET_BRIDGE: int = 0
+const SECRET_WALL: int = 1
+const SECRET_RUNE: int = 2
+const SECRET_WAYS: int = 3
 
 ## The biome its rooms and enemies are of (`RoomBase.biome`, `EnemyBase.biomes`).
 @export var biome: StringName = &""
@@ -45,6 +50,13 @@ const MOST_ROOMS: int = 32
 @export_range(1, 32) var scale_depth: int = 8
 ## The shapes a biome's map may take, each rolled by its weight (decision 5).
 @export var styles: Array[MapStyle] = []
+## How each secret room is reached (the owner, 2026-11-20: three ways, all good, mixed in a biome),
+## by weight, rolled for each as the biome is made (`BiomeGenerator`): SECRET_BRIDGE (a hidden bridge,
+## built out once its rock breaks), SECRET_WALL (wall to wall: the room against another's wall, the
+## cracked wall a seam's short doorway, `RoomBase.seam`) and SECRET_RUNE (no join at all: a hidden rune
+## in another room, once found, teleports a wizard to the room and back). A way that cannot be placed
+## falls back to the others weighing above 0, in that order (a way weighed 0 is never taken). The default: the hidden bridge alone.
+@export var secret_ways: PackedFloat32Array = PackedFloat32Array([1.0, 0.0, 0.0])
 
 @export_group("Elites")
 ## Elites (connected biomes CB11, decision 24): an enemy with more health, one extra card in its staff
@@ -73,6 +85,7 @@ func copied() -> MapRules:
 		styles_made.append(style.duplicate(false) as MapStyle if style != null else null)
 	made.styles = styles_made
 	made.elite_cards = elite_cards.duplicate()
+	made.secret_ways = secret_ways.duplicate()
 	return made
 
 
@@ -217,6 +230,11 @@ func _biome_range_problems() -> PackedStringArray:
 		found.append("%s: elite_chance %s; 0 to 1." % [biome, elite_chance])
 	if room_budget < 1:
 		found.append("%s: room_budget %d; at least 1." % [biome, room_budget])
+	if secret_ways.size() > SECRET_WAYS:
+		found.append("%s: secret_ways has %d weights; %d at most (a hidden bridge, wall to wall, a rune)." % [biome, secret_ways.size(), SECRET_WAYS])
+	for weight: float in secret_ways:
+		if not (weight >= 0.0):
+			found.append("%s: a secret way's weight %s; 0 or more." % [biome, weight])
 	if spawning != null:
 		for line: String in spawning.problems():
 			found.append("%s: spawning: %s" % [biome, line])
@@ -271,11 +289,36 @@ func biome_templates(content: RunContent, shapes: Dictionary, kind_id: StringNam
 	return found
 
 
-## The walkways of the biome with two sockets (its bridges), by their shapes in `shapes`, in id order.
+## The walkways of the biome with two sockets (its bridges), by their shapes in `shapes`, in id order:
+## its seams left out (`biome_seams`).
 func biome_walkways(content: RunContent, shapes: Dictionary) -> Array[RoomBase]:
+	return _walkways(content, shapes, false)
+
+
+## The seams of the biome with two sockets (`RoomBase.seam`: the doorways of a secret room laid wall
+## to wall), by their shapes in `shapes`, in id order.
+func biome_seams(content: RunContent, shapes: Dictionary) -> Array[RoomBase]:
+	return _walkways(content, shapes, true)
+
+
+## The weight of each way a secret room is reached (`secret_ways`), SECRET_WAYS of them: missing ones
+## 0, and the hidden bridge alone when none weighs anything.
+func secret_way_weights() -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	var total: float = 0.0
+	for way in SECRET_WAYS:
+		var weight: float = maxf(secret_ways[way], 0.0) if way < secret_ways.size() else 0.0
+		out.append(weight)
+		total += weight
+	if total <= 0.0:
+		out[SECRET_BRIDGE] = 1.0
+	return out
+
+
+func _walkways(content: RunContent, shapes: Dictionary, seams: bool) -> Array[RoomBase]:
 	var found: Array[RoomBase] = []
 	for room: RoomBase in content.rooms:
-		if room.biome != biome or not room.walkway:
+		if room.biome != biome or not room.walkway or room.seam != seams:
 			continue
 		var shape: PieceShape = shapes.get(room.id) as PieceShape
 		if shape != null and shape.sockets() == 2:

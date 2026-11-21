@@ -323,6 +323,9 @@ var gates: GatherDoors = GatherDoors.new()
 var locks: LockDoors = LockDoors.new()
 ## The teleports from the held Y map and their hints (the owner, 2026-11-19; `MapTeleport`).
 var teleports: MapTeleport = MapTeleport.new()
+## A biome's secret runes: the secret rooms reached by a rune, no bridge (the owner, 2026-11-20;
+## `SecretRunes`).
+var runes: SecretRunes = SecretRunes.new()
 ## Who may join part way through a run, and who waits for its end (the owner, 2026-11-19; `JoinGate`).
 var joins: JoinGate = JoinGate.new()
 ## The party's map: the rooms seen (connected biomes CB9, `PartyMap`), and how far past a room entered
@@ -386,6 +389,7 @@ func _ready() -> void:
 	gates.events = events
 	locks.events = events
 	teleports.events = events
+	runes.events = events
 	joins.events = events
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
@@ -1625,6 +1629,7 @@ func _clear_run() -> void:
 	life.clear()
 	gates.clear()
 	locks.clear()
+	runes.clear()
 	teleports.forget()
 	joins.clear()
 	if party_map.rooms() > 0:
@@ -1763,8 +1768,10 @@ func _begin_locks(map: BiomeMap) -> void:
 				element = choices[game.chance_int(SECRET_PURPOSE, room, 0, choices.size())]
 		elements.append(element)
 	locks.begin(map, rules, elements, _key_drops(map, rules, game))
-	locks.lay(biome, projectiles.grid() if projectiles != null else null)
+	runes.lay(map, biome, _kind_of, _on_ground)
+	locks.lay(biome, projectiles.grid() if projectiles != null else null, runes.rocks())
 	locks.tell_all()
+	runes.tell_all(map, locks)
 
 
 ## The rooms the biome's keys drop in, one a key (the owner, 2026-11-19: several treasure rooms, not
@@ -1885,6 +1892,7 @@ func _step_biome(delta: float) -> bool:
 	if gated != GatherDoors.NONE:
 		_open_gate(gated)
 	locks.step(_driven_bodies(), life, projectiles.grid() if projectiles != null else null)
+	runes.step(delta, biome.map, locks, life, get_wizard, _driven_bodies())
 	teleports.tell(get_wizard, _driven_bodies(), biome, life)
 	if gates.count_portal(_wizards):
 		_take_portal_home()
@@ -2152,9 +2160,10 @@ func _rebuild_biome() -> void:
 		life.tell_seals(projectiles.grid())
 		life.tell_awake(projectiles.grid())
 		gates.lay(biome, projectiles.grid())
-		locks.lay(biome, projectiles.grid())
+		locks.lay(biome, projectiles.grid(), runes.rocks())
 	gates.tell_all(_wizards, life)
 	locks.tell_all(true)
+	runes.tell_all(biome.map, locks)
 	teleports.forget()
 	_tell_seen(true)
 	_tell_cleared(true)

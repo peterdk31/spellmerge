@@ -40,6 +40,16 @@ extends RefCounted
 ##    with a key of its own, so the rooms and their fill roll as they did. With no table or no card
 ##    there, the room is of no type.
 ##
+## **A secret room's way** (the owner, 2026-11-20: three ways, all good, mixed in a biome): as each
+## room of a kind entering by a secret (`RoomKind.DOOR_SECRET`) is placed in step 4, its way is rolled
+## by `MapRules.secret_way_weights` under SECRET_PURPOSE (keyed by the attempt, counted): a **hidden
+## bridge** (placed as any room, by a walkway), **wall to wall** (placed against the wall of the room
+## it hangs off, their slabs' dark margins touching, by a seam: `RoomBase.seam`, the short doorway its
+## cracked wall opens; the pair's GAP waived) or a **rune** (placed where a walkway off one of that
+## room's free sockets would take it, but joined by no piece: a rune, `BiomeMap.add_rune`, the socket
+## left free). A way with no placement falls back to the others, in that order. The rules hold as for
+## any dead end: one join, never a loop's or an extra entrance's.
+##
 ## A line with no limit (the fights) fills the rooms past the fixed and chance ones only while a
 ## template is left to host it (a template stands once a biome), so the count rolled is the most
 ## the content allows (CB11: four fight templates in the crypt until CB13 brings more).
@@ -62,6 +72,8 @@ extends RefCounted
 
 ## What the generator's rolls are named by.
 const PURPOSE: StringName = &"biome_map"
+## What each secret room's way is rolled by (`MapRules.secret_ways`), its key the attempt's.
+const SECRET_PURPOSE: StringName = &"biome_secret_ways"
 ## What the reward rooms' types are rolled by (step 7).
 const REWARD_PURPOSE: StringName = &"biome_rewards"
 ## How many times a map is tried before it is given up.
@@ -93,6 +105,7 @@ static func generate(definition: RunDefinition, content: RunContent, shapes: Dic
 	for attempt in ATTEMPTS:
 		var dice := MapDice.new(sim, PURPOSE, attempt, Step.size())
 		var growth := Growth.new(rules, content, shapes, dice)
+		growth.secret_dice = MapDice.new(sim, SECRET_PURPOSE, attempt, 1)
 		why = growth.grow()
 		if why == "":
 			var made: BiomeMap = growth.to_map()
@@ -145,9 +158,24 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 	for room in map.rooms():
 		var shape: PieceShape = map.room_shape(room, shapes)
 		rects.append(shape.rect_at(map.room_places[room]).grow(GAP * 0.5) if shape != null else Rect2())
+	# Two rooms a seam joins stand wall to wall (their rectangles touch; `BiomeMap.problems` has them
+	# not overlap): the gap is waived for that pair alone.
+	var touching: Dictionary = {}
+	for bridge in map.bridges():
+		var bridge_shape: PieceShape = shapes.get(map.bridge_templates[bridge]) as PieceShape
+		if bridge_shape == null or not bridge_shape.seam:
+			continue
+		var pair := Vector2i(mini(map.end_room(bridge, 0), map.end_room(bridge, 1)), maxi(map.end_room(bridge, 0), map.end_room(bridge, 1)))
+		touching[pair] = true
+		if not _enters_by_secret(content, map.room_kinds[pair.x]) and not _enters_by_secret(content, map.room_kinds[pair.y]):
+			found.append("bridge %d is a seam (wall to wall) between rooms %d and %d, neither a secret room: a seam leads only into one." % [bridge, pair.x, pair.y])
+	for rune in map.runes():
+		var to: int = map.rune_room(rune, 1)
+		if to >= 0 and to < map.rooms() and not _enters_by_secret(content, map.room_kinds[to]):
+			found.append("rune %d leads to room %d, a '%s': a rune leads only into a secret room." % [rune, to, map.room_kinds[to]])
 	for a in rects.size():
 		for b in range(a + 1, rects.size()):
-			if rects[a].intersects(rects[b]):
+			if rects[a].intersects(rects[b]) and not touching.has(Vector2i(a, b)):
 				found.append("rooms %d and %d are less than %d px apart." % [a, b, int(GAP)])
 	for room in map.rooms():
 		var host: RoomBase = _template(content, map.room_templates[room])
@@ -167,8 +195,8 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 			found.append("room %d's kind '%s' is no line of the biome's table the content fills." % [room, map.room_kinds[room]])
 		elif not _fills_at(rules, content, rule, map.depths[room], end_depth):
 			found.append("room %d's kind '%s' stands %d bridges deep, a depth its line does not take or nothing fills there." % [room, rule.kind, map.depths[room]])
-		elif rule.dead_end and _bridges_of(map, room) != 1:
-			found.append("room %d's kind '%s' is a dead end, but %d bridges reach it." % [room, rule.kind, _bridges_of(map, room)])
+		elif rule.dead_end and map.joins_of(room) != 1:
+			found.append("room %d's kind '%s' is a dead end, but %d joins reach it (bridges and runes)." % [room, rule.kind, map.joins_of(room)])
 	for rule: KindRule in lines:
 		var of_kind: int = int(counts.get(rule.kind, 0))
 		if not whole:
@@ -178,15 +206,13 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 	var fights: int = fights_on_way(map, content, deepest)
 	if fights < rules.fights_on_way:
 		found.append("a way to the boss passes %d fights; %d at least." % [fights, rules.fights_on_way])
-	for bridge in map.bridges():
-		var a: int = map.end_room(bridge, 0)
-		var b: int = map.end_room(bridge, 1)
-		for pair: Vector2i in [Vector2i(a, b), Vector2i(b, a)]:
-			if map.depths[pair.x] > map.depths[pair.y]:
+	for a in map.rooms():
+		for b: int in map.neighbours(a):
+			if b < 0 or b >= map.rooms() or map.depths[a] > map.depths[b]:
 				continue
-			var rule: KindRule = by_kind.get(map.room_kinds[pair.y]) as KindRule
-			if rule != null and not rule.may_follow(map.room_kinds[pair.x]):
-				found.append("bridge %d leads from a '%s' to a '%s', which may not follow it." % [bridge, map.room_kinds[pair.x], map.room_kinds[pair.y]])
+			var rule: KindRule = by_kind.get(map.room_kinds[b]) as KindRule
+			if rule != null and not rule.may_follow(map.room_kinds[a]):
+				found.append("the join from room %d to room %d leads from a '%s' to a '%s', which may not follow it." % [a, b, map.room_kinds[a], map.room_kinds[b]])
 	return found
 
 
@@ -204,7 +230,7 @@ static func joins_left(map: BiomeMap, rules: MapRules, content: RunContent, shap
 
 
 ## The fewest fights (rooms of a kind filled with enemies) on any way from the start room to room
-## `goal` over `map`'s bridges (the goal not counted).
+## `goal` over `map`'s joins (bridges and runes; the goal not counted).
 static func fights_on_way(map: BiomeMap, content: RunContent, goal: int) -> int:
 	if goal < 0 or goal >= map.rooms():
 		return 0
@@ -217,12 +243,10 @@ static func fights_on_way(map: BiomeMap, content: RunContent, goal: int) -> int:
 	var changed: bool = true
 	while changed:
 		changed = false
-		for bridge in map.bridges():
-			for end in 2:
-				var from: int = map.end_room(bridge, end)
-				var to: int = map.end_room(bridge, 1 - end)
-				if best[from] >= most:
-					continue
+		for from in map.rooms():
+			if best[from] >= most:
+				continue
+			for to: int in map.neighbours(from):
 				var cost: int = best[from] + (1 if to != goal and _fights(content, map.room_kinds[to]) else 0)
 				if cost < best[to]:
 					best[to] = cost
@@ -248,12 +272,10 @@ static func _fills_at(rules: MapRules, content: RunContent, rule: KindRule, dept
 	return true
 
 
-static func _bridges_of(map: BiomeMap, room: int) -> int:
-	var count: int = 0
-	for bridge in map.bridges():
-		if map.end_room(bridge, 0) == room or map.end_room(bridge, 1) == room:
-			count += 1
-	return count
+## True when a room of kind `kind` enters by a secret (`RoomKind.DOOR_SECRET`).
+static func _enters_by_secret(content: RunContent, kind: StringName) -> bool:
+	var of_kind: RoomKind = content.kind(kind) if kind != &"" else null
+	return of_kind != null and of_kind.door == RoomKind.DOOR_SECRET
 
 
 static func _template(content: RunContent, id: StringName) -> RoomBase:
@@ -359,7 +381,7 @@ static func _kinds_given(line: RewardEntry, cards: RewardCards) -> Array[StringN
 ## One attempt's map as it grows (steps 1 to 5): a generator's scratch, never state.
 class Growth:
 	extends RefCounted
-	const DERIVED: Array[StringName] = [&"rules", &"content", &"shapes", &"dice", &"style", &"mirrored", &"crossings", &"room_templates", &"room_places", &"room_mirrors", &"room_lines", &"room_kinds", &"room_shapes", &"room_rects", &"room_depths", &"room_free", &"room_bridges", &"bridge_templates", &"bridge_places", &"bridge_mirrors", &"bridge_ends", &"bridge_rects", &"free_at", &"used", &"end_depth", &"last_off_way", &"loops_left"]
+	const DERIVED: Array[StringName] = [&"rules", &"content", &"shapes", &"dice", &"style", &"mirrored", &"crossings", &"room_templates", &"room_places", &"room_mirrors", &"room_lines", &"room_kinds", &"room_shapes", &"room_rects", &"room_depths", &"room_free", &"room_bridges", &"bridge_templates", &"bridge_places", &"bridge_mirrors", &"bridge_ends", &"bridge_rects", &"free_at", &"used", &"end_depth", &"last_off_way", &"loops_left", &"secret_dice", &"seam_crossings", &"rune_ends", &"placing"]
 
 	var rules: MapRules = null
 	var content: RunContent = null
@@ -401,6 +423,14 @@ class Growth:
 	var last_off_way: int = -1
 	## How many loops the style may still close.
 	var loops_left: int = 0
+	## The rolls of each secret room's way (SECRET_PURPOSE; null: every secret room by a bridge).
+	var secret_dice: MapDice = null
+	## As `crossings`, the seams' (`MapRules.biome_seams`): a wall-to-wall join's crossings.
+	var seam_crossings: Array = [[], [], [], []]
+	## The runes placed, `BiomeMap.RUNE_FIELDS` numbers each (host room, the room it leads to).
+	var rune_ends: PackedInt32Array = PackedInt32Array()
+	## How the room being placed is joined (`MapRules.SECRET_BRIDGE`, `SECRET_WALL`, `SECRET_RUNE`).
+	var placing: int = MapRules.SECRET_BRIDGE
 
 	func _init(of_rules: MapRules, of_content: RunContent, of_shapes: Dictionary, of_dice: MapDice) -> void:
 		rules = of_rules
@@ -408,7 +438,9 @@ class Growth:
 		shapes = of_shapes
 		dice = of_dice
 		for walkway: RoomBase in rules.biome_walkways(content, shapes):
-			_add_crossings(walkway.id)
+			_add_crossings(walkway.id, crossings)
+		for seam: RoomBase in rules.biome_seams(content, shapes):
+			_add_crossings(seam.id, seam_crossings)
 
 	## Grows the map: "" when it is made, else why not.
 	func grow() -> String:
@@ -472,6 +504,8 @@ class Growth:
 		for bridge in bridge_templates.size():
 			var at: int = bridge * BiomeMap.END_FIELDS
 			map.add_bridge(bridge_templates[bridge], bridge_places[bridge] - corner, bridge_mirrors[bridge], bridge_ends[at], bridge_ends[at + 1], bridge_ends[at + 2], bridge_ends[at + 3])
+		for rune in rune_ends.size() / BiomeMap.RUNE_FIELDS:
+			map.add_rune(rune_ends[rune * BiomeMap.RUNE_FIELDS], rune_ends[rune * BiomeMap.RUNE_FIELDS + 1])
 		map.work_out_depths()
 		return map
 
@@ -592,10 +626,31 @@ class Growth:
 			rules_list[i] = rules_list[j]
 			rules_list[j] = held
 
+	## A room of `rule` off a room placed (`_place_off_way_now`); a secret room by the way rolled for
+	## it (the class doc, "A secret room's way"), else the next way in order. "" when it is placed,
+	## else why not.
+	func _place_off_way(rule: KindRule) -> String:
+		if not BiomeGenerator._enters_by_secret(content, rule.kind):
+			return _place_off_way_now(rule)
+		var weights: PackedFloat32Array = rules.secret_way_weights()
+		var first: int = secret_dice.pick(0, weights) if secret_dice != null else MapRules.SECRET_BRIDGE
+		var order := PackedInt32Array([first])
+		for way in MapRules.SECRET_WAYS:
+			if way != first:
+				order.append(way)
+		var why: String = ""
+		for way: int in order:
+			placing = way
+			why = _place_off_way_now(rule)
+			placing = MapRules.SECRET_BRIDGE
+			if why == "":
+				return ""
+		return why
+
 	## A room of `rule` off a room placed: the last room off the way by the style's `branch_chain`,
 	## else one by weight (1, and `hub_pull` for each of its bridges), each tried until one has a
 	## placement. "" when it is placed, else why not.
-	func _place_off_way(rule: KindRule) -> String:
+	func _place_off_way_now(rule: KindRule) -> String:
 		var parents: Array[int] = []
 		for room in room_templates.size():
 			if _may_lead_to(room, rule):
@@ -689,22 +744,30 @@ class Growth:
 			var crossing: Crossing = pick[2]
 			var way: int = dice.below(Step.PLACE, crossing.mirrors.size())
 			var room: int = _add_room(pick[3], pick[4], pick[6], rule, rule.kind, room_depths[parent] + 1)
-			_add_bridge(crossing, way, pick[7], parent, pick[1], room, pick[5])
+			if placing == MapRules.SECRET_RUNE:
+				_add_rune(parent, room)
+			else:
+				_add_bridge(crossing, way, pick[7], parent, pick[1], room, pick[5])
 			return ""
 		return "no placement for a '%s' off room %d (%s)." % [rule.kind, parents[0], room_templates[parents[0]]]
 
 	## Every placement of template `host` off room `parent` (the class doc) into `found`, each
-	## weighed in `found_weights` by `weight` times 1 and `pull` for each loop it leaves to close.
+	## weighed in `found_weights` by `weight` times 1 and `pull` for each loop it leaves to close. As
+	## `placing` says: by a walkway (a bridge), by a seam against `parent`'s wall (wall to wall: the
+	## two rooms' rectangles may touch, never overlap), or where a walkway would take it, no piece
+	## laid (a rune: its way need not be clear).
 	func _gather(parent: int, weight: float, pull: float, host: StringName, kind: StringName, found: Array, found_weights: PackedFloat32Array) -> void:
 		var parent_shape: PieceShape = room_shapes[parent]
+		var by: Array = seam_crossings if placing == MapRules.SECRET_WALL else crossings
+		var against: int = parent if placing == MapRules.SECRET_WALL else -1
 		for socket in parent_shape.sockets():
 			if room_free[parent][socket] == 0:
 				continue
 			var at: Vector2 = room_places[parent] + parent_shape.socket_at[socket]
-			for crossing: Crossing in crossings[parent_shape.socket_facing[socket]]:
+			for crossing: Crossing in by[parent_shape.socket_facing[socket]]:
 				var bridge_place: Vector2 = at - crossing.from_at
 				var bridge_rect := Rect2(bridge_place, crossing.size)
-				if not _bridge_clear(bridge_rect, parent, -1):
+				if placing != MapRules.SECRET_RUNE and not _bridge_clear(bridge_rect, parent, -1):
 					continue
 				var far: Vector2 = at + crossing.span
 				var facing: int = RoomSocket.opposite(crossing.far_facing)
@@ -715,16 +778,20 @@ class Growth:
 							continue
 						var place: Vector2 = far - shape.socket_at[its]
 						var rect := Rect2(place, shape.size)
-						if not _room_clear(rect) or _crosses_bridges(rect):
+						if not _room_clear(rect, against) or _crosses_bridges(rect):
 							continue
 						found.append([parent, socket, crossing, host, mirror, its, place, bridge_place])
 						found_weights.append(weight * (1.0 + (pull * float(_closable(shape, place, its, parent, kind)) if pull > 0.0 else 0.0)))
 
-	## True when a room at `rect` keeps GAP clear of every room placed.
-	func _room_clear(rect: Rect2) -> bool:
+	## True when a room at `rect` keeps GAP clear of every room placed but `touching`, which it may
+	## touch but not overlap (wall to wall; -1: none).
+	func _room_clear(rect: Rect2, touching: int = -1) -> bool:
 		var grown: Rect2 = rect.grow(GAP)
-		for other: Rect2 in room_rects:
-			if grown.intersects(other):
+		for room in room_rects.size():
+			if room == touching:
+				if rect.intersects(room_rects[room]):
+					return false
+			elif grown.intersects(room_rects[room]):
 				return false
 		return true
 
@@ -799,6 +866,12 @@ class Growth:
 				free_at[_key(room, socket)] = Vector2i(room, socket)
 		return room
 
+	## A rune in room `host` leading to room `to` (no piece: both rooms count it as a join).
+	func _add_rune(host: int, to: int) -> void:
+		rune_ends.append_array(PackedInt32Array([host, to]))
+		room_bridges[host] += 1
+		room_bridges[to] += 1
+
 	func _key(room: int, socket: int) -> Vector3i:
 		var at: Vector2 = room_places[room] + room_shapes[room].socket_at[socket]
 		return Vector3i(roundi(at.x), roundi(at.y), room_shapes[room].socket_facing[socket])
@@ -836,14 +909,17 @@ class Growth:
 			var at: int = bridge * BiomeMap.END_FIELDS
 			var shape: PieceShape = _shape(map.bridge_templates[bridge], map.bridge_mirrors[bridge])
 			_lay_bridge(map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge], shape.rect_at(map.bridge_places[bridge]), map.bridge_ends.slice(at, at + BiomeMap.END_FIELDS))
+		for rune in map.runes():
+			_add_rune(map.rune_room(rune, 0), map.rune_room(rune, 1))
 
 	## How many bridges step 5b would still add (none for a map it finished).
 	func joins_left() -> int:
 		return _joins_kept().size()
 
-	## The crossings of walkway `id`: for each of its mirrorings and each end, the facing of the room
-	## socket that end meets, grouped where they place the bridge alike.
-	func _add_crossings(id: StringName) -> void:
+	## The crossings of walkway `id` into `into` (`crossings` or `seam_crossings`): for each of its
+	## mirrorings and each end, the facing of the room socket that end meets, grouped where they place
+	## the bridge alike.
+	func _add_crossings(id: StringName, into: Array) -> void:
 		for mirror: int in PieceShape.MIRRORINGS:
 			var shape: PieceShape = _shape(id, mirror)
 			for end in 2:
@@ -851,7 +927,7 @@ class Growth:
 				var span: Vector2 = shape.socket_at[1 - end] - shape.socket_at[end]
 				var far_facing: int = shape.socket_facing[1 - end]
 				var same: Crossing = null
-				for crossing: Crossing in crossings[facing]:
+				for crossing: Crossing in into[facing]:
 					if crossing.template == id and crossing.from_at == shape.socket_at[end] and crossing.span == span and crossing.far_facing == far_facing:
 						same = crossing
 				if same == null:
@@ -861,7 +937,7 @@ class Growth:
 					same.span = span
 					same.far_facing = far_facing
 					same.size = shape.size
-					crossings[facing].append(same)
+					into[facing].append(same)
 				same.mirrors.append(mirror)
 				same.ends.append(end)
 
@@ -928,6 +1004,9 @@ class Growth:
 		for bridge in bridge_templates.size():
 			var at: int = bridge * BiomeMap.END_FIELDS
 			if (bridge_ends[at] == a and bridge_ends[at + 2] == b) or (bridge_ends[at] == b and bridge_ends[at + 2] == a):
+				return true
+		for at in range(0, rune_ends.size(), BiomeMap.RUNE_FIELDS):
+			if (rune_ends[at] == a and rune_ends[at + 1] == b) or (rune_ends[at] == b and rune_ends[at + 1] == a):
 				return true
 		return false
 

@@ -328,12 +328,17 @@ func places() -> int:
 ## True when the map draws place `place` now: a room seen, or led to by a bridge drawn (in the shown
 ## room's shadow); a bridge with a seen room at one end and a room the map may draw at the other. So
 ## no bridge on the map ends in the dark (the owner, 2026-11-20: "There should be no dead ends!"): a
-## secret room not yet found is never drawn for its bridge, and so neither is its bridge.
+## secret room not yet found is never drawn for its bridge, and so neither is its bridge. A secret
+## room is drawn only once found, whichever way it is reached (the owner, 2026-11-20): never for being
+## shown on the party's map (`map_reveal`), and a found one reached by a rune, with no bridge to draw
+## it for, in the shown room's shadow.
 func draws(place: int) -> bool:
 	if place < 0 or place >= _rects.size():
 		return false
 	if _room[place] == 0:
 		return _bridge_drawn(place)
+	if _secret[place] != 0:
+		return _level(place) >= ENTERED or (pieces != null and pieces.is_opened(place))
 	if _level(place) >= SHOWN:
 		return true
 	if not _may_draw(place):
@@ -379,6 +384,9 @@ func draws_symbol(place: int) -> bool:
 	if _secret[place] != 0 and (pieces == null or not pieces.is_opened(place)):
 		# A secret room's symbol only once it is discovered (its rock broken; the owner, #888).
 		return false
+	if _secret[place] != 0:
+		# Found: drawn with its room, however it is reached (a rune's has no bridge to draw it for).
+		return true
 	if _level(place) >= SHOWN:
 		return true
 	for other in _rects.size():

@@ -243,6 +243,33 @@ func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 ## its doorway the room's lip (the rock stands there). Found, it builds out from the room it leaves
 ## a band a frame, each pixel stepping through the dark's stages, toward the secret room; a restore
 ## draws it as it stands, hidden or whole.
+## The owner's secret ways (2026-11-20): a secret room standing wall to wall with the nave, joined by
+## a seam: the seam is hidden as a secret room's bridge is (pure void, the nave's doorway its lip,
+## never over the nave's slab), and once the cracked wall breaks it opens in stages, its end at the
+## nave first.
+func test_a_wall_to_wall_secret_rooms_seam_is_hidden_until_found_then_opens_in_stages() -> void:
+	var map: BiomeMap = BiomeMaps.wall_secret(registry)
+	input.add_virtual_device(0)
+	check(flow.start_biome(0, map, [RoomFight.new(), RoomFight.new()] as Array[RoomFight]), "the biome starts")
+	tick.run(DT)
+	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+	dark.step(0.0, _grid())
+	var seam: int = map.rooms()
+	var rect: Rect2 = dark.covered_of(seam)
+	var west: Vector2 = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.WEST)
+	check_equal(dark.build_of(seam), UnseenDarkScript.HIDDEN, "not found: hidden")
+	check(rect.has_area() and rect.end.x <= west.x - UnseenDarkScript.LANDING, "covered in the void's black, short of the nave's landing")
+	flow.locks.open(1, _grid())
+	dark.step(0.0, _grid())
+	var near := Vector2(rect.end.x - 4.0, rect.get_center().y)
+	var stages: Array[int] = []
+	while dark.is_moving():
+		dark.advance()
+		stages.append(dark.cell_stage_at(seam, near))
+	check_equal(stages.slice(0, 4), [3, 2, 1, 0] as Array[int], "found: the doorway opens a stage a frame from the nave (Smooth)")
+	check_equal(dark.covered_of(seam), Rect2(), "and is not covered once open")
+
+
 func test_a_secret_rooms_bridge_is_hidden_until_found_then_builds_out_in_stages() -> void:
 	var map: BiomeMap = BiomeMaps.split(registry)
 	map.room_kinds[1] = &"secret"

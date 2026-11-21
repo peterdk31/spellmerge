@@ -133,6 +133,7 @@ const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
+const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
@@ -563,6 +564,8 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 ## (`lock_looks.gd`) and the dark over its unvisited rooms (`unseen_dark.gd`; CB12).
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
+## A biome's secret runes (`rune_looks.gd`; the owner, 2026-11-20).
+var _runes: RuneLooksScript = null
 var _unseen: UnseenDarkScript = null
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
 var _teleports: TeleportLooksScript = null
@@ -933,6 +936,11 @@ func _ready() -> void:
 	_locks.registry = registry
 	add_child(_locks)
 	_locks.bind(events)
+	_runes = RuneLooksScript.new()
+	_runes.name = "RuneLooks"
+	_runes.registry = registry
+	add_child(_runes)
+	_runes.bind(events)
 	_void = VoidBackdropScript.new()
 	_void.name = "VoidBackdrop"
 	add_child(_void)
@@ -2605,6 +2613,10 @@ func mouth_looks() -> MouthLooksScript:
 
 func lock_looks() -> LockLooksScript:
 	return _locks
+
+
+func rune_looks() -> RuneLooksScript:
+	return _runes
 
 
 ## Where a teleported wizard left (for tests).

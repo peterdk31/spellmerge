@@ -2,7 +2,8 @@ class_name SpecialPlaces
 extends RefCounted
 ## Where a special room's things stand (connected biomes CB11, decisions 19 to 21): a shop's shelf,
 ## a fountain's pool and a dropped key, read from the room's places (`RoomPlaces`, at its place in
-## the biome: its template's zones, mirrored with it), else laid round its middle. Pure rules; Flow
+## the biome: its template's zones, mirrored with it), else laid round its middle; and a secret rune
+## (the owner, 2026-11-20). Pure rules; Flow
 ## asks them as a room opens or is cleared.
 
 ## The zones a template marks them by: each `shelf` zone an item's spot (in the tree's order), the
@@ -33,6 +34,15 @@ const SIGN_SPOT: Vector2 = Vector2(0.0, 40.0)
 ## (48 px square on the middle) nor lies on a key's first spots.
 const REWARD_ZONE: StringName = &"reward"
 const REWARD_SPOTS: Array[Vector2] = [Vector2(-60.0, 48.0), Vector2(-36.0, 48.0), Vector2(36.0, 48.0), Vector2(60.0, 48.0)]
+## The zone a secret rune lies in (the hidden rune of a room, or the one leading back in its secret
+## room), and with none, the spots round the room's middle it tries in order for the first clear of
+## what the room holds (`rune_spot`'s `keep_off`): off the middle, where the keys, the portal and the
+## rewards lie, toward the room's corners.
+const RUNE_ZONE: StringName = &"rune"
+const RUNE_SPOTS: Array[Vector2] = [
+	Vector2(96.0, -64.0), Vector2(-96.0, -64.0), Vector2(96.0, 64.0), Vector2(-96.0, 64.0),
+	Vector2(0.0, -96.0), Vector2(0.0, 96.0), Vector2(64.0, 0.0), Vector2(-64.0, 0.0),
+]
 
 
 ## The shelf's spots of a room whose places are `places` and whose middle is `middle` (world pixels).
@@ -64,6 +74,23 @@ static func reward_spots(places: RoomPlaces, middle: Vector2) -> PackedVector2Ar
 	for offset: Vector2 in REWARD_SPOTS:
 		out.append((from + offset).floor())
 	return out
+
+
+## Where a secret rune lies in a room (world pixels, before it is put on clear ground): its `rune`
+## zone's middle, else the first of RUNE_SPOTS round `middle` outside every rectangle of `keep_off`
+## (`taken_by`), else the first of them.
+static func rune_spot(places: RoomPlaces, middle: Vector2, keep_off: Array[Rect2] = []) -> Vector2:
+	var zone: Rect2 = places.zone(RUNE_ZONE) if places != null else Rect2()
+	if zone.has_area():
+		return zone.get_center().floor()
+	for offset: Vector2 in RUNE_SPOTS:
+		var spot: Vector2 = middle + offset
+		var clear: bool = true
+		for rect: Rect2 in keep_off:
+			clear = clear and not rect.has_point(spot)
+		if clear:
+			return spot.floor()
+	return (middle + RUNE_SPOTS[0]).floor()
 
 
 ## The fountain's pool of a room (world pixels).

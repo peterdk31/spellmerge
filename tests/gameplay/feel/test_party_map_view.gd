@@ -699,6 +699,31 @@ func test_no_bridge_on_the_map_ends_in_the_dark() -> void:
 	check_equal(view.shade_of(WEST), 1, "in the stone's shadow, as a room only shown")
 
 
+## The owner's secret ways (2026-11-20): the Y map shows a secret room only once found, whichever
+## way: one reached by a rune (no bridge to draw it for) is drawn once its rune is found, in the
+## stone's shadow as a room only shown, and lit once entered; one shown on the party's map (its
+## `map_reveal`) but not found is never drawn.
+func test_a_secret_room_reached_by_a_rune_is_on_the_map_only_once_found() -> void:
+	var map: BiomeMap = BiomeMaps.rune_secret(registry)
+	input.add_virtual_device(0)
+	check(flow.start_biome(0, map, [RoomFight.new(), RoomFight.new()] as Array[RoomFight]), "the biome starts")
+	tick.run(DT)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.draws(0), "the nave is on the map")
+	check(not view.draws(1), "the rune's secret room not found: not on the map")
+	var seen: PackedByteArray = flow.party_map.seen.duplicate()
+	seen[1] = 1
+	events.rooms_seen.emit(seen, false)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(not view.draws(1) and not view.draws_symbol(1), "shown on the party's map but not found: still not drawn, nor its symbol")
+	flow.locks.open(1, _grid())
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.draws(1), "found: on the map, with no bridge to draw it for")
+	check(view.draws_symbol(1), "and its symbol")
+	check_equal(view.shade_of(1), 1, "in the stone's shadow, as a room only shown")
+
+
 ## The run stat `secret_sense` (the owner's answer of 2026-11-19): a secret room within that many
 ## pixels of a room the party entered shows on that player's own map only, worked out from the party's
 ## map and the seat's stat as told (`run_stats_told`).
@@ -756,11 +781,17 @@ func test_a_sensed_secret_room_comes_in_through_its_own_void_light() -> void:
 	check_equal(stages, [0, 1, 2, 3] as Array[int], "on an open map it comes in a stage a frame")
 	check_equal(view.drawn_colour(0, EAST), Palette.shades_of(&"void")[1], "it rests in the void's faint light: it reads as secret")
 	check_equal(view.drawn_colour(1, EAST), Color.TRANSPARENT, "not on another player's map")
-	# The party's map takes it over (shown to all, as a seen room's neighbour is): it steps down
-	# through the void's shadow to the stone's, never in one jump (the review's).
+	# Shown on the party's map (as a seen room's neighbour is) but not found: a secret room is drawn
+	# only once found (the owner, 2026-11-20), so it stays this player's sense alone.
 	var seen: PackedByteArray = flow.party_map.seen.duplicate()
 	seen[EAST] = 1
 	events.rooms_seen.emit(seen, false)
+	view.step(0.0, actors, 1, _grid(), views)
+	check(not view.draws(EAST), "shown but not found: the party's map does not draw a secret room")
+	check_equal(view.drawn_colour(0, EAST), Palette.shades_of(&"void")[1], "still sensed, in the void's faint light")
+	# Found (its rock broken), the party's map takes it over: it steps down through the void's shadow
+	# to the stone's, never in one jump (the review's).
+	flow.locks.open(EAST, _grid())
 	var looks: Array[Color] = [view.drawn_colour(0, EAST)]
 	while view.is_moving():
 		view.advance()

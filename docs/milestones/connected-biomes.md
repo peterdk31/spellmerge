@@ -846,3 +846,14 @@ The owner decided two follow-ups on #899: hide what stands in unvisited rooms on
 - **The void's motes** are drawn at the motes' z (16) like every mote; `VOID_MOTE_Z`, `_lay_void_z` and `MoteRegions.set_region_z` are gone.
 - **The benchmark** (`tests/benchmark/fixed_steps.gd`, the stress runner's `fixed_frames`, on in the biome frames and the play frames): one tick a drawn frame (`Tick.step_physics`), Feel's view a tick's time a frame, the windows counted in ticks, so frame N shows tick N every run; `test_fixed_fights.gd` plays a fight twice and compares the state and the camera every 10 frames (by the real clock they differed from frame 10 on). `--real-clock` runs as before.
 - **Tests:** `tests/gameplay/feel/test_unseen_hidden.gd`; screenshots `tests/screenshots/shot_unseen_hidden.gd` (fails when an unvisited room holding foes and pickups shows more than its void's motes). Numbers: docs/LOG.md, "What stands unseen is hidden one by one".
+
+## Each corner panel drawn once (2026-11-21, after #900)
+
+The owner chose this round's HUD work on 2026-11-21: cache each seat's corner panel (its labels, counts, glyphs, staff rows and D-pad cross were about 10 to 25 draw calls a seat).
+
+- **The picture** (`hud/widgets/cached_view.gd`, HUD README, "The corner panels are drawn once"): the panel's content is drawn into a SubViewport only on frames something on it changed: any canvas item's draw, showing or layout, a child added or removed, or the panel moved or resized. The panel draws it back as one picture.
+- **Live on top:** the see-through backing, and each staff row's glyph shade and rim and its mana line (one layer of plain rects), so a cooldown's sweep never draws the picture again. A panel is 3 draw calls idle or fighting.
+- **Fewer redraws:** a staff row redraws its strip and shade only when their pixels change; the meter line and the quick-use cross likewise.
+- **Pixels:** the same as main in every state shot, but for see-through pixels by at most 2 in 255 (premultiplied rounding; "Open questions" on the PR).
+- **Measured** (docs/LOG.md, "Each corner panel drawn once"): one player 63 to 40 draw calls in the start room, 87 to 64 idle in a fight room, 160 to 141 fighting; 4p Equal 590 to 535.
+- **Tests:** `tests/hud/test_cached_view.gd` (every change the panel shows draws it again the same frame, and any frame a look changed without one fails; an idle panel draws nothing; a cooldown draws the live layer only; nothing lies past the picture). Screenshots: `tests/screenshots/shot_panel_cache.gd` (the picture against the panel drawn as before, `PlayerPanel.set_drawn_live`).

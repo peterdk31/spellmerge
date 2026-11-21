@@ -146,6 +146,9 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 	_last = now
 	var near: Rect2 = view.grow(VIEW_MARGIN) if view.has_area() else Rect2()
 	var budget: int = MOST_A_FRAME
+	if near.has_area() and _layout != null and not near.intersects(_layout_box(), true):
+		_owe_far(dt, pool)
+		return
 	for stream in _streams:
 		var cells: PackedInt32Array = _cells[stream.group]
 		if pool == null or ramp_table == null or cells.is_empty():
@@ -170,6 +173,25 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 				continue
 			budget -= 1
 			_throw(stream, k, middle, pool)
+
+
+## A frame with every cell farther than VIEW_MARGIN from the view (`give_off`): no mote is given
+## off and none is rolled, each stream keeping only the part of a mote it owes, as if every mote owed
+## had been rolled and passed by (the performance pass, 2026-11-21: a biome's rooms out of sight
+## rolled their fires' motes each frame). Only the dice's order differs, and they are the view's.
+func _owe_far(dt: float, pool: MotesScript) -> void:
+	for stream in _streams:
+		var cells: PackedInt32Array = _cells[stream.group]
+		if pool == null or ramp_table == null or cells.is_empty():
+			stream.owed = 0.0
+			continue
+		var owed: float = minf(stream.owed + stream.look.rate * float(cells.size()) * dt, float(MOST_A_FRAME))
+		stream.owed = owed - floorf(owed)
+
+
+## The box every cell's middle lies in.
+func _layout_box() -> Rect2:
+	return Rect2(_layout.origin, Vector2(float(_layout.columns * CoverLayout.CELL), float(_layout.rows * CoverLayout.CELL)))
 
 
 ## One mote of kind `k` off `stream`, round the middle `middle` of a cell, into `pool`.

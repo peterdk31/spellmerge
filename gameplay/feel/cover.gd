@@ -91,6 +91,10 @@ const STIR_SHOT_PIXELS: float = 2.5
 const STIR_BLAST_PIXELS: float = 10.0
 ## When a cell never walked through was walked (long before any clock).
 const NEVER: float = -1.0e6
+## `step_with`'s box of the bodies found when it is not told one (every view takes them), and
+## `found_box` with no body found.
+const EVERYWHERE: Rect2 = Rect2(-1.0e9, -1.0e9, 2.0e9, 2.0e9)
+const NOWHERE: Rect2 = Rect2(1.0e9, 1.0e9, 0.0, 0.0)
 
 ## The bus and the registry (a test's own view's; null for Feel's views, which `cover_rooms.gd` hands
 ## their rooms, and in a test that lays a layout itself).
@@ -149,6 +153,14 @@ var _held_stirs_version: int = -1
 var _held_hand_stirs: Callable = Callable()
 ## True when the bodies handed over (`_send`) changed since the batches were last told them.
 var _bodies_held: bool = false
+## The box round the bodies found by the last `step` (`found_box`), and, while switched off and out
+## of every body's reach, the bodies another view found this frame (`step_with`), taken only when
+## shown again (`_bodies_due`; the performance pass, 2026-11-21: 27 views each walked the 32 bodies a
+## frame).
+var _found_box: Rect2 = NOWHERE
+var _due_found: PackedVector2Array = PackedVector2Array()
+var _due_count: int = 0
+var _bodies_due: bool = false
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -363,17 +375,70 @@ func body_count() -> int:
 ## ShaderMaterial; the spectacle's `Stirs.hand_to`; none: not handed) whenever their `stirs_version`
 ## is not the one handed last.
 func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+	_bodies_due = false
 	_find_bodies(table, focus)
 	_draw_frame(now, pool, view, stirs_version, hand_stirs)
 
 
 ## `step` with the bodies another view found this frame (`found`, `count` of them: Feel's first
-## room's `bodies()`, so a frame gathers them once for every room), the rest as `step`.
-func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+## room's `bodies()`, so a frame gathers them once for every room; `box` round them, its
+## `found_box()`), the rest as `step`. A view switched off whose cells no body found reaches walks
+## none and takes none of them: it takes them only when shown again (`_on_visibility_changed`), so
+## it draws then as if it had taken them every frame.
+func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable(), box: Rect2 = EVERYWHERE) -> void:
+	if not is_visible_in_tree() and not _reached_by(box):
+		# Held as it is: the one the batches of the finding view hold, which it never writes.
+		_due_found = found
+		_due_count = count
+		_bodies_due = true
+		_draw_idle(now, pool, view, stirs_version, hand_stirs)
+		return
+	_bodies_due = false
+	_take_found(found, count)
+	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+
+
+## The bodies found by the last `step` (`step_with`'s, its own), at most BODIES.
+func _take_found(found: PackedVector2Array, count: int) -> void:
 	_near_count = mini(count, mini(found.size(), BODIES))
 	for at in _near_count:
 		_near_at[at] = found[at]
-	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+
+
+## The box round the bodies the last `step` found (NOWHERE with none), for `step_with`.
+func found_box() -> Rect2:
+	return _found_box
+
+
+## True when a body in `box` (`found_box`'s) could walk one of the layout's cells (`_walk`'s test).
+func _reached_by(box: Rect2) -> bool:
+	if layout == null:
+		return false
+	var low: Vector2 = _walk_low()
+	var high: Vector2 = _walk_high()
+	return not (box.end.x < low.x or box.end.y < low.y or box.position.x > high.x or box.position.y > high.y)
+
+
+## The corners of the box a body's position lies in when its footprint may touch the layout's cells.
+func _walk_low() -> Vector2:
+	return layout.origin - FOOT_REACH_HIGH - Vector2.ONE
+
+
+func _walk_high() -> Vector2:
+	return layout.origin + Vector2(float(layout.columns * CoverLayout.CELL), float(layout.rows * CoverLayout.CELL)) - FOOT_REACH_LOW + Vector2.ONE
+
+
+## A frame switched off with no body in reach (`step_with`): the clock, the changed cells' times and
+## the motes, as `_draw_frame`; nothing walked and the bodies left for when it is shown.
+func _draw_idle(now: float, pool: MotesScript, view: Rect2, stirs_version: int, hand_stirs: Callable) -> void:
+	_now = now
+	if _times_dirty:
+		_times_dirty = false
+		_times_texture.update(_times)
+	motes.give_off(now, pool, view)
+	_held_stirs_version = stirs_version
+	_held_hand_stirs = hand_stirs
+	_held = true
 
 
 ## The frame's look once the bodies are found (`step`).
@@ -389,16 +454,7 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 	_held_hand_stirs = hand_stirs
 	# The bodies found are taken every frame, shown or not: the other rooms' views and the mist
 	# read them (`bodies`) from the first room's view, which may be switched off.
-	if _bodies_moved():
-		_sent = 1 - _sent
-		# Taken out while it is written, so the write is in place (as `show_state`'s rows).
-		var bodies_now: PackedVector2Array = _send[_sent]
-		_send[_sent] = PackedVector2Array()
-		for at in _near_count:
-			bodies_now[at] = _near_at[at]
-		_send[_sent] = bodies_now
-		_sent_count = _near_count
-		_bodies_held = true
+	_take_bodies()
 	# A view switched off (a room nobody has entered, a place out of every view: unseen_rooms.gd)
 	# draws nothing, so its batches are handed nothing a frame (the performance pass, 2026-11-21:
 	# a biome's every room was told the clock and the bodies each frame); the view grid above is
@@ -407,6 +463,21 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 		_held = true
 		return
 	_hand_batches()
+
+
+## The bodies found (`_near_at`) into the array handed over next, when they differ from the last.
+func _take_bodies() -> void:
+	if not _bodies_moved():
+		return
+	_sent = 1 - _sent
+	# Taken out while it is written, so the write is in place (as `show_state`'s rows).
+	var bodies_now: PackedVector2Array = _send[_sent]
+	_send[_sent] = PackedVector2Array()
+	for at in _near_count:
+		bodies_now[at] = _near_at[at]
+	_send[_sent] = bodies_now
+	_sent_count = _near_count
+	_bodies_held = true
 
 
 ## Hand the batches what changed: the clock, the stirs, the bodies found and the rows written
@@ -438,6 +509,10 @@ func _hand_batches() -> void:
 ## drawn, so it draws as if it had been handed every frame.
 func _on_visibility_changed() -> void:
 	if _held and is_visible_in_tree():
+		if _bodies_due:
+			_bodies_due = false
+			_take_found(_due_found, _due_count)
+			_take_bodies()
 		_hand_batches()
 
 
@@ -445,6 +520,7 @@ func _on_visibility_changed() -> void:
 ## actor id, a nearer one taking the place of the farthest kept once they are full).
 func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 	_near_count = 0
+	_found_box = NOWHERE
 	if table == null:
 		return
 	var open: int = table.open_ids(_ids)
@@ -469,6 +545,13 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 		for k in BODIES:
 			if _near_far[k] > _near_far[farthest]:
 				farthest = k
+	if _near_count > 0:
+		var low: Vector2 = _near_at[0]
+		var high: Vector2 = low
+		for at in range(1, _near_count):
+			low = low.min(_near_at[at])
+			high = high.max(_near_at[at])
+		_found_box = Rect2(low, high - low)
 
 
 ## The covered cells under the bodies found (their `FOOTPRINT`), walked at `now`; the grid marked
@@ -477,8 +560,8 @@ func _walk(now: float) -> void:
 	# A body whose footprint lies wholly off this piece's cells walks none of them: passed by with
 	# one test (a biome's every piece hears every body found; the performance pass, 2026-11-20). The
 	# box is a pixel wider than FOOTPRINT's reach each way, so no foot on a cell is passed by.
-	var low: Vector2 = layout.origin - FOOT_REACH_HIGH - Vector2.ONE
-	var high: Vector2 = layout.origin + Vector2(float(layout.columns * CoverLayout.CELL), float(layout.rows * CoverLayout.CELL)) - FOOT_REACH_LOW + Vector2.ONE
+	var low: Vector2 = _walk_low()
+	var high: Vector2 = _walk_high()
 	for at in _near_count:
 		var body: Vector2 = _near_at[at]
 		if body.x < low.x or body.y < low.y or body.x > high.x or body.y > high.y:

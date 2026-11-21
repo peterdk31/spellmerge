@@ -126,6 +126,9 @@ func test_a_view_switched_off_hands_nothing_until_it_is_shown() -> void:
 	cover.step(2.0, table, Vector2.ZERO)
 	check_equal(material.get_shader_parameter(&"view_time"), 1.0, "off: not handed the clock")
 	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(10, 10), "nor the bodies")
+	# The other rooms' views and the mist read the first room's bodies, which may be switched off
+	# (the review's: they were frozen at the last frame it was shown).
+	check_equal(cover.bodies()[0], Vector2(200, 200), "but the bodies it hands the other rooms are this frame's")
 	var cell: int = cover.layout.cell_of(Vector2(200, 200))
 	check(cover.walked_at(cell) >= 2.0, "but the cell it stands in is walked, off as on")
 	cover.visible = true

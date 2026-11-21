@@ -147,6 +147,8 @@ var _stirs_version: int = -1
 var _held: bool = false
 var _held_stirs_version: int = -1
 var _held_hand_stirs: Callable = Callable()
+## True when the bodies handed over (`_send`) changed since the batches were last told them.
+var _bodies_held: bool = false
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -385,6 +387,18 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 	motes.give_off(now, pool, view)
 	_held_stirs_version = stirs_version
 	_held_hand_stirs = hand_stirs
+	# The bodies found are taken every frame, shown or not: the other rooms' views and the mist
+	# read them (`bodies`) from the first room's view, which may be switched off.
+	if _bodies_moved():
+		_sent = 1 - _sent
+		# Taken out while it is written, so the write is in place (as `show_state`'s rows).
+		var bodies_now: PackedVector2Array = _send[_sent]
+		_send[_sent] = PackedVector2Array()
+		for at in _near_count:
+			bodies_now[at] = _near_at[at]
+		_send[_sent] = bodies_now
+		_sent_count = _near_count
+		_bodies_held = true
 	# A view switched off (a room nobody has entered, a place out of every view: unseen_rooms.gd)
 	# draws nothing, so its batches are handed nothing a frame (the performance pass, 2026-11-21:
 	# a biome's every room was told the clock and the bodies each frame); the view grid above is
@@ -399,30 +413,19 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 ## (the frame's last `step`'s).
 func _hand_batches() -> void:
 	_held = false
-	var now: float = _now
-	var stirs_version: int = _held_stirs_version
-	var hand_stirs: Callable = _held_hand_stirs
-	var stirred: bool = hand_stirs.is_valid() and stirs_version != _stirs_version
+	var stirred: bool = _held_hand_stirs.is_valid() and _held_stirs_version != _stirs_version
 	if stirred:
-		_stirs_version = stirs_version
-	var moved: bool = _bodies_moved()
-	if moved:
-		_sent = 1 - _sent
-		# Taken out while it is written, so the write is in place (as `show_state`'s rows).
-		var bodies_now: PackedVector2Array = _send[_sent]
-		_send[_sent] = PackedVector2Array()
-		for at in _near_count:
-			bodies_now[at] = _near_at[at]
-		_send[_sent] = bodies_now
-		_sent_count = _near_count
+		_stirs_version = _held_stirs_version
+	var moved: bool = _bodies_held
+	_bodies_held = false
 	for index in _batches.size():
 		var batch: MultiMeshInstance2D = _batches[index]
 		if batch == null:
 			continue
 		var material := batch.material as ShaderMaterial
-		material.set_shader_parameter(&"view_time", now)
+		material.set_shader_parameter(&"view_time", _now)
 		if stirred:
-			hand_stirs.call(material)
+			_held_hand_stirs.call(material)
 		if moved:
 			material.set_shader_parameter(&"bodies", _send[_sent])
 			material.set_shader_parameter(&"body_count", _sent_count)

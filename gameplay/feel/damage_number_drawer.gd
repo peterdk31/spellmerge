@@ -27,6 +27,9 @@ const Z: int = 22
 ## The plain text: its font size, outline and outline colour (the dummy's labels').
 const FONT_SIZE: int = 8
 const OUTLINE: int = 3
+## The most numbers a run holds, so a screen full of numbers tests each against at most this many
+## (a run is two draw calls; ending one early only costs two more).
+const RUN_MOST: int = 16
 const OUTLINE_COLOR: Color = Color(0.078, 0.071, 0.122, 1.0)
 ## The colours of a plain hit and of a heal (docs/STYLE.md; the heal cue's green).
 const PLAIN_COLOR: Color = Color.WHITE
@@ -235,6 +238,11 @@ func _runs(drawing: bool) -> int:
 		if _left[slot] <= 0.0 or _new[slot] == 1:
 			continue
 		var box: Rect2 = _box_of(slot)
+		if count == RUN_MOST:
+			if drawing:
+				_draw_run(count)
+			runs += 1
+			count = 0
 		for k in count:
 			if _run_box[k].intersects(box):
 				if drawing:

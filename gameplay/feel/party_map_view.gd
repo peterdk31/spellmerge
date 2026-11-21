@@ -560,18 +560,19 @@ func _any_open() -> bool:
 	return false
 
 
-## Every piece's look as it stands (with every map shut, nothing is seen changing).
 ## True while every map is shut and the pieces' looks wait to be settled when read (for tests).
 func waits_to_settle() -> bool:
 	return _unsettled
 
 
+## The pieces' looks settled if they wait to be (`_unsettled`).
 func _settled() -> void:
 	if _unsettled:
 		_unsettled = false
 		_settle()
 
 
+## Every piece's look as it stands (with every map shut, nothing is seen changing).
 func _settle() -> void:
 	for place in _shade.size():
 		_shade[place] = _shade_wanted(place)

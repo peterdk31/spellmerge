@@ -60,6 +60,10 @@ func test_numbers_apart_share_a_run_and_one_over_another_starts_its_own() -> voi
 	_bus.damage_number_shown.emit(0, Vector2(42.0, 52.0), 7.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0)
 	drawer.step(0.0)
 	check_equal(drawer.runs_now(), 2, "a sixth over the first: a run of its own after them")
+	for n in DrawerScript.RUN_MOST:
+		_bus.damage_number_shown.emit(0, Vector2(40.0 + 60.0 * (n % 8), 200.0 + 40.0 * float(n / 8)), 3.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0)
+	drawer.step(0.0)
+	check(drawer.runs_now() >= 3, "a run holds RUN_MOST numbers at most")
 
 
 func test_the_oldest_gives_way_when_every_slot_shows_one() -> void:

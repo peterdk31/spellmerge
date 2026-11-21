@@ -521,3 +521,30 @@ func test_the_harming_rows_kept_are_a_recounts_and_looks_see_every_fire() -> voi
 		check_equal(_cover.room().get("_harming_rows"), kept, "step %d: the rows kept are a recount's" % i)
 		check_equal(int(_cover.room().get("_harming")), total, "step %d: and so is the total" % i)
 	check(saw_fire, "the looks saw the fires")
+
+
+## The performance pass (2026-11-21, round C): a room none of whose cells is in a harming state now
+## harms nobody (`harms_nobody`), so the bodies are not looked at in it, and a room at rest steps
+## no cell (`has_active`); a fire makes it harm, and it harms nobody again once only ash is left.
+## A sleeping body nobody harms is passed by first; one being harmed keeps its time asleep.
+func test_a_room_harms_nobody_until_a_cell_harms_and_a_sleeper_keeps_its_time() -> void:
+	var cell: int = _cell(6, 6)
+	var body: Actor = _world.actor(_middle(cell), [&"health", &"hurtbox"])
+	var still := GRASS.duplicate(true) as CoverKind
+	still.states[BURNING].spreads = &""
+	still.states[BURNING].spread_chance = 0.0
+	_cover.free()
+	_cover = _make_cover(7, [still])
+	var room: CoverRoom = _cover.room()
+	check(room.harms_nobody() and not room.has_active(), "grass at rest: nobody harmed, nothing to step")
+	_touch(&"fire", _middle(cell))
+	_steps(1)
+	check(not room.harms_nobody() and room.has_active(), "burning: it harms, and steps")
+	check_equal(_cover.harmed(), PackedInt32Array([body.id]), "the body in it is harmed")
+	_world.table.set_asleep(body.id, true)
+	_steps(10)
+	check_equal(_cover.harmed(), PackedInt32Array([body.id]), "asleep, its time is kept")
+	_world.table.set_asleep(body.id, false)
+	_steps(100)
+	check(room.harms_nobody(), "ash: nobody harmed again")
+	check(_cover.harmed().is_empty(), "and the body dropped once its time ran out")

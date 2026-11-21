@@ -15,6 +15,7 @@ const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
 const NativeScript := preload("res://core/native/native.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 var flow: FlowScript
 var events: Node
@@ -381,3 +382,52 @@ func test_a_wizard_outside_a_mouth_is_on_the_bridge_and_enters_only_through_it()
 	_ticks(1)
 	check_equal(_wizard(0).room, 1, "past its mouth the wizard is in the antechamber")
 	check(flow.life.has(1, RoomLife.SEALED), "whose fight starts and seals")
+
+
+## An actor table that counts its lookups (`node_of`).
+class CountingActors extends ActorsScript:
+	var looked: int = 0
+
+	func node_of(id: int) -> Node:
+		looked += 1
+		return super(id)
+
+
+## The performance pass (2026-11-21, round C): a tick's waking looks each open body up once (it
+## looked every one up twice, a pass for the places and one for the sleep), and every body of a
+## sleeping place is asleep, the rest awake, in one call to the actor table.
+func test_waking_looks_each_body_up_once() -> void:
+	var table := own(CountingActors.new()) as CountingActors
+	var ids := PackedInt32Array()
+	for n in 5:
+		var body := own(Node2D.new()) as Node2D
+		var id: int = table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+		table.set_node(id, body)
+		ids.append(id)
+	var life := RoomLife.new()
+	life.begin(2, 3, [] as Array[RoomFight])
+	table.looked = 0
+	life.wake(table, null)
+	check_equal(table.looked, 5, "each body looked up once")
+	for id in ids:
+		check_equal(table.asleep[id], 0, "a body in no place is awake")
+	var places := PackedInt32Array([0, 1, -1, 2, 7])
+	var awake := PackedByteArray([1, 0, 0])
+	table.sleep_with_places(ids, 5, places, awake)
+	check_equal(table.asleep[ids[0]], 0, "in an awake place: awake")
+	check_equal(table.asleep[ids[1]], 1, "in a sleeping one: asleep")
+	check_equal(table.asleep[ids[2]], 0, "in none: awake")
+	check_equal(table.asleep[ids[3]], 1, "a sleeping bridge: asleep")
+	check_equal(table.asleep[ids[4]], 0, "past the places: awake")
+
+
+## The rooms with a flag as one mask (`rooms_with`; the map's teleports ask it for every seat each
+## tick, the performance pass of 2026-11-21): a bit a room, none past 62.
+func test_the_rooms_with_a_flag_are_a_mask() -> void:
+	var life := RoomLife.new()
+	life.begin(70, 70, [] as Array[RoomFight])
+	for room: int in [0, 3, 62, 63, 69]:
+		life.set_flag(room, RoomLife.CLEARED, true)
+	life.set_flag(5, RoomLife.ENTERED, true)
+	check_equal(life.rooms_with(RoomLife.CLEARED), (1 << 0) | (1 << 3) | (1 << 62), "the cleared rooms below 63")
+	check_equal(life.rooms_with(RoomLife.ENTERED), 1 << 5, "another flag its own")

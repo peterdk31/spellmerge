@@ -856,3 +856,14 @@ The owner chose **grid lighting + one pass** in place of the per-pixel light pas
 - **Native** (`native/src/light_grid.cpp`): `MoteKernel.light_grid_rows`, `light_grid_beam` and `light_grid_bake` on the grid's arrays in place, its numbers and members checked when switched on (`check_light_grid`); compared byte for byte by `tests/gameplay/feel/test_light_grid.gd` (seeded rows of every kind, beams, boxes, at 8 and 12 px, views apart and overlapping), which fails when one rounding in the C++ is changed. Methods of the drawing kernel: a class of its own would need the owner's `ci/smbot/rules.py` (`NATIVE_CLASSES`).
 - **No light buffer any more:** the SubViewport a view the GPU drew the light into, its batches, mirrors and beam meshes, and `light.gdshader` and `light_beam.gdshader` are gone. Every reader (the apply rect, its factor pass at a bigger picture, the mist, the lit-only motes) takes the cell its world point lies in (`light_grid.gdshaderinc`, `view_light(world)`): one sampler where there were four. `light_grid_smooth` weighs the four nearest cells' middles instead, its bands still cut hard. The split's cheaper-light rung (`SplitBudget`, a smaller buffer past the first view) changes nothing now: the grid's cost is the CPU's.
 - **Tests:** `test_light_grid.gd` (the views on the world's grid, the falloff at a cell's middle, the glows, the kernel against the GDScript), `test_light.gd` (the rows read, the grid following the view, flashes, cues, beams, spots and a card's light reach on the grid), `test_shadows.gd` (the grid blocked by the pick, a carried light lit from where it stands), `test_split_screen.gd` (a grid a view, the third view's copy reading this frame's grid), `test_light_resolution.gd`. Screenshots: the cell sizes, nearest and smoothed, against main (PR's branch `shots/perf/grid-light`).
+- **Measured** (`play_frames.gd` on the fixed clock, fixed_steps.gd, under xvfb on llvmpipe, 4 cores; frame / GPU ms; 1p rows at the web's load, 2p and 4p at the desktop's; one clean round each, the fixed clock's runs repeating within a few per cent):
+
+  | scenario | 640 main | 640 grid | 1280 main | 1280 grid |
+  | --- | --- | --- | --- | --- |
+  | 1p start web | 26.5 / 16.8 | 26.0 / 16.4 | 52.5 / 42.3 | 52.0 / 41.7 |
+  | 1p near web | 28.0 / 17.9 | 26.2 / 16.8 | 61.1 / 50.2 | 61.1 / 49.7 |
+  | 1p far web | 40.6 / 25.4 | 39.5 / 24.4 | 74.0 / 59.0 | 72.9 / 58.0 |
+  | 2p apart dynamic | 65.0 / 44.3 | 61.1 / 41.1 | 110.0 / 87.6 | 103.6 / 82.5 |
+  | 4p apart equal | 106.0 / 72.5 | 104.6 / 70.6 | 167.1 / 130.1 | 162.6 / 126.0 |
+
+  The light buffers drew in about 0.6 to 1.2 ms a view on llvmpipe; the grid costs less on the CPU than that (the frames are shorter everywhere, most in the splits, where a buffer a view was drawn). What a 1280 x 720 picture still doubles is the root's own fill (the picture, the screen copy the apply rect multiplies, the mist): the one pass's to take on next.

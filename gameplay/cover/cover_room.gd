@@ -112,6 +112,18 @@ func may_harm() -> bool:
 	return _rest_harms or not _active.is_empty()
 
 
+## True when a cell is not at rest (`step_cells` has something to step).
+func has_active() -> bool:
+	return not _active.is_empty()
+
+
+## True when no cell of the room is in a state that gives a status now (`_harming`, worked out from
+## the state): a body standing in it is given nothing, whichever cell it stands in (the performance
+## pass, 2026-11-21: Cover looked up the cell of every body in a room with cobwebs at rest elsewhere).
+func harms_nobody() -> bool:
+	return plays() and _harming == 0
+
+
 # --- Read ------------------------------------------------------------------------------
 
 func state_at(cell: int) -> int:
@@ -197,6 +209,9 @@ func touch(element_name: StringName, at: Vector2, radius: float) -> void:
 ## (in NEIGHBOURS' order) that its element would move on, one roll each. The spreads apply once every
 ## cell has stepped. The kinds' moves are read from their tables here: every cell may burn at once.
 func step_cells(delta: float, game: Sim, number: int) -> void:
+	if _active.is_empty():
+		# Every cell at rest: none ages, moves on or spreads (the performance pass, 2026-11-21).
+		return
 	var cells: PackedByteArray = layout.cells
 	var columns: int = layout.columns
 	var rows: int = layout.rows

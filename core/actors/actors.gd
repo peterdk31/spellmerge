@@ -370,6 +370,19 @@ func set_still(id: int, on: bool) -> void:
 			_release_hold(id)
 
 
+## Every one of the `count` bodies `ids` asleep or awake with its place (`places[n]`, the place of
+## `ids[n]`; one outside `awake` is awake): asleep while its place's `awake` is 0 (Flow's room life,
+## each tick; one call for them all, the performance pass, 2026-11-21).
+func sleep_with_places(ids: PackedInt32Array, count: int, places: PackedInt32Array, awake: PackedByteArray) -> void:
+	var size: int = awake.size()
+	for n in count:
+		var id: int = ids[n]
+		if id < 0 or id >= ACTORS:
+			continue
+		var place: int = places[n]
+		asleep[id] = 1 if place >= 0 and place < size and awake[place] == 0 else 0
+
+
 func is_still(id: int) -> bool:
 	return id >= 0 and id < ACTORS and still[id] != 0
 

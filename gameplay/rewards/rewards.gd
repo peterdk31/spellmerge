@@ -140,7 +140,7 @@ const SIGN_NAME: String = "Reroll shelf"
 const SIGN_TEXT: String = "New items on this shop's shelf. Costs more each time."
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items", &"_said_rewards"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"sim", &"_said_coins", &"_said_items", &"_said_rewards", &"_taker_at", &"_takers"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
@@ -220,6 +220,9 @@ var _said_items: Dictionary = {}
 ## The reward items (offer numbers) this machine's looks were last told lie there
 ## (`reward_item_changed`), as `_said_coins`.
 var _said_rewards: Dictionary = {}
+## Scratch: each seat's standing body's place this tick, a bit a seat with one (`_find_takers`).
+var _taker_at: PackedVector2Array = PackedVector2Array()
+var _takers: int = 0
 
 
 func _ready() -> void:
@@ -293,9 +296,16 @@ func step(delta: float) -> void:
 			_say_stats(seat)
 			_say_shelf_near(seat)
 	var at: int = 0
+	var takers_found: bool = false
 	while at < _coin_numbers.size():
+		if not takers_found:
+			# The standing wizards' feet, found once for every coin until one is taken (a take tells
+			# the game, which may move or down a body; the performance pass, 2026-11-21).
+			_find_takers()
+			takers_found = true
 		var taker: int = _taker_of(_coin_at[at])
 		if taker != ActorsScript.NONE:
+			takers_found = false
 			var number: int = _coin_numbers[at]
 			var where: Vector2 = _coin_at[at]
 			_coin_numbers.remove_at(at)
@@ -757,16 +767,28 @@ func _cards() -> RewardCards:
 	return RewardCards.gather(registry.get_all(ItemKinds.content_of(ItemKinds.CARD)[0]))
 
 
-## The first seat (in order) whose driven wizard, standing, reaches `at` with its feet; NONE for none.
+## The first seat (in order) whose driven wizard, standing, reaches `at` with its feet (as
+## `_find_takers` last found them); NONE for none.
 func _taker_of(at: Vector2) -> int:
+	for seat in SEATS:
+		if _takers & (1 << seat) != 0 and _taker_at[seat].distance_squared_to(at) <= COIN_REACH * COIN_REACH:
+			return seat
+	return ActorsScript.NONE
+
+
+## Where each seat's standing body stands, for `_taker_of` (`_takers`: a bit a seat with one).
+func _find_takers() -> void:
+	_takers = 0
+	if _taker_at.size() != SEATS:
+		_taker_at.resize(SEATS)
 	for seat in SEATS:
 		var id: int = actors.actor_of_seat(seat)
 		if id == ActorsScript.NONE:
 			continue
 		var body := actors.node_of(id) as Actor
-		if body != null and not body.is_down() and body.global_position.distance_squared_to(at) <= COIN_REACH * COIN_REACH:
-			return seat
-	return ActorsScript.NONE
+		if body != null and not body.is_down():
+			_takers |= 1 << seat
+			_taker_at[seat] = body.global_position
 
 
 ## Seat `seat`'s coin stack changed by `amount` (a fall takes no more than it holds): its wizard's

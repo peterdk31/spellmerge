@@ -100,7 +100,8 @@ var cards_left: float = 0.0:
 		if not is_equal_approx(value, cards_left):
 			cards_left = value
 			_measure()
-## Drawn live over a cached panel's picture (`player_panel.gd`): the glyph's shade and rim and the
+## Drawn live over a cached panel's picture (`player_panel.gd`): the glyph's shade and rim, the
+## `NEXT_CAST` shade over the cards, the arrows at the strip's ends (drawn over that shade) and the
 ## mana line are drawn by the panel's live layer (`draw_live_onto`), not by the cover and the line
 ## themselves, and a change of them is told by `live_changed`, so the picture is not drawn again
 ## for a cooldown's every pixel. Off: they draw themselves, as before (the screenshots' comparison).
@@ -112,6 +113,8 @@ var live: bool = false:
 				_mana.live = value
 			if _cover != null:
 				_cover.queue_redraw()
+			if _strip != null:
+				_strip.queue_redraw()
 			live_changed.emit()
 
 ## The glyph's shade or rim or the mana line changed (while `live`).
@@ -503,9 +506,6 @@ func _draw_cards() -> void:
 	var view: float = _strip.size.x
 	_drawn_outline = -1
 	_drawn_dashed = -1
-	# The insides of the next cast's frame and of every frame, for the `NEXT_CAST` shade.
-	var next_inside := Rect2()
-	var all_inside := Rect2()
 	# Three passes, each a run of one kind (the frames' fills, the icons, all one page of
 	# `IconAtlas`, then the strikes and the frames' edges), so the strip is three draw calls
 	# however many cards it shows; nothing of one pass overlaps another's in a way the order shows
@@ -559,36 +559,76 @@ func _draw_cards() -> void:
 			_strip.draw_rect(box, GOLD if marked else (SHORT if short else FRAME), false, 1.0)
 			if marked:
 				_drawn_outline = c
-		var inside := box.grow(-1.0)
-		if is_next:
-			next_inside = inside
-		all_inside = inside if all_inside.size.x <= 0.0 else all_inside.merge(inside)
-	if not on_button:
+	# The `NEXT_CAST` shade and the arrows over it: here, or while `live` by the panel's live layer
+	# (`draw_live_onto`), so a delay never draws the picture again.
+	if not live:
+		_draw_over_cards_onto(_strip, Vector2.ZERO, false)
+
+
+## The `NEXT_CAST` shade over the next cast (the whole cycle during a recharge) and the arrows at
+## the strip's ends, on `target` with the strip's top left at `at`; `clip`: cut to the strip, as
+## the strip itself clips what it draws (drawn elsewhere than on the strip).
+func _draw_over_cards_onto(target: CanvasItem, at: Vector2, clip: bool) -> void:
+	if style == Style.NEXT_CAST:
 		_drawn_shade = Rect2()
-		var fill: float = cooldown_fill()
-		var under: Rect2 = all_inside if recharging else next_inside
-		var shade := Rect2()
-		if is_winding() and under.size.x > 0.0:
-			# A wind-up charges from the left: what has wound up is shaded, its edge gold.
-			var charged: float = _strip_shade_pixels(under.size.x)
-			shade = Rect2(under.position, Vector2(charged, under.size.y))
-			_strip.draw_rect(shade, SHADE)
-			_strip.draw_rect(Rect2(shade.end.x - 1.0, under.position.y, 1.0, under.size.y), EDGE_WIND)
-		elif fill > 0.0 and under.size.x > 0.0:
-			# Pulls back left to right: what is still to wait is on the right.
-			var width: float = _strip_shade_pixels(under.size.x)
-			shade = Rect2(under.end.x - width, under.position.y, width, under.size.y)
-			_strip.draw_rect(shade, SHADE)
-			_strip.draw_rect(Rect2(shade.position, Vector2(1.0, shade.size.y)), EDGE_RECHARGE if recharging else EDGE_DELAY)
+		var shade: Rect2 = _strip_shade()
 		if shade.size.x > 0.0:
+			var edge: Rect2
+			var edge_color: Color
+			if is_winding():
+				edge = Rect2(shade.end.x - 1.0, shade.position.y, 1.0, shade.size.y)
+				edge_color = EDGE_WIND
+			else:
+				edge = Rect2(shade.position, Vector2(1.0, shade.size.y))
+				edge_color = EDGE_RECHARGE if is_recharging() else EDGE_DELAY
+			_rect_onto(target, shade, SHADE, at, clip)
+			_rect_onto(target, edge, edge_color, at, clip)
 			_drawn_shade = Rect2(shade.position + _strip.position, shade.size)
+	var next: int = next_cast()
+	var view: float = _strip.size.x
 	var next_left: bool = next < _cast_x.size() and _cast_x[next] - float(_scroll) < 0.0
 	var next_right: bool = next < _cast_x.size() and not next_left and not is_cast_in_view(next)
 	# An arrow slides in from past its end, a pixel or two a frame, never popping in whole.
 	if _left_in > 0:
-		_draw_arrow(-_arrow_out(_left_in), -1, GOLD if next_left else MUTED)
+		_draw_arrow(target, at, clip, -_arrow_out(_left_in), -1, GOLD if next_left else MUTED)
 	if _right_in > 0:
-		_draw_arrow(view - ARROW_WIDTH + _arrow_out(_right_in), 1, GOLD if next_right else MUTED)
+		_draw_arrow(target, at, clip, view - ARROW_WIDTH + _arrow_out(_right_in), 1, GOLD if next_right else MUTED)
+
+
+## The `NEXT_CAST` shade in the strip's coordinates (empty for none): over the inside of the next
+## cast's frame, or of every frame in view during a recharge; a wind-up's from the left, a delay's
+## what is still to wait, on the right.
+func _strip_shade() -> Rect2:
+	var view: float = _strip.size.x
+	var next: int = next_cast()
+	var recharging: bool = is_recharging()
+	var under := Rect2()
+	for c in _cast_size.size():
+		var box: Rect2 = _cast_box(c, view)
+		if box.size.x <= 0.0:
+			continue
+		var inside := box.grow(-1.0)
+		if recharging:
+			under = inside if under.size.x <= 0.0 else under.merge(inside)
+		elif c == next and _firing != -1:
+			under = inside
+	if under.size.x <= 0.0:
+		return Rect2()
+	if is_winding():
+		return Rect2(under.position, Vector2(_strip_shade_pixels(under.size.x), under.size.y))
+	if cooldown_fill() > 0.0:
+		var width: float = _strip_shade_pixels(under.size.x)
+		return Rect2(under.end.x - width, under.position.y, width, under.size.y)
+	return Rect2()
+
+
+## `rect` (strip coordinates) in `color` on `target` at `at`, cut to the strip when `clip`.
+func _rect_onto(target: CanvasItem, rect: Rect2, color: Color, at: Vector2, clip: bool) -> void:
+	if clip:
+		rect = rect.intersection(Rect2(0.0, 0.0, _strip.size.x, BOX_HEIGHT))
+		if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+			return
+	target.draw_rect(Rect2(rect.position + at, rect.size), color)
 
 
 ## Cast `c`'s frame on the strip as it is scrolled now (empty when it is out of the strip's
@@ -607,13 +647,13 @@ func _arrow_out(slid: int) -> float:
 
 ## A small arrow at `x` of the strip pointing `way` (-1 left, 1 right), on a dark backing over the
 ## cards it hides: 3 px wide, its columns 2, 4 and 6 px tall from the tip.
-func _draw_arrow(x: float, way: int, color: Color) -> void:
-	_strip.draw_rect(Rect2(x, 0.0, ARROW_WIDTH, BOX_HEIGHT), FILL)
+func _draw_arrow(target: CanvasItem, at: Vector2, clip: bool, x: float, way: int, color: Color) -> void:
+	_rect_onto(target, Rect2(x, 0.0, ARROW_WIDTH, BOX_HEIGHT), FILL, at, clip)
 	for step in 3:
 		# The tip is the column furthest out; each column inward is 2 px taller.
 		var column: float = x + (float(step) if way < 0 else ARROW_WIDTH - 1.0 - float(step))
 		var half: float = float(step)
-		_strip.draw_rect(Rect2(column, BOX_HEIGHT * 0.5 - 1.0 - half, 1.0, 2.0 + half * 2.0), color)
+		_rect_onto(target, Rect2(column, BOX_HEIGHT * 0.5 - 1.0 - half, 1.0, 2.0 + half * 2.0), color, at, clip)
 
 
 ## Over the glyph: the `BUTTON` shade, which pulls back up as the delay runs (what is still to
@@ -627,6 +667,8 @@ func _draw_cover() -> void:
 ## The cover's shade and rim and the mana line, on `target` with the row's top left at `at` (a
 ## cached panel's live layer, drawn over its picture every frame they change: `live`).
 func draw_live_onto(target: CanvasItem, at: Vector2) -> void:
+	if _strip != null:
+		_draw_over_cards_onto(target, at + _strip.position, true)
 	if _mana != null and _mana.visible:
 		_mana.draw_onto(target, at + _mana.position)
 	_draw_cover_onto(target, at)
@@ -692,17 +734,21 @@ func _strip_shade_pixels(wide: float) -> float:
 	return 0.0
 
 
-## What the cover draws, as one number: two frames with the same number draw the same pixels.
+## What the live layer draws of this row, as one number (the glyph's shade and rim, and the
+## `NEXT_CAST` shade over the cards): two frames with the same number draw the same pixels.
 func _cover_looks() -> int:
 	var tall: float = GlyphScript.GLYPH_HEIGHT - 2.0
 	var on_button: bool = style == Style.BUTTON
 	var shade: int = int(_cover_pixels(tall)) if on_button else 0
 	var dim: bool = style == Style.NEXT_CAST and _left > 0.0
+	var cards: Rect2 = _strip_shade() if not on_button and _strip != null else Rect2()
+	shade |= (int(cards.position.x) & 0xff) << 16 | (int(cards.size.x) & 0xff) << 24
 	return shade | (int(on_button) << 8) | (int(is_winding()) << 9) | (int(is_recharging()) << 10) | (int(_fizzle_frames > 0) << 11) | (int(_rim_frames > 0) << 12) | (int(dim) << 13)
 
 
 ## What the strip draws, as one number: the marks, the scroll and the arrows. (The `NEXT_CAST`
-## shade is not in it: that style draws the strip again every frame of a delay, as it always did.)
+## shade is the live layer's, `_cover_looks`; not live, that style draws the strip again every
+## frame of a delay, as it always did.)
 func _strip_looks() -> int:
 	return next_cast() | (_cursor << 8) | ((_firing + 2) << 16) | (int(is_recharging()) << 24) | (int(is_winding()) << 25) | (_left_in << 26) | (_right_in << 30) | (int(style == Style.BUTTON) << 34) | (_scroll << 36)
 
@@ -715,7 +761,7 @@ func _redraw_changed() -> void:
 		_cover_drawn = cover
 		_redraw_cover()
 	var strip: int = _strip_looks()
-	if strip != _strip_drawn or style == Style.NEXT_CAST:
+	if strip != _strip_drawn or (style == Style.NEXT_CAST and not live):
 		_strip_drawn = strip
 		if _strip != null:
 			_strip.queue_redraw()

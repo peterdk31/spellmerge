@@ -10,8 +10,9 @@ extends "res://tests/support/screenshot.gd"
 ## (`panel_cache_<shot>_screen`), which a checkout from before the cache takes too, to compare.
 ##
 ## States: one player just after casting (the cooldown's sweep part way, the mana lines eased, a key,
-## the purse), with a quick-use slot bound and recharging (the D-pad cross), the next-cast style, and
-## four players' corners.
+## the purse), with a quick-use slot bound and recharging (the D-pad cross), the next-cast style (and
+## its shades set by hand: a delay, and a long staff's recharge under its arrows), and four players'
+## corners.
 
 const DevHub := preload("res://tests/support/dev_hub.gd")
 const ShotStaffs := preload("res://tests/screenshots/shot_hud_staffs.gd")
@@ -61,6 +62,18 @@ func take() -> void:
 	_hud.call("_on_reload_style_changed", false)
 	await settle(2)
 	await _pair("next_cast", [0])
+	# The next-cast style's shades, set by hand (the HUD held still): the three-cast staff half way
+	# through a delay, the long one in its recharge, shaded over every cast in view under its arrows.
+	_hud.set_process(false)
+	var row: Object = panel.call("staff_row", 1)
+	row.call("set_timing", 1, 0.4)
+	row.call("set_timing", 1, 0.2)
+	var long: Object = panel.call("staff_row", 3)
+	for _frame in 30:
+		long.call("set_timing", 3, 0.0)
+	long.call("set_timing", 0, 0.6)
+	long.call("set_timing", 0, 0.45)
+	await _pair("next_cast_shaded", [0])
 	_hud.call("_on_reload_style_changed", true)
 	_flow.call("stop_run")
 	await create_timer(0.3).timeout

@@ -393,3 +393,57 @@ func test_nothing_in_the_panel_lies_past_its_picture_s_pad() -> void:
 		var control := item as Control
 		if control.is_visible_in_tree():
 			check(room.encloses(control.get_global_rect()), "%s at %s lies inside the picture %s" % [control.name, control.get_global_rect(), room])
+
+
+func test_the_next_cast_style_s_delay_draws_the_live_layer_only_and_never_stale() -> void:
+	# The owner's answer on #905: the shade over the next cast is the live layer's too, so a delay
+	# keeps the picture as it is. Staff 1 is short (it never slides): the picture's redraws are
+	# counted on it. Staff 0 is long, so the arrows (drawn over that shade) and its slides are
+	# checked against draws from scratch.
+	_build(0, CARDS)
+	_build(1, 3)
+	_panel().set_reload_style(RowScript.Style.NEXT_CAST)
+	for _frame in 4:
+		await process_frame
+	var caster: int = _mgr.actors.home_of_seat(0)
+	var short_row: RowScript = _panel().staff_row(1)
+	var pictures: int = _cache().refreshes
+	var live_draws: Array[int] = [0]
+	_panel().live_layer().draw.connect(func() -> void: live_draws[0] += 1)
+	var frames: int = 0
+	var casts: int = 0
+	var shaded: int = 0
+	while casts < 4 and frames < 300:
+		if _spells.cooldown_left(caster, 1) <= 0.0:
+			check(_spells.cast_staff(caster, 1, Vector2.ZERO, Vector2.RIGHT, 1000.0) >= 0.0, "cast %d" % casts)
+			casts += 1
+		_mgr.step(DT)
+		_spells.step(DT)
+		await process_frame
+		frames += 1
+		if short_row.drawn_shade().size.x > 0.0:
+			shaded += 1
+	check(shaded > 10, "the short staff's cards were shaded on %d frames" % shaded)
+	check(live_draws[0] > casts, "the live layer drew the shade (%d times)" % live_draws[0])
+	check(_cache().refreshes - pictures <= casts * 3, "the picture was drawn again %d times in %d frames of %d casts: for the casts, not the shade" % [_cache().refreshes - pictures, frames, casts])
+	# The long staff through its cycle and recharge, each frame against a draw from scratch, the HUD
+	# held still meanwhile (its own step would slide the strip on).
+	var row: RowScript = _panel().staff_row(0)
+	casts = 0
+	frames = 0
+	while casts < CARDS + 1 and frames < 600:
+		if _spells.cooldown_left(caster, 0) <= 0.0:
+			check(_spells.cast_staff(caster, 0, Vector2.ZERO, Vector2.RIGHT, 1000.0) >= 0.0, "cast %d" % casts)
+			casts += 1
+		_mgr.step(DT)
+		_spells.step(DT)
+		await process_frame
+		frames += 1
+		if frames % 3 != 0:
+			continue
+		var shown: Rect2 = row.drawn_shade()
+		_hud.set_process(false)
+		row.call(&"_redraw_all")
+		await process_frame
+		check_equal(row.drawn_shade(), shown, "frame %d: the shade shown is the one it would draw" % frames)
+		_hud.set_process(true)

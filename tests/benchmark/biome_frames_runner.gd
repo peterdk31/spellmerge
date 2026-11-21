@@ -115,13 +115,19 @@ func _scenario_started(scenario: Dictionary) -> void:
 		return
 	if map.rooms() < ROOMS_WANTED:
 		print("BENCH: biome frames %s: the map has %d rooms, not %d" % [scenario["label"], map.rooms(), ROOMS_WANTED])
-	_rooms = _fight_rooms(map, 1 if scenario.get("spread", "apart") == "together" else _wizards.size())
-	_room_rects.clear()
+	# A row's "room": "largest" fight rooms (the default), the "smallest", or "start": the wizards
+	# left where the run put them (the start room, the rooms round it not yet entered).
+	var room_rule: String = String(scenario.get("room", "largest"))
 	var biome: Object = _flow.get(&"biome")
+	if room_rule == "start":
+		_rooms = PackedInt32Array([_room_of(map, _wizards[0].global_position)])
+	else:
+		_rooms = _fight_rooms(map, 1 if scenario.get("spread", "apart") == "together" else _wizards.size(), room_rule == "smallest")
+	_room_rects.clear()
 	for room in _rooms:
 		_room_rects.append(biome.call(&"room_rect", room) as Rect2)
 	var grid: RoomGrid = _projectiles.call(&"grid") as RoomGrid
-	for index in _wizards.size():
+	for index in (0 if room_rule == "start" else _wizards.size()):
 		var rect: Rect2 = _room_rects[index % _room_rects.size()]
 		var at: Vector2 = rect.get_center() + Vector2(24.0 * float(index / _room_rects.size()), 0.0)
 		if grid != null:
@@ -152,13 +158,13 @@ func _map() -> BiomeMap:
 ## `count` fight rooms of `map` far apart (the largest first, then each the room farthest from
 ## those taken, by their rects' middles), so wizards put in them part into a view each: rooms side
 ## by side can fit one picture, the party camera zoomed out over them.
-func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
+func _fight_rooms(map: BiomeMap, count: int, smallest: bool = false) -> PackedInt32Array:
 	var biome: Object = _flow.get(&"biome")
 	var fights: Array[int] = []
 	for room in map.rooms():
 		if map.room_kinds[room] == FIGHT_KIND:
 			fights.append(room)
-	fights.sort_custom(func(a: int, b: int) -> bool: return (biome.call(&"room_rect", a) as Rect2).get_area() > (biome.call(&"room_rect", b) as Rect2).get_area())
+	fights.sort_custom(func(a: int, b: int) -> bool: return ((biome.call(&"room_rect", a) as Rect2).get_area() > (biome.call(&"room_rect", b) as Rect2).get_area()) != smallest)
 	var out := PackedInt32Array()
 	if fights.is_empty():
 		out.append(0)
@@ -179,6 +185,15 @@ func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
 				best = room
 		out.append(best)
 	return out
+
+
+## The room of `map` whose rect holds `at` (0 when none does).
+func _room_of(map: BiomeMap, at: Vector2) -> int:
+	var biome: Object = _flow.get(&"biome")
+	for room in map.rooms():
+		if (biome.call(&"room_rect", room) as Rect2).has_point(at):
+			return room
+	return 0
 
 
 ## The crowd shared out over the rooms the wizards stand in, each on clear ground.

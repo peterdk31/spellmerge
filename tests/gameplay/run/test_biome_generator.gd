@@ -522,8 +522,15 @@ func test_the_rule_check_names_what_a_map_breaks() -> void:
 		map.work_out_depths(), "a way to the boss passes 0 fights")
 	_breaks(made, rules, func(map: BiomeMap) -> void:
 		map.add_bridge(MadeUpBiome.BRIDGE_ACROSS, Vector2.ZERO, 0, boss - 1, 0, boss, 0)
-		map.work_out_depths(), "is a dead end, but 2 bridges reach it")
+		map.work_out_depths(), "is a dead end, but 2 joins reach it")
 	var secret: int = made.room_kinds.find(&"secret")
+	# The owner's secret ways (2026-11-20): a rune is a join as a bridge is, and only into a secret room.
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.add_rune(0, secret)
+		map.work_out_depths(), "'secret' is a dead end, but 2 joins reach it")
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.add_rune(0, fight)
+		map.work_out_depths(), "a rune leads only into a secret room")
 	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[secret] = &"boss", "rooms of 'boss'")
 	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[fight] = &"reward", "rooms of 'reward'")
 	# A reward room led to from the shop (`not_after`): the first bridge from the way's first room on.
@@ -701,7 +708,7 @@ func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
 		var left: int = BiomeGenerator.joins_left(map, rules, content, shapes)
 		if left > 0:
 			unsound.append("seed %d: %d pairs of doorways a walkway could join left unjoined" % [seed_value, left])
-		if map.style != &"loop" and map.bridges() >= map.rooms():
+		if map.style != &"loop" and map.bridges() + map.runes() >= map.rooms():
 			extra += 1
 		for bridge in map.bridges():
 			for end in 2:
@@ -762,7 +769,7 @@ func test_no_loop_or_extra_entrance_joins_a_secret_room() -> void:
 		for room in map.rooms():
 			if map.room_kinds[room] == &"secret":
 				secrets += 1
-				check_equal(_bridges_of(map, room), 1, "seed %d: secret room %d has its one bridge" % [seed_value, room])
+				check_equal(map.joins_of(room), 1, "seed %d: secret room %d has its one join (a bridge, a seam or a rune)" % [seed_value, room])
 	check(secrets > 0, "secret rooms were placed: %d" % secrets)
 	# A secret line that is no dead end is named by the validator, never made.
 	var rules := (crypt.biomes[0] as MapRules).duplicate(true) as MapRules
@@ -838,3 +845,133 @@ func test_each_reward_room_is_given_its_type_from_the_seed() -> void:
 					check_equal(content.cards.kind_of(type.element), RewardType.ELEMENT_KIND, "its element is an element card")
 			seen[",".join(type.to_row())] = true
 	check(seen.size() >= 3, "the seeds give the reward room different types: %s" % [seen.keys()])
+
+
+## The owner, 2026-11-20: a secret room is reached by a hidden bridge, wall to wall or by a secret
+## rune, the three mixed in a biome, each room's way rolled as the biome is made (the crypt's weights
+## even). Over a sweep of the crypt's seeds every map is sound (every rule, no doorway left unjoined),
+## each way is played, a wall-to-wall secret room's rectangle touches the room it hangs off and is
+## joined by a seam alone, a rune's has no bridge at all, every secret room has its one join; the same
+## seed gives the same ways; and rules weighing only the bridge give the hidden bridge every time.
+func test_the_crypt_s_secret_rooms_take_every_way() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var rules: MapRules = crypt.biomes[0]
+	check_equal(rules.secret_way_weights(), PackedFloat32Array([1.0, 1.0, 1.0]), "the crypt weighs the three ways evenly")
+	check(not rules.biome_seams(content, shapes).is_empty(), "the crypt has seams")
+	for walkway: RoomBase in rules.biome_walkways(content, shapes):
+		check(not walkway.seam, "a seam is never a bridge across the void: %s" % walkway.id)
+	var ways := PackedInt32Array([0, 0, 0])
+	var unsound := PackedStringArray()
+	for seed_value in range(1, 61):
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		if not map.is_made():
+			unsound.append("seed %d: no map: %s" % [seed_value, "; ".join(map.not_made)])
+			continue
+		for line: String in map.problems(shapes) + BiomeGenerator.rule_problems(map, rules, content, shapes):
+			unsound.append("seed %d: %s" % [seed_value, line])
+		if BiomeGenerator.joins_left(map, rules, content, shapes) > 0:
+			unsound.append("seed %d: doorways a walkway could join left unjoined" % seed_value)
+		for room in map.rooms():
+			if map.room_kinds[room] != &"secret":
+				continue
+			if map.joins_of(room) != 1:
+				unsound.append("seed %d: secret room %d has %d joins" % [seed_value, room, map.joins_of(room)])
+				continue
+			var way: int = _secret_way(map, room, shapes)
+			ways[way] += 1
+			if way == MapRules.SECRET_WALL:
+				var bridge: int = _bridge_to(map, room)
+				var other: int = map.end_room(bridge, 0) if map.end_room(bridge, 1) == room else map.end_room(bridge, 1)
+				var a: Rect2 = map.room_shape(room, shapes).rect_at(map.room_places[room])
+				var b: Rect2 = map.room_shape(other, shapes).rect_at(map.room_places[other])
+				if a.intersects(b) or not a.grow(1.0).intersects(b):
+					unsound.append("seed %d: wall-to-wall secret room %d does not touch room %d (%s, %s)" % [seed_value, room, other, a, b])
+			elif way == MapRules.SECRET_RUNE and _bridge_to(map, room) >= 0:
+				unsound.append("seed %d: a rune's secret room %d has a bridge" % [seed_value, room])
+		var again: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		if not again.same_as(map):
+			unsound.append("seed %d: made twice, two maps" % seed_value)
+	print("secret ways over crypt seeds 1 to 60 (a hidden bridge, wall to wall, a rune): %s" % ways)
+	check_equal(unsound, PackedStringArray(), "every map sound, every secret room reached its one way")
+	for way in MapRules.SECRET_WAYS:
+		check(ways[way] >= 5, "way %d (a hidden bridge, wall to wall, a rune) played in the sweep: %s" % [way, ways])
+	# The hidden bridge alone: no seam, no rune.
+	var only_bridges := crypt.copied()
+	only_bridges.biomes[0].secret_ways = PackedFloat32Array([1.0, 0.0, 0.0])
+	for seed_value in range(1, 13):
+		var map: BiomeMap = BiomeGenerator.generate(only_bridges, content, shapes, _sim(seed_value))
+		check_equal(map.runes(), 0, "seed %d: the bridge alone: no rune" % seed_value)
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret":
+				check_equal(_secret_way(map, room, shapes), MapRules.SECRET_BRIDGE, "seed %d: the bridge alone: secret room %d by a bridge" % [seed_value, room])
+	# A way weighed 0 is never taken, not even to fall back on (the review's): wall to wall alone
+	# never gives a bridge or a rune, however often the wall finds no place (then another attempt).
+	var only_walls := crypt.copied()
+	only_walls.biomes[0].secret_ways = PackedFloat32Array([0.0, 1.0, 0.0])
+	var walls: int = 0
+	for seed_value in range(1, 25):
+		var map: BiomeMap = BiomeGenerator.generate(only_walls, content, shapes, _sim(seed_value))
+		if not map.is_made():
+			continue
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret":
+				check_equal(_secret_way(map, room, shapes), MapRules.SECRET_WALL, "seed %d: wall to wall alone: secret room %d against a wall" % [seed_value, room])
+				walls += 1
+	check(walls > 0, "wall-to-wall rooms placed: %d" % walls)
+
+
+## How secret room `room` of `map` is reached (`MapRules.SECRET_*`).
+func _secret_way(map: BiomeMap, room: int, shapes: Dictionary) -> int:
+	if map.rune_to(room) >= 0:
+		return MapRules.SECRET_RUNE
+	var bridge: int = _bridge_to(map, room)
+	return MapRules.SECRET_WALL if bridge >= 0 and (shapes[map.bridge_templates[bridge]] as PieceShape).seam else MapRules.SECRET_BRIDGE
+
+
+func _bridge_to(map: BiomeMap, room: int) -> int:
+	for bridge in map.bridges():
+		if map.end_room(bridge, 0) == room or map.end_room(bridge, 1) == room:
+			return bridge
+	return -1
+
+
+## The owner, 2026-11-20 (on #895): more rooms with more than one way in. The crypt's styles with no
+## loop pull lean toward placements that leave doorways for the extra entrances (`MapStyle.
+## entrance_pull`); over crypt seeds 1 to 200 the maps with an extra entrance and the bridges past a
+## tree are more than with no lean, every map still keeping every rule (the sweep's own checks).
+func test_the_styles_lean_toward_extra_entrances() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var leans: int = 0
+	for style: MapStyle in crypt.biomes[0].styles:
+		if style.loop_pull <= 0.0:
+			check(style.entrance_pull > 0.0, "the crypt's %s style leans toward extra entrances" % style.id)
+			leans += 1
+	check(leans >= 3, "the crypt's styles that close no loop lean")
+	var flat := crypt.copied()
+	for style: MapStyle in flat.biomes[0].styles:
+		style.entrance_pull = 0.0
+	var counts: Array = []
+	for definition: RunDefinition in [flat, crypt]:
+		var maps: int = 0
+		var extra: int = 0
+		var unsound: int = 0
+		for seed_value in range(1, 201):
+			var map: BiomeMap = BiomeGenerator.generate(definition, content, shapes, _sim(seed_value))
+			if not map.is_made() or not BiomeGenerator.rule_problems(map, definition.biomes[0], content, shapes).is_empty():
+				unsound += 1
+				continue
+			var past_tree: int = map.bridges() + map.runes() - (map.rooms() - 1)
+			extra += past_tree
+			maps += 1 if past_tree > 0 else 0
+		check_equal(unsound, 0, "every map made and sound")
+		counts.append([extra, maps])
+	print("bridges past a tree over crypt seeds 1 to 200 (bridges, maps): no lean %s, the crypt's lean %s" % [counts[0], counts[1]])
+	check(counts[1][0] > counts[0][0] and counts[1][1] > counts[0][1], "more extra bridges, in more maps, with the lean: %s against %s" % [counts[1], counts[0]])

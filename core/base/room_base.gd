@@ -30,6 +30,11 @@ extends Resource
 ## template that spans the dark between two rooms' sockets in a biome (a bridge), its own sockets
 ## (`RoomSocket`) on its edge at its ends. It hosts no room kind and is no room of a run's map.
 @export var walkway: bool = false
+## True for a seam (the owner, 2026-11-20: a secret room may stand "wall to wall" with another room,
+## no bridge): a walkway only as long as the two rooms' dark margins, laid only where a secret room
+## stands against another room's wall, the short doorway breaking the cracked wall opens. Never a
+## bridge across the void (`MapRules.biome_walkways` leaves it out; `biome_seams` lists it).
+@export var seam: bool = false
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
 ## teammate's revive or the restart. In such a room everyone down starts no restart.

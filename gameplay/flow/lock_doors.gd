@@ -12,6 +12,11 @@ extends RefCounted
 ##   rock stands in that room's doorway and nobody walks out onto a bridge not drawn). A door is shut
 ##   (`RoomGrid.shut_mouth`: a wall to everything) until the room opens; then all its doors open, for
 ##   everyone (decision 21: a key door opens for all).
+## - **A secret room reached by a rune** (the owner, 2026-11-20; `BiomeMap.add_rune`) has no mouth:
+##   its door is its rune (`is_rune_door`, `door_bridges` NONE and `door_ends` the rune's number), its
+##   rock the hidden rune's square in the room the rune is in (`lay`'s `rune_rocks`, Flow's
+##   `SecretRunes`), broken as any rock by its element. The view hears it from `SecretRunes`, never
+##   as a rock. A secret room against another's wall (a seam) is a bridge's secret room as any.
 ## - **Keys** (decision 21, as the owner changed it on 2026-11-19: "Multiple treasures can be in each
 ##   biome. But there should not necessarily be a key for each treasure room available"): a key is
 ##   no room's own. Any key opens any key door and is spent by it, and the party chooses which doors
@@ -74,7 +79,8 @@ var events: EventsScript = null
 var rules: PackedByteArray = PackedByteArray()
 var opened: PackedByteArray = PackedByteArray()
 var elements: Array[StringName] = []
-## Each door: the room it leads into, and the bridge (and which end of it) whose mouth it is.
+## Each door: the room it leads into, and the bridge (and which end of it) whose mouth it is; a rune's
+## door: NONE and the rune's number.
 var door_rooms: PackedInt32Array = PackedInt32Array()
 var door_bridges: PackedInt32Array = PackedInt32Array()
 var door_ends: PackedInt32Array = PackedInt32Array()
@@ -132,6 +138,12 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 				# A key room with more than one bridge: its key drops in the shallowest room beside it,
 				# the one on the way to it.
 				key_drops[at_key] = other
+	for rune in map.runes():
+		var secret: int = map.rune_room(rune, 1)
+		if secret >= 0 and secret < count and rules[secret] == RULE_SECRET:
+			door_rooms.append(secret)
+			door_bridges.append(NONE)
+			door_ends.append(rune)
 	for room: int in drops:
 		if room >= 0 and room < count:
 			key_drops.append(room)
@@ -154,17 +166,13 @@ static func open_rooms(map: BiomeMap, room_rules: PackedByteArray) -> PackedInt3
 	var queue: Array[int] = [0]
 	while not queue.is_empty():
 		var room: int = queue.pop_front()
-		for bridge in map.bridges():
-			for end in 2:
-				if map.end_room(bridge, end) != room:
-					continue
-				var other: int = map.end_room(bridge, 1 - end)
-				if other < 0 or other >= reached.size() or reached[other] != 0:
-					continue
-				if other < room_rules.size() and room_rules[other] != RULE_NONE:
-					continue
-				reached[other] = 1
-				queue.append(other)
+		for other: int in map.neighbours(room):
+			if other < 0 or other >= reached.size() or reached[other] != 0:
+				continue
+			if other < room_rules.size() and room_rules[other] != RULE_NONE:
+				continue
+			reached[other] = 1
+			queue.append(other)
 	for room in reached.size():
 		if reached[room] != 0:
 			out.append(room)
@@ -213,7 +221,12 @@ func element_of(room: int) -> StringName:
 	return elements[room] if rule_of(room) == RULE_SECRET else &""
 
 
-## The world rectangle of door `door`'s mouth (laid by `lay`; empty before).
+## True when door `door` is a rune's (no mouth: its rock the hidden rune's square).
+func is_rune_door(door: int) -> bool:
+	return door >= 0 and door < door_bridges.size() and door_bridges[door] == NONE
+
+
+## The world rectangle of door `door`'s mouth (laid by `lay`; empty before, and for a rune's).
 func mouth_of(door: int) -> Rect2:
 	return _mouths[door] if door >= 0 and door < _mouths.size() else Rect2()
 
@@ -232,18 +245,24 @@ static func keys_of(body: Actor) -> int:
 
 
 ## Lay the doors into `grid` from the biome laid in `world` (as the biome starts, and after a restore:
-## the grid's layers are not state): each door's mouth found, shut while its room is not open.
-func lay(world: BiomeWorld, grid: RoomGrid) -> void:
+## the grid's layers are not state): each door's mouth found, shut while its room is not open; a
+## rune's door its rock from `rune_rocks` (by rune: the hidden rune's square, `SecretRunes.rocks`).
+func lay(world: BiomeWorld, grid: RoomGrid, rune_rocks: Array[Rect2] = []) -> void:
 	_mouths.clear()
 	_rocks.clear()
 	for door in doors():
+		if is_rune_door(door):
+			_mouths.append(Rect2())
+			_rocks.append(rune_rocks[door_ends[door]] if door_ends[door] < rune_rocks.size() else Rect2())
+			continue
 		_mouths.append(world.mouth_rect(door_bridges[door], door_ends[door]) if world != null else Rect2())
 		var secret: bool = rules[door_rooms[door]] == RULE_SECRET
 		_rocks.append(world.doorway_rect(door_bridges[door], door_ends[door]) if world != null and secret else _mouths[door])
 	if grid == null:
 		return
 	for door in doors():
-		grid.shut_mouth(_mouths[door], not is_open(door_rooms[door]))
+		if not is_rune_door(door):
+			grid.shut_mouth(_mouths[door], not is_open(door_rooms[door]))
 
 
 ## Room `room` was cleared: each key still waiting to drop there lies at the next of `spots` (Flow
@@ -342,6 +361,8 @@ func touched(element: StringName, at: Vector2, radius: float, grid: RoomGrid) ->
 		if rules[room] != RULE_SECRET or is_open(room) or elements[room] != element:
 			continue
 		var rock: Rect2 = rock_of(door)
+		if not rock.has_area():
+			continue
 		var nearest := Vector2(clampf(at.x, rock.position.x, rock.end.x), clampf(at.y, rock.position.y, rock.end.y))
 		var reach: float = maxf(radius, 0.0) + TOUCH_REACH
 		if nearest.distance_squared_to(at) <= reach * reach:
@@ -359,7 +380,7 @@ func open(room: int, grid: RoomGrid) -> void:
 	for door in doors():
 		if door_rooms[door] != room:
 			continue
-		if grid != null:
+		if grid != null and not is_rune_door(door):
 			grid.shut_mouth(mouth_of(door), false)
 		_tell_door(door)
 	_tell_opened(false)
@@ -387,11 +408,12 @@ func _tell_opened(again: bool) -> void:
 		events.rooms_opened.emit(opened.duplicate(), again)
 
 
-## The view's number of door `door`: key doors and secret rocks are each counted on their own.
+## The view's number of door `door`: key doors and secret rocks are each counted on their own (a
+## rune's door is no rock: `SecretRunes` tells it).
 func _view_number(door: int) -> int:
 	var number: int = 0
 	for other in door:
-		if rules[door_rooms[other]] == rules[door_rooms[door]]:
+		if rules[door_rooms[other]] == rules[door_rooms[door]] and not is_rune_door(other):
 			number += 1
 	return number
 
@@ -402,7 +424,7 @@ func _tell_door(door: int) -> void:
 	var room: int = door_rooms[door]
 	if rules[room] == RULE_KEY:
 		events.key_door_shown.emit(_view_number(door), mouth_of(door), is_open(room))
-	elif rules[room] == RULE_SECRET:
+	elif rules[room] == RULE_SECRET and not is_rune_door(door):
 		events.secret_rock_shown.emit(_view_number(door), rock_of(door), elements[room], is_open(room))
 
 

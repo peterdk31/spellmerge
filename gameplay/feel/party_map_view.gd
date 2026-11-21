@@ -33,7 +33,9 @@ extends CanvasLayer
 ## (none, shadow, base, light; a room only shown stops at its shadow, a bridge at its base; a sensed
 ## secret room through the stone's shadow, the void's shadow and the void's base), a room
 ## entered climbs from its shadow to its light, and a symbol rises in by rows, each a step a frame at
-## FPS; with every map shut they are drawn as they stand. A frame whose size or scale must change (the
+## FPS; and a piece's shape comes in by IN_STAGES too (the owner, 2026-11-20: a room only known through
+## a bridge never pops in): a quarter of its pixels, then half (keeping the quarter), then all, a stage
+## a frame beside its shades; with every map shut they are drawn as they stand. A frame whose size or scale must change (the
 ## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
 ## pixels; nothing fades.
 ##
@@ -92,6 +94,10 @@ var input: InputManagerScript = null
 ## MAP_CELL), whether it is a room, a walkway's two rooms (-1: none), a room's symbol and its shades.
 var _rects: Array[Rect2] = []
 var _floors: Array[ImageTexture] = []
+## By place, its floor thinned to each stage before whole (`thinned`: IN_STAGES - 1 of them), and the
+## stage its shape is drawn at (0 none ... IN_STAGES whole).
+var _floors_in: Array = []
+var _in: PackedInt32Array = PackedInt32Array()
 var _room: PackedByteArray = PackedByteArray()
 var _ends: PackedInt32Array = PackedInt32Array()
 var _symbols: Array[PackedByteArray] = []
@@ -160,6 +166,8 @@ var _stone: PackedColorArray = Palette.shades_of(&"stone")
 ## A sensed secret room's stages, coming in: as a room only shown (the stone's shadow), then the
 ## void's shadow, then its faint light (the void's base; the owner, 2026-11-19).
 const SENSED_STAGES: int = 3
+## The stages a piece's shape comes in by on an open map: a quarter of its pixels, half, all.
+const IN_STAGES: int = 3
 var _sensed_shades: PackedColorArray = PackedColorArray([Palette.shades_of(&"stone")[0], Palette.shades_of(&"void")[0], Palette.shades_of(&"void")[1]])
 
 
@@ -328,12 +336,17 @@ func places() -> int:
 ## True when the map draws place `place` now: a room seen, or led to by a bridge drawn (in the shown
 ## room's shadow); a bridge with a seen room at one end and a room the map may draw at the other. So
 ## no bridge on the map ends in the dark (the owner, 2026-11-20: "There should be no dead ends!"): a
-## secret room not yet found is never drawn for its bridge, and so neither is its bridge.
+## secret room not yet found is never drawn for its bridge, and so neither is its bridge. A secret
+## room is drawn only once found, whichever way it is reached (the owner, 2026-11-20): never for being
+## shown on the party's map (`map_reveal`), and a found one reached by a rune, with no bridge to draw
+## it for, in the shown room's shadow.
 func draws(place: int) -> bool:
 	if place < 0 or place >= _rects.size():
 		return false
 	if _room[place] == 0:
 		return _bridge_drawn(place)
+	if _secret[place] != 0:
+		return _level(place) >= ENTERED or (pieces != null and pieces.is_opened(place))
 	if _level(place) >= SHOWN:
 		return true
 	if not _may_draw(place):
@@ -355,11 +368,12 @@ func _secrets_found() -> int:
 	return count
 
 
-## True when bridge `bridge` is drawn: a seen room at one end, a room the map may draw at the other.
+## True when bridge `bridge` is drawn: a seen room at one end, and both its rooms ones the map may
+## draw (a secret room only once found, however it was seen).
 func _bridge_drawn(bridge: int) -> bool:
 	var a: int = _ends[bridge * 2]
 	var b: int = _ends[bridge * 2 + 1]
-	return (_level(a) >= SHOWN and _may_draw(b)) or (_level(b) >= SHOWN and _may_draw(a))
+	return (_level(a) >= SHOWN or _level(b) >= SHOWN) and _may_draw(a) and _may_draw(b)
 
 
 ## True when room `room` may be drawn for a bridge leading to it: seen, or no secret room still
@@ -367,9 +381,10 @@ func _bridge_drawn(bridge: int) -> bool:
 func _may_draw(room: int) -> bool:
 	if room < 0 or room >= _rects.size():
 		return false
-	if _level(room) >= SHOWN or _secret[room] == 0:
+	if _secret[room] == 0:
 		return true
-	return pieces != null and pieces.is_opened(room)
+	# A secret room only once found, as `draws` (shown by `map_reveal` is not found).
+	return _level(room) >= ENTERED or (pieces != null and pieces.is_opened(room))
 
 
 ## True when the map draws room `place`'s symbol now (seen, or led to by a drawn bridge).
@@ -379,6 +394,9 @@ func draws_symbol(place: int) -> bool:
 	if _secret[place] != 0 and (pieces == null or not pieces.is_opened(place)):
 		# A secret room's symbol only once it is discovered (its rock broken; the owner, #888).
 		return false
+	if _secret[place] != 0:
+		# Found: drawn with its room, however it is reached (a rune's has no bridge to draw it for).
+		return true
 	if _level(place) >= SHOWN:
 		return true
 	for other in _rects.size():
@@ -446,7 +464,7 @@ func is_moving() -> bool:
 			return true
 	if _any_open():
 		for place in _shade.size():
-			if _shade[place] != _shade_wanted(place) or _symbol_rows[place] != _rows_wanted(place) or _done[place] != _done_wanted(place):
+			if _shade[place] != _shade_wanted(place) or _in[place] != _in_wanted(place) or _symbol_rows[place] != _rows_wanted(place) or _done[place] != _done_wanted(place):
 				return true
 		for at in _sense_shade.size():
 			if _sense_shade[at] != _sense_wanted(at):
@@ -465,6 +483,7 @@ func advance() -> void:
 		_pick_stage[seat] += signi(_pick_wanted(seat) - _pick_stage[seat])
 	for place in _shade.size():
 		_shade[place] += signi(_shade_wanted(place) - _shade[place])
+		_in[place] += signi(_in_wanted(place) - _in[place])
 		_symbol_rows[place] += signi(_rows_wanted(place) - _symbol_rows[place])
 		_done[place] += signi(_done_wanted(place) - _done[place])
 	for at in _sense_shade.size():
@@ -507,6 +526,11 @@ func _shade_wanted(place: int) -> int:
 	return 3 if _level(place) >= ENTERED else 1
 
 
+## Whole once the party's map draws it (its sense alone draws a secret room whole, in its own shades).
+func _in_wanted(place: int) -> int:
+	return IN_STAGES if draws(place) else 0
+
+
 func _rows_wanted(place: int) -> int:
 	return RoomKind.SYMBOL_SIDE if draws_symbol(place) else 0
 
@@ -528,6 +552,7 @@ func _any_open() -> bool:
 func _settle() -> void:
 	for place in _shade.size():
 		_shade[place] = _shade_wanted(place)
+		_in[place] = _in_wanted(place)
 		_symbol_rows[place] = _rows_wanted(place)
 		_done[place] = _done_wanted(place)
 	for at in _sense_shade.size():
@@ -660,6 +685,9 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 		var colour: Color = drawn_colour(seat, place)
 		var at: Vector2 = origin + ((_rects[place].position - _area.position) / MAP_CELL).floor() * scale
 		var texture: ImageTexture = _floors[place]
+		var stage: int = _in[place]
+		if _shade[place] > 0 and stage > 0 and stage < IN_STAGES and texture != null:
+			texture = (_floors_in[stage - 1] as Array)[place] as ImageTexture
 		if texture != null:
 			canvas.draw_texture_rect(texture, Rect2(at, texture.get_size() * scale), false, colour)
 	for place in _rects.size():
@@ -719,6 +747,10 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_laid_world = world_now
 	_rects.clear()
 	_floors.clear()
+	_floors_in.clear()
+	for stage in IN_STAGES - 1:
+		_floors_in.append([])
+	_in.resize(places)
 	_symbols.clear()
 	_symbol_shades.clear()
 	_glyphs.clear()
@@ -743,6 +775,8 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_area = rect if place == 0 else _area.merge(rect)
 		_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
 		_floors.append(floor_of(grid, place))
+		for stage in IN_STAGES - 1:
+			(_floors_in[stage] as Array).append(thinned(_floors[place], stage + 1))
 		var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
 		_secret[place] = 1 if KindSymbolScript.hidden_until_opened(kind) else 0
 		_tells_done[place] = 1 if KindSymbolScript.shows_done(kind) else 0
@@ -781,6 +815,26 @@ static func glyphs_corner(middle: Vector2, count: int, scale: int) -> Vector2:
 
 ## Place `place`'s floor on `grid` as a white mask, a pixel a MAP_CELL square (open ground of the
 ## place: no wall, no hole), or null when it has none.
+## `texture` (a floor, `floor_of`) at coming-in stage `stage` (1 to IN_STAGES - 1): stage 1 only its
+## pixels at even columns of even rows (a quarter), stage 2 those whose column and row add up even
+## (half, the quarter among them). Null for none.
+static func thinned(texture: ImageTexture, stage: int) -> ImageTexture:
+	if texture == null:
+		return null
+	var image: Image = texture.get_image()
+	for y in image.get_height():
+		for x in image.get_width():
+			var kept: bool = (x % 2 == 0 and y % 2 == 0) if stage <= 1 else (x + y) % 2 == 0
+			if not kept:
+				image.set_pixel(x, y, Color.TRANSPARENT)
+	return ImageTexture.create_from_image(image)
+
+
+## The stage place `place`'s shape is drawn at (0 none ... IN_STAGES whole; for tests).
+func in_stage_of(place: int) -> int:
+	return _in[place] if place >= 0 and place < _in.size() else 0
+
+
 static func floor_of(grid: RoomGrid, place: int) -> ImageTexture:
 	var rect: Rect2 = grid.place_rect(place)
 	var w: int = ceili(rect.size.x / MAP_CELL)

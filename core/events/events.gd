@@ -635,6 +635,13 @@ signal key_door_shown(door: int, area: Rect2, open: bool)
 ## empty): every secret rock forgotten (as `key_door_shown`'s -1). For the view only. Heard by feel
 ## (its crack's tint, brightening as its element touches near it, and its breaking in stages).
 signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bool)
+## Sender: flow (the owner, 2026-11-20: a secret room reached by a secret rune). In a biome: rune
+## `rune` (by number), its hidden rune at `at` and the rune leading back in its secret room at
+## `back_at` (world pixels, each its middle), the `element` that finds it (as a secret rock's), `found`
+## once found (its room opened: it then teleports a wizard standing on it to the other). Sent as it
+## changes; rune -1 (the rest empty): every rune forgotten (as `secret_rock_shown`'s -1). For the view
+## only. Heard by feel (`rune_looks.gd`: a faint crack in its element's tint, drawn in as a rune once found).
+signal secret_rune_shown(rune: int, at: Vector2, back_at: Vector2, element: StringName, found: bool)
 ## Sender: flow (connected biomes CB11, decision 21). In a biome: key `key` (by number, one a key
 ## door) lies on the floor at `at` (`lying`), or does no more (taken into the bag of the body that
 ## reached it; the biome left). After a snapshot is restored, said again for every key (key -1 first: every key

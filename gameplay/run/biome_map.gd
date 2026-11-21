@@ -20,9 +20,17 @@ extends RefCounted
 ## room sockets it names at the same point, facing each other; no socket joined twice; no two rooms
 ## overlap, nor two bridges, and a bridge joins two rooms and overlaps only those; every mirroring
 ## one of the four; every room reached from the start room; and its depths worked out.
+##
+## **Runes** (the owner, 2026-11-20: a secret room may be reached by a secret rune, no bridge at all):
+## a rune joins two rooms with no piece between them, its host (end 0: the hidden rune in it, once
+## found, teleports a wizard to the other room) and the room it leads to (end 1: a rune there leads
+## back). A rune counts as a join wherever who joins whom is read (`neighbours`, `joins_of`: the
+## depths, the reach, a dead end's one join); only Flow's runes stand on it (`SecretRunes`).
 
 ## How many numbers a bridge's `bridge_ends` row holds: room a, its socket, room b, its socket.
 const END_FIELDS: int = 4
+## How many numbers a rune's `rune_ends` row holds: its host room, the room it leads to.
+const RUNE_FIELDS: int = 2
 
 ## The biome it is a map of (`MapRules.biome`).
 var biome: StringName = &""
@@ -42,6 +50,8 @@ var bridge_templates: Array[StringName] = []
 var bridge_places: PackedVector2Array = PackedVector2Array()
 var bridge_mirrors: PackedByteArray = PackedByteArray()
 var bridge_ends: PackedInt32Array = PackedInt32Array()
+## Its runes, RUNE_FIELDS numbers a rune: the room its hidden rune is in, then the room it leads to.
+var rune_ends: PackedInt32Array = PackedInt32Array()
 ## Each room's depth: the fewest bridges from room 0 (-1: not reached). Worked out by `work_out_depths`
 ## once the map is made, and kept with it.
 var depths: PackedInt32Array = PackedInt32Array()
@@ -101,6 +111,49 @@ func add_bridge(template: StringName, place: Vector2, mirror: int, room_a: int, 
 	bridge_mirrors.append(mirror)
 	bridge_ends.append_array(PackedInt32Array([room_a, socket_a, room_b, socket_b]))
 	return bridge_templates.size() - 1
+
+
+## A rune in room `host` leading to room `to` (and back): its number.
+func add_rune(host: int, to: int) -> int:
+	rune_ends.append_array(PackedInt32Array([host, to]))
+	return runes() - 1
+
+
+## How many runes it has.
+func runes() -> int:
+	return rune_ends.size() / RUNE_FIELDS
+
+
+## The room rune `rune`'s end `end` is in: 0 its host (the hidden rune), 1 the room it leads to.
+func rune_room(rune: int, end: int) -> int:
+	return rune_ends[rune * RUNE_FIELDS + end]
+
+
+## The rune leading to room `room` (-1: none).
+func rune_to(room: int) -> int:
+	for rune in runes():
+		if rune_room(rune, 1) == room:
+			return rune
+	return -1
+
+
+## The rooms joined to room `room`, by its bridges and then its runes, once for each join.
+func neighbours(room: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for bridge in bridges():
+		for end in 2:
+			if end_room(bridge, end) == room:
+				out.append(end_room(bridge, 1 - end))
+	for rune in runes():
+		for end in 2:
+			if rune_room(rune, end) == room:
+				out.append(rune_room(rune, 1 - end))
+	return out
+
+
+## How many joins (bridges and runes) reach room `room`.
+func joins_of(room: int) -> int:
+	return neighbours(room).size()
 
 
 ## True when it has rooms: a map made (else `not_made` says why).
@@ -180,19 +233,15 @@ func work_out_depths() -> void:
 	while head < queue.size():
 		var room: int = queue[head]
 		head += 1
-		for bridge in bridges():
-			for end in 2:
-				if end_room(bridge, end) != room:
-					continue
-				var other: int = end_room(bridge, 1 - end)
-				if other >= 0 and other < rooms() and depths[other] < 0:
-					depths[other] = depths[room] + 1
-					queue.append(other)
+		for other: int in neighbours(room):
+			if other >= 0 and other < rooms() and depths[other] < 0:
+				depths[other] = depths[room] + 1
+				queue.append(other)
 
 
 ## True when `other` is the same map, row for row.
 func same_as(other: BiomeMap) -> bool:
-	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_levels == other.room_levels and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_reward_items == other.room_reward_items and room_reward_card_kinds == other.room_reward_card_kinds and room_reward_elements == other.room_reward_elements and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
+	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_levels == other.room_levels and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_reward_items == other.room_reward_items and room_reward_card_kinds == other.room_reward_card_kinds and room_reward_elements == other.room_reward_elements and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and rune_ends == other.rune_ends and depths == other.depths
 
 
 ## A copy, row for row.
@@ -217,6 +266,7 @@ func copy() -> BiomeMap:
 	out.bridge_places = bridge_places.duplicate()
 	out.bridge_mirrors = bridge_mirrors.duplicate()
 	out.bridge_ends = bridge_ends.duplicate()
+	out.rune_ends = rune_ends.duplicate()
 	out.depths = depths.duplicate()
 	return out
 
@@ -316,6 +366,16 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 		for room in rooms():
 			if not ends.has(room) and rect.intersects(room_rects[room]):
 				found.append("%s overlaps room %d, which it does not join: move it." % [what, room])
+	if rune_ends.size() != runes() * RUNE_FIELDS:
+		found.append("the map's runes are not of one length: make them with add_rune.")
+		return found
+	for rune in runes():
+		var host: int = rune_room(rune, 0)
+		var to: int = rune_room(rune, 1)
+		if host < 0 or host >= rooms() or to < 0 or to >= rooms():
+			found.append("rune %d joins room %d to room %d, which are not both there." % [rune, host, to])
+		elif host == to:
+			found.append("rune %d joins room %d to itself: a rune joins two rooms." % [rune, host])
 	var reach: BiomeMap = copy()
 	reach.work_out_depths()
 	for room in rooms():

@@ -55,8 +55,9 @@ func level_of(room: int) -> int:
 	return seen[room] if room >= 0 and room < seen.size() else UNSEEN
 
 
-## Room `room` of `map` is entered: ENTERED, and every room within `reveal` bridges of it SHOWN if it
-## was not seen. True when anything changed.
+## Room `room` of `map` is entered: ENTERED, and every room within `reveal` joins (bridges and runes,
+## `BiomeMap.neighbours`) of it SHOWN if it was not seen (a secret room is still drawn only once
+## found: Feel's map). True when anything changed.
 func enter(room: int, map: BiomeMap) -> bool:
 	if room < 0 or room >= seen.size():
 		return false
@@ -75,16 +76,12 @@ func enter(room: int, map: BiomeMap) -> bool:
 		head += 1
 		if _distance[at] >= reveal:
 			continue
-		for bridge in map.bridges():
-			for end in 2:
-				if map.end_room(bridge, end) != at:
-					continue
-				var other: int = map.end_room(bridge, 1 - end)
-				if other < 0 or other >= seen.size() or _distance[other] >= 0:
-					continue
-				_distance[other] = _distance[at] + 1
-				_queue.append(other)
-				if seen[other] == UNSEEN:
-					seen[other] = SHOWN
-					changed = true
+		for other: int in map.neighbours(at):
+			if other < 0 or other >= seen.size() or _distance[other] >= 0:
+				continue
+			_distance[other] = _distance[at] + 1
+			_queue.append(other)
+			if seen[other] == UNSEEN:
+				seen[other] = SHOWN
+				changed = true
 	return changed

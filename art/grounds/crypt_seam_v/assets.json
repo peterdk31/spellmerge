@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "path": "art/grounds/crypt_seam_v/crypt_seam_v_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt seam (north to south)'s floor (the owner's secret ways, 2026-11-20), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/seams/crypt_seam_v/crypt_seam_v.shape.json: a 64 px band of the crypt rooms' own flagstones running north to south, 64 px long, the doorway between two rooms standing wall to wall (content/grounds/flagstone), its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/crypt_seam_v/crypt_seam_v_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt seam (north to south)'s underside, drawn by tools/ground_shape.py from content/rooms/crypt/seams/crypt_seam_v/crypt_seam_v.shape.json: the rock of the doorway hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/crypt_seam_v/crypt_seam_v_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt seam (north to south)'s edge glow, drawn at half size by tools/ground_shape.py from content/rooms/crypt/seams/crypt_seam_v/crypt_seam_v.shape.json: the crypt edge's faint glow along the doorway's sides, added over what lies below it."
+    }
+  ]
+}

@@ -58,7 +58,7 @@ static func may_go(wizard: Actor, driven: Node2D, life: RoomLife, map: BiomeMap)
 	if place < 0:
 		return false
 	if place < life.rooms():
-		return not _fighting(place, life) and not life.has(place, RoomLife.SEALED)
+		return calm(place, life)
 	var bridge: int = place - life.rooms()
 	if bridge >= map.bridges():
 		return false
@@ -105,14 +105,26 @@ func tell(wizard_of: Callable, driven: Array[Node2D], biome: BiomeWorld, life: R
 func go(seat: int, wizard: Actor, driven: Node2D, life: RoomLife, map: BiomeMap, room: int, at: Vector2) -> bool:
 	if room < 0 or room >= 63 or rooms_for(wizard, driven, life, map) & (1 << room) == 0:
 		return false
+	arrive(seat, wizard, at, events)
+	return true
+
+
+## Seat `seat`'s `wizard` put at `at` and materializing there (`Actor.spawn` for ARRIVE_SECONDS in
+## ARRIVE_STYLE), `bus` (the events, or null) told where it left (`wizard_teleported`): a teleport's
+## arrival, from the map or a secret rune (`SecretRunes`).
+static func arrive(seat: int, wizard: Actor, at: Vector2, bus: Node) -> void:
 	var from: Vector2 = wizard.position
 	wizard.position = at
 	wizard.velocity = Vector2.ZERO
 	wizard.find_room()
 	wizard.spawn(ARRIVE_SECONDS, ARRIVE_STYLE)
-	if events != null:
-		events.wizard_teleported.emit(seat, from, at)
-	return true
+	if bus != null:
+		bus.wizard_teleported.emit(seat, from, at)
+
+
+## True when room `room` has no fight under way and is not sealed (a teleport may leave it).
+static func calm(room: int, life: RoomLife) -> bool:
+	return not _fighting(room, life) and not life.has(room, RoomLife.SEALED)
 
 
 ## Where a wizard teleported into a room of rectangle `rect` and places `places` stands: the room's

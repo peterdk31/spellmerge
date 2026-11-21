@@ -75,6 +75,27 @@ func test_the_look_picks_the_eye_column_and_the_style_its_row() -> void:
 		check_equal(face.eyes_frame(), Vector2i(case[1], Face.Style.STERN), "aiming %s" % str(case[0]))
 
 
+## The performance pass (2026-11-21): the eyes and the brows are drawn from one texture, the two
+## shared sheets copied onto one page, so a face's two layers are one draw call.
+func test_a_faces_two_layers_are_drawn_from_one_page_of_the_sheets_own_pixels() -> void:
+	var face := _face(_wearer(Face.Style.STERN))
+	var layers: Array[AtlasTexture] = []
+	for child in face.get_children():
+		if child is Sprite2D:
+			layers.append((child as Sprite2D).texture as AtlasTexture)
+	check_equal(layers.size(), 2, "two layers, each a region of a page")
+	if layers.size() != 2 or layers[0] == null or layers[1] == null:
+		return
+	check(layers[0].atlas == layers[1].atlas, "both on one page")
+	var page: Image = Face.shared_page()
+	for pair: Array in [[layers[0], Face.EYES_SHEET], [layers[1], Face.BROWS_SHEET]]:
+		var region: AtlasTexture = pair[0]
+		var sheet: Image = (pair[1] as Texture2D).get_image()
+		sheet.convert(Image.FORMAT_RGBA8)
+		check_equal(region.get_size(), Vector2(sheet.get_size()), "the region its sheet's size")
+		check(page.get_region(Rect2i(region.region)).get_data() == sheet.get_data(), "the region its sheet's own pixels")
+
+
 func test_the_resting_mood_shows_and_neutral_is_the_personalitys() -> void:
 	var sergeant := _wearer(Face.Style.STERN, Face.Mood.ANGRY)
 	var optimist := _wearer(Face.Style.CHEER)

@@ -1221,7 +1221,7 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_unseen.step(real_delta, grid)
 		# An unvisited room is the void (the owner, 2026-11-21): the void's motes drift over its dark.
 		if _spectacle != null:
-			_spectacle.set_void_covers(_unseen.void_covers())
+			_spectacle.set_void_covers(_unseen.void_covers(), _unseen.void_changes())
 	if _teleports != null:
 		_teleports.table = table
 		_teleports.step(real_delta)

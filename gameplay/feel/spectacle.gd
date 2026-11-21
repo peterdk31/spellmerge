@@ -23,6 +23,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MoteRegionsScript := preload("res://gameplay/feel/mote_regions.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
@@ -48,7 +49,8 @@ const KindAirScript := preload("res://gameplay/feel/kind_air.gd")
 const VOID_AIR: MoteSource = preload("res://gameplay/feel/presets/void_air.tres")
 const VOID_SHARE: float = 1.0 / 32.0
 const VOID_POOL_SHARE: float = 0.5
-## The void's own pool's fewest rows (a Minimal ring's share is 64 already).
+## The void's own pool's fewest rows (a Minimal ring's share is 128; this holds for a benchmark's
+## small pool).
 const VOID_POOL_LEAST: int = 64
 ## The void's motes draw over the dark of the unvisited rooms (`unseen_dark.gd`'s Z, 20), so they
 ## drift on over a room nobody has entered as over the void round it (the owner, 2026-11-21), and
@@ -139,9 +141,14 @@ var pool: MotesScript = null
 ## so the void's drift crosses a room nobody has entered as if it were not there, while the room's
 ## own motes (in `pool`, under the dark) stay hidden. Not lit only: it reads no light. Read only.
 var void_pool: MotesScript = null
-## The rectangles the dark covers whole (`set_void_covers`: `UnseenDark.void_covers`), where the void
-## gives its motes off too. Read only.
+## The rectangles the dark covers whole by place (`set_void_covers`: `UnseenDark.void_covers`; an
+## empty one for a place not covered), where the void gives its motes off too, and the count of their
+## writes. Read only.
 var void_covers: Array[Rect2] = []
+var _void_changes: int = 0
+## The void pool's regions' z laid for: the covers' writes and the regions' fits then (-1: not yet).
+var _void_z_changes: int = -1
+var _void_z_fits: int = -1
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
@@ -409,6 +416,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 			_void_stirred_version = stirs.version
 			stirs.hand_to(void_drawn)
 		void_pool.use_places(projectiles.grid() if projectiles != null else null)
+		_lay_void_z()
 		void_pool.step(now)
 	if marks != null:
 		marks.step(now)
@@ -1016,9 +1024,34 @@ static func void_cap_of(cap: int) -> int:
 
 
 ## The rectangles the dark of the unvisited rooms covers whole (`UnseenDark.void_covers`; the same
-## array each frame: nothing is made), where the void's motes are given off too.
-func set_void_covers(covers: Array[Rect2]) -> void:
+## array each frame: nothing is made), where the void's motes are given off too, and how many times
+## they were written (`UnseenDark.void_changes`).
+func set_void_covers(covers: Array[Rect2], changes: int) -> void:
 	void_covers = covers
+	_void_changes = changes
+
+
+## Each place's chunks of the void's pool drawn at VOID_MOTE_Z while the dark covers some of it (the
+## void's motes born there drift over the dark), else at MOTE_Z (under the dark: once a room's
+## reveal begins, the void's motes left over it go under its opening blocks, then are motes of the
+## room, under its telegraphs, spell-spectacle's "never over a telegraph"). The crossers (the void
+## between the slabs) stay at VOID_MOTE_Z. Laid again only when the covers change or the places are
+## read again.
+func _lay_void_z() -> void:
+	var regions: MoteRegionsScript = void_pool.regions
+	if _void_changes == _void_z_changes and regions.fits == _void_z_fits:
+		return
+	_void_z_changes = _void_changes
+	_void_z_fits = regions.fits
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	for place in regions.places:
+		var over: bool = false
+		var rect: Rect2 = grid.place_rect(place) if grid != null else Rect2()
+		for cover in void_covers:
+			if cover.has_area() and rect.intersects(cover):
+				over = true
+				break
+		regions.set_region_z(place + 1, VOID_MOTE_Z if over else MOTE_Z)
 
 
 ## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made

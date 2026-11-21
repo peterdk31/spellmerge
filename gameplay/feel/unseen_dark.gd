@@ -81,10 +81,12 @@ var _built_at: PackedInt32Array = PackedInt32Array()
 var _bands: Array[PackedInt32Array] = []
 ## The room hearing's `done_again` read last (a restore: drawn as it stands).
 var _read_again: int = 0
-## What it covers whole now, one rectangle a place (`void_covers`): the void shows there, so the
-## void's motes are given off and drawn over them too (the owner, 2026-11-21). The one array, kept and
-## written again only when a stage changes.
+## What it covers whole now, one rectangle a place (`void_covers`; none: an empty one): the void shows
+## there, so the void's motes are given off and drawn over them too (the owner, 2026-11-21). The one
+## array, sized with the places and written in place only when a stage changes; how many times it
+## was (`void_changes`).
 var _void_rects: Array[Rect2] = []
+var _void_changes: int = 0
 var _laid_places: int = -1
 var _laid_world: int = -1
 var _clock: float = 0.0
@@ -276,21 +278,26 @@ func _lay(grid: RoomGrid, places: int) -> void:
 	_changed()
 
 
-## The rectangles the dark covers whole now (each unvisited room's, each hidden secret room's
-## bridge's: `covered_of`), where an unseen room is the void itself: the spectacle gives the void's
-## motes off over them and draws them over the dark (`Spectacle.void_air`, `void_pool`). The same
-## array every call, written again when a stage changes; read only.
+## The rectangles the dark covers whole now, by place (each unvisited room's, each hidden secret
+## room's bridge's: `covered_of`; an empty one for a place it does not), where an unseen room is the
+## void itself: the spectacle gives the void's motes off over them and draws them over the dark
+## (`Spectacle.void_air`, `void_pool`). The same array every call, written in place when a stage
+## changes (`void_changes` counts the writes); read only.
 func void_covers() -> Array[Rect2]:
 	return _void_rects
 
 
-## A stage changed: drawn again, and what it covers whole read again.
+func void_changes() -> int:
+	return _void_changes
+
+
+## A stage changed: drawn again, and what it covers whole read again (in place: nothing is made).
 func _changed() -> void:
-	_void_rects.clear()
+	if _void_rects.size() != _rects.size():
+		_void_rects.resize(_rects.size())
 	for place in _rects.size():
-		var covered: Rect2 = covered_of(place)
-		if covered.has_area():
-			_void_rects.append(covered)
+		_void_rects[place] = covered_of(place)
+	_void_changes += 1
 	queue_redraw()
 
 

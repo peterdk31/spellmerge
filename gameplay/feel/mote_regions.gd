@@ -69,6 +69,9 @@ const PLACE_ASK: int = RoomGrid.WHOLE_ASK
 
 ## The places drawn by region (0: none, the ring's chunks draw). Read only.
 var places: int = 0
+## How many times the places were read (`fit` finding them changed): each region's z is the pool's
+## again then. Read only.
+var fits: int = 0
 ## Chunks taken from another region while every chunk was in use (for tests and the benchmarks).
 var stolen: int = 0
 ## The place squares (a copy of the grid's `whole_places`), how many across and down, their corner;
@@ -107,6 +110,8 @@ var _mesh: Mesh = null
 var _z: int = 0
 ## The ring's rows a chunk (the pool's CHUNK).
 var _ring_rows: int = 1
+## By region (0 the crossers): the z its chunks are drawn at (`set_region_z`; the pool's z by default).
+var _region_z: PackedInt32Array = PackedInt32Array()
 
 
 ## The regions of a ring of `cap` rows in chunks of `ring_rows`, their chunks under `parent`, drawn
@@ -189,6 +194,8 @@ func step(now: float) -> void:
 			continue
 		if _dirty[c] == 1:
 			_dirty[c] = 0
+			if node.z_index != _region_z[region]:
+				node.z_index = _region_z[region]
 			if _boxed[c] != region:
 				_boxed[c] = region
 				node.multimesh.custom_aabb = _box(region)
@@ -196,6 +203,23 @@ func step(now: float) -> void:
 			if node.multimesh.visible_instance_count != _fill[c]:
 				node.multimesh.visible_instance_count = _fill[c]
 			node.visible = true
+
+
+## Region `region`'s chunks drawn at `z` from now on (its chunks now at once; one taken later at its
+## next upload): the void's motes over a room nobody has entered drawn over its dark, under it once
+## its reveal begins (the spectacle's `void_pool`). A place's region is the place plus one.
+func set_region_z(region: int, z: int) -> void:
+	if region < 0 or region >= _region_z.size() or _region_z[region] == z:
+		return
+	_region_z[region] = z
+	for c in _nodes.size():
+		if _region[c] == region:
+			_nodes[c].z_index = z
+
+
+## The z region `region`'s chunks are drawn at (the pool's for none; for tests).
+func region_z(region: int) -> int:
+	return _region_z[region] if region >= 0 and region < _region_z.size() else _z
 
 
 ## Every chunk hidden and free, no row copied (the places gone, or changed).
@@ -320,6 +344,9 @@ func _take(grid: RoomGrid, count: int) -> void:
 		_origin = Vector2.ZERO
 	_open.resize(count + 1)
 	_open.fill(-1)
+	_region_z.resize(count + 1)
+	_region_z.fill(_z)
+	fits += 1
 	# A chunk's box is set again when next written (its region's number may name another place).
 	_boxed.fill(-1)
 

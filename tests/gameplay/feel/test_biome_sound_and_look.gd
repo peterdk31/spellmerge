@@ -497,7 +497,7 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	var room: Rect2 = _grid().place_rect(1)
 	check_equal(UnseenDarkScript.DARK, VoidBackdropScript.COLOUR, "the cover is the void's own colour")
 	var covers: Array[Rect2] = spectacle.get(&"void_covers")
-	check(covers == dark.void_covers(), "Feel hands the spectacle what the dark covers")
+	check(is_same(covers, dark.void_covers()), "Feel hands the spectacle what the dark covers (the one array)")
 	check(covers.has(room) and covers.has(_grid().place_rect(2)) and not covers.has(_grid().place_rect(0)), "the unvisited rooms, not the start room")
 	var void_pool: MotesScript = spectacle.get(&"void_pool") as MotesScript
 	var pool: MotesScript = spectacle.get(&"pool") as MotesScript
@@ -521,6 +521,7 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	check_equal(pool.next_row(), rows_before, "none into the motes' pool")
 	# Drawn by the room's own chunk of the void's pool (#892), none by the motes' pool's for it.
 	void_pool.use_places(_grid())
+	spectacle.call(&"_lay_void_z")
 	void_pool.step(now)
 	var in_room: int = 0
 	var newest: int = posmod(void_pool.next_row() - 1, void_pool.cap())
@@ -531,6 +532,7 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 			in_room += 1
 			check_equal(void_pool.regions.node_of(chunk).z_index, SpectacleScript.VOID_MOTE_Z, "its chunk is drawn over the dark")
 			break
+	check_equal(void_pool.regions.region_z(1), SpectacleScript.MOTE_Z, "the start room's chunks of the void's pool are drawn as motes")
 	check(in_room > 0, "the void's motes over the room are drawn by its chunk of the void's pool")
 	# Entered: the reveal begins, and from its first stage the room is the void no more.
 	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
@@ -538,6 +540,16 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	dark.step(0.0, _grid())
 	dark.advance()
 	check_equal(dark.stage_of(1), UnseenDarkScript.BLOCK_SIDES.size() - 2, "a stage into the reveal")
+	feel.call(&"_step_rooms", 0.0, 1)
+	spectacle.call(&"_lay_void_z")
+	check_equal(void_pool.regions.region_z(2), SpectacleScript.MOTE_Z, "the void's motes left over it go under its opening blocks, then under its telegraphs")
+	check_equal(void_pool.regions.region_z(3), SpectacleScript.VOID_MOTE_Z, "the court's stay over its dark")
+	var under: int = 0
+	for c in void_pool.regions.chunks_made():
+		if void_pool.regions.region_of_chunk(c) == 2:
+			under += 1
+			check_equal(void_pool.regions.node_of(c).z_index, SpectacleScript.MOTE_Z, "at once")
+	check(under > 0, "its chunk is there")
 	air.given = 0
 	for i in 200:
 		now += 0.1
@@ -549,6 +561,27 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 		dark.advance()
 		stages.append(dark.stage_of(1))
 	check_equal(stages, [2, 1, 0] as Array[int], "the reveal still opens a stage a frame")
+
+
+## The void's pool is made and freed with the motes' pool (the "Particles" setting's cap: VOID_SHARE of
+## it, twice over; none with no motes) and follows the particle amount and the split's share.
+func test_the_void_pool_follows_the_motes_settings() -> void:
+	_start(1)
+	var spectacle: Node = feel.call(&"spectacle")
+	var cap_before: int = spectacle.get(&"mote_cap")
+	var density_before: float = spectacle.get(&"mote_density")
+	var top: int = MoteCap.STOPS[-1]
+	spectacle.call(&"set_mote_cap", top)
+	var void_pool: MotesScript = spectacle.get(&"void_pool") as MotesScript
+	check(void_pool != null and void_pool.cap() == SpectacleScript.void_cap_of(top), "remade with the cap (%d)" % (void_pool.cap() if void_pool != null else -1))
+	check_equal(SpectacleScript.void_cap_of(top), ceili(float(top) / 16.0), "VOID_SHARE of the ring, twice over")
+	spectacle.call(&"set_mote_density", 0.5)
+	check_equal((spectacle.get(&"void_pool") as MotesScript).density, (spectacle.get(&"pool") as MotesScript).density, "the particle amount reaches it")
+	spectacle.call(&"use_motes", null)
+	check(spectacle.get(&"void_pool") == null, "no motes: no void pool")
+	spectacle.call(&"set_mote_density", density_before)
+	spectacle.call(&"set_mote_cap", cap_before)
+	check(spectacle.get(&"void_pool") != null, "made again with the motes")
 
 
 ## The equal split's blank quarter shows the void (the owner, 2026-11-20): the spectacle gives the

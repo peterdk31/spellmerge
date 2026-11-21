@@ -816,3 +816,14 @@ The owner decided on 2026-11-21 to move toward more detailed art (64 x 64 sprite
 - **The A/B and the switch:** `tests/benchmark/play_frames.gd` and `biome_frames.gd` take `--picture=1280x720` (the root's `content_scale_size`) and `--light-at-picture` (`SpellLight.fixed_resolution` false: the light at the picture's own resolution, as before).
 - **A room's mist out of every view is not stepped** (#900's measure: a biome's 14 mists stepped every frame, about 0.4 ms native): stepped again within 160 px of a view, its clock and stirs handed anew.
 - Tests: `tests/gameplay/feel/test_light_resolution.gd` (the scale; no pass at 640 x 360; the buffer's size, the passes, the factor rect and the readers' bindings at 1280 x 720 and back; the mist's twin, with its numbers, through a room in Feel, out of the tree and back; the copies' own pass; split boxes on the blocks' grid; the party camera's world), `test_mist.gd` (the shared include; the mist out of view not stepped). Screenshots: `tests/screenshots/shot_light_resolution.gd`.
+- **Measured** (`play_frames.gd` under xvfb on llvmpipe, 4 cores, the web's load where the row says so; medians of 3, frame / GPU ms; 2p and 4p at the desktop's load):
+
+  | scenario | 640 x 360 main | 1280 x 720 main | 1280 x 720 this | 640 x 360 this (1 run) |
+  | --- | --- | --- | --- | --- |
+  | 1p near web | 41.0 / 25.2 | 77.2 / 61.4 | 77.8 / 59.2 | 35.3 / 20.6 |
+  | 1p far web | 58.9 / 31.6 | 95.7 / 69.9 | 86.6 / 62.8 | 47.0 / 25.6 |
+  | 1p start web | 31.8 / 18.7 | 61.9 / 46.7 | 63.0 / 47.7 | 29.2 / 17.1 |
+  | 2p apart dynamic | 70.5 / 35.2 | 109.1 / 72.3 | 100.4 / 69.6 | 64.5 / 33.7 |
+  | 4p apart equal | 138.4 / 76.6 | 168.0 / 106.4 | 160.3 / 106.4 | 123.9 / 66.8 |
+
+  The draw calls and primitives do not change with the picture. By pass at 1280 x 720 (1p near web, `--off=`, medians of 2, GPU): the mist **18 → 10 ms**; the light with the mist 33 → 25 ms, so the light alone stays about 15 ms. On llvmpipe what is left of the light is the picture's own pixels: the screen copy the apply rect multiplies and its full-size rect, which no pass can make smaller (a multiply blend cannot brighten in an 8-bit target); the passes themselves take about 5 to 6 ms (`light passes` in the `gpu` line). On a GPU, where the per-pixel arithmetic (the rooms' tints, the bands, the mist's noise) weighs more against the fill, the gain should be larger; the owner's GPU and web runs are the measure. The mist skip (1p near web and start web, Feel's spectacle step, medians of 3): 2.54 → 2.07 ms and 2.33 → 1.99 ms.

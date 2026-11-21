@@ -1,11 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## Spell light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a, P3b): a
-## light buffer the projectile batches, Feel's flashes, the live beams and the room's light spots
-## draw into, and a rect that applies it to the world. Its batches mirror the manager's (each is
-## handed the rows the batch uploads; nothing is written twice), every shot lights (the enemies'
+## grid (grid lighting: gameplay/feel/light_grid.gd) the projectile batches' rows, Feel's flashes, the
+## live beams and the room's light spots light, and a rect that applies it to the world. It reads the
+## rows the manager's batches upload (nothing is written twice), every shot lights (the enemies'
 ## too), Feel hands its flash rows and beam paths over, a torch is a light spot coloured by its
 ## art, a room sets the ambient, the steps are a switch, the rect sits above every body and under
-## every spell, flash and telegraph, the buffer follows the view at a quarter of its size, the
+## every spell, flash and telegraph, the grid follows the view's part of the world, the
 ## shaders are warmed, and with the "Dynamic lighting" setting off no node of it exists. How it looks is
 ## checked by eye (tests/screenshots/shot_spell_light.gd): headless runs draw nothing.
 
@@ -17,6 +17,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -90,11 +91,12 @@ func _items(node: Node, into: Array[CanvasItem]) -> void:
 func test_the_setting_is_on_by_default_and_makes_the_light() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
+	var manager: ProjectilesScript = made[2]
 	check(SpellLightSetting.default_on(), "spell light is on by default on the desktop")
 	var light: SpellLightScript = feel.light()
 	check(light != null and feel.is_ancestor_of(light), "Feel makes the light (its spectacle)")
-	check(light.viewport != null and light.apply != null, "a light buffer and the rect that applies it")
-	check_equal(light.batches.size(), feel.projectiles.batch_count(), "one light batch per projectile batch, the card bodies' too")
+	check(light.grid != null and light.apply != null, "a light grid and the rect that applies it")
+	check(manager.light_rows_wanted, "the shots' rows are kept for it")
 
 
 func test_off_leaves_no_nodes_and_on_makes_them_again() -> void:
@@ -110,17 +112,16 @@ func test_off_leaves_no_nodes_and_on_makes_them_again() -> void:
 	for child: Node in feel.find_children("*", "SubViewport", true, false):
 		if not child.is_queued_for_deletion():
 			viewports += 1
-	check_equal(viewports, 0, "off: no light buffer under Feel")
+	check_equal(viewports, 0, "off: no SubViewport under Feel")
 	for item in found:
 		check(item.material == null or (item.material as ShaderMaterial) == null or (item.material as ShaderMaterial).shader != SpellLightScript.APPLY_SHADER, "off: no apply rect")
-	for batch in manager.batch_count():
-		check(manager.batch_mirror(batch) == null, "off: batch %d mirrored by nothing" % batch)
+	check(not manager.light_rows_wanted, "off: the shots' rows kept for nobody")
 	bus.spell_light_changed.emit(true)
 	check(feel.light() != null and feel.spell_light, "on again: the light is back")
-	check(manager.batch_mirror(0) == feel.light().batches[0].multimesh, "and mirrors the batches again")
+	check(manager.light_rows_wanted, "and the shots' rows kept for it again")
 
 
-func test_the_light_batches_get_the_rows_the_batches_upload() -> void:
+func test_the_grid_reads_the_rows_the_batches_upload() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var manager: ProjectilesScript = made[2]
@@ -132,14 +133,20 @@ func test_the_light_batches_get_the_rows_the_batches_upload() -> void:
 	var drawn: int = 0
 	for batch in manager.batch_count():
 		var source: MultiMesh = manager._nodes[batch].multimesh
-		var mirror: MultiMesh = manager.batch_mirror(batch)
-		check(mirror == light.batches[batch].multimesh, "batch %d is mirrored by its light batch" % batch)
-		check(mirror != source and mirror.mesh is QuadMesh, "batch %d: the light draws a quad of its own, not the shots' mesh" % batch)
-		check_equal(mirror.instance_count, source.instance_count, "batch %d: as many rows" % batch)
-		check_equal(mirror.visible_instance_count, source.visible_instance_count, "batch %d: as many drawn" % batch)
-		check(mirror.buffer == source.buffer, "batch %d: the same rows" % batch)
-		drawn += mirror.visible_instance_count
-	check(drawn >= 5, "the live shots are in the light batches, got %d" % drawn)
+		check(manager.batch_mirror(batch) == null, "batch %d: no mirror (no light buffer)" % batch)
+		check_equal(manager.light_count(batch), manager._draw_out[ProjectilesScript.DRAW_OUT_FIRST + batch], "batch %d: as many rows kept as drawn" % batch)
+		if manager.light_count(batch) > 0:
+			check(manager.light_rows(batch).size() >= manager.light_count(batch) * SpellLightScript.STRIDE, "batch %d: its rows" % batch)
+		drawn += manager.light_count(batch)
+		check(source != null, "batch %d has its node" % batch)
+	check(drawn >= 5, "the live shots' rows are kept for the light, got %d" % drawn)
+	var before: int = light.grids_baked
+	light.follow()
+	check_equal(light.grids_baked, before + 1, "the grid is worked out before the draw")
+	check(light.grid.light_at(0, Vector2(120.0, 100.0)).get_luminance() > 0.0, "and the shots light it round them")
+	manager.update_draw(1.0)
+	for batch in manager.batch_count():
+		check(manager.light_count(batch) == 0 or manager.light_rows(batch).size() > 0, "batch %d: last frame's rows let go before this frame's are written" % batch)
 
 
 func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
@@ -191,7 +198,7 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 	check(FeelScript.FLOOR_Z < at and FeelScript.FLOOR_Z == FeelScript.MARK_Z, "floor flashes lie with the floor marks, lit by the light")
 
 
-func test_the_buffer_follows_the_view_at_a_quarter_size() -> void:
+func test_the_grid_follows_the_views_part_of_the_world() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var light: SpellLightScript = feel.light()
@@ -199,46 +206,38 @@ func test_the_buffer_follows_the_view_at_a_quarter_size() -> void:
 	var before: Transform2D = view.canvas_transform
 	view.canvas_transform = Transform2D(0.0, Vector2(2.0, 2.0), 0.0, Vector2(-100.0, -40.0))
 	light.follow()
-	var size: Vector2 = view.get_visible_rect().size
-	var wanted := Vector2i(ceili(size.x / SpellLightScript.DOWNSCALE), ceili(size.y / SpellLightScript.DOWNSCALE))
-	check_equal(light.viewport.size, wanted, "the buffer is a quarter of the view each way")
-	var world := Vector2(300.0, 200.0)
-	var on_screen: Vector2 = view.global_canvas_transform * view.canvas_transform * world
-	var in_buffer: Vector2 = light.viewport.canvas_transform * world
-	var scale := Vector2(float(wanted.x) / size.x, float(wanted.y) / size.y)
-	check(in_buffer.is_equal_approx(on_screen * scale), "a point lands where it is on screen, scaled: %s against %s" % [in_buffer, on_screen * scale])
+	var shown: Rect2 = (view.global_canvas_transform * view.canvas_transform).affine_inverse() * view.get_visible_rect()
+	var corner := Vector2(light.grid.view_origin[0], light.grid.view_origin[1])
+	check(corner.x <= shown.position.x and corner.y <= shown.position.y and shown.position.x - corner.x < light.grid.cell and shown.position.y - corner.y < light.grid.cell, "its first cell holds the view's corner, on the world's grid (%s, %s)" % [corner, shown.position])
+	check(fmod(corner.x, light.grid.cell) == 0.0 and fmod(corner.y, light.grid.cell) == 0.0, "on a multiple of the cell")
+	check(corner.x + light.grid.view_size[0] * light.grid.cell >= shown.end.x and corner.y + light.grid.view_size[1] * light.grid.cell >= shown.end.y, "its cells cover the view")
 	view.canvas_transform = before
 
 
-func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
+func test_the_shaders_are_warmed_and_the_rect_reads_the_grid() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var light: SpellLightScript = feel.light()
 	var warmed: Array[Shader] = ShaderWarmupScript.shaders()
-	check(warmed.has(SpellLightScript.LIGHT_SHADER), "the light shader is warmed")
 	check(warmed.has(SpellLightScript.APPLY_SHADER), "the apply shader is warmed")
+	check(warmed.has(SpellLightScript.FACTOR_SHADER), "and its pass's")
 	var shade: ShaderMaterial = light.apply.material as ShaderMaterial
-	check(shade.get_shader_parameter(&"light_buffer") is ViewportTexture, "the rect reads the light buffer")
+	light.follow()
+	check(shade.get_shader_parameter(&"light_grid") == light.grid.texture, "the rect reads the grid")
+	check(is_equal_approx(float(shade.get_shader_parameter(&"light_grid_cell")), light.grid.cell), "by its cell")
 	var ambient: Variant = shade.get_shader_parameter(&"ambient")
 	check(ambient == null or is_equal_approx(float(ambient), 1.0), "the ambient is 1.0 with no room: the room as it is")
-	for batch in light.batches.size():
-		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
-		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		var rows: int = SpellLightScript.ROWS_RUNE if light._projectiles.batch_mesh(batch) == ProjectilesScript.MESH_QUAD else SpellLightScript.ROWS_SHOT
-		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "shots"])
-	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
 
 
 ## The shader's ROWS_* and its row-reading constants are the script's and Feel's.
-func test_the_light_shader_reads_rows_as_the_script_says() -> void:
-	var code: String = SpellLightScript.LIGHT_SHADER.code
-	for pair: Array in [["ROWS_SHOT", SpellLightScript.ROWS_SHOT], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_FLASH", SpellLightScript.ROWS_FLASH], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
-		check(code.contains("const int %s = %d;" % [pair[0], pair[1]]), "the shader's %s is %d" % pair)
-	check(code.contains("const float FLASH_FROM = %s;" % str(FeelScript.FLASH_FROM)), "the shader's FLASH_FROM is Feel's")
-	check(code.contains("const float FLASH_SPAN = %s;" % str(FeelScript.FLASH_SPAN)), "the shader's FLASH_SPAN is Feel's")
-	check(SpellLightScript.BEAM_SHADER.code.contains("const int BEAM_POINTS = %d;" % SpellLightScript.BEAM_POINTS), "the beam light's BEAM_POINTS")
+func test_the_grid_reads_rows_as_the_script_says() -> void:
+	for pair: Array in [[SpellLightScript.ROWS_SHOT, LightGridScript.ROWS_SHOT], [SpellLightScript.ROWS_RUNE, LightGridScript.ROWS_RUNE], [SpellLightScript.ROWS_FLASH, LightGridScript.ROWS_FLASH], [SpellLightScript.ROWS_SPOT, LightGridScript.ROWS_SPOT], [SpellLightScript.ROWS_CUE, LightGridScript.ROWS_CUE]]:
+		check_equal(pair[0], pair[1], "the grid reads rows as the light names them")
+	check_equal(LightGridScript.FLASH_FROM, FeelScript.FLASH_FROM, "the grid's FLASH_FROM is Feel's")
+	check_equal(LightGridScript.FLASH_SPAN, FeelScript.FLASH_SPAN, "the grid's FLASH_SPAN is Feel's")
 	check_equal(SpellLightScript.BEAM_POINTS, FeelScript.LIVE_BEAM_POINTS, "a beam's light holds every point of a live beam")
 	check_equal(SpellLightScript.STRIDE, FeelScript.FLASH_STRIDE, "a flash row is a light row")
+	check_equal(LightGridScript.STRIDE, SpellLightScript.STRIDE, "and a grid row")
 
 
 ## Which flashes light is data (`FlashKind.room_light`): the flares, rings, casts, hits, puffs, the
@@ -254,8 +253,7 @@ func test_each_flash_kinds_light_is_its_files() -> void:
 	feel.show_flash(&"burst", Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
 	feel._process(1.0 / 60.0)
 	check_equal(feel.flash_info(&"burst")["light"], 1.0, "a burst lights 1.0 (its file)")
-	check(is_equal_approx(feel.light().flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], 1.0), "and its row says so")
-	check(SpellLightScript.LIGHT_SHADER.code.contains("MODEL_MATRIX[2].y"), "where the light reads it")
+	check(is_equal_approx(feel.light().flash_rows(SpellLightScript.FLASHES_FLARE)[6], 1.0), "and its row says so, where the grid reads it")
 
 
 ## Feel's flashes light: the light's flash batches draw the rows Feel just uploaded.
@@ -268,14 +266,15 @@ func test_feels_flashes_are_handed_to_the_light() -> void:
 	feel.show_flash(&"arc", Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
 	feel._process(1.0 / 60.0)
 	for kind: int in [SpellLightScript.FLASHES_FLARE, SpellLightScript.FLASHES_BLAST, SpellLightScript.FLASHES_ARC]:
-		var multimesh: MultiMesh = light.flashes[kind].multimesh
-		check_equal(multimesh.visible_instance_count, 1, "flash batch %d lights its one flash" % kind)
-		check_equal(multimesh.instance_count, feel.effect_slots, "as many rows as Feel's slots")
-		check_equal(int((light.flashes[kind].material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_FLASH, "read as flash rows")
-	var row: PackedFloat32Array = light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer
+		check_equal(light.flash_count(kind), 1, "flash batch %d lights its one flash" % kind)
+		check(light.flash_rows(kind).size() >= feel.effect_slots * SpellLightScript.STRIDE, "Feel's rows, as many as its slots")
+	var row: PackedFloat32Array = light.flash_rows(SpellLightScript.FLASHES_FLARE)
 	check(is_equal_approx(row[3], 100.0) and is_equal_approx(row[7], 100.0), "the burst's row is Feel's: where it is")
+	light.follow()
+	check(light.grid.light_at(0, Vector2(100.0, 100.0)).get_luminance() > 0.0, "it lights the grid at its place")
+	check_equal(light.flash_count(SpellLightScript.FLASHES_FLARE), 0, "the rows let go once read")
 	feel._process(1.0)
-	check_equal(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.visible_instance_count, 0, "a flash that ended no longer lights")
+	check_equal(light.flash_count(SpellLightScript.FLASHES_FLARE), 0, "a flash that ended no longer lights")
 
 
 ## A cue's `light` part (S6, item 4) lights round its point in its colour for its seconds, fading;
@@ -290,20 +289,20 @@ func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
 	feel.play_cue(&"heal", 0, Vector2(100.0, 50.0))
 	feel._process(1.0 / 60.0)
 	check_equal(light.cue_light_count(), 1, "one cue light")
-	var rows: PackedFloat32Array = light.cue_lights.multimesh.buffer
+	var rows: PackedFloat32Array = light.cue_rows()
 	check(is_equal_approx(rows[3], 100.0) and is_equal_approx(rows[7], 50.0), "at the cue's point")
 	check(is_equal_approx(rows[0], 44.0) and is_equal_approx(rows[5], 44.0), "out to its radius")
 	check(rows[15] > 0.9 and rows[15] <= 1.0, "as bright as it says, fading: %f" % rows[15])
 	check(is_equal_approx(rows[12], 0.4196078), "in its exact colour")
 	check(not feel.flash_info(&"ring_out").is_empty(), "its ring is a flare row")
-	check_equal(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], 0.0, "unlit: its row lights 0")
+	check_equal(light.flash_rows(SpellLightScript.FLASHES_FLARE)[6], 0.0, "unlit: its row lights 0")
 	feel._process(1.0)
 	check_equal(light.cue_light_count(), 0, "gone after its seconds")
 	feel.play_cue(&"possess_start", 0, Vector2(100.0, 50.0))
 	feel._process(1.0 / 60.0)
 	check_equal(light.cue_light_count(), 0, "a cue with no light part makes no cue light")
 	check(not feel.flash_info(&"ring_in").is_empty(), "its ring")
-	check(is_equal_approx(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], feel.flash_kind(&"ring_in").room_light), "lights by its kind, as before")
+	check(is_equal_approx(light.flash_rows(SpellLightScript.FLASHES_FLARE)[6], feel.flash_kind(&"ring_in").room_light), "lights by its kind, as before")
 
 
 ## The cue lights' rows are the spell light's own: a new one past CUE_LIGHTS takes the oldest's
@@ -338,17 +337,17 @@ func test_a_beam_lights_along_its_path() -> void:
 	path[2] = Vector3(110.0, 70.0, 150.0)
 	light.light_beams_begin()
 	light.light_beam(1, path, 3, 2, 0, Color(0.9, 0.5, 0.1), 0.5)
-	check_equal(light.beams.size(), 2, "a light per beam slot")
-	var beam: MeshInstance2D = light.beams[1]
-	check(beam.visible and beam.get_parent() == light.viewport, "drawn into the light buffer")
-	var shade: ShaderMaterial = beam.material as ShaderMaterial
-	check(shade.shader == SpellLightScript.BEAM_SHADER, "by the beam light shader")
-	check(shade.get_shader_parameter(&"beam_path") == path and int(shade.get_shader_parameter(&"beam_points")) == 3, "along the beam's own path")
-	check_equal(int(shade.get_shader_parameter(&"beam_player")), 2, "in its caster's ramp")
-	check(is_equal_approx(float(shade.get_shader_parameter(&"beam_fade")), 0.5), "fading as it fades")
-	check((beam.mesh as ArrayMesh).custom_aabb.size.x >= 100000.0, "its mesh's box is the world: never culled")
-	light.light_beams_begin()
-	check(not beam.visible, "not lit until Feel lights it again")
+	check_equal(light.beams_lit(), 1, "one beam lit")
+	check(light.beam_path(0) == path, "along the beam's own path")
+	var glow: Vector3 = light.grid.look_glow(0.9, 0.5, 0.1, 2, 0, 0, 0, true)
+	var colour: Color = light.beam_colour(0)
+	var strength: float = SpellLightScript.BEAM_STRENGTH * 0.5
+	check(is_equal_approx(colour.r, glow.x * strength) and is_equal_approx(colour.b, glow.z * strength), "in its glow, fading as it fades")
+	check(is_equal_approx(light.beam_reach(0), SpellLightScript.BEAM_REACH), "as wide as a beam's light")
+	light.follow()
+	check(light.grid.light_at(0, Vector2(60.0, 20.0)).get_luminance() > 0.0, "the grid is lit along it")
+	check(light.grid.light_at(0, Vector2(60.0, 60.0)).get_luminance() == 0.0, "not far from it")
+	check_equal(light.beams_lit(), 0, "let go once read: not lit until Feel lights it again")
 
 
 ## Every shot lights by one rule, an enemy's too: its row is in the light batch, a live head.
@@ -364,13 +363,12 @@ func test_an_enemy_shot_lights_like_any() -> void:
 	var at: Vector2 = manager.get_position_of(slot)
 	var found: bool = false
 	for batch in manager.batch_count():
-		var mirror: MultiMesh = manager.batch_mirror(batch)
-		var buffer: PackedFloat32Array = mirror.buffer
-		for n in mirror.visible_instance_count:
+		var buffer: PackedFloat32Array = manager.light_rows(batch)
+		for n in manager.light_count(batch):
 			var i: int = n * SpellLightScript.STRIDE
 			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.HEAD_LIVE != 0:
 				found = true
-	check(found, "the enemy shot's live head is in a light batch, so it lights")
+	check(found, "the enemy shot's live head is in the rows kept for the light, so it lights")
 
 
 ## The regression (tails as motes, 2026-11-05): a shot drawn without a trail row (every shot, now
@@ -382,18 +380,15 @@ func test_a_shot_without_a_trail_row_lights() -> void:
 	manager.step(1.0 / 60.0)
 	manager.update_draw(1.0)
 	check(slot >= 0, "a shot (with no trail row: its tail is motes)")
-	var shader: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	check(not shader.contains("row >= 0.0 && flag_set(flags, HF_LIVE)"), "the light shader lights a head without a row")
 	var at: Vector2 = manager.get_position_of(slot)
 	var found: bool = false
 	for batch in manager.batch_count():
-		var mirror: MultiMesh = manager.batch_mirror(batch)
-		var buffer: PackedFloat32Array = mirror.buffer
-		for n in mirror.visible_instance_count:
+		var buffer: PackedFloat32Array = manager.light_rows(batch)
+		for n in manager.light_count(batch):
 			var i: int = n * SpellLightScript.STRIDE
 			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.HEAD_LIVE != 0:
 				found = true
-	check(found, "its head is in a light batch")
+	check(found, "its head is in the rows kept for the light")
 
 
 ## A torch is a light spot (data on a plain node: rooms carry no scripts), lit in its flame's
@@ -414,12 +409,13 @@ func test_a_torch_lights_in_its_flames_colour() -> void:
 	var flame: AnimatedSprite2D = torch.get_node("Flame") as AnimatedSprite2D
 	var colours: PackedColorArray = ArtPixels.colours_of(flame.sprite_frames.get_frame_texture(flame.animation, 0))
 	check(not colours.is_empty() and LightSpot.colour_of(spot).is_equal_approx(colours[0]), "its colour is the flame art's lightest")
-	var row: PackedFloat32Array = light.spots.multimesh.buffer
+	var row: PackedFloat32Array = light.spot_rows()
 	check(Vector2(row[3], row[7]).is_equal_approx((spot as Node2D).global_position), "where its spot is")
 	check(is_equal_approx(row[0], LightSpot.reach_of(spot)), "as far as its reach")
 	check(Color(row[8], row[9], row[10]).is_equal_approx(colours[0]), "in the flame's colour")
 	check(is_equal_approx(row[11], LightSpot.DEFAULT_STRENGTH), "at its strength")
-	check_equal(int((light.spots.material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_SPOT, "read as spots")
+	light.follow()
+	check(light.grid.light_at(0, (spot as Node2D).global_position).get_luminance() > 0.0, "read as a spot: it lights the grid round it")
 	torch.free()
 	light.follow()
 	check_equal(light.spot_count(), 0, "a torch gone lights no more")
@@ -539,7 +535,7 @@ func test_feels_frame_lights_the_wizards_staffs() -> void:
 	for frame in 15:
 		feel._process(1.0 / 60.0)
 	check_equal(feel.light().carried_count(), 1, "seat 0's wizard carries its light, eased in")
-	var row: PackedFloat32Array = feel.light().carried.multimesh.buffer
+	var row: PackedFloat32Array = feel.light().carried_rows()
 	check(Vector2(row[3], row[7]).is_equal_approx(wizard.muzzle_position()), "at its staff tip")
 	table.set_node(table.home_of_seat(0), null)
 	wizard.free()
@@ -583,9 +579,8 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	manager.update_draw(1.0)
 	var rows: Dictionary = {}
 	for batch in manager.batch_count():
-		var mirror: MultiMesh = manager.batch_mirror(batch)
-		var buffer: PackedFloat32Array = mirror.buffer
-		for n in mirror.visible_instance_count:
+		var buffer: PackedFloat32Array = manager.light_rows(batch)
+		for n in manager.light_count(batch):
 			var i: int = n * SpellLightScript.STRIDE
 			for slot: int in [plain, dim, rune]:
 				var at: Vector2 = manager.get_position_of(slot)
@@ -597,13 +592,30 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	var bounded: int = manager.spawn(0, Vector2(400.0, 100.0), Vector2(60.0, 0.0), 2.0, 4.0)
 	manager.set_light(bounded, 9.0, 0.0)
 	check(is_equal_approx(manager._look_light_intensity[bounded], ProjectilesScript.LIGHT_MAX) and is_equal_approx(manager._look_light_reach[bounded], ProjectilesScript.LIGHT_REACH_MIN), "kept in bounds")
-	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	# The shader names the row's floats once: MODEL_MATRIX[2].x is a row's float 2, .y its float 6.
+	# The grid reads the row's floats 2 and 6 as its card's light reach and intensity (light_grid.gd's
+	# `_row`: `rows[at + 2]`, `rows[at + 6]`).
 	check_equal(ProjectilesScript.LIGHT_REACH_FLOAT, 2, "the reach is the row's float 2")
 	check_equal(ProjectilesScript.LIGHT_INTENSITY_FLOAT, 6, "the intensity its float 6")
-	check(code.contains("#define LIGHT_REACH MODEL_MATRIX[2].x") and code.contains("#define LIGHT_INTENSITY MODEL_MATRIX[2].y"), "which the light shader reads as LIGHT_REACH and LIGHT_INTENSITY")
-	check(code.contains("RUNE_REACH * LIGHT_REACH") and code.contains("rune_strength * LIGHT_INTENSITY"), "a rune's light: its reach and brightness times the row's")
-	check(code.contains("half_size = vec2(reach * LIGHT_REACH)") and code.contains("shot_strength * LIGHT_INTENSITY"), "a head's light too")
+	var grid := LightGridScript.new()
+	grid.use_native(false)
+	grid.fit(PackedVector4Array([Vector4(0.0, 0.0, 640.0, 360.0)]), 1)
+	var lit: Array[float] = []
+	for reach: float in [1.0, 2.0]:
+		var row := PackedFloat32Array()
+		row.resize(SpellLightScript.STRIDE)
+		row[3] = 200.0
+		row[7] = 200.0
+		row[5] = float(ProjectilesScript.HEAD_LIVE)
+		row[8] = 4.0 / 255.0
+		row[12] = 1.0
+		row[13] = 1.0
+		row[14] = 1.0
+		row[ProjectilesScript.LIGHT_REACH_FLOAT] = reach
+		row[ProjectilesScript.LIGHT_INTENSITY_FLOAT] = 1.0
+		grid.clear()
+		grid.add_rows(row, 1, SpellLightScript.ROWS_SHOT, 1.0, 0.0, 0.0, false)
+		lit.append(grid.light_at(0, Vector2(244.0, 200.0)).get_luminance())
+	check(lit[0] == 0.0 and lit[1] > 0.0, "a head's light reaches as far as its row's reach says (%s)" % [lit])
 
 
 ## A beam card's light (card-looks phase 1b, 2): a beam's light is BEAM_STRENGTH times its card's
@@ -619,8 +631,8 @@ func test_a_beams_light_follows_its_cards_light() -> void:
 	light.light_beams_begin()
 	light.light_beam(0, path, 2, 0, 0, Color.WHITE, 1.0)
 	light.light_beam(1, path, 2, 0, 0, Color.WHITE, 1.0, 0.5, 2.0)
-	var plain: ShaderMaterial = light.beams[0].material as ShaderMaterial
-	var card: ShaderMaterial = light.beams[1].material as ShaderMaterial
-	check(is_equal_approx(float(plain.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH) and is_equal_approx(float(plain.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH), "a plain beam lights as before")
-	check(is_equal_approx(float(card.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH * 0.5), "half as bright")
-	check(is_equal_approx(float(card.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH * 2.0), "twice as wide")
+	check(is_equal_approx(light.beam_reach(0), SpellLightScript.BEAM_REACH), "a plain beam lights as before")
+	var plain: Color = light.beam_colour(0)
+	var card: Color = light.beam_colour(1)
+	check(is_equal_approx(card.r, plain.r * 0.5) and is_equal_approx(card.g, plain.g * 0.5), "half as bright")
+	check(is_equal_approx(light.beam_reach(1), SpellLightScript.BEAM_REACH * 2.0), "twice as wide")

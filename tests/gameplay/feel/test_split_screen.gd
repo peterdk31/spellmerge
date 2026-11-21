@@ -126,9 +126,9 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 	light.use_views(_split.views())
 	light.follow()
 	check_equal(light.view_count(), 2, "a buffer a view")
-	check(light.view_buffer(1).world_2d == light.viewport.world_2d, "the second buffer draws the same lights")
-	check(light.view_buffer(1).get_parent() == light, "it is the light's")
-	check(reader.get_shader_parameter(&"light_buffer_1") == light.view_buffer(1).get_texture(), "the reader has the second view's buffer")
+	check_equal(light.grid.view_count, 2, "the second view has a grid of its own, in the one texture")
+	check(reader.get_shader_parameter(&"light_grid") == light.grid.texture, "the reader has the grid")
+	check_equal(reader.get_shader_parameter(&"light_grid_size_1"), Vector4(light.grid.view_size[2], light.grid.view_size[3], 0.0, 0.0), "and the second view's part of it")
 	# The first two views share each reader (the owner, 2026-11-20): no copy, the item drawn in both,
 	# its shader told each view's transform and size.
 	for item: CanvasItem in [light.apply, before]:
@@ -165,7 +165,7 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 		check(own != null and own != item.material and own.shader == (item.material as ShaderMaterial).shader, "drawn with a material of its own, the same shader")
 		check_equal(int(own.get_shader_parameter(ViewReadersScript.VIEW_ID)), 2, "naming the third view's buffer")
 		check(not bool(own.get_shader_parameter(ViewReadersScript.SHARED_ON)), "never matched by its transform")
-		check(own.get_shader_parameter(&"light_buffer_2") == (item.material as ShaderMaterial).get_shader_parameter(&"light_buffer_2"), "its other uniforms the item's")
+		check(own.get_shader_parameter(&"light_grid_view_2") == (item.material as ShaderMaterial).get_shader_parameter(&"light_grid_view_2"), "its other uniforms the item's")
 		check_equal(copy.get_index(), item.get_index() + 1, "drawn just after it")
 		check_equal(copy.z_index, item.z_index, "at its z")
 		check(light.readers.copy_of(item, 3) == null, "no copy for a view not drawn")
@@ -191,9 +191,10 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 	before.visible = false
 	light.follow()
 	check(not light.readers.copy_of(before, 2).visible, "a hidden reader's copy is hidden")
-	var drawn: Transform2D = (_split.views()[1] as SubViewport).canvas_transform
-	var expected: Transform2D = Transform2D(0.0, Vector2.ONE / SpellLightScript.DOWNSCALE, 0.0, Vector2.ZERO) * drawn
-	check(light.view_buffer(1).canvas_transform.is_equal_approx(expected), "the second buffer follows the second view, scaled down")
+	var second_view := _split.views()[1] as SubViewport
+	var shown: Rect2 = (second_view.global_canvas_transform * second_view.canvas_transform).affine_inverse() * second_view.get_visible_rect()
+	var corner := Vector2(light.grid.view_origin[2], light.grid.view_origin[3])
+	check(corner.x <= shown.position.x and corner.y <= shown.position.y and shown.position.x - corner.x < light.grid.cell and shown.position.y - corner.y < light.grid.cell, "the second grid follows the second view's part of the world (%s, %s)" % [corner, shown.position])
 	var copy_of_later: CanvasItem = light.readers.copy_of(later, 2)
 	later.queue_free()
 	await process_frame

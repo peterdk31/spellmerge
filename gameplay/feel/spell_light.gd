@@ -691,9 +691,36 @@ func _take_flashes(kind: int, rows: PackedFloat32Array, count: int, slots: int) 
 	_flash_count[kind] = mini(count, rows.size() / STRIDE) if lit else 0
 
 
-## How many of flash batch `kind`'s rows (FLASHES_*) light this frame (for tests).
+## How many of flash batch `kind`'s rows (FLASHES_*) light this frame, and those rows, until the next
+## draw reads them (for tests).
 func flash_count(kind: int) -> int:
 	return _flash_count[kind]
+
+
+func flash_rows(kind: int) -> PackedFloat32Array:
+	return _flash_rows[kind]
+
+
+## The cue lights' rows (`cue_light_count` of them) and the carried lights' this frame (for tests).
+func cue_rows() -> PackedFloat32Array:
+	return _cue_buffer
+
+
+func carried_rows() -> PackedFloat32Array:
+	return _carried_rows
+
+
+## Lit beam `i`'s path, reach and colour this frame, until the next draw reads them (for tests).
+func beam_path(i: int) -> PackedVector3Array:
+	return _beam_paths[i]
+
+
+func beam_reach(i: int) -> float:
+	return _beam_reach[i]
+
+
+func beam_colour(i: int) -> Color:
+	return _beam_colour[i]
 
 
 ## A cue's light (its `light` part): round `at`, reaching `reach` pixels, `strength` bright at
@@ -865,6 +892,12 @@ static func move_spot_row(buffer: PackedFloat32Array, at: int, lean: Vector2, du
 ## moved, `spot_stirs.gd`), or by the rows as placed with `rows` empty. Read at the next draw.
 func show_spots(rows: PackedFloat32Array) -> void:
 	_spot_shown = rows if rows.size() == _spot_count * STRIDE else _no_rows
+
+
+## The rows the room's spots light by this frame (the moved rows `show_spots` was handed, else the rows
+## as placed), until the next draw reads them (for tests).
+func spot_rows_shown() -> PackedFloat32Array:
+	return _spot_shown if _spot_shown.size() == _spot_count * STRIDE and _spot_count > 0 else _spot_buffer
 
 
 ## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`) as placed, read only:

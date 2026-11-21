@@ -27,6 +27,7 @@ const SPELL_FOLDER: StringName = &"spells"
 
 ## The table last published (`publish`), and how many times one was: what reads it on the CPU (Feel's
 ## grid lighting, gameplay/feel/light_grid.gd) takes it again when the count moves. View only.
+const VIEW: Array[StringName] = [&"published", &"published_version"]
 static var published: PackedColorArray = PackedColorArray()
 static var published_version: int = 0
 

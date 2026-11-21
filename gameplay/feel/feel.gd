@@ -136,6 +136,9 @@ const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
+const UnseenStandingScript := preload("res://gameplay/feel/unseen_standing.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
+const MistScript := preload("res://gameplay/feel/mist.gd")
 const RoomsViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
@@ -572,6 +575,14 @@ var _unseen: UnseenDarkScript = null
 ## What the rooms nobody has entered hold, not drawn under their dark (`unseen_rooms.gd`; the owner,
 ## 2026-11-21).
 var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
+## What stands there, hidden one by one (the owner, 2026-11-21, on #899): the bodies and the rooms'
+## mists (`unseen_standing.gd`), and the looks that draw what lies on the floor, each told the dark's
+## mask (`UnseenDark.mask`) and drawn again whenever it changes (`_masked_looks`, the mask's changes
+## they were drawn for).
+var _unseen_standing: UnseenStandingScript = UnseenStandingScript.new()
+var _masked_looks: Array[CanvasItem] = []
+var _masked_for: int = -1
+var _no_mists: Array[MistScript] = []
 ## The one picture's box as the party camera stands this frame, for `_unseen_rooms` (`_rooms_seen`).
 var _rooms_seen_box: RoomsViewBoxesScript = RoomsViewBoxesScript.new()
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
@@ -992,6 +1003,7 @@ func _ready() -> void:
 	_reward_items.name = "RewardItems"
 	add_child(_reward_items)
 	_reward_items.bind(events)
+	_mask_looks()
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -1229,10 +1241,22 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_unseen.step(real_delta, grid)
 		# An unvisited room is the void (the owner, 2026-11-21): the void's motes drift over its dark.
 		if _spectacle != null:
-			_spectacle.set_void_covers(_unseen.void_covers(), _unseen.void_changes())
+			_spectacle.set_void_covers(_unseen.void_covers())
 		# What those rooms hold is not drawn under the dark, nor what lies out of every view (the
 		# owner, 2026-11-21).
 		_unseen_rooms.step(_unseen, grid, _rooms_seen(), _spectacle.marks if _spectacle != null else null, _spectacle.pool.regions if _spectacle != null and _spectacle.pool != null else null, _cover_rooms)
+		# What stands in them is hidden one by one, so no cover is drawn over them (the owner,
+		# 2026-11-21, on #899): the bodies, the rooms' mists, what lies on the floor, the rooms' light.
+		if _spectacle != null:
+			_unseen_standing.step(_unseen.mask, table, _spectacle.mist, _spectacle.room_mists)
+		else:
+			_unseen_standing.step(_unseen.mask, table, null, _no_mists)
+		if _spectacle != null and _spectacle.light != null:
+			_spectacle.light.hide_unseen(_unseen.mask)
+		if _unseen.mask.changes != _masked_for:
+			_masked_for = _unseen.mask.changes
+			for look in _masked_looks:
+				look.queue_redraw()
 	if _teleports != null:
 		_teleports.table = table
 		_teleports.step(real_delta)
@@ -1243,6 +1267,25 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 	if _party_map != null:
 		_party_map.input = _input_manager()
 		_party_map.step(real_delta, table, seats_here, grid, _views_shown())
+
+
+## The looks that draw what lies on a room's floor told where nothing is drawn (the dark's mask).
+func _mask_looks() -> void:
+	var mask: UnseenMaskScript = _unseen.mask
+	_gather_doors.unseen = mask
+	_mouths.unseen = mask
+	_locks.unseen = mask
+	_runes.unseen = mask
+	_ground_items.unseen = mask
+	_coins.unseen = mask
+	_special_rooms.unseen = mask
+	_reward_items.unseen = mask
+	_masked_looks = [_gather_doors, _mouths, _locks, _runes, _ground_items, _coins, _special_rooms, _reward_items]
+
+
+## What stands where nobody has seen yet, hidden (for tests).
+func unseen_standing() -> UnseenStandingScript:
+	return _unseen_standing
 
 
 ## The open portals, read once (`CarrierPortal.read_view`), drawn by the portal look; their motes

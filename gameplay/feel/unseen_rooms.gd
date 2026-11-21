@@ -4,14 +4,15 @@ extends RefCounted
 ## simply render the background everywhere", then "also hide rooms out of view").
 ##
 ## **Unvisited:** such a
-## room is covered whole by the void's dark (`unseen_dark.gd`, its `covers_whole`), so its layout
-## (its floor, walls and decor: the node `room_built` hands over), its floor marks' layer
-## (`Marks.set_layer_shown`), its motes' chunks (`MoteRegions.set_region_shown`, the motes' pool's,
-## never the void's, which drift over the dark) and its ground cover (`CoverRooms.view_of`) are
-## switched off, and the dark over it is all that is drawn there: one rectangle on the void's own
-## black. Once its reveal begins they are drawn again, as they stand (the marks and motes kept on
-## being written), under the opening blocks. The dark stays the guard for anything else a room
-## holds (bodies, pickups, a rune's crack), so nothing shows that did not before.
+## room is covered whole by the void's dark (`unseen_dark.gd`, its `covers_whole`: unvisited, its
+## reveal not begun), so its layout (its floor, walls and decor: the node `room_built` hands over), its
+## floor marks' layer (`Marks.set_layer_shown`), its motes' chunks (`MoteRegions.set_region_shown`,
+## the motes' pool's, never the void's, which drift over it) and its ground cover
+## (`CoverRooms.view_of`) are switched off, and nothing is drawn there but the void's own black and
+## its motes. Once its reveal begins they are drawn again, as they stand (the marks and motes kept on
+## being written), under the opening blocks. What else stands in it (bodies, pickups, a rune's crack)
+## is hidden one by one by the dark's mask (`unseen_standing.gd`, the looks' `unseen`; the owner,
+## 2026-11-21, on #899).
 ##
 ## **Out of view:** a place whose rectangle grown by MARGIN meets none of the views' boxes
 ## (`ViewBoxes`, the spectacle's: one box, or a box a split view) has the same switched off. Godot

@@ -25,6 +25,7 @@ extends Node2D
 ## a frame (`step`); it redraws only while something moves or a mouth shimmers.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 
 ## Over the floor and the cover's marks, under the bodies.
@@ -54,6 +55,10 @@ const RUNE_SIDE: int = 5
 ## The light when a room's kind names none.
 const DEFAULT_LIGHT: StringName = &"spark"
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## The pieces (Feel's room hearing: which places are walkways, each room's kind).
 var pieces: RoomHearingScript = null
 
@@ -327,6 +332,8 @@ func _size_lists() -> void:
 
 func _draw() -> void:
 	for mouth in _areas.size():
+		if unseen != null and unseen.hides(Rect2(_areas[mouth]).get_center()):
+			continue
 		if _glow[mouth] > 0:
 			_draw_shimmer(mouth)
 		if _flare[mouth] >= 0:

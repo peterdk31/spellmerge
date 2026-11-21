@@ -21,6 +21,7 @@ extends Node2D
 ## it draws only while something moves (`_process` redraws then).
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## Over the floor, under the labels (the exit signs' 22).
@@ -42,6 +43,10 @@ const LAMP_OUT: int = 4
 const PORTAL_RADIUS: int = 20
 const PORTAL_RING: int = 4
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## The colours: the bars' stone (light, dark), a lamp's shades out to lit, a held lamp's, the ring's.
 var bar_colours: PackedColorArray = Palette.shades_of(&"stone")
 var lamp_colours: PackedColorArray = PackedColorArray([Palette.OUTLINE, Palette.shades_of(&"spark")[0], Palette.shades_of(&"spark")[1], Palette.shades_of(&"spark")[2]])
@@ -302,6 +307,8 @@ static func _gap_to(area: Rect2, at: Vector2) -> float:
 
 func _draw() -> void:
 	for door in _rules.size():
+		if unseen != null and door < _areas.size() and unseen.hides(_areas[door].get_center()):
+			continue
 		if _rules[door] == RoomKind.DOOR_PORTAL_HOME:
 			_draw_portal(door)
 		else:

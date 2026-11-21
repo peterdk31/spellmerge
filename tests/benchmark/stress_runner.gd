@@ -39,7 +39,8 @@ extends Node
 ## `STRESS OK` or `STRESS FAILED` and quits with 0 or 1.
 ##
 ## Reproducibility: the filler shots and the enemy places use a fixed seed. The rest of
-## the run varies only with frame timing, like the 4-bot test.
+## the run varies only with frame timing, like the 4-bot test, unless the run is on the fixed clock
+## (`fixed_frames`, fixed_steps.gd: one tick a drawn frame), where it plays the same every run.
 
 const HashLabel := preload("res://tests/benchmark/hash_label.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
@@ -49,6 +50,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const FixedStepsScript := preload("res://tests/benchmark/fixed_steps.gd")
 ## The room the fight is played in: the antechamber, pinned as a one-room biome at the world's origin
 ## (tests/support/pinned_run.gd; since connected biomes CB8 a crypt run starts on its start room).
 const STRESS_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
@@ -58,6 +60,18 @@ const PLAYERS: int = 4
 ## filler shots kept flying, else its "shots", the cap) and "idle" (the bots stand, casting nothing:
 ## the light load of a room walked through, against the crowd's).
 var players: int = PLAYERS
+## Whether the run is on a fixed clock (fixed_steps.gd: one tick a drawn frame, its windows counted
+## in ticks, the shots topped up a tick at a time), so every run of a scenario plays the same; set
+## before the runner is in the tree (the biome frames' and the play frames' are). Off, the Tick runs
+## by the real clock, as in the game.
+var fixed_frames: bool = false
+## With the fixed clock: the state hash taken every this many measured frames (0: none), kept by
+## scenario run in `frame_hashes` (a test's, to see a run played twice is the same).
+var hash_every: int = 0
+var frame_hashes: Array[PackedInt64Array] = []
+var _fixed: Node = null
+## The frames measured so far this scenario.
+var _measured_frames: int = 0
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
 ## whether hit particles start. The web and desktop scenarios follow the caps on purpose (each
 ## budget is its cap). `desktop_only` scenarios are left out of a web build (`scenarios_for`).
@@ -239,6 +253,11 @@ func _ready() -> void:
 		_projectiles.set(&"native", false)
 		WallSlide.use_native(false)
 	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
+	if fixed_frames:
+		_fixed = FixedStepsScript.new()
+		add_child(_fixed)
+		_fixed.connect(&"stepped", _on_fixed_tick)
+		print("BENCH: fixed clock: one tick a drawn frame, the windows in ticks (tests/benchmark/fixed_steps.gd)")
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
@@ -441,12 +460,17 @@ func _stress_enemy_data() -> EnemyBase:
 func _process(delta: float) -> void:
 	if not _active:
 		return
-	_elapsed += delta
+	# On the fixed clock a frame is one tick (fixed_steps.gd), so the windows are counted in ticks.
+	_elapsed += TickScript.DT if fixed_frames else delta
 	_keep_wizards_up()
 	# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
 	_top_up_enemies()
 	_process_frames += 1
-	if _measuring and _process_frames % PARTS_EVERY == 0:
+	if _measuring:
+		_measured_frames += 1
+	# On the fixed clock by the frames measured, so a run played again times the same frames (the
+	# timing pass steps the crowd with no time, which is not quite nothing).
+	if _measuring and (_measured_frames if fixed_frames else _process_frames) % PARTS_EVERY == 0:
 		_time_parts()
 	if not _measuring and _elapsed >= warm_up:
 		_measuring = true
@@ -458,6 +482,10 @@ func _process(delta: float) -> void:
 		if profile:
 			_start_tree_profile()
 		_measuring_started()
+		frame_hashes.append(PackedInt64Array())
+		_measured_frames = 0
+	if _measuring and fixed_frames and hash_every > 0 and _measured_frames > 0 and _measured_frames % hash_every == 0:
+		frame_hashes[frame_hashes.size() - 1].append(_state_hash())
 	if _elapsed >= warm_up + measure:
 		_end_scenario()
 
@@ -496,7 +524,18 @@ func _time_parts() -> void:
 	_parts_frames += 1
 
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
+	if not fixed_frames:
+		_tick_work()
+
+
+## On the fixed clock, right after each tick (fixed_steps.gd's `stepped`).
+func _on_fixed_tick() -> void:
+	_tick_work()
+
+
+## A physics step's work: the shots topped up and counted.
+func _tick_work() -> void:
 	if not _active:
 		return
 	_top_up_shots()
@@ -792,6 +831,12 @@ func _report_state_hash(label: String) -> void:
 		part_total += part_took
 		part_most = maxi(part_most, part_took)
 	print("BENCH: stress %s: state hash spread over %d ticks: avg %.2f ms max %.2f ms a tick" % [label, HASH_SLICES, float(part_total) / float(HASH_SLICES) / 1000.0, float(part_most) / 1000.0])
+
+
+## The game's state hash now (every area the Tick names, as the netcode would make it).
+func _state_hash() -> int:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	return SimHash.whole(SimHash.areas(tick.state_areas())) if tick != null else 0
 
 
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.

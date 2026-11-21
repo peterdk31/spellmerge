@@ -110,8 +110,6 @@ var _mesh: Mesh = null
 var _z: int = 0
 ## The ring's rows a chunk (the pool's CHUNK).
 var _ring_rows: int = 1
-## By region (0 the crossers): the z its chunks are drawn at (`set_region_z`; the pool's z by default).
-var _region_z: PackedInt32Array = PackedInt32Array()
 ## By region: 1 while its chunks are not drawn (`set_region_shown`: a room nobody has entered, under
 ## the void's dark, unseen_rooms.gd); their rows are still copied, so they show as they stand again.
 var _region_hidden: PackedByteArray = PackedByteArray()
@@ -197,8 +195,6 @@ func step(now: float) -> void:
 			continue
 		if _dirty[c] == 1:
 			_dirty[c] = 0
-			if node.z_index != _region_z[region]:
-				node.z_index = _region_z[region]
 			if _boxed[c] != region:
 				_boxed[c] = region
 				node.multimesh.custom_aabb = _box(region)
@@ -206,18 +202,6 @@ func step(now: float) -> void:
 			if node.multimesh.visible_instance_count != _fill[c]:
 				node.multimesh.visible_instance_count = _fill[c]
 			node.visible = _region_hidden[region] == 0
-
-
-## Region `region`'s chunks drawn at `z` from now on (its chunks now at once; one taken later at its
-## next upload): the void's motes over a room nobody has entered drawn over its dark, under it once
-## its reveal begins (the spectacle's `void_pool`). A place's region is the place plus one.
-func set_region_z(region: int, z: int) -> void:
-	if region < 0 or region >= _region_z.size() or _region_z[region] == z:
-		return
-	_region_z[region] = z
-	for c in _nodes.size():
-		if _region[c] == region:
-			_nodes[c].z_index = z
 
 
 ## Region `region`'s chunks drawn (`shown`) or not from now on (its chunks now at once; one taken
@@ -234,11 +218,6 @@ func set_region_shown(region: int, shown: bool) -> void:
 ## Whether region `region`'s chunks are drawn (`set_region_shown`; true for none).
 func region_shown(region: int) -> bool:
 	return region < 0 or region >= _region_hidden.size() or _region_hidden[region] == 0
-
-
-## The z region `region`'s chunks are drawn at (the pool's for none; for tests).
-func region_z(region: int) -> int:
-	return _region_z[region] if region >= 0 and region < _region_z.size() else _z
 
 
 ## Every chunk hidden and free, no row copied (the places gone, or changed).
@@ -363,8 +342,6 @@ func _take(grid: RoomGrid, count: int) -> void:
 		_origin = Vector2.ZERO
 	_open.resize(count + 1)
 	_open.fill(-1)
-	_region_z.resize(count + 1)
-	_region_z.fill(_z)
 	_region_hidden.resize(count + 1)
 	_region_hidden.fill(0)
 	fits += 1

@@ -52,10 +52,6 @@ const VOID_POOL_SHARE: float = 0.5
 ## The void's own pool's fewest rows (a Minimal ring's share is 128; this holds for a benchmark's
 ## small pool).
 const VOID_POOL_LEAST: int = 64
-## The void's motes draw over the dark of the unvisited rooms (`unseen_dark.gd`'s Z, 20), so they
-## drift on over a room nobody has entered as over the void round it (the owner, 2026-11-21), and
-## under the labels (22).
-const VOID_MOTE_Z: int = 21
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
@@ -137,18 +133,14 @@ var still_motes: StillMotesScript = StillMotesScript.new()
 ## Read only.
 var pool: MotesScript = null
 ## The void's motes (`void_air`, `void_blank_air`), a pool of their own of the void's kind alone, made
-## and freed with `pool` (`use_motes`): drawn at VOID_MOTE_Z, over the dark of the unvisited rooms,
-## so the void's drift crosses a room nobody has entered as if it were not there, while the room's
-## own motes (in `pool`, under the dark) stay hidden. Not lit only: it reads no light. Read only.
+## and freed with `pool` (`use_motes`), drawn at the motes' z: over an unvisited room as over the void
+## round it, since nothing of that room is drawn (`unseen_rooms.gd`, the owner, 2026-11-21), while
+## the room's own motes (in `pool`) are switched off there. Not lit only: it reads no light. Read
+## only.
 var void_pool: MotesScript = null
-## The rectangles the dark covers whole by place (`set_void_covers`: `UnseenDark.void_covers`; an
-## empty one for a place not covered), where the void gives its motes off too, and the count of their
-## writes. Read only.
+## The rectangles nothing is drawn in by place (`set_void_covers`: `UnseenDark.void_covers`; an empty
+## one for a place that is drawn), where the void gives its motes off too. Read only.
 var void_covers: Array[Rect2] = []
-var _void_changes: int = 0
-## The void pool's regions' z laid for: the covers' writes and the regions' fits then (-1: not yet).
-var _void_z_changes: int = -1
-var _void_z_fits: int = -1
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
@@ -416,7 +408,6 @@ func step(now: float, table: ActorsScript = null) -> void:
 			_void_stirred_version = stirs.version
 			stirs.hand_to(void_drawn)
 		void_pool.use_places(projectiles.grid() if projectiles != null else null)
-		_lay_void_z()
 		void_pool.step(now)
 	if marks != null:
 		marks.step(now)
@@ -1011,7 +1002,7 @@ func _make_void_pool(cap: int) -> void:
 	for kind: MoteKind in _mote_kinds():
 		if kind.id == VOID_AIR.kind:
 			kinds.append(kind)
-	void_pool = MotesScript.new(void_cap_of(cap), VOID_MOTE_Z, kinds, _ramp_table)
+	void_pool = MotesScript.new(void_cap_of(cap), MOTE_Z, kinds, _ramp_table)
 	void_pool.name = "VoidMotes"
 	void_pool.density = mote_density * split_share
 	add_child(void_pool)
@@ -1023,35 +1014,11 @@ static func void_cap_of(cap: int) -> int:
 	return maxi(ceili(float(cap) * VOID_SHARE / VOID_POOL_SHARE), VOID_POOL_LEAST)
 
 
-## The rectangles the dark of the unvisited rooms covers whole (`UnseenDark.void_covers`; the same
-## array each frame: nothing is made), where the void's motes are given off too, and how many times
-## they were written (`UnseenDark.void_changes`).
-func set_void_covers(covers: Array[Rect2], changes: int) -> void:
+## The rectangles of the unvisited rooms and the hidden secret ways, where nothing is drawn
+## (`UnseenDark.void_covers`; the same array each frame: nothing is made), so the void's motes are
+## given off there too.
+func set_void_covers(covers: Array[Rect2]) -> void:
 	void_covers = covers
-	_void_changes = changes
-
-
-## Each place's chunks of the void's pool drawn at VOID_MOTE_Z while the dark covers some of it (the
-## void's motes born there drift over the dark), else at MOTE_Z (under the dark: once a room's
-## reveal begins, the void's motes left over it go under its opening blocks, then are motes of the
-## room, under its telegraphs, spell-spectacle's "never over a telegraph"). The crossers (the void
-## between the slabs) stay at VOID_MOTE_Z. Laid again only when the covers change or the places are
-## read again.
-func _lay_void_z() -> void:
-	var regions: MoteRegionsScript = void_pool.regions
-	if _void_changes == _void_z_changes and regions.fits == _void_z_fits:
-		return
-	_void_z_changes = _void_changes
-	_void_z_fits = regions.fits
-	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
-	for place in regions.places:
-		var over: bool = false
-		var rect: Rect2 = grid.place_rect(place) if grid != null else Rect2()
-		for cover in void_covers:
-			if cover.has_area() and rect.intersects(cover):
-				over = true
-				break
-		regions.set_region_z(place + 1, VOID_MOTE_Z if over else MOTE_Z)
 
 
 ## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made

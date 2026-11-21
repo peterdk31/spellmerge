@@ -120,6 +120,10 @@ var _sense_shade: PackedInt32Array = PackedInt32Array()
 ## the biome changes (`_sensed_stale`).
 var _sensed: PackedByteArray = PackedByteArray()
 var _sensed_stale: bool = true
+## True while every map is shut and the pieces' looks were not yet settled to what they want: they
+## are only drawn once a map opens, so they are settled when read (`_settled`), not every frame (the
+## performance pass, 2026-11-21: half a millisecond a frame in a biome, the map shut).
+var _unsettled: bool = false
 ## How many secret rooms were found (opened) when last read: a change works the senses out again.
 var _found_secrets: int = 0
 ## By seat: held now, the opening's stage, its frame (screen pixels) and scale, and where the map's
@@ -267,15 +271,18 @@ func shown_rect(seat: int) -> Rect2i:
 ## Place `place`'s shade drawn now (0 none, 1 the stone's shadow, 2 its base, 3 its light) and its
 ## symbol's rows shown (for tests).
 func shade_of(place: int) -> int:
+	_settled()
 	return _shade[place] if place >= 0 and place < _shade.size() else 0
 
 
 ## Room `place`'s symbol's done look's stage (0 none ... `KindSymbol.DONE_STAGES`; for tests).
 func done_of(place: int) -> int:
+	_settled()
 	return _done[place] if place >= 0 and place < _done.size() else 0
 
 
 func symbol_rows_of(place: int) -> int:
+	_settled()
 	return _symbol_rows[place] if place >= 0 and place < _symbol_rows.size() else 0
 
 
@@ -287,6 +294,7 @@ func glyphs_of(place: int) -> int:
 ## Room `place` as sensed on seat `seat`'s map now (0 not drawn, then its stage: 1 the stone's
 ## shadow, 2 the void's shadow, 3 the void's base; for tests).
 func sense_shade_of(seat: int, place: int) -> int:
+	_settled()
 	var at: int = seat * _rects.size() + place
 	return _sense_shade[at] if seat >= 0 and place >= 0 and place < _rects.size() and at < _sense_shade.size() else 0
 
@@ -296,6 +304,7 @@ func sense_shade_of(seat: int, place: int) -> int:
 ## the party's map takes it over (entered, shown) it steps down through the void's shadow, never
 ## jumping from the void's light to the stone (the review's).
 func drawn_colour(seat: int, place: int) -> Color:
+	_settled()
 	var shade: int = _shade[place] if place >= 0 and place < _shade.size() else 0
 	var sensed: int = sense_shade_of(seat, place)
 	if sensed > 1 or (shade <= 0 and sensed > 0):
@@ -304,6 +313,7 @@ func drawn_colour(seat: int, place: int) -> Color:
 
 
 func _drawn(seat: int, place: int) -> bool:
+	_settled()
 	return (place < _shade.size() and _shade[place] > 0) or sense_shade_of(seat, place) > 0
 
 
@@ -430,7 +440,7 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	for seat in ActorsScript.SEATS:
 		_held[seat] = 1 if not _rects.is_empty() and seats_here & (1 << seat) != 0 and _holds(seat) else 0
 	if not _any_open():
-		_settle()
+		_unsettled = true
 	_clock += delta
 	var change: float = 1.0 / FPS
 	if not is_moving():
@@ -474,6 +484,8 @@ func is_moving() -> bool:
 
 ## One stage of every opening and every piece's look (a frame at FPS).
 func advance() -> void:
+	# A map opening steps from the looks settled now, as a frame of it shut settled them.
+	_settled()
 	for seat in ActorsScript.SEATS:
 		_stage[seat] += signi(_stage_wanted(seat) - _stage[seat])
 		if _stage[seat] == 0:
@@ -549,6 +561,17 @@ func _any_open() -> bool:
 
 
 ## Every piece's look as it stands (with every map shut, nothing is seen changing).
+## True while every map is shut and the pieces' looks wait to be settled when read (for tests).
+func waits_to_settle() -> bool:
+	return _unsettled
+
+
+func _settled() -> void:
+	if _unsettled:
+		_unsettled = false
+		_settle()
+
+
 func _settle() -> void:
 	for place in _shade.size():
 		_shade[place] = _shade_wanted(place)
@@ -832,6 +855,7 @@ static func thinned(texture: ImageTexture, stage: int) -> ImageTexture:
 
 ## The stage place `place`'s shape is drawn at (0 none ... IN_STAGES whole; for tests).
 func in_stage_of(place: int) -> int:
+	_settled()
 	return _in[place] if place >= 0 and place < _in.size() else 0
 
 

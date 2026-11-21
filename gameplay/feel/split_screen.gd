@@ -52,6 +52,7 @@ const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
+const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
 
@@ -70,13 +71,16 @@ const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divid
 ## How far past the biome's top left corner (each way, world pixels) the void view looks: inside the
 ## void's black (`VoidBackdrop.GROW`) and past any view's limits.
 const VOID_AWAY: float = 1024.0
-## A view's box is snapped out to this many screen pixels (`view_box`): a multiple of every light
-## buffer's downscale (SpellLight.DOWNSCALE and the budget's), so a view's light buffer texels lie
-## where the whole screen's would, and the light looks the same in a box as on the screen.
+## A view's box is snapped out to this many screen pixels (`view_box`) at PictureGrid.SIZE, and that
+## times `PictureGrid.scale_of` in a bigger picture: a multiple of every light buffer's downscale
+## (SpellLight.DOWNSCALE and the budget's, both times the scale there) and of the blocks the light's
+## passes are drawn in, so a view's light buffer texels and blocks lie where the whole screen's would,
+## and the light looks the same in a box as on the screen.
 const BOX_SNAP: int = 8
 ## A view's box reaches this many screen pixels past its cell's corners (`view_box`): the light
 ## readers sample a light buffer linearly, so a cell pixel near the box's edge reads texels up to
-## half a texel past it; a texel is at most the budget's largest downscale (8) screen pixels.
+## half a texel past it; a texel is at most the budget's largest downscale (8) screen pixels at
+## PictureGrid.SIZE (times `PictureGrid.scale_of` in a bigger picture, as the pad is).
 const BOX_PAD: int = 8
 ## How much larger a view's box may be than its cell's needs, each way, before it is made again
 ## (`kept_box`): a box resized makes its view's and its light buffer's render targets anew, so it
@@ -190,7 +194,7 @@ func view_in_slot(slot: int) -> SubViewport:
 
 ## The box of the screen view `view` of `laid` needs (screen pixels): its cell's corners' box,
 ## grown by BOX_PAD (no pixel the cell's shader keeps is outside it, nor the light texels it reads)
-## and snapped out to BOX_SNAP pixels, within `screen`; the whole screen when `whole` (the twin's view, whose picture
+## and snapped out to BOX_SNAP pixels (each times `PictureGrid.scale_of(screen)`), within `screen`; the whole screen when `whole` (the twin's view, whose picture
 ## is shown over the blank's quarter too) or for a cell of fewer than 3 corners. A view draws only
 ## its box, so a quarter pane draws a quarter of the screen's pixels, not all of them; its picture
 ## is the same, the box's part of the whole screen's.
@@ -205,10 +209,13 @@ static func view_box(laid: ScreenViewsScript, view: int, screen: Vector2, whole:
 		var point: Vector2 = laid.corner(view, at)
 		low = low.min(point)
 		high = high.max(point)
-	var start := Vector2i((low - Vector2.ONE * BOX_PAD).floor())
-	var end := Vector2i((high + Vector2.ONE * BOX_PAD).ceil())
-	start = Vector2i(floori(float(start.x) / BOX_SNAP) * BOX_SNAP, floori(float(start.y) / BOX_SNAP) * BOX_SNAP)
-	end = Vector2i(ceili(float(end.x) / BOX_SNAP) * BOX_SNAP, ceili(float(end.y) / BOX_SNAP) * BOX_SNAP)
+	var by: int = PictureGridScript.scale_of(screen)
+	var pad: int = BOX_PAD * by
+	var snap: int = BOX_SNAP * by
+	var start := Vector2i((low - Vector2.ONE * pad).floor())
+	var end := Vector2i((high + Vector2.ONE * pad).ceil())
+	start = Vector2i(floori(float(start.x) / snap) * snap, floori(float(start.y) / snap) * snap)
+	end = Vector2i(ceili(float(end.x) / snap) * snap, ceili(float(end.y) / snap) * snap)
 	var box := Rect2i(start, end - start).intersection(full)
 	return box if box.has_area() else full
 
@@ -223,7 +230,9 @@ static func kept_box(current: Rect2i, needed: Rect2i, screen: Vector2) -> Rect2i
 		return current
 	if needed == full:
 		return full
-	var grown: Rect2i = needed.grow(BOX_SLACK / 2).intersection(full)
+	# Grown by whole snaps, so the box stays on the grid `view_box` snaps it to.
+	var snap: int = BOX_SNAP * PictureGridScript.scale_of(screen)
+	var grown: Rect2i = needed.grow(ceili(float(BOX_SLACK / 2) / snap) * snap).intersection(full)
 	return grown if grown.has_area() else full
 
 

@@ -52,10 +52,6 @@ const VOID_POOL_SHARE: float = 0.5
 ## The void's own pool's fewest rows (a Minimal ring's share is 128; this holds for a benchmark's
 ## small pool).
 const VOID_POOL_LEAST: int = 64
-## The void's motes draw over the dark of the unvisited rooms (`unseen_dark.gd`'s Z, 20), so they
-## drift on over a room nobody has entered as over the void round it (the owner, 2026-11-21), and
-## under the labels (22).
-const VOID_MOTE_Z: int = 21
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
@@ -137,18 +133,14 @@ var still_motes: StillMotesScript = StillMotesScript.new()
 ## Read only.
 var pool: MotesScript = null
 ## The void's motes (`void_air`, `void_blank_air`), a pool of their own of the void's kind alone, made
-## and freed with `pool` (`use_motes`): drawn at VOID_MOTE_Z, over the dark of the unvisited rooms,
-## so the void's drift crosses a room nobody has entered as if it were not there, while the room's
-## own motes (in `pool`, under the dark) stay hidden. Not lit only: it reads no light. Read only.
+## and freed with `pool` (`use_motes`), drawn at the motes' z: over an unvisited room as over the void
+## round it, since nothing of that room is drawn (`unseen_rooms.gd`, the owner, 2026-11-21), while
+## the room's own motes (in `pool`) are switched off there. Not lit only: it reads no light. Read
+## only.
 var void_pool: MotesScript = null
-## The rectangles the dark covers whole by place (`set_void_covers`: `UnseenDark.void_covers`; an
-## empty one for a place not covered), where the void gives its motes off too, and the count of their
-## writes. Read only.
+## The rectangles nothing is drawn in by place (`set_void_covers`: `UnseenDark.void_covers`; an empty
+## one for a place that is drawn), where the void gives its motes off too. Read only.
 var void_covers: Array[Rect2] = []
-var _void_changes: int = 0
-## The void pool's regions' z laid for: the covers' writes and the regions' fits then (-1: not yet).
-var _void_z_changes: int = -1
-var _void_z_fits: int = -1
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
@@ -205,6 +197,9 @@ var stirs: StirsScript = StirsScript.new()
 ## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
 var spot_stirs: SpotStirsScript = SpotStirsScript.new()
 
+## How far out of every view a room's mist is still stepped (world px): its lip and a frame's camera
+## move, as UnseenRooms.REACH.
+const MIST_STEP_REACH: float = 160.0
 ## The room's low floor mist (atmosphere F; null with spell light off, or "Fog" off once faded out),
 ## over the floor, the marks and the bodies' shadows and under every body. Read only.
 var mist: MistScript = null
@@ -300,6 +295,8 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(MistScript.PASS_SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(SpellLightScript.FACTOR_SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -416,7 +413,6 @@ func step(now: float, table: ActorsScript = null) -> void:
 			_void_stirred_version = stirs.version
 			stirs.hand_to(void_drawn)
 		void_pool.use_places(projectiles.grid() if projectiles != null else null)
-		_lay_void_z()
 		void_pool.step(now)
 	if marks != null:
 		marks.step(now)
@@ -433,11 +429,20 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
 		shadows.step_in(table, now, seen, blockers)
-	if mist != null:
+	if mist != null and _mist_seen(mist, seen):
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	for later: MistScript in room_mists:
-		later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+		if _mist_seen(later, seen):
+			later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	_free_faded()
+
+
+## Whether `drawn`'s room is near a view (within MIST_STEP_REACH of `seen`'s boxes; none known: yes): a
+## mist out of every view is not stepped (#900's measure: a biome's mists stepped every frame cost
+## about 0.4 ms native). Stepped again as it nears a view, its clock and the stirs are handed anew and
+## its parting moves on by at most a step's worth (MistParting clamps the time), before it shows.
+static func _mist_seen(drawn: MistScript, seen: ViewBoxesScript) -> bool:
+	return seen == null or seen.is_empty() or seen.intersects(Rect2(drawn.room_origin, drawn.room_size), MIST_STEP_REACH)
 
 
 ## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
@@ -1011,7 +1016,7 @@ func _make_void_pool(cap: int) -> void:
 	for kind: MoteKind in _mote_kinds():
 		if kind.id == VOID_AIR.kind:
 			kinds.append(kind)
-	void_pool = MotesScript.new(void_cap_of(cap), VOID_MOTE_Z, kinds, _ramp_table)
+	void_pool = MotesScript.new(void_cap_of(cap), MOTE_Z, kinds, _ramp_table)
 	void_pool.name = "VoidMotes"
 	void_pool.density = mote_density * split_share
 	add_child(void_pool)
@@ -1023,35 +1028,11 @@ static func void_cap_of(cap: int) -> int:
 	return maxi(ceili(float(cap) * VOID_SHARE / VOID_POOL_SHARE), VOID_POOL_LEAST)
 
 
-## The rectangles the dark of the unvisited rooms covers whole (`UnseenDark.void_covers`; the same
-## array each frame: nothing is made), where the void's motes are given off too, and how many times
-## they were written (`UnseenDark.void_changes`).
-func set_void_covers(covers: Array[Rect2], changes: int) -> void:
+## The rectangles of the unvisited rooms and the hidden secret ways, where nothing is drawn
+## (`UnseenDark.void_covers`; the same array each frame: nothing is made), so the void's motes are
+## given off there too.
+func set_void_covers(covers: Array[Rect2]) -> void:
 	void_covers = covers
-	_void_changes = changes
-
-
-## Each place's chunks of the void's pool drawn at VOID_MOTE_Z while the dark covers some of it (the
-## void's motes born there drift over the dark), else at MOTE_Z (under the dark: once a room's
-## reveal begins, the void's motes left over it go under its opening blocks, then are motes of the
-## room, under its telegraphs, spell-spectacle's "never over a telegraph"). The crossers (the void
-## between the slabs) stay at VOID_MOTE_Z. Laid again only when the covers change or the places are
-## read again.
-func _lay_void_z() -> void:
-	var regions: MoteRegionsScript = void_pool.regions
-	if _void_changes == _void_z_changes and regions.fits == _void_z_fits:
-		return
-	_void_z_changes = _void_changes
-	_void_z_fits = regions.fits
-	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
-	for place in regions.places:
-		var over: bool = false
-		var rect: Rect2 = grid.place_rect(place) if grid != null else Rect2()
-		for cover in void_covers:
-			if cover.has_area() and rect.intersects(cover):
-				over = true
-				break
-		regions.set_region_z(place + 1, VOID_MOTE_Z if over else MOTE_Z)
 
 
 ## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made
@@ -1161,6 +1142,7 @@ func _make_light(on: bool) -> void:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
+		light.passes_changed.connect(_hand_mist_passes)
 		add_child(light)
 		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
@@ -1250,6 +1232,17 @@ func _fit_mist(at_once: bool) -> void:
 		for at in room_mists.size():
 			room_mists[at].use_light(light.buffer())
 			light.read_by(_later_key(at), room_mists[at].material as ShaderMaterial)
+		_hand_mist_passes()
+
+
+## Every mist's billows drawn in the light's pass under it while there is one (the picture bigger than
+## PictureGrid.SIZE; `SpellLight.under_holder`), again when the passes come or go.
+func _hand_mist_passes() -> void:
+	var holder: Node = light.under_holder() if light != null else null
+	if mist != null:
+		mist.use_passes(holder)
+	for later: MistScript in room_mists:
+		later.use_passes(holder)
 
 
 ## Later room `at`'s mist made (while the first room's is), as laid.
@@ -1268,6 +1261,7 @@ func _make_later_mist(at: int) -> void:
 	if light != null:
 		made.use_light(light.buffer())
 		light.read_by(_later_key(at), made.material as ShaderMaterial)
+		made.use_passes(light.under_holder())
 
 
 func _later_key(at: int) -> StringName:

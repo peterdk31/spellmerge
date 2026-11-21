@@ -22,6 +22,7 @@ extends Node2D
 ## A child of Feel, top level (world space); it steps itself while something moves.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Over the floor and the doors' bars (the gather doors' 2), under the labels.
 const Z: int = 3
@@ -59,6 +60,10 @@ const CHUNKS: int = 6
 ## Where the elements are (their tints).
 const SPELLS_FOLDER: StringName = &"spells"
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## The registry the elements are read from (Feel's; null in a test: the spark's tint).
 var registry: Node = null
 ## The colours: the bars' stone, the padlock's brass (spark) and its shackle's iron (stone).
@@ -320,6 +325,8 @@ func _draw() -> void:
 
 func _draw_key_door(door: int) -> void:
 	var area: Rect2i = _door_areas[door]
+	if unseen != null and unseen.hides(Rect2(area).get_center()):
+		return
 	var frame: int = _door_frame[door]
 	if frame >= DOOR_FRAMES:
 		return
@@ -380,6 +387,8 @@ func _draw_bars(area: Rect2i, sunk: int) -> void:
 
 
 func _draw_rock(rock: int) -> void:
+	if unseen != null and unseen.hides(Rect2(_rock_areas[rock]).get_center()):
+		return
 	var frame: int = _rock_frame[rock]
 	if frame >= BREAK_FRAMES:
 		return

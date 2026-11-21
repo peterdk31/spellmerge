@@ -4,7 +4,7 @@ extends Node
 ## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Dynamic lighting" setting is on (`SpellLightSetting`, `spell_light_changed`); with
 ## it off none of these nodes exist.
 ##
-## - **The light buffer:** a SubViewport a DOWNSCALE-th of the view each way, cleared to black
+## - **The light buffer:** a SubViewport a DOWNSCALE-th of the view at PictureGrid.SIZE each way (below), cleared to black
 ##   every frame, its canvas transform the main view's scaled down (`follow`, before every draw),
 ##   so it sees the same part of the world. Everything below draws one soft light per row into it
 ##   with `light.gdshader` (ROWS_* say how its rows read) or `light_beam.gdshader`.
@@ -60,6 +60,15 @@ extends Node
 ##   the item itself, told apart in its shader by the transform and size each is drawn through, and
 ##   the third and fourth each a copy of it on its own layer, whose material names its view
 ##   (`light_views.gdshaderinc`).
+## - **At a fixed resolution** (the owner's decision of 2026-11-21, docs/milestones/connected-biomes.md,
+##   "The light at a fixed resolution"): the light is drawn for a picture of PictureGrid.SIZE a view
+##   (gameplay/feel/picture_grid.gd), however big the picture is. Each buffer is DOWNSCALE times
+##   smaller than that (its view's share of it), and while the picture is `grid_scale` times bigger the
+##   apply rect's light is worked out in a factor pass a view at that size (`factor_passes`, one rect
+##   each drawn by `light_factor.gdshader`, gameplay/feel/light_passes.gd) and the apply rect takes it
+##   whole for each block of the picture; what reads the light under it may draw a pass of its own there
+##   too (`under_passes`, `under_holder`: the mist's billows), handed to its material with the buffers.
+##   At PictureGrid.SIZE there are no passes and everything is worked out where it is drawn, as before.
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
@@ -68,8 +77,11 @@ const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const LIGHT_SHADER: Shader = preload("res://gameplay/feel/light.gdshader")
 const APPLY_SHADER: Shader = preload("res://gameplay/feel/light_apply.gdshader")
 const BEAM_SHADER: Shader = preload("res://gameplay/feel/light_beam.gdshader")
-## The light buffer is this many times smaller than the view each way (a quarter: 160 x 90 for
-## the game's 640 x 360).
+const FACTOR_SHADER: Shader = preload("res://gameplay/feel/light_factor.gdshader")
+const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const LightPassesScript := preload("res://gameplay/feel/light_passes.gd")
+## The light buffer is this many times smaller than PictureGrid.SIZE each way (a quarter: 160 x 90 for
+## a view of the whole screen, whatever the picture's size).
 const DOWNSCALE: int = 4
 ## The apply rect reaches this far from the origin each way: past any room, so it always covers
 ## the view (the GPU only shades what is on screen).
@@ -112,6 +124,14 @@ const BEAM_STRENGTH: float = 0.8
 ## `light_views.gdshaderinc` that hold the buffers past the first.
 const VIEWS_MOST: int = ViewReadersScript.VIEWS_MOST
 const EXTRA_UNIFORMS: Array[StringName] = [&"light_buffer_1", &"light_buffer_2", &"light_buffer_3"]
+## The uniforms of `light_passes.gdshaderinc` that hold a view's pass (the first view's and every copy's
+## own, `ViewReaders.set_view_uniform`; the second view's), say which views have one and how much smaller
+## they are.
+const PASS_UNIFORMS: Array[StringName] = [&"light_pass_0", &"light_pass_1"]
+const PASS_VIEWS: StringName = &"light_pass_views"
+const PASS_SCALE: StringName = &"light_pass_scale"
+## The apply rect's uniforms its factor passes' rects share (`light_apply.gdshaderinc`'s).
+const APPLY_UNIFORMS: Array[StringName] = [&"ambient", &"shade", &"bands", &"lit_from", &"bright_from", &"tint_rects", &"tint_hues", &"tint_count"]
 ## Floats a 2D MultiMesh row holds with colours and custom data.
 const STRIDE: int = 16
 ## Where a spot row (`write_spot_row`) holds its light's reach, its middle's x and y, and its strength.
@@ -133,6 +153,10 @@ const MAX_TINTS: int = 40
 ## lights are blocked.
 const SHOTS_BLOCKED: bool = false
 
+## The passes came or went (the picture's size crossed a whole multiple of PictureGrid.SIZE): what
+## draws under the light at its resolution (`under_holder`) draws its pass again.
+signal passes_changed
+
 ## The light buffer, its shot batches (by BATCH_*), flash batches (FLASHES_*), beams, the spots'
 ## batch and the rect that applies it. Read only.
 var viewport: SubViewport = null
@@ -151,6 +175,19 @@ var shade: Color = Color.WHITE
 var bands: int = DEFAULT_BANDS
 ## How many rooms' tints the apply rect reads (`set_room_tints`). Read only.
 var tint_count: int = 0
+## How many times bigger than PictureGrid.SIZE the picture is each way (PictureGrid.scale_of, at
+## every draw). Read only.
+var grid_scale: int = 1
+## Whether the light keeps its resolution (PictureGrid.SIZE a view) in a bigger picture; false draws it
+## at the picture's own, as before 2026-11-21 (the benchmarks' A/B: `--light-at-picture`).
+var fixed_resolution: bool = true
+## The passes at the light's resolution while `grid_scale` is more than 1 (the picture at least twice
+## PictureGrid.SIZE each way; null at 1): the apply
+## rect's factor a view, with its rects (one a view, each on its view's layer), and what readers drawn
+## under the light draw there (`under_holder`). Read only.
+var factor_passes: LightPassesScript = null
+var under_passes: LightPassesScript = null
+var factor_rects: Array[ColorRect] = []
 var _projectiles: ProjectileManagerScript = null
 var _quad: QuadMesh = null
 static var _beam_mesh: ArrayMesh = null
@@ -381,8 +418,9 @@ func release() -> void:
 	_projectiles = null
 
 
-## Fit the light buffer to the view: its size a DOWNSCALE-th of the view's, its canvas transform
-## the view's scaled down, so a light lands under its shot; and redraw the spots if one came or
+## Fit the light buffer to the view: its size a DOWNSCALE-th of the view's at PictureGrid.SIZE (the picture
+## `grid_scale` times bigger: a DOWNSCALE * `grid_scale`-th), and the passes at the light's resolution with
+## it; its canvas transform the view's scaled down, so a light lands under its shot; and redraw the spots if one came or
 ## went. While the screen is split (`use_views`) the buffer follows the first view and each other
 ## view's buffer its own, and each reader's copies a view follow it (`readers`). Run just before
 ## every draw, after the camera has moved.
@@ -390,17 +428,35 @@ func follow() -> void:
 	if _spots_dirty and is_inside_tree():
 		draw_spots()
 	readers.follow(_views)
+	var root: Viewport = get_viewport()
+	if root != null:
+		var by: int = PictureGridScript.scale_of(root.get_visible_rect().size) if fixed_resolution else 1
+		if by != grid_scale:
+			_use_scale(by)
 	if _views.is_empty():
-		var view: Viewport = get_viewport()
-		if view == null:
+		if root == null:
 			return
-		_fit(viewport, view, DOWNSCALE)
+		_fit(viewport, root, DOWNSCALE * grid_scale)
+		_fit_passes(0, root)
 	else:
 		for k in _views.size():
 			var shown: Viewport = _views[k]
 			if shown == null or not is_instance_valid(shown):
 				break
-			_fit(viewport if k == 0 else _extra[k - 1], shown, DOWNSCALE if k == 0 else _extra_downscale)
+			_fit(viewport if k == 0 else _extra[k - 1], shown, (DOWNSCALE if k == 0 else _extra_downscale) * grid_scale)
+			_fit_passes(k, shown)
+
+
+## View `k`'s passes fitted to `view` (while there are passes).
+func _fit_passes(k: int, view: Viewport) -> void:
+	if factor_passes == null or k >= factor_passes.count:
+		return
+	factor_passes.fit(k, view)
+	under_passes.fit(k, view)
+	# The pass under the light is drawn only while something is drawn in it (a mist's twin).
+	var wanted: int = SubViewport.UPDATE_ALWAYS if under_passes.holder().get_child_count() > 0 else SubViewport.UPDATE_DISABLED
+	if under_passes.viewports[k].render_target_update_mode != wanted:
+		under_passes.viewports[k].render_target_update_mode = wanted
 
 
 ## `buffer` sized a `downscale`-th of `view` each way, its canvas transform `view`'s scaled down.
@@ -445,19 +501,93 @@ func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, void_vi
 		_extra.append(buffer)
 	for k in _extra.size():
 		_extra[k].render_target_update_mode = SubViewport.UPDATE_ALWAYS if k + 1 < _views.size() else SubViewport.UPDATE_DISABLED
+	_use_passes()
+	_use_readers()
+	follow()
+
+
+## The passes at the light's resolution for a picture `by` times PictureGrid.SIZE: made past 1, freed
+## at 1; every reader handed them.
+func _use_scale(by: int) -> void:
+	grid_scale = maxi(by, 1)
+	if grid_scale > 1 and factor_passes == null:
+		factor_passes = LightPassesScript.new("LightFactor")
+		add_child(factor_passes)
+		under_passes = LightPassesScript.new("LightUnder")
+		add_child(under_passes)
+	elif grid_scale == 1 and factor_passes != null:
+		for passes: LightPassesScript in [factor_passes, under_passes]:
+			remove_child(passes)
+			passes.queue_free()
+		factor_passes = null
+		under_passes = null
+		factor_rects.clear()
+	_use_passes()
+	passes_changed.emit()
+
+
+## A pass a view (while there are passes; the equal split's void quarter has none), each view's factor
+## rect reading its own buffer; each buffer drawn before what reads it, and every reader handed them.
+func _use_passes() -> void:
+	var count: int = maxi(_views.size(), 1)
+	if factor_passes != null:
+		factor_passes.use(count, grid_scale)
+		under_passes.use(count, grid_scale)
+		while factor_rects.size() < count:
+			factor_rects.append(_factor_rect(factor_rects.size()))
+		for k in factor_rects.size():
+			factor_rects[k].visible = k < count
+			(factor_rects[k].material as ShaderMaterial).set_shader_parameter(&"light_buffer", view_buffer(k).get_texture())
 	# Each buffer is drawn before the view that reads it (Godot draws a viewport's children first):
-	# made after the views, it would be read a frame late, slipping behind them as they move.
+	# made after the views, it would be read a frame late, slipping behind them as they move. With
+	# passes, a buffer before its factor pass, and the passes before their view.
 	for k in VIEWS_MOST:
 		var buffer: SubViewport = viewport if k == 0 else (_extra[k - 1] if k - 1 < _extra.size() else null)
 		if buffer == null:
 			break
 		var reader: Viewport = _views[k] if k < _views.size() and is_instance_valid(_views[k]) else buffer.get_parent().get_viewport()
-		RenderingServer.viewport_set_parent_viewport(buffer.get_viewport_rid(), reader.get_viewport_rid())
+		if factor_passes != null and k < factor_passes.count:
+			factor_passes.draw_before(k, reader)
+			under_passes.draw_before(k, reader)
+			RenderingServer.viewport_set_parent_viewport(buffer.get_viewport_rid(), factor_passes.viewports[k].get_viewport_rid())
+		else:
+			RenderingServer.viewport_set_parent_viewport(buffer.get_viewport_rid(), reader.get_viewport_rid())
 	_bind(apply.material as ShaderMaterial)
 	for key: StringName in _readers:
 		_bind(_readers[key] as ShaderMaterial)
-	_use_readers()
-	follow()
+
+
+## View `k`'s factor rect: over the world in its factor pass, on that view's layer alone, drawn with the
+## apply rect's numbers (`APPLY_UNIFORMS`, kept the same by `_set_apply`).
+func _factor_rect(k: int) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.name = "Factor%d" % k
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.position = Vector2(-REACH, -REACH)
+	rect.size = Vector2(REACH, REACH) * 2.0
+	rect.visibility_layer = LightPassesScript.view_layer(k)
+	var material := ShaderMaterial.new()
+	material.shader = FACTOR_SHADER
+	var from := apply.material as ShaderMaterial
+	for uniform: StringName in APPLY_UNIFORMS:
+		material.set_shader_parameter(uniform, from.get_shader_parameter(uniform))
+	rect.material = material
+	factor_passes.holder().add_child(rect)
+	return rect
+
+
+## Where what reads the light under it draws its pass at the light's resolution (the mist's billows: an
+## item under it is drawn in every view's pass, and read back by the reader through `read_by`); null
+## while there are no passes (the picture at PictureGrid.SIZE).
+func under_holder() -> Node:
+	return under_passes.holder() if under_passes != null else null
+
+
+## The apply rect's uniform `uniform` set to `value`, on its factor rects too.
+func _set_apply(uniform: StringName, value: Variant) -> void:
+	(apply.material as ShaderMaterial).set_shader_parameter(uniform, value)
+	for rect in factor_rects:
+		(rect.material as ShaderMaterial).set_shader_parameter(uniform, value)
 
 
 ## The readers drawn in each view for the views now (and the void quarter's).
@@ -490,15 +620,27 @@ func read_by(key: StringName, material: ShaderMaterial) -> void:
 	_use_readers()
 
 
-## The light buffers' textures on `material`, the first the light buffer's.
+## The light buffers' textures on `material`, the first the light buffer's, and its passes at the light's
+## resolution (the apply rect's factor passes, the others' `under_passes`; none at PictureGrid.SIZE).
 func _bind(material: ShaderMaterial) -> void:
 	material.set_shader_parameter(&"light_buffer", viewport.get_texture())
 	# A buffer no view draws now is none (black): the void quarter's view reads it (no light there).
 	for k in EXTRA_UNIFORMS.size():
 		material.set_shader_parameter(EXTRA_UNIFORMS[k], _extra[k].get_texture() if k < _extra.size() and k + 1 < _views.size() else null)
+	var passes: LightPassesScript = factor_passes if material == apply.material else under_passes
+	var count: int = passes.count if passes != null else 0
+	for k in VIEWS_MOST:
+		var drawn: Texture2D = passes.texture(k) if k < count else null
+		if k < PASS_UNIFORMS.size():
+			material.set_shader_parameter(PASS_UNIFORMS[k], drawn)
+		else:
+			# The third and fourth views' copies hold their own pass where the first view's is.
+			readers.set_view_uniform(material, k, PASS_UNIFORMS[0], drawn)
+	material.set_shader_parameter(PASS_VIEWS, (1 << count) - 1)
+	material.set_shader_parameter(PASS_SCALE, grid_scale)
 
 
-## The light buffer's texture (the light round everything this frame, the view a DOWNSCALE-th
+## The light buffer's texture (the light round everything this frame, the view at PictureGrid.SIZE a DOWNSCALE-th
 ## the size), for what draws by the light (the motes' lit-only kinds; docs/milestones/atmosphere.md,
 ## B): handed over, nothing asked of them.
 func buffer() -> Texture2D:
@@ -517,9 +659,8 @@ static func lit_steps() -> Vector4:
 func set_ambient(to: float, dark: Color = Color.WHITE) -> void:
 	ambient = clampf(to, 0.0, 1.0)
 	shade = Color(clampf(dark.r, 0.0, 1.0), clampf(dark.g, 0.0, 1.0), clampf(dark.b, 0.0, 1.0))
-	var material := apply.material as ShaderMaterial
-	material.set_shader_parameter(&"ambient", ambient)
-	material.set_shader_parameter(&"shade", Vector3(shade.r, shade.g, shade.b))
+	_set_apply(&"ambient", ambient)
+	_set_apply(&"shade", Vector3(shade.r, shade.g, shade.b))
 
 
 ## Each room's own light tinted by its kind (connected biomes CB12b, gameplay/feel/room_tints.gd):
@@ -529,10 +670,9 @@ func set_ambient(to: float, dark: Color = Color.WHITE) -> void:
 ## rooms. Set only when a tint changes.
 func set_room_tints(rects: PackedVector4Array, tints: PackedVector4Array, count: int) -> void:
 	tint_count = clampi(count, 0, mini(MAX_TINTS, mini(rects.size(), tints.size())))
-	var material := apply.material as ShaderMaterial
-	material.set_shader_parameter(&"tint_rects", rects)
-	material.set_shader_parameter(&"tint_hues", tints)
-	material.set_shader_parameter(&"tint_count", tint_count)
+	_set_apply(&"tint_rects", rects)
+	_set_apply(&"tint_hues", tints)
+	_set_apply(&"tint_count", tint_count)
 
 
 ## The carried lights this frame: `count` spot rows (ROWS_SPOT, STRIDE floats each) of `rows`,
@@ -549,7 +689,7 @@ func carried_count() -> int:
 ## The steps the light comes in: 0 smooth, 2 or more that many (dim counted); DEFAULT_BANDS 3.
 func set_bands(to: int) -> void:
 	bands = 0 if to <= 0 else maxi(to, 2)
-	(apply.material as ShaderMaterial).set_shader_parameter(&"bands", bands)
+	_set_apply(&"bands", bands)
 
 
 ## Feel's flash rows, just uploaded: the flares' (`flares` rows of `flare_rows`), the explosions'

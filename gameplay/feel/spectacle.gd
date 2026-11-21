@@ -197,6 +197,9 @@ var stirs: StirsScript = StirsScript.new()
 ## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
 var spot_stirs: SpotStirsScript = SpotStirsScript.new()
 
+## How far out of every view a room's mist is still stepped (world px): its lip and a frame's camera
+## move, as UnseenRooms.REACH.
+const MIST_STEP_REACH: float = 160.0
 ## The room's low floor mist (atmosphere F; null with spell light off, or "Fog" off once faded out),
 ## over the floor, the marks and the bodies' shadows and under every body. Read only.
 var mist: MistScript = null
@@ -292,6 +295,8 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(MistScript.PASS_SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(SpellLightScript.FACTOR_SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -424,11 +429,20 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
 		shadows.step_in(table, now, seen, blockers)
-	if mist != null:
+	if mist != null and _mist_seen(mist, seen):
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	for later: MistScript in room_mists:
-		later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+		if _mist_seen(later, seen):
+			later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	_free_faded()
+
+
+## Whether `drawn`'s room is near a view (within MIST_STEP_REACH of `seen`'s boxes; none known: yes): a
+## mist out of every view is not stepped (#900's measure: a biome's mists stepped every frame cost
+## about 0.4 ms native). Stepped again as it nears a view, its clock and the stirs are handed anew and
+## its parting moves on by at most a step's worth (MistParting clamps the time), before it shows.
+static func _mist_seen(drawn: MistScript, seen: ViewBoxesScript) -> bool:
+	return seen == null or seen.is_empty() or seen.intersects(Rect2(drawn.room_origin, drawn.room_size), MIST_STEP_REACH)
 
 
 ## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
@@ -1128,6 +1142,7 @@ func _make_light(on: bool) -> void:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
+		light.passes_changed.connect(_hand_mist_passes)
 		add_child(light)
 		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
@@ -1217,6 +1232,17 @@ func _fit_mist(at_once: bool) -> void:
 		for at in room_mists.size():
 			room_mists[at].use_light(light.buffer())
 			light.read_by(_later_key(at), room_mists[at].material as ShaderMaterial)
+		_hand_mist_passes()
+
+
+## Every mist's billows drawn in the light's pass under it while there is one (the picture bigger than
+## PictureGrid.SIZE; `SpellLight.under_holder`), again when the passes come or go.
+func _hand_mist_passes() -> void:
+	var holder: Node = light.under_holder() if light != null else null
+	if mist != null:
+		mist.use_passes(holder)
+	for later: MistScript in room_mists:
+		later.use_passes(holder)
 
 
 ## Later room `at`'s mist made (while the first room's is), as laid.
@@ -1235,6 +1261,7 @@ func _make_later_mist(at: int) -> void:
 	if light != null:
 		made.use_light(light.buffer())
 		light.read_by(_later_key(at), made.material as ShaderMaterial)
+		made.use_passes(light.under_holder())
 
 
 func _later_key(at: int) -> StringName:

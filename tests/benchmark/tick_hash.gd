@@ -57,8 +57,6 @@ func _on_ticked_profiled() -> void:
 		return
 	if _ticks_profiled == 0 and _tick.step_profile.is_empty():
 		_tick.profile_steps(Time.get_ticks_usec)
-		var sub = preload("res://tests/benchmark/subprof_tmp.gd")
-		sub.sums.fill(0)
 		_projectiles = root.get_node_or_null("Projectiles")
 		if _projectiles != null:
 			var parts := PackedInt64Array()
@@ -96,7 +94,6 @@ func _report_steps() -> void:
 	var parts := PackedStringArray()
 	for row: Array in rows:
 		parts.append("%s %.3f" % [row[1], float(row[0]) / ticks / 1000.0])
-	print("SUB: " + preload("res://tests/benchmark/subprof_tmp.gd").report(_ticks_profiled))
 	var shots := PackedStringArray()
 	for i in _projectile_sums.size():
 		shots.append("%s %.3f" % [PROJECTILE_PARTS[i] if i < PROJECTILE_PARTS.size() else str(i), float(_projectile_sums[i]) / ticks / 1000.0])

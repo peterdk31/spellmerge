@@ -70,8 +70,11 @@ var _walkway: PackedInt32Array = PackedInt32Array()
 var _rows: PackedInt32Array = PackedInt32Array()
 ## By mouth: whether its room's kind shows the done look once done (1), and the done look's stage drawn.
 var _tells_done: PackedByteArray = PackedByteArray()
-## By mouth: its room's symbol is hidden until the room is opened (1: a secret room, `KindSymbol.hidden_until_opened`).
-var _hidden: PackedByteArray = PackedByteArray()
+## By mouth: the secret room its sign waits for (-1: none): its own room's when that is a secret room
+## (`KindSymbol.hidden_until_opened`), else, on a secret room's bridge (hidden until found, the owner,
+## 2026-11-20), the secret room at the bridge's other end, so neither the sign nor its light shows
+## over a doorway nobody can see.
+var _waits_on: PackedInt32Array = PackedInt32Array()
 var _done: PackedInt32Array = PackedInt32Array()
 ## The room hearing's `done_again` as read last (a change: the rooms done drawn as they stand).
 var _read_again: int = 0
@@ -185,9 +188,9 @@ func _wanted(mouth: int) -> int:
 	return RoomKind.SYMBOL_SIDE
 
 
-## False while mouth `mouth`'s room keeps its symbol hidden (a secret room not yet opened).
+## False while mouth `mouth`'s sign waits for a secret room not yet opened (`_waits_on`).
 func _shown(mouth: int) -> bool:
-	return _hidden[mouth] == 0 or (pieces != null and pieces.is_opened(mouths.room_of(mouth)))
+	return _waits_on[mouth] < 0 or (pieces != null and pieces.is_opened(_waits_on[mouth]))
 
 
 func _done_wanted(mouth: int) -> int:
@@ -200,7 +203,7 @@ func _done_wanted(mouth: int) -> int:
 func _settle_done() -> void:
 	for mouth in _done.size():
 		var wanted: int = _done_wanted(mouth)
-		var rows: int = _rows[mouth] if _hidden[mouth] == 0 else _wanted(mouth)
+		var rows: int = _rows[mouth] if _waits_on[mouth] < 0 else _wanted(mouth)
 		if _done[mouth] != wanted or _rows[mouth] != rows:
 			# A secret room's sign found or lost by the restore is drawn as it stands too.
 			_done[mouth] = wanted
@@ -255,7 +258,7 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	_rows.resize(found)
 	_near.resize(found)
 	_tells_done.resize(found)
-	_hidden.resize(found)
+	_waits_on.resize(found)
 	_done.resize(found)
 	_read_again = pieces.done_again() if pieces != null else 0
 	for mouth in found:
@@ -263,12 +266,15 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		var kind: RoomKind = pieces.kind_of(room) if pieces != null else null
 		_pixels.append(kind.symbol_pixels() if kind != null else PackedByteArray())
 		_tells_done[mouth] = 1 if KindSymbolScript.shows_done(kind) else 0
-		_hidden[mouth] = 1 if KindSymbolScript.hidden_until_opened(kind) else 0
+		_waits_on[mouth] = room if KindSymbolScript.hidden_until_opened(kind) else -1
 		_shades.append(KindSymbolScript.shades_of(kind))
 		var area: Rect2i = mouths.area_of(mouth)
 		var middle: Vector2 = Rect2(area).get_center()
 		_middle[mouth] = middle
 		_walkway[mouth] = grid.place_at(middle) if grid != null else RoomGrid.NO_PLACE
+		var secret_end: int = pieces.secret_end(_walkway[mouth]) if pieces != null and _waits_on[mouth] < 0 else -1
+		if secret_end >= 0:
+			_waits_on[mouth] = pieces.end_room(_walkway[mouth], secret_end)
 		_at[mouth] = corner_beside(area, grid.place_rect(room) if grid != null else Rect2())
 		var type: RewardType = pieces.type_of(room) if pieces != null and kind != null else null
 		var glyphs: Array[PackedByteArray] = []

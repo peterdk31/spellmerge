@@ -440,6 +440,13 @@ func test_a_secret_rock_opens_to_its_own_element_only() -> void:
 	check(element != &"", "an element rolled for the room")
 	check(not rocks.is_empty() and rocks.back()[2] == element and not rocks.back()[3], "the view is told the rock and its element")
 	var mouth: Rect2 = flow.locks.mouth_of(0)
+	# The owner, 2026-11-20: the bridge to a secret room is hidden until found, so its rock stands in
+	# the doorway of the room the bridge leaves (the nave's west socket), not at the secret room.
+	var socket: Vector2 = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.WEST)
+	check(mouth.grow(1.0).has_point(socket) and not mouth.intersects(flow.biome.room_rect(WEST)), "the rock's mouth is where the bridge leaves the nave")
+	check(flow.locks.rock_of(0).intersects(flow.biome.room_rect(0)) and flow.locks.rock_of(0).encloses(mouth), "the rock the doorway, from the nave's landing to the mouth")
+	check(_grid().is_shut_mouth(mouth.get_center()), "shut: nobody walks out onto the hidden bridge")
+	check(not _grid().walk_way_clear(socket - Vector2(-20.0, 0.0), socket + Vector2(-40.0, 0.0)), "the doorway is wall from the nave")
 	var other: StringName = &"fire" if element != &"fire" else &"frost"
 	events.emit_signal("floor_touched", 0, other, mouth.get_center(), 16.0)
 	_ticks(1)

@@ -9,7 +9,9 @@ extends CanvasLayer
 ## **What it shows:** every room the party has entered (the floor's light stone) and every room only
 ## shown (the run stat `map_reveal`: the stone's shadow), each in its own shape (its floor at
 ## MAP_CELL world pixels a map pixel, read once from the grid as the biome is laid); each bridge with a
-## seen room at an end; each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
+## seen room at an end, and the room at its other end in the stone's shadow too, so no bridge ends in
+## the dark (the owner, 2026-11-20: "There should be no dead ends!"; a secret room not yet found, and
+## its bridge, stay undrawn); each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
 ## drawn bridge leads to (their mouth tells it already, `mouth_symbols.gd`), with a reward room's
 ## type under it (`reward_glyphs.gd`, the owner's ask of 2026-11-19), rising with it; and every wizard, a dot in
 ## its hat colour. **A player's own sense** (the run stat `secret_sense`, told for each seat by
@@ -112,6 +114,8 @@ var _sense_shade: PackedInt32Array = PackedInt32Array()
 ## the biome changes (`_sensed_stale`).
 var _sensed: PackedByteArray = PackedByteArray()
 var _sensed_stale: bool = true
+## How many secret rooms were found (opened) when last read: a change works the senses out again.
+var _found_secrets: int = 0
 ## By seat: held now, the opening's stage, its frame (screen pixels) and scale, and where the map's
 ## corner sits in its frame (screen pixels).
 var _held: PackedByteArray = PackedByteArray([0, 0, 0, 0])
@@ -321,13 +325,51 @@ func places() -> int:
 	return _rects.size()
 
 
-## True when the map draws place `place` now (a room seen, a bridge with a seen room at an end).
+## True when the map draws place `place` now: a room seen, or led to by a bridge drawn (in the shown
+## room's shadow); a bridge with a seen room at one end and a room the map may draw at the other. So
+## no bridge on the map ends in the dark (the owner, 2026-11-20: "There should be no dead ends!"): a
+## secret room not yet found is never drawn for its bridge, and so neither is its bridge.
 func draws(place: int) -> bool:
 	if place < 0 or place >= _rects.size():
 		return false
-	if _room[place] != 0:
-		return _level(place) >= SHOWN
-	return _level(_ends[place * 2]) >= SHOWN or _level(_ends[place * 2 + 1]) >= SHOWN
+	if _room[place] == 0:
+		return _bridge_drawn(place)
+	if _level(place) >= SHOWN:
+		return true
+	if not _may_draw(place):
+		return false
+	for other in _rects.size():
+		if _room[other] == 0 and (_ends[other * 2] == place or _ends[other * 2 + 1] == place) and _bridge_drawn(other):
+			return true
+	return false
+
+
+## How many secret rooms are opened now (a cheap count, read once a frame).
+func _secrets_found() -> int:
+	var count: int = 0
+	if pieces == null:
+		return count
+	for place in _secret.size():
+		if _secret[place] != 0 and pieces.is_opened(place):
+			count += 1
+	return count
+
+
+## True when bridge `bridge` is drawn: a seen room at one end, a room the map may draw at the other.
+func _bridge_drawn(bridge: int) -> bool:
+	var a: int = _ends[bridge * 2]
+	var b: int = _ends[bridge * 2 + 1]
+	return (_level(a) >= SHOWN and _may_draw(b)) or (_level(b) >= SHOWN and _may_draw(a))
+
+
+## True when room `room` may be drawn for a bridge leading to it: seen, or no secret room still
+## hidden (its rock not broken).
+func _may_draw(room: int) -> bool:
+	if room < 0 or room >= _rects.size():
+		return false
+	if _level(room) >= SHOWN or _secret[room] == 0:
+		return true
+	return pieces != null and pieces.is_opened(room)
 
 
 ## True when the map draws room `place`'s symbol now (seen, or led to by a drawn bridge).
@@ -353,6 +395,11 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	var world_now: int = pieces.world() if pieces != null else 0
 	if places != _laid_places or world_now != _laid_world:
 		_lay(grid, places, world_now)
+	var found: int = _secrets_found()
+	if found != _found_secrets:
+		# A secret room found draws it for its bridge, so no seat senses it any more (the review's).
+		_found_secrets = found
+		_sensed_stale = true
 	var again: int = pieces.done_again() if pieces != null else 0
 	if again != _read_again:
 		# The rooms done (cleared, opened, rewards left, fountains) told again after a restore: drawn as
@@ -708,14 +755,12 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_glyphs.append(glyphs)
 		_glyph_shades.append(glyph_shades)
 	for place in places:
-		if _room[place] != 0:
+		if _room[place] != 0 or pieces == null:
 			continue
-		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
-		var end: int = 0
-		for room in places:
-			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
-				_ends[place * 2 + end] = room
-				end += 1
+		# Its real ends, as Flow put them on its layout (a room merely touching it is none of them:
+		# the review's, 2026-11-20).
+		for end in 2:
+			_ends[place * 2 + end] = pieces.end_room(place, end)
 	# A biome laid is drawn as it stands, every map shut (a new world opens nothing already open).
 	_stage.fill(0)
 	_reopen.fill(0)

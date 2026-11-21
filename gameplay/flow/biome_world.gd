@@ -170,6 +170,32 @@ func mouth_rect(bridge: int, end: int) -> Rect2:
 	return _moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]) if shape != null else Rect2()
 
 
+## Bridge `bridge`'s ends on its layout (`PieceShape.BRIDGE_ENDS_META`, `BRIDGE_JOINTS_META`).
+func _set_bridge_ends(layout: Node, bridge: int) -> void:
+	var ends := PackedInt32Array()
+	var joints := PackedVector2Array()
+	for end in 2:
+		var room: int = map.end_room(bridge, end)
+		var socket: int = map.end_socket(bridge, end)
+		var shape: PieceShape = map.room_shape(room, _shapes)
+		ends.append(room)
+		ends.append(shape.socket_facing[socket] if shape != null else 0)
+		joints.append(map.room_places[room] + shape.socket_at[socket] if shape != null else Vector2.ZERO)
+	layout.set_meta(PieceShape.BRIDGE_ENDS_META, ends)
+	layout.set_meta(PieceShape.BRIDGE_JOINTS_META, joints)
+
+
+## The world rectangle of the doorway where bridge `bridge`'s end `end` meets its room: from the
+## landing inside the room's socket (`PieceShape.LANDING`) out to the far side of its mouth
+## (`PieceShape.MOUTH_DEPTH`), across the mouth; where a secret room's rock stands (`LockDoors`).
+func doorway_rect(bridge: int, end: int) -> Rect2:
+	if map == null or bridge < 0 or bridge >= map.bridges():
+		return Rect2()
+	var room: int = map.end_room(bridge, end)
+	var shape: PieceShape = map.room_shape(room, _shapes)
+	return _moved(shape.strip(map.end_socket(bridge, end), -PieceShape.LANDING, PieceShape.MOUTH_DEPTH), map.room_places[room]) if shape != null else Rect2()
+
+
 ## The world's bounds for the biome: every piece (`area`), and MARGIN round them.
 func bounds() -> Rect2:
 	return area().grow(MARGIN)
@@ -231,6 +257,9 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	# A reward room's type, for the view (its mouths' signs and the held map; the owner, 2026-11-19).
 	if number < map.rooms() and not map.reward_type_of(number).is_any():
 		layout.set_meta(RewardType.LAYOUT_META, map.reward_type_of(number).to_row())
+	# A bridge's ends, for the view (which room it leaves, which it reaches; the owner, 2026-11-20).
+	if number >= map.rooms():
+		_set_bridge_ends(layout, number - map.rooms())
 	var piece := layout as Node2D
 	if piece != null:
 		piece.position = place

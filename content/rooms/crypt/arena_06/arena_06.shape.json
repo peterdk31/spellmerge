@@ -1,5 +1,5 @@
 {
-	"about": "The crypt's Bishop's tomb (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark the bishop's great tomb in the middle, two sarcophagi laid end to end under the shaft of light, a candle at each corner, four pillars round it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (north, east, south) by pins. tools/ground_shape.py draws arena_06_ground.tscn and its art from this.",
+	"about": "The crypt's Bishop's tomb (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark the bishop's great tomb in the middle, two sarcophagi laid end to end under the shaft of light, a candle at each corner, four pillars round it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (north, east, south) by pins. An off-centre west socket (the owner, 2026-11-20: doorways anywhere along an edge where the layout makes sense). tools/ground_shape.py draws arena_06_ground.tscn and its art from this.",
 	"size": [
 		640,
 		576
@@ -22,7 +22,7 @@
 			6
 		],
 		"seed": 19,
-		"pins": [
+		"pins": [[0, 384, 40, 448], 
 			[
 				288,
 				0,

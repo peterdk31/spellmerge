@@ -359,7 +359,9 @@ func test_the_mend_bot_holds_its_heal_with_a_foe_in_its_line() -> void:
 	await physics_frame
 	foe.global_position = mender.global_position + Vector2(120.0, 6.0)
 	check(bot.foe_in_line(mender, Vector2.RIGHT, bot.heal_reach()), "a foe beyond the teammate holds the heal")
-	check(not bot.foe_in_line(mender, Vector2.UP, bot.heal_reach()), "a foe aside does not")
+	# Within the foe's distance only, so a room the map puts north of the start room (its props are
+	# of another team) is not read: the foe aside alone is asked about.
+	check(not bot.foe_in_line(mender, Vector2.UP, 200.0), "a foe aside does not")
 	check(not bot.foe_in_line(mender, Vector2.RIGHT, 60.0), "nor one past the reach")
 	# Regression (the playtest of 2026-11-20): a foe pressed against the mender took the heal as it
 	# left the staff, whichever way it was aimed.

@@ -18,6 +18,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## Seeds each style is generated from.
 const SEEDS: int = 150
+## The crypt's seeds swept for dead ends (the owner, 2026-11-20).
+const DEAD_END_SEEDS: int = 120
 
 var _biome: MadeUpBiome = null
 
@@ -48,6 +50,9 @@ func _maps_of(style: MapStyle) -> Array[BiomeMap]:
 			check(false, "%s, seed %d: no map: %s" % [style.id, seed_value, "\n".join(map.not_made)])
 			continue
 		var problems: PackedStringArray = map.problems(_biome.shapes) + BiomeGenerator.rule_problems(map, rules, _biome.content, _biome.shapes)
+		var left: int = BiomeGenerator.joins_left(map, rules, _biome.content, _biome.shapes)
+		if left > 0:
+			problems.append("%d pairs of doorways a walkway could join left unjoined" % left)
 		if not problems.is_empty():
 			failed += 1
 			check(false, "%s, seed %d: %s" % [style.id, seed_value, "\n".join(problems)])
@@ -163,7 +168,9 @@ func test_the_styles_differ_as_their_weights_say() -> void:
 		hub[style.id] = widest
 	# A way of at least fights_on_way + 1 rooms: the branching and hub maps' ways are both near it.
 	check(boss_depth[&"long"] > boss_depth[&"branching"] and boss_depth[&"long"] > boss_depth[&"hub"] and boss_depth[&"branching"] >= boss_depth[&"hub"], "the long map's boss stands deepest: %s" % boss_depth)
-	check(loops[&"loop"] > 20 and loops[&"long"] == 0 and loops[&"branching"] == 0 and loops[&"hub"] == 0, "the loop style closes loops where the shapes leave room for one (%d of 60 maps), the others none: %s" % [loops[&"loop"], loops])
+	# The others close no loop of their own, only the extra entrances where two doorways line up a
+	# walkway apart (step 5b, the owner, 2026-11-20): now and then.
+	check(loops[&"loop"] > 20 and loops[&"long"] * 4 < loops[&"loop"] and loops[&"branching"] * 4 < loops[&"loop"] and loops[&"hub"] * 4 < loops[&"loop"], "the loop style closes loops where the shapes leave room for one (%d of 60 maps), the others only where doorways line up: %s" % [loops[&"loop"], loops])
 	check(hub[&"hub"] > hub[&"long"] and hub[&"hub"] > hub[&"branching"], "the hub's busiest room has the most bridges: %s" % hub)
 
 
@@ -667,6 +674,130 @@ func test_every_crypt_fight_room_and_walkway_is_played() -> void:
 		if room != null and room.biome == &"crypt" and (room.walkway or room.kinds.has(&"fight")) and not placed.has(room.id):
 			unplayed.append(String(room.id))
 	check_equal(unplayed, PackedStringArray(), "every crypt fight room and walkway is played in some map")
+
+
+## The owner, 2026-11-20: "There should be no dead ends!" Over a sweep of the crypt's seeds every
+## bridge's two ends meet two rooms' sockets (at one point, facing each other), every socket is
+## joined once at most, and no two free doorways of two rooms a walkway could join (clear, keeping
+## the rules) are left unjoined (the extra entrances, step 5b). Laid, a joined socket's doorway is
+## open onto its bridge and every other socket stays lip: no doorway opens onto the void.
+func test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var rules: MapRules = crypt.biomes[0]
+	var extra: int = 0
+	var off_centre: Dictionary = {}
+	var unsound := PackedStringArray()
+	for seed_value in range(1, DEAD_END_SEEDS + 1):
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		if not map.is_made():
+			unsound.append("seed %d: no map: %s" % [seed_value, "; ".join(map.not_made)])
+			continue
+		for line: String in _dead_ends(map, shapes):
+			unsound.append("seed %d: %s" % [seed_value, line])
+		var left: int = BiomeGenerator.joins_left(map, rules, content, shapes)
+		if left > 0:
+			unsound.append("seed %d: %d pairs of doorways a walkway could join left unjoined" % [seed_value, left])
+		if map.style != &"loop" and map.bridges() >= map.rooms():
+			extra += 1
+		for bridge in map.bridges():
+			for end in 2:
+				var room: int = map.end_room(bridge, end)
+				var shape: PieceShape = map.room_shape(room, shapes)
+				var socket: int = map.end_socket(bridge, end)
+				var across: Vector2 = shape.socket_at[socket] - shape.size * 0.5
+				if absf(across.x if shape.socket_facing[socket] % 2 == 0 else across.y) >= 32.0:
+					off_centre[map.room_mirrors[room]] = int(off_centre.get(map.room_mirrors[room], 0)) + 1
+	check_equal(unsound, PackedStringArray(), "every bridge meets two rooms, every doorway a bridge")
+	# The owner, 2026-11-20: a doorway may stand anywhere along an edge; the bridges meet those off
+	# its middle in every mirroring of their rooms.
+	check_equal(off_centre.size(), 4, "bridges meet doorways off an edge's middle in all four mirrorings: %s" % [off_centre])
+	check(extra > 0, "rooms with more than one way in where the doorways line up, in styles that close no loop: %d maps of %d" % [extra, DEAD_END_SEEDS])
+	# Laid: open where joined, lip elsewhere.
+	var world := Fixture.new(root)
+	var into := Node2D.new()
+	root.add_child(into)
+	for seed_value: int in [1, 2, 3]:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		var biome := BiomeWorld.new()
+		biome.registry = world.registry
+		biome.projectiles = world.projectiles
+		check_equal(biome.lay(into, map), PackedStringArray(), "seed %d: laid" % seed_value)
+		var grid: RoomGrid = world.projectiles.grid()
+		var joined: Dictionary = {}
+		for bridge in map.bridges():
+			for end in 2:
+				joined[Vector2i(map.end_room(bridge, end), map.end_socket(bridge, end))] = true
+		var wrong := PackedStringArray()
+		for room in map.rooms():
+			var shape: PieceShape = map.room_shape(room, shapes)
+			for socket in shape.sockets():
+				var at: Vector2 = map.room_places[room] + shape.socket_at[socket]
+				var way: Vector2 = shape.way_of(socket)
+				var open: bool = grid.walk_way_clear(at - way * 12.0, at + way * 40.0)
+				if open != joined.has(Vector2i(room, socket)):
+					wrong.append("room %d (%s) socket %d %s" % [room, map.room_templates[room], socket, "opens onto the void" if open else "is joined but walled"])
+		check_equal(wrong, PackedStringArray(), "seed %d: a doorway open where a bridge meets it, lip elsewhere" % seed_value)
+		biome.clear()
+		for child in into.get_children():
+			child.free()
+	world.free_all()
+	into.free()
+
+
+## The owner, 2026-11-20: a secret room is reached only through its secret, so no loop or extra
+## entrance ever joins it: its line must be a dead end (the validator names one that is not).
+func test_no_loop_or_extra_entrance_joins_a_secret_room() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var secrets: int = 0
+	for seed_value in 30:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret":
+				secrets += 1
+				check_equal(_bridges_of(map, room), 1, "seed %d: secret room %d has its one bridge" % [seed_value, room])
+	check(secrets > 0, "secret rooms were placed: %d" % secrets)
+	# A secret line that is no dead end is named by the validator, never made.
+	var rules := (crypt.biomes[0] as MapRules).duplicate(true) as MapRules
+	for rule: KindRule in rules.kinds:
+		if rule.kind == &"secret":
+			rule.dead_end = false
+	var named: bool = false
+	for line: String in rules.biome_problems(content, shapes):
+		named = named or line.contains("'secret' enters by a secret")
+	check(named, "the validator names a secret line that is no dead end")
+
+
+## What makes a dead end of `map`'s bridges: an end that names no room's socket, meets it off its
+## point or not facing it, or a socket joined twice.
+func _dead_ends(map: BiomeMap, shapes: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	var joined: Dictionary = {}
+	for bridge in map.bridges():
+		var shape: PieceShape = map.bridge_shape(bridge, shapes)
+		for end in 2:
+			var room: int = map.end_room(bridge, end)
+			var socket: int = map.end_socket(bridge, end)
+			var room_shape: PieceShape = map.room_shape(room, shapes) if room >= 0 and room < map.rooms() else null
+			if room_shape == null or socket < 0 or socket >= room_shape.sockets():
+				found.append("bridge %d's end %d meets no room's socket" % [bridge, end])
+				continue
+			var key := Vector2i(room, socket)
+			if joined.has(key):
+				found.append("room %d's socket %d joined twice" % [room, socket])
+			joined[key] = true
+			var room_at: Vector2 = map.room_places[room] + room_shape.socket_at[socket]
+			var bridge_at: Vector2 = map.bridge_places[bridge] + shape.socket_at[end]
+			if room_at != bridge_at or shape.socket_facing[end] != RoomSocket.opposite(room_shape.socket_facing[socket]):
+				found.append("bridge %d's end %d (%s at %s) misses room %d's socket %d (%s)" % [bridge, end, map.bridge_templates[bridge], bridge_at, room, socket, room_at])
+	return found
 
 
 ## The reward rooms' types (the owner's ask of 2026-11-19, step 7): every crypt reward room gets one,

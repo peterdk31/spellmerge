@@ -145,6 +145,10 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 		if rule.max_per_run == 0:
 			unlimited += 1
 		var of_kind: RoomKind = content.kind(rule.kind)
+		if of_kind.door == RoomKind.DOOR_SECRET and not rule.dead_end:
+			# The owner, 2026-11-20: a secret room is reached only through its secret, so no room
+			# hangs off it and no loop or extra entrance joins it.
+			found.append("%s: kind '%s' enters by a secret: its line is a dead end (dead_end), reached only through its secret." % [biome, rule.kind])
 		var fights: bool = of_kind.fill == RoomKind.FILL_ENEMIES
 		if of_kind.fill == RoomKind.FILL_ELITES or (fights and elite_depth >= 0 and elite_chance > 0.0):
 			has_elites = true

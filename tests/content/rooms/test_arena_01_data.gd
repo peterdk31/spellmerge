@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The crypt room's data (content/rooms/crypt/arena_01): the resource is a RoomBase, the scene
 ## has no scripts, and its spawns and doors are its scene's markers (props W8a: `RoomPlaces`). The
 ## antechamber (crypt rework CR3, docs/milestones/crypt-rework.md): a floating room drawn from its
-## shape, its pillars props and two sockets, its landmark the fallen column under a shaft of light.
+## shape, its pillars props and four sockets, its landmark the fallen column under a shaft of light.
 
 const RoomData := preload("res://content/rooms/crypt/arena_01.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -33,9 +33,10 @@ func test_spawn_groups_hold_only_markers() -> void:
 
 
 ## A floating room drawn from its shape, its own Void behind the slab, its five pillars props and its
-## two sockets (`RoomScan.floating_room_problems`).
+## four sockets: west and east, and off-centre north and south ones (the owner, 2026-11-20: doorways
+## anywhere along an edge) (`RoomScan.floating_room_problems`).
 func test_it_is_a_floating_room_drawn_from_its_shape() -> void:
-	check_equal(RoomScan.floating_room_problems(RoomData as RoomBase, room_root, 4), PackedStringArray(), "a floating room")
+	check_equal(RoomScan.floating_room_problems(RoomData as RoomBase, room_root, 4, 4), PackedStringArray(), "a floating room")
 
 
 func test_its_landmark_stands_under_the_shaft() -> void:

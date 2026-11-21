@@ -38,6 +38,12 @@ const MIRRORINGS: PackedInt32Array = [0, MIRROR_X, MIRROR_Y, MIRROR_X | MIRROR_Y
 ## The meta a laid piece's layout carries for the view, how it is placed (`Vector2i`, x or y 1 where
 ## mirrored): Feel's `GroundShape.MIRROR_META` (connected biomes CB4), which draws its ground so.
 const GROUND_MIRROR_META: StringName = &"ground_mirror"
+## A bridge's layout's meta, for the view (the owner, 2026-11-20: a secret room's bridge is hidden
+## until found): the rooms its sockets 0 and 1 meet and those rooms' sockets' facings
+## (`PackedInt32Array([room_a, facing_a, room_b, facing_b])`), and where they meet in the biome's
+## world (`BRIDGE_JOINTS_META`, `PackedVector2Array([at_a, at_b])`). Set by Flow's `BiomeWorld`.
+const BRIDGE_ENDS_META: StringName = &"bridge_ends"
+const BRIDGE_JOINTS_META: StringName = &"bridge_joints"
 
 ## The template's id (`RoomBase.id`), whether it is a walkway, and its mirroring.
 var id: StringName = &""

@@ -24,6 +24,10 @@ extends RefCounted
 ## 5. **The loops:** up to the style's `loops` extra bridges between two rooms' free sockets that a
 ##    bridge's ends meet, each kept only where the rules still hold (the boss still deepest, fights
 ##    enough on every way to it, every kind at a depth it takes).
+## 5b. **The extra entrances** (the owner, 2026-11-20): in every style, once every room stands, every
+##    two free sockets of two rooms not yet joined that a walkway spans clear of every other piece,
+##    joined where the rules still hold, one at a time and with no roll (`joins_left` counts what a
+##    map still leaves: none for a map made).
 ## 6. **The fill:** each room's scale (`RunDefinition.biome_room_scale`: its depth, the run's
 ##    players) and a fight's enemies bought by its scaled budget, the boss's one boss (`RoomFill`);
 ##    its elites (connected biomes CB11, decision 24): a fight room from `MapRules.elite_depth` on is
@@ -184,6 +188,19 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 			if rule != null and not rule.may_follow(map.room_kinds[pair.x]):
 				found.append("bridge %d leads from a '%s' to a '%s', which may not follow it." % [bridge, map.room_kinds[pair.x], map.room_kinds[pair.y]])
 	return found
+
+
+## How many bridges between two free sockets of two rooms not yet joined, spanned by a walkway of
+## the biome clear of every other piece and keeping the rules, `map` still leaves (step 5b, the extra
+## entrances): none for a map the generator made, so no two doorways face each other a bridge apart
+## unjoined where they could be (the owner, 2026-11-20). The tests read every seed by it.
+static func joins_left(map: BiomeMap, rules: MapRules, content: RunContent, shapes: Dictionary) -> int:
+	if not map.is_made():
+		return 0
+	var growth := Growth.new(rules, content, shapes, null)
+	growth.style = rules.styles[0] if not rules.styles.is_empty() else null
+	growth.take_map(map)
+	return growth.joins_left()
 
 
 ## The fewest fights (rooms of a kind filled with enemies) on any way from the start room to room
@@ -436,6 +453,7 @@ class Growth:
 				return why
 			# A loop is closed as soon as it can be, before a later room stands in its way.
 			_close_loops()
+		_add_entrances()
 		var problems: PackedStringArray = BiomeGenerator.rule_problems(to_map(), rules, content, shapes)
 		return problems[0] if not problems.is_empty() else ""
 
@@ -769,6 +787,8 @@ class Growth:
 		var free := PackedByteArray()
 		free.resize(shape.sockets())
 		free.fill(1)
+		# A dead end and the boss's room never take a loop's or an extra entrance's bridge (a secret
+		# room is a dead end: the validator, `MapRules.biome_problems`).
 		var loops: bool = rule == null or not (rule.dead_end or rule.stands_deepest())
 		room_free.append(free)
 		room_bridges.append(0)
@@ -788,15 +808,38 @@ class Growth:
 	func _add_bridge(crossing: Crossing, way: int, place: Vector2, a: int, socket_a: int, b: int, socket_b: int) -> void:
 		var from_end: int = crossing.ends[way]
 		var ends: PackedInt32Array = PackedInt32Array([a, socket_a, b, socket_b]) if from_end == 0 else PackedInt32Array([b, socket_b, a, socket_a])
-		bridge_templates.append(crossing.template)
+		_lay_bridge(crossing.template, place, crossing.mirrors[way], Rect2(place, crossing.size), ends)
+
+	## A bridge of walkway `template` at `place` in mirroring `mirror`, covering `rect`, its sockets 0
+	## and 1 meeting the room sockets `ends` names (END_FIELDS numbers): those sockets taken.
+	func _lay_bridge(template: StringName, place: Vector2, mirror: int, rect: Rect2, ends: PackedInt32Array) -> void:
+		bridge_templates.append(template)
 		bridge_places.append(place)
-		bridge_mirrors.append(crossing.mirrors[way])
+		bridge_mirrors.append(mirror)
 		bridge_ends.append_array(ends)
-		bridge_rects.append(Rect2(place, crossing.size))
-		for end: Vector2i in [Vector2i(a, socket_a), Vector2i(b, socket_b)]:
+		bridge_rects.append(rect)
+		for end: Vector2i in [Vector2i(ends[0], ends[1]), Vector2i(ends[2], ends[3])]:
 			room_free[end.x][end.y] = 0
 			room_bridges[end.x] += 1
 			free_at.erase(_key(end.x, end.y))
+
+	## `map` (made of this growth's rules, content and shapes) as this growth's rooms and bridges, so
+	## what a step would still do to it can be asked (`BiomeGenerator.joins_left`).
+	func take_map(map: BiomeMap) -> void:
+		var by_kind: Dictionary = {}
+		for rule: KindRule in rules.biome_lines(content, shapes):
+			by_kind[rule.kind] = rule
+		for room in map.rooms():
+			var rule: KindRule = by_kind.get(map.room_kinds[room]) as KindRule if room > 0 else null
+			_add_room(map.room_templates[room], map.room_mirrors[room], map.room_places[room], rule, map.room_kinds[room], map.depths[room])
+		for bridge in map.bridges():
+			var at: int = bridge * BiomeMap.END_FIELDS
+			var shape: PieceShape = _shape(map.bridge_templates[bridge], map.bridge_mirrors[bridge])
+			_lay_bridge(map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge], shape.rect_at(map.bridge_places[bridge]), map.bridge_ends.slice(at, at + BiomeMap.END_FIELDS))
+
+	## How many bridges step 5b would still add (none for a map it finished).
+	func joins_left() -> int:
+		return _joins_kept().size()
 
 	## The crossings of walkway `id`: for each of its mirrorings and each end, the facing of the room
 	## socket that end meets, grouped where they place the bridge alike.
@@ -828,36 +871,58 @@ class Growth:
 	## two rooms not yet joined, each by chance among those that keep the rules.
 	func _close_loops() -> void:
 		while loops_left > 0:
-			var found: Array = []  # [crossing, the bridge's place, room a, socket a, room b, socket b]
-			for key: Vector3i in free_at:
-				var from: Vector2i = free_at[key]
-				var at := Vector2(key.x, key.y)
-				for crossing: Crossing in crossings[key.z]:
-					var far: Vector2 = at + crossing.span
-					var other_key := Vector3i(roundi(far.x), roundi(far.y), RoomSocket.opposite(crossing.far_facing))
-					if not free_at.has(other_key):
-						continue
-					var to: Vector2i = free_at[other_key]
-					if to.x == from.x or to.x < from.x or _joined(from.x, to.x):
-						continue
-					var place: Vector2 = at - crossing.from_at
-					if not _bridge_clear(Rect2(place, crossing.size), from.x, to.x):
-						continue
-					found.append([crossing, place, from.x, from.y, to.x, to.y])
-			var kept: Array = []
-			for loop_bridge: Array in found:
-				if _keeps_rules(loop_bridge):
-					kept.append(loop_bridge)
+			var kept: Array = _joins_kept()
 			if kept.is_empty():
 				return
 			var pick: Array = kept[dice.below(Step.LOOPS, kept.size())]
 			var crossing: Crossing = pick[0]
 			loops_left -= 1
-			_add_bridge(crossing, dice.below(Step.LOOPS, crossing.mirrors.size()), pick[1], pick[2], pick[3], pick[4], pick[5])
-			# A loop can shorten a way: the depths the next rooms hang off are the map's.
-			var depths: PackedInt32Array = to_map().depths
-			for room in room_depths.size():
-				room_depths[room] = depths[room]
+			_join(pick, dice.below(Step.LOOPS, crossing.mirrors.size()))
+
+	## Step 5b, the extra entrances (the owner, 2026-11-20: "rooms can have multiple entrances, if it
+	## makes sense in the layout"): once every room stands, every two free sockets of two rooms not
+	## yet joined that a walkway of the biome spans (straight or a corner, clear of every other room
+	## and bridge) are joined, each only where the rules still hold, one at a time (the depths worked
+	## out again after each). No roll: the first that keeps the rules, in the order the sockets were
+	## freed, in its walkway's first mirroring that places it so; the same rooms give the same bridges.
+	func _add_entrances() -> void:
+		while true:
+			var kept: Array = _joins_kept()
+			if kept.is_empty():
+				return
+			_join(kept[0], 0)
+
+	## Every bridge between two free sockets a walkway's ends meet, of two rooms not yet joined, clear
+	## of every other piece, that keeps the rules so far: [crossing, the bridge's place, room a,
+	## socket a, room b, socket b] each, in the order the sockets were freed.
+	func _joins_kept() -> Array:
+		var kept: Array = []
+		for key: Vector3i in free_at:
+			var from: Vector2i = free_at[key]
+			var at := Vector2(key.x, key.y)
+			for crossing: Crossing in crossings[key.z]:
+				var far: Vector2 = at + crossing.span
+				var other_key := Vector3i(roundi(far.x), roundi(far.y), RoomSocket.opposite(crossing.far_facing))
+				if not free_at.has(other_key):
+					continue
+				var to: Vector2i = free_at[other_key]
+				if to.x <= from.x or _joined(from.x, to.x):
+					continue
+				var place: Vector2 = at - crossing.from_at
+				if not _bridge_clear(Rect2(place, crossing.size), from.x, to.x):
+					continue
+				var join: Array = [crossing, place, from.x, from.y, to.x, to.y]
+				if _keeps_rules(join):
+					kept.append(join)
+		return kept
+
+	## The bridge `join` (as `_joins_kept` gives it) laid in its crossing's `way`th mirroring, the
+	## depths worked out again: a new bridge can shorten a way, and the next rooms hang off the map's.
+	func _join(join: Array, way: int) -> void:
+		_add_bridge(join[0], way, join[1], join[2], join[3], join[4], join[5])
+		var depths: PackedInt32Array = to_map().depths
+		for room in room_depths.size():
+			room_depths[room] = depths[room]
 
 	func _joined(a: int, b: int) -> bool:
 		for bridge in bridge_templates.size():

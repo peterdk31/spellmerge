@@ -6,7 +6,10 @@ extends RefCounted
 ## and hears the floor touched.
 ##
 ## - **A locked room** is one whose kind enters by `RoomKind.DOOR_KEY` (a treasure room) or
-##   `DOOR_SECRET` (a secret room). Each mouth where a bridge meets it is one of its doors, shut
+##   `DOOR_SECRET` (a secret room). Each mouth where a bridge meets a key room is one of its doors; a
+##   secret room's door is its bridge's other mouth, where the bridge leaves the room it hangs off
+##   (the owner, 2026-11-20: the bridge to a secret room is hidden until the secret is found, so the
+##   rock stands in that room's doorway and nobody walks out onto a bridge not drawn). A door is shut
 ##   (`RoomGrid.shut_mouth`: a wall to everything) until the room opens; then all its doors open, for
 ##   everyone (decision 21: a key door opens for all).
 ## - **Keys** (decision 21, as the owner changed it on 2026-11-19: "Multiple treasures can be in each
@@ -28,7 +31,8 @@ extends RefCounted
 ## - **A secret rock** (decision 22) opens to one element, rolled for its room as the biome begins
 ##   (Flow's `_begin_locks`): that element touching the floor (`floor_touched`, queued by
 ##   `queue_touch` and applied at the next `step`, never in the middle of the shots' step) with its
-##   circle within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
+##   circle within TOUCH_REACH of the rock (`rock_of`: the doorway, from its landing inside the room
+##   the bridge hangs off to its mouth) breaks it (`touched`), and the room opens.
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
 ##   element) and each key lying (`key_shown`) as it changes; -1 when every one is forgotten (the biome
 ##   left, a restore: told again by `tell_all`), and the rooms opened (`rooms_opened`: as one opens,
@@ -58,12 +62,12 @@ const KEY_REACH: float = 10.0
 const NO_KEYS: PackedInt32Array = [-1]
 ## How far round a door's mouth its room's lip counts as at that door (as a gather door's).
 const LIP_REACH: float = 24.0
-## How near a floor touch's circle must come to a secret door's mouth to break its rock, in pixels.
+## How near a floor touch's circle must come to a secret door's rock (`rock_of`) to break it, in pixels.
 const TOUCH_REACH: float = 8.0
 
-## Not state: the bus (set by Flow), each door's mouth in the world (laid from the map, `lay`) and,
+## Not state: the bus (set by Flow), each door's mouth and rock in the world (laid from the map, `lay`) and,
 ## by seat, the door its hint was last told (`key_needed_shown`: view only, told again after a restore).
-const DERIVED: Array[StringName] = [&"events", &"_mouths", &"_needed"]
+const DERIVED: Array[StringName] = [&"events", &"_mouths", &"_rocks", &"_needed"]
 
 var events: EventsScript = null
 ## Each room's rule (RULE_*), by its number; 1 in `opened` once it opened; a secret room's element.
@@ -84,6 +88,8 @@ var touch_elements: Array[StringName] = []
 var touch_at: PackedVector2Array = PackedVector2Array()
 var touch_radii: PackedFloat32Array = PackedFloat32Array()
 var _mouths: Array[Rect2] = []
+## Each door's rock (a secret door's doorway, `rock_of`; a key door's mouth), laid with the mouths.
+var _rocks: Array[Rect2] = []
 var _needed: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
 
 
@@ -112,7 +118,9 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 				continue
 			door_rooms.append(room)
 			door_bridges.append(bridge)
-			door_ends.append(end)
+			# A secret room's rock stands at the bridge's far end, in the doorway of the room it
+			# hangs off: the bridge is hidden until it breaks (the owner, 2026-11-20).
+			door_ends.append(1 - end if rules[room] == RULE_SECRET else end)
 			var other: int = map.end_room(bridge, 1 - end)
 			if not drops.is_empty() or rules[room] != RULE_KEY:
 				continue
@@ -179,6 +187,7 @@ func clear() -> void:
 	touch_at.resize(0)
 	touch_radii.resize(0)
 	_mouths.clear()
+	_rocks.clear()
 	if had:
 		_forget(false)
 		_tell_opened(false)
@@ -209,6 +218,14 @@ func mouth_of(door: int) -> Rect2:
 	return _mouths[door] if door >= 0 and door < _mouths.size() else Rect2()
 
 
+## The world rectangle of door `door`'s rock, where its element breaks it and the view draws it: a
+## secret door's doorway (`BiomeWorld.doorway_rect`: from the landing inside the room the bridge
+## hangs off to its mouth, so a spell landing on that room's floor at the wall finds it); a key
+## door's mouth. Laid by `lay` (empty before).
+func rock_of(door: int) -> Rect2:
+	return _rocks[door] if door >= 0 and door < _rocks.size() else Rect2()
+
+
 ## How many keys `body` holds in its own currency bag (0 for none, or no inventory).
 static func keys_of(body: Actor) -> int:
 	return body.inventory.count_of(KEY_BAG, KeyBase.ID) if body != null and body.inventory != null else 0
@@ -218,8 +235,11 @@ static func keys_of(body: Actor) -> int:
 ## the grid's layers are not state): each door's mouth found, shut while its room is not open.
 func lay(world: BiomeWorld, grid: RoomGrid) -> void:
 	_mouths.clear()
+	_rocks.clear()
 	for door in doors():
 		_mouths.append(world.mouth_rect(door_bridges[door], door_ends[door]) if world != null else Rect2())
+		var secret: bool = rules[door_rooms[door]] == RULE_SECRET
+		_rocks.append(world.doorway_rect(door_bridges[door], door_ends[door]) if world != null and secret else _mouths[door])
 	if grid == null:
 		return
 	for door in doors():
@@ -313,16 +333,16 @@ func queue_touch(element: StringName, at: Vector2, radius: float) -> void:
 
 
 ## An element touched the floor: `element` within `radius` of `at`. Every shut
-## secret room of that element with a door's mouth within the circle's reach (TOUCH_REACH more)
-## opens. Returns the first room opened (NONE for none).
+## secret room of that element with a door's rock (`rock_of`) within the circle's reach (TOUCH_REACH
+## more) opens. Returns the first room opened (NONE for none).
 func touched(element: StringName, at: Vector2, radius: float, grid: RoomGrid) -> int:
 	var found: int = NONE
 	for door in doors():
 		var room: int = door_rooms[door]
 		if rules[room] != RULE_SECRET or is_open(room) or elements[room] != element:
 			continue
-		var mouth: Rect2 = mouth_of(door)
-		var nearest := Vector2(clampf(at.x, mouth.position.x, mouth.end.x), clampf(at.y, mouth.position.y, mouth.end.y))
+		var rock: Rect2 = rock_of(door)
+		var nearest := Vector2(clampf(at.x, rock.position.x, rock.end.x), clampf(at.y, rock.position.y, rock.end.y))
 		var reach: float = maxf(radius, 0.0) + TOUCH_REACH
 		if nearest.distance_squared_to(at) <= reach * reach:
 			open(room, grid)
@@ -383,7 +403,7 @@ func _tell_door(door: int) -> void:
 	if rules[room] == RULE_KEY:
 		events.key_door_shown.emit(_view_number(door), mouth_of(door), is_open(room))
 	elif rules[room] == RULE_SECRET:
-		events.secret_rock_shown.emit(_view_number(door), mouth_of(door), elements[room], is_open(room))
+		events.secret_rock_shown.emit(_view_number(door), rock_of(door), elements[room], is_open(room))
 
 
 ## Seat `seat`'s body stands at shut key door `door` with no key (NONE: at none), told on a change.

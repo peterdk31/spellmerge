@@ -661,8 +661,11 @@ func test_the_map_shows_the_rooms_seen_the_bridges_from_them_and_the_kinds_they_
 	view.step(0.0, actors, 1, _grid(), _two_views())
 	check_equal(view.places(), 5, "every piece")
 	check(view.draws(0), "the start room, entered")
-	check(not view.draws(WEST) and not view.draws(EAST), "the rooms not seen are not drawn")
-	check(view.draws(3) and view.draws(4), "the bridges from the start room are")
+	check(view.draws(3) and view.draws(4), "the bridges from the start room are drawn")
+	# The owner, 2026-11-20: "There should be no dead ends!": a bridge drawn never ends in the dark,
+	# so the rooms it leads to are drawn too, in the shadow of a room only shown.
+	check(view.draws(WEST) and view.draws(EAST), "and the rooms they lead to, so no bridge ends in the dark")
+	check(view.shade_of(WEST) == 1 and view.shade_of(EAST) == 1, "in the stone's shadow, as a room only shown")
 	check(view.draws_symbol(WEST) and view.draws_symbol(EAST), "and the kinds they lead to, as their mouths tell")
 	var floor: ImageTexture = PartyMapViewScript.floor_of(_grid(), 0)
 	check(floor != null and floor.get_width() == ceili(_grid().place_rect(0).size.x / PartyMapViewScript.MAP_CELL), "a room's floor at a map pixel a MAP_CELL")
@@ -670,6 +673,30 @@ func test_the_map_shows_the_rooms_seen_the_bridges_from_them_and_the_kinds_they_
 	view.step(0.0, actors, 1, _grid(), _two_views())
 	check(view.draws(WEST), "entered, the antechamber is drawn")
 	check_equal(view.shade_of(WEST), 3, "with every map shut, as it stands: the stone's light")
+
+
+## The owner, 2026-11-20: "There should be no dead ends!" On the map no bridge ends in the dark: each
+## drawn bridge's far room is drawn too; a secret room not yet found is not, and so neither is its
+## bridge, until its rock is broken.
+func test_no_bridge_on_the_map_ends_in_the_dark() -> void:
+	var map: BiomeMap = _start_kinds(1, &"secret", &"fight")
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	var to_secret: int = -1
+	for bridge in map.bridges():
+		var place: int = map.rooms() + bridge
+		if map.end_room(bridge, 0) == WEST or map.end_room(bridge, 1) == WEST:
+			to_secret = place
+		if view.draws(place):
+			for end in 2:
+				check(view.draws(map.end_room(bridge, end)), "bridge %d is drawn: so is its room %d" % [bridge, map.end_room(bridge, end)])
+	check(to_secret >= 0, "a bridge leads to the secret room")
+	check(not view.draws(WEST) and not view.draws(to_secret), "the secret room not found: neither it nor its bridge on the map")
+	check(view.draws(EAST), "the court a bridge leads to is drawn")
+	flow.locks.open(WEST, _grid())
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.draws(WEST) and view.draws(to_secret), "found: its bridge and the room on the map")
+	check_equal(view.shade_of(WEST), 1, "in the stone's shadow, as a room only shown")
 
 
 ## The run stat `secret_sense` (the owner's answer of 2026-11-19): a secret room within that many
@@ -695,6 +722,12 @@ func test_a_players_secret_sense_shows_a_secret_room_near_on_their_own_map_only(
 	check(not view.senses(1, EAST) and view.sense_shade_of(1, EAST) == 0, "never on another player's map")
 	check(not view.senses(0, WEST), "a room that is no secret one is never sensed")
 	check(not view.draws(EAST), "the party's map is as it was")
+	# Found (its rock broken) with nobody in it yet: drawn for its bridge, so sensed no more (the
+	# review's: the sense was worked out again only as the party's map changed).
+	flow.locks.open(EAST, _grid())
+	view.step(0.0, actors, 3, _grid(), _two_views())
+	check(view.draws(EAST) and not view.senses(0, EAST), "found: on the party's map, no longer sensed")
+	check_equal(view.sense_shade_of(0, EAST), 0, "its sensed look gone (every map shut: as it stands)")
 
 
 ## The owner, 2026-11-19: a sensed secret room reads as secret, in a faint void light of its own,
@@ -750,8 +783,8 @@ func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reope
 		view.advance()
 		view.step(0.0, actors, 1, _grid(), views)
 	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "open")
-	check_equal(view.shade_of(WEST), 0, "the antechamber not drawn")
-	check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "but its symbol, as its bridge leads there")
+	check_equal(view.shade_of(WEST), 1, "the antechamber in the stone's shadow, as its bridge leads there (no dead end)")
+	check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "and its symbol")
 	_into(map, WEST, RoomSocket.Facing.EAST)
 	view.step(0.0, actors, 1, _grid(), views)
 	var shades: Array[int] = []
@@ -760,7 +793,7 @@ func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reope
 		shades.append(view.shade_of(WEST))
 	# Its empty fight is cleared as it is entered: its symbol's done look steps with the shades and
 	# goes on after them.
-	check_equal(shades.slice(0, 3), [1, 2, 3] as Array[int], "entered while the map is open: it comes in a shade a frame")
+	check_equal(shades.slice(0, 2), [2, 3] as Array[int], "entered while the map is open: it climbs from its shadow a shade a frame")
 	check_equal(view.done_of(WEST), KindSymbolScript.DONE_STAGES, "and, cleared, its symbol stepped to the done look")
 	# The screen merges under it: one view of the whole screen, a bigger frame. It closes, then opens again.
 	var frame: Rect2i = view.frame_of(0)
@@ -818,7 +851,7 @@ func test_a_machine_that_joins_mid_run_has_the_map_and_the_dark_right() -> void:
 	check_equal(dark.stage_of(WEST), 0, "the antechamber, entered before the join, lit at once")
 	check_equal(dark.stage_of(EAST), darkest, "the court dark")
 	check(not dark.is_moving(), "drawn as it stands, nothing played in")
-	check(view.draws(0) and view.draws(WEST) and not view.draws(EAST), "the joiner's map: the rooms entered before it came")
+	check(view.draws(0) and view.shade_of(WEST) == 3 and view.shade_of(EAST) == 1, "the joiner's map: the rooms entered before it came lit, the court only led to in shadow")
 
 
 func test_a_restore_into_the_world_shown_draws_the_dark_as_it_stands() -> void:

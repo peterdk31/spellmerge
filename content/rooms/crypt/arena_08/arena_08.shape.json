@@ -1,5 +1,5 @@
 {
-	"about": "The crypt's Bone hall (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark two low walls of stacked bones across the hall's north half, a gap between them, bones piled at their feet. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, south) by pins. tools/ground_shape.py draws arena_08_ground.tscn and its art from this.",
+	"about": "The crypt's Bone hall (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark two low walls of stacked bones across the hall's north half, a gap between them, bones piled at their feet. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, south) by pins. An off-centre north socket (the owner, 2026-11-20: doorways anywhere along an edge where the layout makes sense). tools/ground_shape.py draws arena_08_ground.tscn and its art from this.",
 	"size": [
 		704,
 		512
@@ -22,7 +22,7 @@
 			6
 		],
 		"seed": 18,
-		"pins": [
+		"pins": [[160, 0, 224, 40], 
 			[
 				0,
 				224,

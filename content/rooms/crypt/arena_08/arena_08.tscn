@@ -247,5 +247,10 @@ position = Vector2(352, 480)
 script = ExtResource("cb_socket")
 facing = 2
 
+[node name="SocketNorth" type="Node2D" parent="."]
+position = Vector2(192, 32)
+script = ExtResource("cb_socket")
+facing = 0
+
 [node name="SocketPreview" type="Node2D" parent="."]
 script = ExtResource("cb_socket_preview")

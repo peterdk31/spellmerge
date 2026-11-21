@@ -136,6 +136,7 @@ const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
+const DecalPagesScript := preload("res://gameplay/feel/decal_pages.gd")
 const UnseenStandingScript := preload("res://gameplay/feel/unseen_standing.gd")
 const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const RoomsViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
@@ -578,6 +579,8 @@ var _unseen: UnseenDarkScript = null
 ## What the rooms nobody has entered hold, not drawn under their dark (`unseen_rooms.gd`; the owner,
 ## 2026-11-21).
 var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
+## Each laid room's decals (the candles, a torch) drawn from one page each (`decal_pages.gd`).
+var _decal_pages: DecalPagesScript = DecalPagesScript.new()
 ## What stands there, hidden one by one (the owner, 2026-11-21, on #899): the bodies and the rooms'
 ## mists (`unseen_standing.gd`), and the looks that draw what lies on the floor, each told the dark's
 ## mask (`UnseenDark.mask`) and drawn again whenever it changes (`_masked_looks`, the mask's changes
@@ -970,6 +973,7 @@ func _ready() -> void:
 	add_child(_unseen)
 	_unseen.bind(events)
 	_unseen_rooms.bind(events)
+	_decal_pages.bind(events)
 	_teleports = TeleportLooksScript.new()
 	_teleports.name = "TeleportLooks"
 	add_child(_teleports)

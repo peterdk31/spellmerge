@@ -22,6 +22,10 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##  - `... feel parts`: Feel's step by part (`Feel.profile_parts`), milliseconds a drawn frame;
 ##  - `... worst frames`: the slowest WORST frames, each with its ticks, the tick's time and the GPU's.
 ## With `--profile` the tree profile rides along (each script's process time: the HUD's among them).
+## `--picture=WxH` draws the game's picture at that size (the root's `content_scale_size`; the shipped
+## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer and the light keeps its
+## resolution (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
+## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
 ## `user://biome_frames/<label>.png` (one slow frame, outside the averages' sense).
 ##
@@ -78,6 +82,23 @@ func _init() -> void:
 		scenarios.append(index)
 	result_word = "BIOME FRAMES"
 	_shots = (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--shots")
+
+
+func _enter_tree() -> void:
+	var picture: Vector2i = picture_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args())
+	if picture != Vector2i.ZERO:
+		get_tree().root.content_scale_size = picture
+		print("BENCH: biome frames picture %dx%d" % [picture.x, picture.y])
+
+
+## The picture `--picture=WxH` asks for among `args` (zero: none asked, the project's).
+static func picture_asked(args: PackedStringArray) -> Vector2i:
+	for arg in args:
+		if arg.begins_with("--picture="):
+			var parts: PackedStringArray = arg.trim_prefix("--picture=").split("x")
+			if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+				return Vector2i(maxi(parts[0].to_int(), 1), maxi(parts[1].to_int(), 1))
+	return Vector2i.ZERO
 
 
 ## Every scenario: for each seed, the two splits apart at the desktop's and the web's load, and the

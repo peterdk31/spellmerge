@@ -300,6 +300,8 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(MistScript.PASS_SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(SpellLightScript.FACTOR_SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -1161,6 +1163,7 @@ func _make_light(on: bool) -> void:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
+		light.passes_changed.connect(_hand_mist_passes)
 		add_child(light)
 		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
@@ -1250,6 +1253,17 @@ func _fit_mist(at_once: bool) -> void:
 		for at in room_mists.size():
 			room_mists[at].use_light(light.buffer())
 			light.read_by(_later_key(at), room_mists[at].material as ShaderMaterial)
+		_hand_mist_passes()
+
+
+## Every mist's billows drawn in the light's pass under it while there is one (the picture bigger than
+## PictureGrid.SIZE; `SpellLight.under_holder`), again when the passes come or go.
+func _hand_mist_passes() -> void:
+	var holder: Node = light.under_holder() if light != null else null
+	if mist != null:
+		mist.use_passes(holder)
+	for later: MistScript in room_mists:
+		later.use_passes(holder)
 
 
 ## Later room `at`'s mist made (while the first room's is), as laid.
@@ -1268,6 +1282,7 @@ func _make_later_mist(at: int) -> void:
 	if light != null:
 		made.use_light(light.buffer())
 		light.read_by(_later_key(at), made.material as ShaderMaterial)
+		made.use_passes(light.under_holder())
 
 
 func _later_key(at: int) -> StringName:

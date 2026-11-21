@@ -53,6 +53,7 @@ const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const EqualPanesScript := preload("res://gameplay/feel/equal_panes.gd")
+const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
 
 const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
 ## A split view's zoom (1: the world at its own size, as one player sees it). The owner's to tune.
@@ -98,6 +99,9 @@ const MERGING: int = 2
 
 ## The views as last laid out (count, cells, transforms, anchors, seats). Read only.
 var views: ScreenViewsScript = ScreenViewsScript.new()
+## How many times bigger than PictureGrid.SIZE the screen is (`step`): every zoom here is that many
+## times the one at PictureGrid.SIZE, so a bigger screen draws the same world finer. Read only.
+var grid: float = 1.0
 ## True while the screen is split (it merges once everyone fits again with room to spare).
 var split: bool = false
 ## True: equal panes, a view a seat (`SplitScreenSetting.EQUAL`); false: the Voronoi split. Set by
@@ -300,6 +304,7 @@ func divider_between(a: int, b: int) -> int:
 ## which each view zooms out to frame.
 func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2, foes: CloseFoesScript = null) -> void:
 	views.screen = screen
+	grid = float(PictureGridScript.scale_of(screen))
 	_foes = foes
 	if camera == null or not is_instance_valid(camera) or table == null or screen.x <= 0.0 or screen.y <= 0.0:
 		reset()
@@ -363,7 +368,7 @@ func _wants_split(screen: Vector2) -> bool:
 		party = _box[seat] if first else party.merge(_box[seat])
 		first = false
 	var need: Vector2 = party.size + Vector2.ONE * (PartyCameraScript.CAMERA_MARGIN * 2.0)
-	var fit: float = minf(screen.x / need.x, screen.y / need.y)
+	var fit: float = minf(screen.x / grid / need.x, screen.y / grid / need.y)
 	return fit < PartyCameraScript.MIN_ZOOM * (MERGE_ROOM if split else 1.0)
 
 
@@ -450,7 +455,7 @@ func _lay_sites(screen: Vector2) -> void:
 	var mid: Vector2 = (low + high) * 0.5
 	var reach: Vector2 = (high - low) * 0.5
 	var room: Vector2 = (screen * 0.5 - Vector2.ONE * SITE_MARGIN).max(Vector2.ONE)
-	var scale: float = SPLIT_ZOOM
+	var scale: float = SPLIT_ZOOM * grid
 	if reach.x > VoronoiCellsScript.EPSILON:
 		scale = minf(scale, room.x / reach.x)
 	if reach.y > VoronoiCellsScript.EPSILON:
@@ -573,7 +578,7 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
 		_pull[slot] = pull
 		var group: int = _group_holding(slot)
-		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM, pull)
+		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM * grid, pull)
 		var aim: Vector2 = _centre[slot]
 		if group >= 0:
 			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
@@ -614,7 +619,7 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 ## about the group's middle drawn at its place. Never wider than `limits` (the world camera's; none:
 ## no bound) allow: a picture past them would be pushed off its group's place.
 func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> float:
-	var zoom: float = SPLIT_ZOOM
+	var zoom: float = SPLIT_ZOOM * grid
 	if _foes == null or _foes.count == 0:
 		return zoom
 	var site: Vector2 = _group_site[group]
@@ -646,10 +651,10 @@ func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> floa
 			if apart.length_squared() < 1.0:
 				continue
 			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
-	var widest: float = PartyCameraScript.MIN_ZOOM
+	var widest: float = PartyCameraScript.MIN_ZOOM * grid
 	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
 		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
-	return clampf(zoom, minf(widest, SPLIT_ZOOM), SPLIT_ZOOM)
+	return clampf(zoom, minf(widest, SPLIT_ZOOM * grid), SPLIT_ZOOM * grid)
 
 
 ## `zoom`, lowered so a point `way` from the place (drawn `way` × zoom from it) stays FOE_MARGIN
@@ -715,7 +720,7 @@ func blank_quarter() -> int:
 
 ## The zoom the live views draw at now (the first's; SPLIT_ZOOM with none), for the void view.
 func view_zoom() -> float:
-	return views.to_screen[0].x.x if views.count > 0 else SPLIT_ZOOM
+	return views.to_screen[0].x.x if views.count > 0 else SPLIT_ZOOM * grid
 
 
 ## The equal panes as last laid (for tests).

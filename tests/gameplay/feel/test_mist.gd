@@ -339,8 +339,11 @@ func test_the_mist_lies_under_the_bodies_over_the_floor_and_under_the_light() ->
 
 func test_the_shader_is_warmed_and_its_numbers_are_the_scripts() -> void:
 	check(WarmupScript.shaders().has(MistScript.SHADER), "the mist's shader is warmed (the spectacle wants it)")
-	var code: String = MistScript.SHADER.code
-	check(code.contains("#include \"res://gameplay/feel/stir.gdshaderinc\""), "it reads the world's stirs")
+	# How thick it is is worked out in an include, shared with its pass at the light's resolution.
+	var density: String = (load("res://gameplay/feel/mist_density.gdshaderinc") as ShaderInclude).code
+	var code: String = MistScript.SHADER.code + density
+	check(MistScript.SHADER.code.contains("#include \"res://gameplay/feel/mist_density.gdshaderinc\"") and MistScript.PASS_SHADER.code.contains("#include \"res://gameplay/feel/mist_density.gdshaderinc\""), "the mist and its pass share how thick it is")
+	check(density.contains("#include \"res://gameplay/feel/stir.gdshaderinc\""), "it reads the world's stirs")
 	check(code.contains("SCREEN_UV"), "it reads the light buffer under each pixel, as the apply rect does")
 	for pair: Array in [["STIR_SHOT_PIXELS", MistScript.STIR_SHOT_PIXELS], ["STIR_BLAST_PIXELS", MistScript.STIR_BLAST_PIXELS], ["STIR_THIN", MistScript.STIR_THIN], ["PART_PIXELS", MistScript.PART_PIXELS], ["PART_THIN", MistScript.PART_THIN], ["THICKEST_DRAWN", MistScript.THICKEST_DRAWN]]:
 		check(code.contains("const float %s = %s;" % [pair[0], String.num(pair[1] as float, 1) if fmod(pair[1] as float, 1.0) == 0.0 else str(pair[1])]), "the shader's %s is the script's" % pair[0])

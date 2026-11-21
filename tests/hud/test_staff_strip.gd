@@ -20,6 +20,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const PanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const RowScript := preload("res://hud/panels/player_panel/staff_row.gd")
+const IconAtlasScript := preload("res://hud/widgets/icon_atlas.gd")
 const FakeCards := preload("res://tests/support/fake_cards.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 ## Loaded, not preloaded: the scene is also the "Hud" autoload (tests/README.md).
@@ -200,6 +201,33 @@ func test_wasted_cards_are_marked() -> void:
 	row.set_plan({"cards": cards, "casts": casts}, icons)
 	check_equal(row.card_count(), 2, "both cards show")
 	check_equal(row.wasted_count(), 1, "the wasted one is greyed")
+
+
+## The performance pass (2026-11-21): a row's icons are drawn from one texture, the shared icon
+## page, so a row of cards is a run of one texture (one draw call), each the icon's own pixels.
+func test_a_rows_icons_are_drawn_from_one_page_with_their_own_pixels() -> void:
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	var cards: Array[StringName] = [&"bolt", &"fire", &"bigger"]
+	var icons: Array[Texture2D] = [load("res://content/spells/carriers/bolt/icon.svg"), load("res://content/spells/elements/fire/icon.svg"), load("res://content/spells/modifiers/bigger/icon.svg")]
+	var casts: Array[Dictionary] = [{"slots": PackedInt32Array([0, 1, 2]), "wasted": {}}]
+	row.set_plan({"cards": cards, "casts": casts}, icons)
+	var page: Texture2D = null
+	for i in 3:
+		var drawn := row.card_texture(i) as AtlasTexture
+		check(drawn != null, "card %d drawn from the icon page" % i)
+		if drawn == null:
+			continue
+		if page == null:
+			page = drawn.atlas
+		check(drawn.atlas == page, "card %d on the same page as the first" % i)
+		check_equal(drawn.get_size(), icons[i].get_size(), "card %d its icon's size" % i)
+		var own_pixels: Image = icons[i].get_image()
+		own_pixels.convert(Image.FORMAT_RGBA8)
+		var copied: Image = IconAtlasScript.pixels_of(drawn)
+		check(copied != null and copied.get_data() == own_pixels.get_data(), "card %d its icon's own pixels" % i)
+	var first: Texture2D = row.card_texture(0)
+	row.set_plan({"cards": cards, "casts": casts}, icons)
+	check(row.card_texture(0) == first, "a plan told again reuses the copies")
 
 
 func test_the_next_cast_mark_moves_after_a_cast() -> void:

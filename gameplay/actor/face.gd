@@ -34,6 +34,10 @@ extends ActorLook
 ## may show another, `restyle`); its `style` still sets its habits. Nothing here allocates per step, and the layers are only set when
 ## their frame or place changed (every actor wears a face; performance pass, 2026-10-28).
 
+## Not state, as every look: the shared sheets on one page (`shared_sheets`), made once.
+static var _shared: Array[Texture2D] = []
+static var _shared_page: Image = null
+
 enum Style { CHEER, EAGER, SLEEPY, STERN, STRAY, STRAY_ONE }
 enum Mood { NEUTRAL, RAISED, ANGRY, FURIOUS, WORRIED }
 
@@ -132,8 +136,9 @@ func setup(owner_actor: Actor) -> void:
 		var own: bool = art != null and art.problems().is_empty()
 		if art != null and not own:
 			push_warning("Face: its own art cannot be drawn (%s); it wears the shared sheets." % "; ".join(art.problems()))
-		_eyes = _layer(art.eyes if own else EYES_SHEET, art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
-		_brows = _layer(art.brows if own else BROWS_SHEET, art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
+		var shared: Array[Texture2D] = shared_sheets()
+		_eyes = _layer(art.eyes if own else shared[0], art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
+		_brows = _layer(art.brows if own else shared[1], art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
 		_own_art = own
 		_rng = RandomNumberGenerator.new()
 		_scene_style = style
@@ -356,6 +361,42 @@ func _brow_row() -> int:
 	if _own_art:
 		return clampi(art_row, 0, _brows.vframes - 1)
 	return 1 if style == Style.STRAY_ONE else 0
+
+
+## The shared eye and brow sheets as two regions of one texture (`SHEETS_PAGE`: the eyes on top,
+## the brows under them, each a copy of its sheet's pixels), so a face's two layers, drawn one
+## after the other, are one draw call, and the faces of a crowd one a face, not two (the
+## performance pass, 2026-11-21). Made once; the sheets themselves when they cannot be copied.
+static func shared_sheets() -> Array[Texture2D]:
+	if _shared.is_empty():
+		var eyes: Image = EYES_SHEET.get_image()
+		var brows: Image = BROWS_SHEET.get_image()
+		if eyes == null or brows == null or eyes.is_empty() or brows.is_empty() or eyes.is_compressed() or brows.is_compressed():
+			_shared = [EYES_SHEET, BROWS_SHEET] as Array[Texture2D]
+			return _shared
+		eyes = eyes.duplicate() as Image
+		brows = brows.duplicate() as Image
+		eyes.convert(Image.FORMAT_RGBA8)
+		brows.convert(Image.FORMAT_RGBA8)
+		var page := Image.create_empty(maxi(eyes.get_width(), brows.get_width()), eyes.get_height() + brows.get_height(), false, Image.FORMAT_RGBA8)
+		page.blit_rect(eyes, Rect2i(Vector2i.ZERO, eyes.get_size()), Vector2i.ZERO)
+		page.blit_rect(brows, Rect2i(Vector2i.ZERO, brows.get_size()), Vector2i(0, eyes.get_height()))
+		_shared_page = page
+		var texture := ImageTexture.create_from_image(page)
+		var eyes_region := AtlasTexture.new()
+		eyes_region.atlas = texture
+		eyes_region.region = Rect2(Vector2.ZERO, eyes.get_size())
+		var brows_region := AtlasTexture.new()
+		brows_region.atlas = texture
+		brows_region.region = Rect2(Vector2(0, eyes.get_height()), brows.get_size())
+		_shared = [eyes_region, brows_region] as Array[Texture2D]
+	return _shared
+
+
+## The page the shared sheets were copied onto (null when they could not be; for tests).
+static func shared_page() -> Image:
+	shared_sheets()
+	return _shared_page
 
 
 func _layer(sheet: Texture2D, origin: Vector2, frame_size: Vector2i) -> Sprite2D:

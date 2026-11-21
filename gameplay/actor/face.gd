@@ -98,6 +98,8 @@ var _brows: Sprite2D = null
 var _rng: RandomNumberGenerator = null
 ## True when the layers draw its own `art` (set up once, with the layers).
 var _own_art: bool = false
+## The shared sheets' copies on another page it wears (`wear_sheets`; empty: the shared page's).
+var _worn: Array[Texture2D] = []
 ## Its style, glow and row as its scene made them (taken at its first setup), for `unstyle`.
 var _scene_style: Style = Style.CHEER
 var _scene_glow: Color = Color.WHITE
@@ -136,7 +138,7 @@ func setup(owner_actor: Actor) -> void:
 		var own: bool = art != null and art.problems().is_empty()
 		if art != null and not own:
 			push_warning("Face: its own art cannot be drawn (%s); it wears the shared sheets." % "; ".join(art.problems()))
-		var shared: Array[Texture2D] = shared_sheets()
+		var shared: Array[Texture2D] = _worn if _worn.size() == 2 else shared_sheets()
 		_eyes = _layer(art.eyes if own else shared[0], art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
 		_brows = _layer(art.brows if own else shared[1], art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
 		_own_art = own
@@ -172,6 +174,25 @@ func restyle(new_style: int, new_glow: Color, new_row: int = -1) -> void:
 		glow = new_glow
 		if _eyes != null:
 			_eyes.modulate = glow
+
+
+## Draw the shared sheets from `eyes` and `brows`, their copies on another page (its body's: an
+## enemy kind's, `CreatureLook`), so the body and its face, drawn one after the other, are one draw
+## call. A face of its own keeps its art. Before or after `setup`.
+func wear_sheets(eyes: Texture2D, brows: Texture2D) -> void:
+	if eyes == null or brows == null or eyes.get_size() != EYES_SHEET.get_size() or brows.get_size() != BROWS_SHEET.get_size():
+		return
+	_worn = [eyes, brows]
+	if _eyes != null and not _own_art:
+		_eyes.texture = eyes
+		_brows.texture = brows
+
+
+## The textures its eyes and brows are drawn from (for tests; empty before `setup`).
+func layer_textures() -> Array[Texture2D]:
+	if _eyes == null:
+		return []
+	return [_eyes.texture, _brows.texture]
 
 
 ## Back to its style, glow and row as its scene made them (a snapshot's phase is shown again from

@@ -17,6 +17,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const MirroredArtScript := preload("res://gameplay/feel/ground/mirrored_art.gd")
+const FloorBakeScript := preload("res://gameplay/feel/ground/floor_bake.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const FLOOR: StringName = &"Floor"
@@ -29,6 +30,8 @@ var native: bool = true
 ## How many rooms' grounds were drawn, and how long the last took (drawing and textures), in µs.
 var drawn: int = 0
 var last_usec: int = 0
+## Each laid floor baked into one texture once drawn (`floor_bake.gd`).
+var bake: FloorBakeScript = FloorBakeScript.new()
 
 
 func _ready() -> void:
@@ -36,14 +39,20 @@ func _ready() -> void:
 		events.room_built.connect(_on_room_built)
 
 
+## The bakes drawn since they were laid are shown (view only; nothing is made a frame).
+func _process(_delta: float) -> void:
+	bake.step()
+
+
 ## Every piece of a biome too (connected biomes CB3), each drawn on its own layout; a mirrored
 ## piece's other art is put where its mirror image stands first (`mirrored_art.gd`), so it lies
-## over its mirrored walls and floor.
+## over its mirrored walls and floor. Then its floor is baked, drawn or not (`floor_bake.gd`).
 func _on_room_built(room_id: StringName, _room: int, layout_root: Node) -> void:
 	MirroredArtScript.place(layout_root)
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null:
 		lay(room, layout_root)
+	bake.bake(layout_root)
 
 
 ## Draw `room`'s ground onto `layout_root`, its layout as built (nothing when the room names no shape

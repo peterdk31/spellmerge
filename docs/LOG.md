@@ -2,6 +2,26 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-21: Baked floors; an enemy and a candle one draw call each
+
+The owner's choice after #900 (round two of the draw calls, part A), for the web build with one player first. Three wins, each guarded by a structural test:
+
+- **A room's floor in one call, not seven** (`gameplay/feel/ground/floor_bake.gd`): once a room's ground is drawn, its floor, rock face, glow and its walls' shades are drawn once into a viewport of the floor's size, in the screen's order (the glow added by `floor_bake.gdshader`, which keeps the texture premultiplied, so over a pit's clear pixels the glow is only light), and from the next frame the `Floor` shows that texture and the four layers are hidden and let go. Memory, a 16-room crypt biome with its 14 walkways: about 19 MB of baked floors (rooms 1.0 MB each on average, walkways 0.2), in place of the drawn floors, rock faces and glows (about 43 MB). `test_floor_bake.gd`.
+- **An enemy's body and face on one page a kind** (`TexturePage`, core/base; `CreatureLook` and `Face.wear_sheets`): the body, its poses' strips and the eye and brow sheets copied side by side at a kind's first spawn. `test_enemy_page.gd`, `tests/core/test_texture_page.gd`.
+- **A candle's wax and flame on one page** (`gameplay/feel/decal_pages.gd`, the torch's bracket and flame too): built at load from the existing art, the flame's frames a copy with the same frames, durations, speed and loop, playing on from its frame. `test_decal_pages.gd`.
+
+The same pixels, held against the old drawing in one frozen frame (`tests/screenshots/shot_baked_floors.gd`: the enemies, the candles, the floor, its rock face and glow pixel for pixel), but where something lies between the layers on screen: ground cover, a floor mark, the floor mist or a shot on the floor now lies over a wall's shade and the glow, not under (a cobweb under a sarcophagus's shade is no longer darkened: up to 45 of 255 on its pixels; the mist over the shades, 1 to 4; round a pit under the shaft's light, up to 9). Medians of 3, main (#902) then this branch, alternating (play_frames on the fixed clock of #901, llvmpipe on this 4-core container):
+
+| scenario | draw calls | primitives | Feel ms | sim ms | frame ms |
+|---|---|---|---|---|---|
+| 1p start web | 63 → 54 | 5653 → 5632 | 2.67 → 2.51 | 1.02 → 0.94 | 20.6 → 19.5 |
+| 1p near web | 86 → 70 | 5625 → 5611 | 2.70 → 2.77 | 1.26 → 1.27 | 22.6 → 21.1 |
+| 1p far web | 158 → 138 | 18760 → 18707 | 3.95 → 3.72 | 2.52 → 2.44 | 31.8 → 29.0 |
+| 2p apart dynamic | 381 → 344 * | 56740 → 56678 * | 5.25 → 3.58 | 4.31 → 4.01 | 50.2 → 23.3 |
+| 4p apart equal | 787 → 718 | 115030 → 114439 | 7.68 → 7.97 | 7.81 → 7.97 | 82.9 → 81.8 |
+
+The counts are the same in every run of a scenario, but for 2p apart dynamic: there two of the branch's three runs framed the two wizards in one view (75 calls, 6.2 k primitives; main did so once in an earlier round on the real clock, the camera variance #901 notes), so * is the one run framed as main's (its median Feel, sim and frame ms are of the one-view runs). Primitives do not change (an earlier round on the real clock seemed to show a rise: it was the scenarios' variance). Feel adds nothing a frame (the bake's step walks an empty list once every floor is shown); its milliseconds and the simulation's move within run-to-run noise. No change to the simulation or the native kernels. The owner accepted the shades under the cover, marks and mist on #904.
+
 ## 2026-11-21: The split's divider goes in time once the players are together
 
 The owner's report: "Sometimes when local players go back near each other, the voronoi line split does not disappear for some time." Measured with wizards walking back at a wizard's pace (`tests/gameplay/feel/test_split_merge_time.gd`): a merging view went only once its picture was within 0.05 px of the one it eased onto, which was itself easing, so the divider stayed 2.4 s once players stood together (2.8 s in a fight) and for good while they walked on together or foes kept the party camera moving. Built: a merging view lands on its target over `MERGE_TIME` (0.3 s, a smoothstep from rest, however the target moves), and its anchor walks onto its target's at 12 px a frame (`MERGE_ANCHOR_STEP`). After: one picture 0.32 s after the split's end in every case (2 to 4 players, fights, walking on; 0.4 s on equal panes with four); a pair beside a far player has no divider between them within 0.32 s of standing within `JOIN_REACH`. No flicker at the fit or at `JOIN_REACH` (the hysteresis kept). View only (docs/milestones/connected-biomes.md, "The merge ends in time"). Also, from the owner's ask on #901 (benchmark runs framing differently): some runs had no current camera, since a new world camera made at the address of a node freed earlier in the same processing pass was skipped by its own `make_current` (Godot skips nodes that left a group during a pass or group call, by address); Flow makes it current again before the frame is drawn (`Flow._make_current`), with `test_camera_current.gd` and `test_fixed_split_frames.gd`.

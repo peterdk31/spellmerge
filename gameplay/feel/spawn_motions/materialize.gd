@@ -299,7 +299,17 @@ static func _light_row(light: RID, sprite: Sprite2D, row: int, bottom: float, si
 	var frame_size: Vector2 = source.size / Vector2(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
 	var frame_at: Vector2 = source.position + frame_size * Vector2(sprite.frame_coords)
 	var cut := Rect2(frame_at.x, frame_at.y + place.position.y - rect.position.y, frame_size.x, place.size.y)
-	RenderingServer.canvas_item_add_texture_rect_region(light, place, sprite.texture.get_rid(), cut, colour)
+	RenderingServer.canvas_item_add_texture_rect_region(light, place, sprite.texture.get_rid(), on_page(sprite.texture, cut), colour)
+
+
+## `cut` (in `texture`'s own pixels) where it lies in what `texture.get_rid()` draws: a region of a
+## page (`AtlasTexture`, an enemy kind's page, `TexturePage`) is drawn from its page, so its cut is
+## moved by the region's place.
+static func on_page(texture: Texture2D, cut: Rect2) -> Rect2:
+	var region := texture as AtlasTexture
+	if region == null or region.atlas == null:
+		return cut
+	return Rect2(cut.position + region.region.position, cut.size)
 
 
 ## Where row `row` of `sprite`'s frame is drawn, in the sprite's own pixels (no height: it has no such

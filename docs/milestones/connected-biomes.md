@@ -861,3 +861,12 @@ The owner reported on 2026-11-21: "Sometimes when local players go back near eac
 ### Open questions for the owner
 
 - `MERGE_TIME` is 0.3 s and `MERGE_ANCHOR_STEP` 12 px a frame (the aim was under about 0.5 s once the players stand within `JOIN_REACH`): a longer merge is softer, a shorter one snappier.
+
+## Baked floors, enemy and candle pages (2026-11-21, after #900)
+
+The owner chose this round's draw-call work (A) on 2026-11-21: **a room's floor baked into one texture** (`gameplay/feel/ground/floor_bake.gd`: the floor, rock face, glow and shades drawn once into a viewport of the floor's size as the room is laid, shown from the next frame, the layers let go: one call, not seven), **an enemy's body and face on one page a kind** (`TexturePage`, core/base; `CreatureLook`) and **a candle's wax and flame on one page** (`gameplay/feel/decal_pages.gd`). View only. The same pixels in a held frame, but ground cover, floor marks, the floor mist and floor shots now lie over the shades and the glow (docs/LOG.md, 2026-11-21, "Baked floors", with the numbers: 1p near web 86 to 70 draw calls, far 158 to 138, start 63 to 54, four players Equal 787 to 718). Tests: `tests/gameplay/feel/test_floor_bake.gd`, `test_decal_pages.gd`, `tests/gameplay/ai/test_enemy_page.gd`, `tests/core/test_texture_page.gd`; screenshots `tests/screenshots/shot_baked_floors.gd`.
+
+### Answered by the owner (2026-11-21, on #904)
+
+1. **Shades under the cover, marks and mist:** accepted as built (one draw call a room's floor).
+2. **The bake at the picture's scale:** noted for later. If the world is drawn in a bigger picture (#902's 1280 x 720) with art at that size, the floor is to be baked at the picture's scale, so the glow keeps its smoothness; nothing to do until then.

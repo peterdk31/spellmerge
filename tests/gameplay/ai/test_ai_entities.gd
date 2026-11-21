@@ -180,7 +180,7 @@ func test_an_enemys_decoy_copies_it_aims_at_the_wizard_and_breaks() -> void:
 	var fresh: Node = ImpData.scene.instantiate()
 	var looks: Array = [(fresh.get_node("Sprite") as Sprite2D).texture, _look(enemy).windup_texture, _look(enemy).hurt_texture]
 	fresh.free()
-	check(copied.texture != null and looks.has(copied.texture), "it copies the enemy's sprite")
+	check(copied.texture != null and looks.has(TexturePage.source_of(copied.texture)), "it copies the enemy's sprite (a copy of its art on its kind's page)")
 	_run(4.0 * STEP)
 	var to_wizard: Vector2 = (_wizard.global_position - decoy.global_position).normalized()
 	check(decoy.aim.dot(to_wizard) > 0.95, "it aims at the wizard, its nearest foe (%s)" % decoy.aim)

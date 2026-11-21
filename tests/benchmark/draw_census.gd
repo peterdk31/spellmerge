@@ -125,6 +125,9 @@ class CallProbe:
 	extends Node
 
 	const CANDIDATE_DEPTH: int = 3
+	## `--census-under=A,B` probes only below the nodes of those names, `--census-depth=N` that deep.
+	var _under: PackedStringArray = PackedStringArray()
+	var _depth: int = CANDIDATE_DEPTH
 	## Frames a state is held (the counts read are the last drawn frame's).
 	const HOLD: int = 3
 	var label: String = ""
@@ -142,6 +145,11 @@ class CallProbe:
 		label = what
 		process_mode = Node.PROCESS_MODE_ALWAYS
 		tree.paused = true
+		for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+			if arg.begins_with("--census-under="):
+				_under = arg.trim_prefix("--census-under=").split(",")
+			elif arg.begins_with("--census-depth="):
+				_depth = int(arg.trim_prefix("--census-depth="))
 		var stack: Array[Node] = [tree.root]
 		var depth_of: Dictionary[Node, int] = {}
 		while not stack.is_empty():
@@ -154,7 +162,7 @@ class CallProbe:
 			var parent_item := node.get_parent() as CanvasItem
 			var depth: int = depth_of.get(parent_item, -1) + 1 if parent_item != null else 0
 			depth_of[node] = depth
-			if depth <= CANDIDATE_DEPTH:
+			if depth <= _depth and _is_under(node):
 				_candidates.append(item)
 				_depths.append(depth)
 		_wait = HOLD
@@ -190,6 +198,16 @@ class CallProbe:
 		_base_prims = prims
 		_candidates[_index].visible = false
 		_hidden = true
+
+	func _is_under(node: Node) -> bool:
+		if _under.is_empty():
+			return true
+		var at: Node = node.get_parent()
+		while at != null:
+			if _under.has(String(at.name)):
+				return true
+			at = at.get_parent()
+		return false
 
 	static func _name_of(item: CanvasItem) -> String:
 		var script: Script = item.get_script() as Script

@@ -75,6 +75,9 @@ var _fresh: bool = false
 ## An element's colour by its id, read once from the registry.
 var _tints: Dictionary[StringName, Color] = {}
 var _font: Font = null
+## The run of numbers being drawn (slots) and their boxes, sized once.
+var _run: PackedInt32Array = PackedInt32Array()
+var _run_box: Array[Rect2] = []
 
 
 func _ready() -> void:
@@ -98,6 +101,8 @@ func _ready() -> void:
 	_new.fill(0)
 	_text.resize(SLOTS)
 	_width.resize(SLOTS)
+	_run.resize(SLOTS)
+	_run_box.resize(SLOTS)
 	if events != null:
 		events.damage_number_shown.connect(show_number)
 		events.damage_numbers_changed.connect(set_shown)
@@ -208,32 +213,95 @@ func _tint_of(element: StringName) -> Color:
 	return _tints[element]
 
 
+## The numbers in slot order, a run at a time: a run's outlines, then its glyphs (and a spared
+## hit's line), so a run is two draw calls (the outlines and the glyphs are two textures of the
+## font) where a number each was two (the performance pass, 2026-11-21). A number joins the run
+## only while its box meets none of the run's, so where two numbers overlap the later still draws
+## wholly over the earlier: the same pixels as drawing them one by one.
 func _draw() -> void:
+	_runs(true)
+
+
+## How many runs the numbers showing now are drawn in (for tests).
+func runs_now() -> int:
+	return _runs(false)
+
+
+## The numbers showing parted into runs, each drawn when `drawing`; how many runs.
+func _runs(drawing: bool) -> int:
+	var count: int = 0
+	var runs: int = 0
 	for slot in SLOTS:
 		if _left[slot] <= 0.0 or _new[slot] == 1:
 			continue
-		var age: float = 1.0 - _left[slot] / _seconds[slot]
-		var fade: float = 1.0 - age * age
+		var box: Rect2 = _box_of(slot)
+		for k in count:
+			if _run_box[k].intersects(box):
+				if drawing:
+					_draw_run(count)
+				runs += 1
+				count = 0
+				break
+		_run[count] = slot
+		_run_box[count] = box
+		count += 1
+	if count > 0:
+		if drawing:
+			_draw_run(count)
+		runs += 1
+	return runs
+
+
+## The first `count` numbers of the run: every outline, then every glyph.
+func _draw_run(count: int) -> void:
+	for k in count:
+		var slot: int = _run[k]
+		_draw_outline(_text[slot], _at_of(slot), _font_size[slot], Color(OUTLINE_COLOR, _alpha_of(slot)))
+	for k in count:
+		var slot: int = _run[k]
 		var colour: Color = _colour[slot]
-		colour.a = fade * (SPARED_ALPHA if _spared[slot] == 1 else 1.0)
-		var outline: Color = Color(OUTLINE_COLOR, colour.a)
-		var at: Vector2 = (_start[slot] + Vector2(-_width[slot] * 0.5, -_rise[slot] * age)).round()
+		colour.a = _alpha_of(slot)
+		var at: Vector2 = _at_of(slot)
 		var size: int = _font_size[slot]
-		_draw_text(_text[slot], at, size, outline, colour)
+		_draw_glyphs(_text[slot], at, size, colour)
 		if _spared[slot] == 1:
 			var y: float = at.y - roundf(float(size) * 0.35)
 			draw_line(Vector2(at.x - 1.0, y), Vector2(at.x + _width[slot] + 1.0, y), colour, 1.0)
 
 
-## `text` from `at` (its baseline's left), glyph by glyph: the outlines first, then the glyphs over
-## them, so a glyph's outline never covers the one before.
-func _draw_text(text: String, at: Vector2, size: int, outline: Color, colour: Color) -> void:
+## Slot `slot`'s number's alpha now (it fades as it rises; a spared hit's dimmer).
+func _alpha_of(slot: int) -> float:
+	var age: float = 1.0 - _left[slot] / _seconds[slot]
+	return (1.0 - age * age) * (SPARED_ALPHA if _spared[slot] == 1 else 1.0)
+
+
+## Where slot `slot`'s number's baseline starts now, on whole pixels.
+func _at_of(slot: int) -> Vector2:
+	var age: float = 1.0 - _left[slot] / _seconds[slot]
+	return (_start[slot] + Vector2(-_width[slot] * 0.5, -_rise[slot] * age)).round()
+
+
+## A box round everything slot `slot`'s number draws now (its glyphs, their outline, a spared
+## hit's line), larger than it, never smaller.
+func _box_of(slot: int) -> Rect2:
+	var size: float = float(_font_size[slot])
+	var pad: float = float(OUTLINE) + 2.0
+	var at: Vector2 = _at_of(slot)
+	return Rect2(at.x - pad, at.y - size * 1.5 - pad, _width[slot] + pad * 2.0, size * 2.0 + pad * 2.0)
+
+
+## `text`'s outlines from `at` (its baseline's left), glyph by glyph; `_draw_glyphs` the glyphs
+## over them, so a glyph's outline never covers the one before.
+func _draw_outline(text: String, at: Vector2, size: int, outline: Color) -> void:
 	var x: float = at.x
 	for i in text.length():
 		var code: int = text.unicode_at(i)
 		draw_char_outline(_font, Vector2(x, at.y), _glyphs.get(code, "?") as String, size, OUTLINE, outline)
 		x += _font.get_char_size(code, size).x
-	x = at.x
+
+
+func _draw_glyphs(text: String, at: Vector2, size: int, colour: Color) -> void:
+	var x: float = at.x
 	for i in text.length():
 		var code: int = text.unicode_at(i)
 		draw_char(_font, Vector2(x, at.y), _glyphs.get(code, "?") as String, size, colour)

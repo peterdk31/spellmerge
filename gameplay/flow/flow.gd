@@ -233,7 +233,7 @@ const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat"
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
 ## room's camera.
-const VIEW: Array[StringName] = [&"_add_camera", &"_add_camera_over"]
+const VIEW: Array[StringName] = [&"_add_camera", &"_add_camera_over", &"_make_current"]
 
 ## Why Flow needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
 const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's members itself"
@@ -1273,8 +1273,20 @@ func _add_camera_over(parent: Node2D, area: Rect2) -> void:
 	camera.limit_right = ceili(area.end.x)
 	camera.limit_bottom = ceili(area.end.y)
 	# The picture shows this room from the moment it is in the tree, whatever camera was current.
-	camera.ready.connect(camera.make_current, CONNECT_ONE_SHOT)
+	camera.ready.connect(_make_current.bind(camera), CONNECT_ONE_SHOT)
 	parent.add_child(camera)
+
+
+## `camera` made the viewport's current one; again at the frame's end when that did not take. A run
+## started inside a group call (the frames service's) while the old world's camera had just left the
+## tree: Godot skips, for the rest of that call, the nodes that left a group during it, by their
+## address, and a new camera made where the old one was freed is skipped too, so its `make_current`
+## did nothing and the run had no camera (the split and the party camera framed nothing; on the
+## benchmark's fixed clock, a run in some processes and not others). Deferred, it runs outside the call.
+static func _make_current(camera: Camera2D) -> void:
+	camera.make_current()
+	if not camera.is_current():
+		camera.make_current.call_deferred()
 
 
 func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], party: PartyLoadout = null) -> void:

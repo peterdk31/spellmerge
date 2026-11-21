@@ -68,6 +68,8 @@ var _last_usec: int = 0
 var _ticks_seen: int = 0
 var _tick_usec_seen: int = 0
 var _counting: bool = false
+## The HUD's cached panels' redraws summed when the measure started (`_panel_draws`).
+var _panel_draws_seen: int = 0
 ## `--shots`: whether to save a screen a scenario, and whether this scenario's is saved.
 var _shots: bool = false
 var _shot_taken: bool = false
@@ -238,6 +240,7 @@ func _measuring_started() -> void:
 	_tick_usec_seen = _tick_usec(tick)
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
+	_panel_draws_seen = _panel_draws()
 	_counting = true
 
 
@@ -376,6 +379,7 @@ func _report_more(label: String) -> void:
 	var apart_views: int = clampi(_wizards.size(), 1, 4)
 	if row.get("spread", "apart") == "apart" and by_views[apart_views] < frames / 2:
 		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew other than %d views (%s): not a %d-way split" % [label, apart_views, str(by_views), apart_views])
+	print("BENCH: biome frames %s cached panels: %d shown, drawn again %d times over %d frames (`cached_view.gd`)" % [label, _panels_shown(), _panel_draws() - _panel_draws_seen, frames])
 	print("BENCH: biome frames %s frame: avg %.2f ms, p95 %.2f ms, worst %.2f ms over %d frames, %.2f views a frame (frames by views 0-4: %s)" % [label, total / float(frames), sorted[int(float(frames - 1) * 0.95)], sorted[frames - 1], frames, float(views) / float(frames), str(by_views)])
 	var tick_total: float = 0.0
 	var ticks_total: int = 0
@@ -427,3 +431,27 @@ func _scenario_ending() -> void:
 	_rooms = PackedInt32Array()
 	_timed.clear()
 	_timed_kind.clear()
+
+
+## The HUD's corner panels drawn once (`hud/widgets/cached_view.gd`): their pictures' redraws summed.
+func _panel_draws() -> int:
+	var total: int = 0
+	var hud: Node = get_tree().root.get_node_or_null("Hud")
+	if hud == null or not hud.has_method(&"get_panel"):
+		return 0
+	for seat in 4:
+		var cache: Object = (hud.call(&"get_panel", seat) as Node).call(&"cache")
+		total += int(cache.get(&"refreshes"))
+	return total
+
+
+## How many corner panels show.
+func _panels_shown() -> int:
+	var shown: int = 0
+	var hud: Node = get_tree().root.get_node_or_null("Hud")
+	if hud == null or not hud.has_method(&"get_panel"):
+		return 0
+	for seat in 4:
+		if (hud.call(&"get_panel", seat) as CanvasItem).is_visible_in_tree():
+			shown += 1
+	return shown

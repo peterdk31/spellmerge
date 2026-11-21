@@ -105,10 +105,14 @@ func set_recharge(slot: int, left: float, whole: float, at_once: bool = false) -
 	if slot < 0 or slot >= SLOTS:
 		return
 	_charge_told[slot] = RechargeShutter.rows(left, whole, ICON)
+	var drawn: int = _charge_rows[slot]
 	if at_once:
 		_charge_rows[slot] = _charge_target(slot)
 	set_process(is_moving())
-	queue_redraw()
+	# What is drawn is the rows stepped to (`advance`): a recharge told again draws nothing new, so a
+	# cached panel is not drawn again for it.
+	if _charge_rows[slot] != drawn:
+		queue_redraw()
 
 
 ## The shutter rows drawn over slot `slot`'s icon (0: none; for tests).

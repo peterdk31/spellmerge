@@ -23,7 +23,9 @@ extends ColorRect
 ##   connected-biomes.md, "The light at a fixed resolution"): while the picture is bigger than
 ##   PictureGrid.SIZE, a twin of this rect in the spell light's pass under it (`SpellLight.under_holder`)
 ##   works out how thick the mist is a block at a time (`mist_pass.gdshader`, with this rect's numbers:
-##   every uniform is set on both), and this rect takes it whole for each block and lights it.
+##   every uniform is set on both), and this rect takes it whole for each block and lights it by the
+##   light at the block's middle. Every room's twin is drawn in one pass, written as it is: the rooms'
+##   rects never overlap, so none overwrites another's.
 ##
 ## Nothing is made a frame: a frame sets the clock, steps the parting (written where a cell changed)
 ## and hands the stirs over when they changed.
@@ -61,6 +63,8 @@ var share: float = 1.0
 ## The twin drawing how thick the mist is in the pass at the light's resolution (`use_passes`; null
 ## with none). Read only.
 var twin: ColorRect = null
+## Where the twin is to be drawn (`use_passes`; null: none), kept while this rect is out of the tree.
+var _holder: Node = null
 ## The room's walls and holes in its own px (from `room_origin`), as the mask is built from them.
 var _walls: Array[Rect2] = []
 var _holes: Array[Rect2] = []
@@ -134,16 +138,16 @@ func use_light(buffer: Texture2D) -> void:
 ## Its twin drawn under `holder` from now on (the spell light's pass under it, `SpellLight.under_holder`:
 ## the picture bigger than PictureGrid.SIZE), with this rect's place and numbers; none with no holder.
 func use_passes(holder: Node) -> void:
+	_holder = holder
+	if not is_inside_tree():
+		_drop_twin()
+		return
 	if twin != null and not is_instance_valid(twin):
 		# Freed with the passes it was drawn in (the light made anew).
 		twin = null
 	if twin != null and twin.get_parent() == holder:
 		return
-	if twin != null and is_instance_valid(twin):
-		if twin.get_parent() != null:
-			twin.get_parent().remove_child(twin)
-		twin.queue_free()
-		twin = null
+	_drop_twin()
 	if holder == null:
 		return
 	twin = ColorRect.new()
@@ -161,9 +165,22 @@ func use_passes(holder: Node) -> void:
 	_refresh()
 
 
-## The twin goes with this rect (the mist freed).
+## The twin goes with this rect out of the tree (the mist freed), and comes back with it.
 func _exit_tree() -> void:
-	use_passes(null)
+	_drop_twin()
+
+
+func _enter_tree() -> void:
+	if _holder != null and is_instance_valid(_holder) and twin == null:
+		use_passes(_holder)
+
+
+func _drop_twin() -> void:
+	if twin != null and is_instance_valid(twin):
+		if twin.get_parent() != null:
+			twin.get_parent().remove_child(twin)
+		twin.queue_free()
+	twin = null
 
 
 ## `uniform` set to `value`, on the twin too.

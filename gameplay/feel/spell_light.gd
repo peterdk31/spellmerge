@@ -123,9 +123,10 @@ const BEAM_STRENGTH: float = 0.8
 ## `light_views.gdshaderinc` that hold the buffers past the first.
 const VIEWS_MOST: int = ViewReadersScript.VIEWS_MOST
 const EXTRA_UNIFORMS: Array[StringName] = [&"light_buffer_1", &"light_buffer_2", &"light_buffer_3"]
-## The uniforms of `light_passes.gdshaderinc` that hold each view's pass, say which views have one and
-## how much smaller they are.
-const PASS_UNIFORMS: Array[StringName] = [&"light_pass_0", &"light_pass_1", &"light_pass_2", &"light_pass_3"]
+## The uniforms of `light_passes.gdshaderinc` that hold a view's pass (the first view's and every copy's
+## own, `ViewReaders.set_view_uniform`; the second view's), say which views have one and how much smaller
+## they are.
+const PASS_UNIFORMS: Array[StringName] = [&"light_pass_0", &"light_pass_1"]
 const PASS_VIEWS: StringName = &"light_pass_views"
 const PASS_SCALE: StringName = &"light_pass_scale"
 ## The apply rect's uniforms its factor passes' rects share (`light_apply.gdshaderinc`'s).
@@ -177,9 +178,10 @@ var tint_count: int = 0
 ## every draw). Read only.
 var grid_scale: int = 1
 ## Whether the light keeps its resolution (PictureGrid.SIZE a view) in a bigger picture; false draws it
-## at the picture's own, as before 2026-11-21 (the benchmarks' and screenshots' A/B: `--light-at-picture`).
+## at the picture's own, as before 2026-11-21 (the benchmarks' A/B: `--light-at-picture`).
 var fixed_resolution: bool = true
-## The passes at the light's resolution while `grid_scale` is more than 1 (null at 1): the apply
+## The passes at the light's resolution while `grid_scale` is more than 1 (the picture at least twice
+## PictureGrid.SIZE each way; null at 1): the apply
 ## rect's factor a view, with its rects (one a view, each on its view's layer), and what readers drawn
 ## under the light draw there (`under_holder`). Read only.
 var factor_passes: LightPassesScript = null
@@ -445,6 +447,10 @@ func _fit_passes(k: int, view: Viewport) -> void:
 		return
 	factor_passes.fit(k, view)
 	under_passes.fit(k, view)
+	# The pass under the light is drawn only while something is drawn in it (a mist's twin).
+	var wanted: int = SubViewport.UPDATE_ALWAYS if under_passes.holder().get_child_count() > 0 else SubViewport.UPDATE_DISABLED
+	if under_passes.viewports[k].render_target_update_mode != wanted:
+		under_passes.viewports[k].render_target_update_mode = wanted
 
 
 ## `buffer` sized a `downscale`-th of `view` each way, its canvas transform `view`'s scaled down.
@@ -617,8 +623,13 @@ func _bind(material: ShaderMaterial) -> void:
 		material.set_shader_parameter(EXTRA_UNIFORMS[k], _extra[k].get_texture() if k < _extra.size() and k + 1 < _views.size() else null)
 	var passes: LightPassesScript = factor_passes if material == apply.material else under_passes
 	var count: int = passes.count if passes != null else 0
-	for k in PASS_UNIFORMS.size():
-		material.set_shader_parameter(PASS_UNIFORMS[k], passes.texture(k) if k < count else null)
+	for k in VIEWS_MOST:
+		var drawn: Texture2D = passes.texture(k) if k < count else null
+		if k < PASS_UNIFORMS.size():
+			material.set_shader_parameter(PASS_UNIFORMS[k], drawn)
+		else:
+			# The third and fourth views' copies hold their own pass where the first view's is.
+			readers.set_view_uniform(material, k, PASS_UNIFORMS[0], drawn)
 	material.set_shader_parameter(PASS_VIEWS, (1 << count) - 1)
 	material.set_shader_parameter(PASS_SCALE, grid_scale)
 

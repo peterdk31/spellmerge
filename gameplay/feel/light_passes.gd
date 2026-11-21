@@ -5,7 +5,9 @@ extends Node
 ## view's canvas transform scaled down by exactly `scale`, so its pixel (i, j) covers the view's
 ## pixels (i * scale, j * scale) to ((i + 1) * scale - 1, (j + 1) * scale - 1). What reads it
 ## (`light_passes.gdshaderinc`) takes that block's pixel whole: whole blocks, never blurred.
-## The spell light's (`spell_light.gd`), made only while the picture is bigger than PictureGrid.SIZE.
+## The spell light's (`spell_light.gd`), made only while the picture is at least twice PictureGrid.SIZE
+## each way. A view's size should be a whole multiple of `scale` (the screen's is, and a split view's box
+## is snapped to it): else its last blocks reach past it and its light drifts by up to a block.
 ##
 ## The passes share one world (the first's): an item put under `holder()` on the shared layer (every
 ## canvas item's default) is drawn in every view's pass; one on `view_layer(k)` alone only in view

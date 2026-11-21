@@ -100,7 +100,8 @@ const MERGING: int = 2
 ## The views as last laid out (count, cells, transforms, anchors, seats). Read only.
 var views: ScreenViewsScript = ScreenViewsScript.new()
 ## How many times bigger than PictureGrid.SIZE the screen is (`step`): every zoom here is that many
-## times the one at PictureGrid.SIZE, so a bigger screen draws the same world finer. Read only.
+## times the one at PictureGrid.SIZE, so a bigger screen draws the same world finer, and so are the
+## places' margins (SITE_MARGIN, SITE_GAP; FOE_MARGIN stays in screen pixels). Read only.
 var grid: float = 1.0
 ## True while the screen is split (it merges once everyone fits again with room to spare).
 var split: bool = false
@@ -454,7 +455,7 @@ func _lay_sites(screen: Vector2) -> void:
 			high = high.max(_group_middle[seat])
 	var mid: Vector2 = (low + high) * 0.5
 	var reach: Vector2 = (high - low) * 0.5
-	var room: Vector2 = (screen * 0.5 - Vector2.ONE * SITE_MARGIN).max(Vector2.ONE)
+	var room: Vector2 = (screen * 0.5 - Vector2.ONE * (SITE_MARGIN * grid)).max(Vector2.ONE)
 	var scale: float = SPLIT_ZOOM * grid
 	if reach.x > VoronoiCellsScript.EPSILON:
 		scale = minf(scale, room.x / reach.x)
@@ -466,7 +467,7 @@ func _lay_sites(screen: Vector2) -> void:
 	# Two groups' places at least SITE_GAP apart, pushed along the line between them in the world
 	# (so the divider between them keeps its way): a far third wizard squeezes the party onto the
 	# screen, and two places almost on one point would swing their line round at the least step.
-	var inner := Rect2(Vector2.ONE * (SITE_MARGIN * 0.5), screen - Vector2.ONE * SITE_MARGIN)
+	var inner := Rect2(Vector2.ONE * (SITE_MARGIN * grid * 0.5), screen - Vector2.ONE * (SITE_MARGIN * grid))
 	for pass_count in 4:
 		for a in ActorsScript.SEATS:
 			if _group_seats[a] == 0:
@@ -475,12 +476,12 @@ func _lay_sites(screen: Vector2) -> void:
 				if _group_seats[b] == 0:
 					continue
 				var apart: float = _group_site[a].distance_to(_group_site[b])
-				if apart >= SITE_GAP:
+				if apart >= SITE_GAP * grid:
 					continue
 				var way: Vector2 = (_group_middle[b] - _group_middle[a]).normalized()
 				if way == Vector2.ZERO:
 					way = Vector2.RIGHT
-				var push: Vector2 = way * ((SITE_GAP - apart) * 0.5)
+				var push: Vector2 = way * ((SITE_GAP * grid - apart) * 0.5)
 				_group_site[a] = (_group_site[a] - push).clamp(inner.position, inner.end)
 				_group_site[b] = (_group_site[b] + push).clamp(inner.position, inner.end)
 

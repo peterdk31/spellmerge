@@ -16,6 +16,13 @@ const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+const EventsScript := preload("res://core/events/events.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
+const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const BIG := Vector2i(1280, 720)
 
@@ -148,20 +155,80 @@ func test_the_mist_draws_its_billows_in_the_pass_with_its_numbers() -> void:
 
 
 func test_the_spectacles_mist_follows_the_lights_passes() -> void:
-	var spectacle := own(SpectacleScript.new()) as SpectacleScript
-	root.add_child(spectacle)
-	spectacle.set_spell_light(true)
-	spectacle.set_fog(true)
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var bus: EventsScript = own(EventsScript.new()) as EventsScript
+	var table: Node = own(ActorSeats.table()) as Node
+	var manager: ProjectilesScript = own(ProjectilesScript.new()) as ProjectilesScript
+	manager.events = bus
+	manager.actors = table
+	root.add_child(manager)
+	var feel: FeelScript = own(FeelScript.new()) as FeelScript
+	var preset := FeelPresetScript.new()
+	preset.hit_sound = &""
+	feel.events = bus
+	feel.registry = registry
+	feel.actors = table
+	feel.projectiles = manager
+	feel.drive_engine = false
+	feel.preset = preset
+	root.add_child(feel)
+	var room := registry.get_resource(&"rooms", &"arena_04") as RoomBase
+	bus.spell_light_changed.emit(true)
+	bus.room_built.emit(room.id, 0, own(room.build(null)) as Node)
+	bus.room_entered.emit(room.id, 0)
+	feel._process(1.0 / 60.0)
+	var spectacle: SpectacleScript = feel.spectacle()
 	var light: SpellLightScript = spectacle.light
+	check(light != null and spectacle.mist != null and spectacle.mist.visible, "a lit room with its mist")
 	if light == null or spectacle.mist == null:
-		# A spectacle with no projectile manager makes no light; nothing to follow.
 		return
+	light.follow()
+	check(spectacle.mist.twin == null, "no twin at the shipped picture")
 	root.content_scale_size = BIG
 	light.follow()
-	check(spectacle.mist.twin != null and spectacle.mist.twin.get_parent() == light.under_holder(), "the mist's twin is drawn in the light's pass")
+	var twin: ColorRect = spectacle.mist.twin
+	check(twin != null and twin.get_parent() == light.under_holder(), "the mist's twin is drawn in the light's pass")
+	check(light.under_passes.viewports[0].render_target_update_mode == SubViewport.UPDATE_ALWAYS, "a pass with a twin in it is drawn")
+	# The mist out of the tree and back (the spectacle moved): its twin goes and comes back.
+	var parent: Node = spectacle.mist.get_parent()
+	parent.remove_child(spectacle.mist)
+	check(spectacle.mist.twin == null, "the twin goes with the mist")
+	parent.add_child(spectacle.mist)
+	check(spectacle.mist.twin != null and spectacle.mist.twin.get_parent() == light.under_holder(), "and comes back with it")
 	root.content_scale_size = _shipped
 	light.follow()
-	check(spectacle.mist.twin == null, "and goes with it")
+	check(spectacle.mist.twin == null, "the passes gone, the twin goes with them")
+
+
+func test_the_third_and_fourth_views_copies_hold_their_own_pass() -> void:
+	var readers := ViewReadersScript.new()
+	var material := ShaderMaterial.new()
+	material.shader = MistScript.SHADER
+	var first := ImageTexture.new()
+	var third := ImageTexture.new()
+	material.set_shader_parameter(&"light_pass_0", first)
+	readers.set_view_uniform(material, 2, &"light_pass_0", third)
+	readers.watch(material, null)
+	var holder := own(Node2D.new()) as Node2D
+	root.add_child(holder)
+	var item := ColorRect.new()
+	item.material = material
+	holder.add_child(item)
+	readers.take(item)
+	readers.use(3)
+	readers.follow([] as Array[Viewport])
+	var copy: CanvasItem = readers.copy_of(item, 2)
+	check(copy != null, "a copy for the third view")
+	if copy == null:
+		return
+	var own_material := copy.material as ShaderMaterial
+	check(own_material.get_shader_parameter(&"light_pass_0") == third, "it holds its own view's pass")
+	check(material.get_shader_parameter(&"light_pass_0") == first, "the item keeps the first view's")
+	material.set_shader_parameter(&"light_pass_0", ImageTexture.new())
+	readers.follow([] as Array[Viewport])
+	check(own_material.get_shader_parameter(&"light_pass_0") == third, "never copied over from the item's")
+	readers.clear()
 
 
 func test_the_pass_shaders_are_warmed() -> void:

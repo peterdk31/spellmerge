@@ -12,10 +12,11 @@
 
 #include "res://gameplay/feel/light_pack.gdshaderinc"
 
+// The pass of the view this is drawn in: the second view's in `light_pass_1`, every other's in
+// `light_pass_0` (the third and fourth views' copies hold their own there: ViewReaders.set_view_uniform),
+// so a reader takes two samplers, not four: WebGL2 promises only 16 texture units, and Godot keeps some.
 uniform sampler2D light_pass_0 : hint_default_black, filter_nearest, repeat_disable;
 uniform sampler2D light_pass_1 : hint_default_black, filter_nearest, repeat_disable;
-uniform sampler2D light_pass_2 : hint_default_black, filter_nearest, repeat_disable;
-uniform sampler2D light_pass_3 : hint_default_black, filter_nearest, repeat_disable;
 // A bit a view that has a pass (bit k: view k), and how many times smaller each way a pass is.
 uniform int light_pass_views = 0;
 uniform int light_pass_scale = 1;
@@ -25,17 +26,23 @@ bool light_pass_here() {
 	return light_view >= 0 && light_view < 4 && ((light_pass_views >> light_view) & 1) != 0;
 }
 
-// The pass's pixel under the picture's pixel at `uv` (`SCREEN_UV`; `pixel`: `SCREEN_PIXEL_SIZE`): its block.
+// The block the picture's pixel at `uv` (`SCREEN_UV`; `pixel`: `SCREEN_PIXEL_SIZE`) is in: the pass's pixel.
+ivec2 light_pass_block(vec2 uv, vec2 pixel) {
+	return ivec2(floor(uv / pixel)) / ivec2(max(light_pass_scale, 1));
+}
+
+// The pass's pixel under the picture's pixel at `uv`: its block's.
 vec4 light_pass_at(vec2 uv, vec2 pixel) {
-	ivec2 at = ivec2(floor(uv / pixel)) / ivec2(max(light_pass_scale, 1));
+	ivec2 at = light_pass_block(uv, pixel);
 	if (light_view == 1) {
 		return texelFetch(light_pass_1, at, 0);
 	}
-	if (light_view == 2) {
-		return texelFetch(light_pass_2, at, 0);
-	}
-	if (light_view == 3) {
-		return texelFetch(light_pass_3, at, 0);
-	}
 	return texelFetch(light_pass_0, at, 0);
+}
+
+// The middle of the block the picture's pixel at `uv` is in (a `SCREEN_UV`): where its pass read the
+// light, so what is read there is the block's whole.
+vec2 light_pass_middle(vec2 uv, vec2 pixel) {
+	float s = float(max(light_pass_scale, 1));
+	return (vec2(light_pass_block(uv, pixel)) + 0.5) * s * pixel;
 }

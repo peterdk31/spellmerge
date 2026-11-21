@@ -40,11 +40,13 @@ void vertex() {
 }
 
 void fragment() {
-	float density = light_pass_here() ? light_unpack_unit(light_pass_at(SCREEN_UV, SCREEN_PIXEL_SIZE)) * THICKEST_DRAWN : mist_density(world);
+	// At the light's resolution its thickness and its light are its block's (light_passes.gdshaderinc).
+	bool by_block = light_pass_here();
+	float density = by_block ? light_unpack_unit(light_pass_at(SCREEN_UV, SCREEN_PIXEL_SIZE)) * THICKEST_DRAWN : mist_density(world);
 	if (density < 0.004) {
 		discard;
 	}
-	vec3 shine = view_light(SCREEN_UV);
+	vec3 shine = view_light(by_block ? light_pass_middle(SCREEN_UV, SCREEN_PIXEL_SIZE) : SCREEN_UV);
 	float most = max(shine.r, max(shine.g, shine.b));
 	float bright = clamp(most / bright_from, 0.0, 1.0) * lit;
 	vec3 hue = most > 0.001 ? shine / most : vec3(1.0);

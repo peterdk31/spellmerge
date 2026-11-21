@@ -555,7 +555,8 @@ func test_the_steps_are_a_switch() -> void:
 	var shade: ShaderMaterial = light.apply.material as ShaderMaterial
 	check_equal(light.bands, 3, "three steps by default")
 	check_equal(int(shade.get_shader_parameter(&"bands")), 3, "to the rect")
-	check(SpellLightScript.APPLY_SHADER.code.contains("uniform int bands = %d;" % SpellLightScript.DEFAULT_BANDS), "the shader's default is the script's")
+	var factor: String = (load("res://gameplay/feel/light_apply.gdshaderinc") as ShaderInclude).code
+	check(factor.contains("uniform int bands = %d;" % SpellLightScript.DEFAULT_BANDS), "the shader's default is the script's")
 	light.set_bands(0)
 	check_equal(int(shade.get_shader_parameter(&"bands")), 0, "smooth")
 	light.set_bands(1)

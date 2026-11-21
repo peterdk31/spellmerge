@@ -9,6 +9,7 @@ extends Node2D
 ## it. It allocates only as items come and go.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Under the bodies (drawn before the world at the same z), over the floor's marks.
 const Z: int = 0
@@ -24,6 +25,10 @@ const BOB_RATE: float = 1.2
 const SHADOW: Color = Color(0.05, 0.04, 0.08, 0.35)
 const SHADOW_HALF: Vector2 = Vector2(7.0, 2.5)
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## By item number: [where, the view] (`ground_item_changed`).
 var _items: Dictionary = {}
 var _clock: float = 0.0
@@ -72,6 +77,8 @@ func _draw() -> void:
 	for item: int in _items:
 		var row: Array = _items[item]
 		var at: Vector2 = row[0]
+		if unseen != null and unseen.hides(at):
+			continue
 		var view: Dictionary = row[1]
 		# Each one bobs a little out of step with the next.
 		var lift: float = LIFT + roundf(sin((_clock * BOB_RATE + float(item) * 0.37) * PI) * BOB)

@@ -16,6 +16,7 @@ extends Node2D
 ## rune still moves.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 
 ## On the floor, under the bodies and the doors' looks.
@@ -30,6 +31,10 @@ const CRACK: int = 5
 ## Where the elements are (their tints).
 const SPELLS_FOLDER: StringName = &"spells"
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## The registry the elements are read from (Feel's; null in a test: the spark's tint).
 var registry: Node = null
 
@@ -167,8 +172,9 @@ static func _round_from_top(point: Vector2) -> float:
 func _draw() -> void:
 	for rune in _at.size():
 		var frame: int = _frame[rune]
-		_draw_rune(_at[rune], frame, _tints[rune], true)
-		if frame > 0:
+		if unseen == null or not unseen.hides(_at[rune]):
+			_draw_rune(_at[rune], frame, _tints[rune], true)
+		if frame > 0 and (unseen == null or not unseen.hides(_back[rune])):
 			_draw_rune(_back[rune], frame, _tints[rune], false)
 
 

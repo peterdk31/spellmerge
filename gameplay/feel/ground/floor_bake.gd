@@ -13,7 +13,9 @@ extends RefCounted
 ## floor now lies over the glow and the shades, not under (docs/LOG.md, 2026-11-21, "Baked floors").
 ##
 ## Until the bake is drawn the layers show as before, so nothing is ever missing for a frame. With
-## no renderer (a headless run, whose viewports are never drawn) nothing is baked (`enabled`).
+## no renderer (a headless run, whose viewports are never drawn) nothing is baked (`enabled`), and a
+## layout whose layers it cannot copy exactly is left as it is drawn (`bakeable`). A fade of the
+## layout (its modulate's alpha) scales the premultiplied texture whole, as it would the layers.
 ## Memory: one RGBA8 texture of the floor's size a piece (a 704×448 crypt room 1.2 MB), in place of
 ## the floor's, the rock face's and the glow's (a drawn room's 2.25 times that). View only: it
 ## changes no node the simulation reads (the walls, holes and places stay the layout's).
@@ -57,7 +59,7 @@ func bake(root: Node) -> SubViewport:
 	if not enabled or root == null or root.has_node(NodePath(BAKE)):
 		return null
 	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D
-	if ground == null or ground.texture == null or not _plain(ground) or ground.modulate != Color.WHITE or ground.self_modulate != Color.WHITE:
+	if ground == null or not bakeable(root):
 		return null
 	var rect: Rect2 = ground.get_rect()
 	var viewport := SubViewport.new()
@@ -160,6 +162,38 @@ static func is_baked(root: Node) -> bool:
 	return ground != null and ground.texture is ViewportTexture and ground.material == _shown_material and _shown_material != null
 
 
+## True when everything `bake` would hide draws as it copies it, so the bake draws it all: a plain
+## `Floor` with a texture and no material or tint; a rock face drawn plainly, a glow added
+## (`CanvasItemMaterial`, add), each plain, shown or not; every child of `Shade` a plain shown
+## polygon of one colour (no texture, material, vertex colours, sub-polygons, inversion or children)
+## and the holder shown. Anything else is left as it is drawn: not baked.
+static func bakeable(root: Node) -> bool:
+	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D if root != null else null
+	if ground == null or ground.texture == null or not _plain(ground) or ground.material != null \
+			or ground.modulate != Color.WHITE or ground.self_modulate != Color.WHITE:
+		return false
+	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D
+	if under != null and (not _plain(under) or under.material != null or under.top_level):
+		return false
+	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
+	if glow != null:
+		var add := glow.material as CanvasItemMaterial
+		if not _plain(glow) or add == null or add.blend_mode != CanvasItemMaterial.BLEND_MODE_ADD or glow.top_level:
+			return false
+	var holder := root.get_node_or_null(NodePath(SHADE)) as CanvasItem
+	if holder == null:
+		return true
+	if not holder.visible or holder.material != null or holder.modulate != Color.WHITE or holder.self_modulate != Color.WHITE:
+		return false
+	for child: Node in holder.get_children():
+		var shade := child as Polygon2D
+		if shade == null or not shade.visible or shade.texture != null or shade.material != null or shade.get_child_count() > 0 \
+				or not shade.vertex_colors.is_empty() or not shade.polygons.is_empty() or shade.invert_enabled or shade.top_level \
+				or not shade.skeleton.is_empty():
+			return false
+	return true
+
+
 ## The floor's layers baked with it, in the order drawn: its rock face, then its glow (shown ones).
 static func layers(root: Node) -> Array[Sprite2D]:
 	var found: Array[Sprite2D] = []
@@ -174,16 +208,16 @@ static func layers(root: Node) -> Array[Sprite2D]:
 	return found
 
 
-## The template's shades baked with the floor (the shown polygons under its `Shade`).
+## The template's shades baked with the floor (its `Shade`'s polygons; `bakeable` holds that they
+## are every child and plain).
 static func shades(root: Node) -> Array[Polygon2D]:
 	var found: Array[Polygon2D] = []
-	var holder := root.get_node_or_null(NodePath(SHADE)) as CanvasItem
-	if holder == null or not holder.visible:
+	var holder := root.get_node_or_null(NodePath(SHADE))
+	if holder == null:
 		return found
 	for child: Node in holder.get_children():
-		var shade := child as Polygon2D
-		if shade != null and shade.visible and shade.texture == null and shade.material == null and shade.get_child_count() == 0:
-			found.append(shade)
+		if child is Polygon2D:
+			found.append(child as Polygon2D)
 	return found
 
 
@@ -207,8 +241,8 @@ func _drop(i: int) -> void:
 	_seen_at.remove_at(i)
 
 
-## A sprite drawn as a plain texture: no frames, region, flip or skew, its own material (or none,
-## the glow's add) and children drawn on their own.
+## A sprite drawn as a plain texture: no frames, region, flip or skew (its material is `bakeable`'s
+## to judge; its children are drawn on their own).
 static func _plain(sprite: Sprite2D) -> bool:
 	return not sprite.region_enabled and sprite.hframes == 1 and sprite.vframes == 1 \
 		and not sprite.flip_h and not sprite.flip_v and sprite.skew == 0.0

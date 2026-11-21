@@ -8,6 +8,7 @@ extends "res://tests/support/suite.gd"
 ## that has one body sprite and the shared face is drawn from one page.
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
+const MaterializeScript := preload("res://gameplay/feel/spawn_motions/materialize.gd")
 
 var _world: AiFixture
 
@@ -93,3 +94,15 @@ func test_every_enemy_kind_of_one_body_and_the_shared_face_is_one_page() -> void
 		check(page != null and drawn.all(func(t: Texture2D) -> bool: return t is AtlasTexture and (t as AtlasTexture).atlas == page), "%s: its body and face on one page" % data.id)
 		checked += 1
 	check(checked >= 5, "the game's enemy kinds were checked (%d)" % checked)
+
+
+## Regression (the review of 2026-11-21): the materialize look's lit rows draw from the texture's
+## RID, which for a region is its page's, so a region's cut is moved to where it lies on the page.
+func test_a_lit_row_of_a_paged_body_is_cut_from_its_place_on_the_page() -> void:
+	var strip := ImageTexture.create_from_image(Image.create(64, 32, false, Image.FORMAT_RGBA8))
+	var body := ImageTexture.create_from_image(Image.create(32, 32, false, Image.FORMAT_RGBA8))
+	var paged: Array[Texture2D] = TexturePage.regions_of([body, strip] as Array[Texture2D])
+	var region := paged[1] as AtlasTexture
+	var cut := Rect2(32.0, 10.0, 32.0, 1.0)
+	check_equal(MaterializeScript.on_page(region, cut), Rect2(region.region.position + cut.position, cut.size), "the strip's frame cut where the strip lies on the page")
+	check_equal(MaterializeScript.on_page(body, cut), cut, "a texture of its own: as it is")

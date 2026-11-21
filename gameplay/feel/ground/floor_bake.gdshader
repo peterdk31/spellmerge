@@ -7,9 +7,20 @@ render_mode blend_premul_alpha;
 
 uniform bool glow = false;
 
-// COLOR comes in as the texture's colour times the item's (Godot's canvas default).
+// The item's own colour (its modulate), before the texture is applied.
+varying vec4 item;
+
+void vertex() {
+	item = COLOR;
+}
+
 void fragment() {
+	vec4 colour = texture(TEXTURE, UV) * item;
 	if (glow) {
-		COLOR = vec4(COLOR.rgb * COLOR.a, 0.0);
+		// Added: its colour times its alpha, the alpha left alone.
+		COLOR = vec4(colour.rgb * colour.a, 0.0);
+	} else {
+		// The baked texture is premultiplied already: a modulate's alpha (a fade) scales it all.
+		COLOR = vec4(colour.rgb * item.a, colour.a);
 	}
 }

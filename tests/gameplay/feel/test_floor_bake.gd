@@ -5,8 +5,10 @@ extends "res://tests/support/suite.gd"
 ## its shades, in that order, each where it lies on the floor; once a frame was drawn after it was in
 ## the tree the floor shows the bake and the layers are hidden and let go, so the floor stack is one
 ## item drawn; Feel's ground part bakes every layout `room_built` hands over; with no renderer
-## nothing is baked. Pixels: tests/screenshots/shot_baked_floors.gd holds the bake against the layers
-## in one frame (a headless run draws no viewport).
+## nothing is baked; a layout it cannot draw whole is left as it is; no room's shade lies over art
+## drawn before it (which the bake would put under it). Pixels: the suite runs headless, which
+## draws no viewport, so the bake's pixels (its blend, the glow's add, the order) are checked only by
+## tests/screenshots/shot_baked_floors.gd, which holds the bake against the layers in one frame.
 const BakeScript := preload("res://gameplay/feel/ground/floor_bake.gd")
 const LayoutScript := preload("res://gameplay/feel/ground/ground_layout.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -136,3 +138,91 @@ func test_with_no_renderer_nothing_is_baked() -> void:
 	var layout: Node = own(_room().build())
 	if not bake.enabled:
 		check(bake.bake(layout) == null and not layout.has_node(NodePath(BakeScript.BAKE)), "nothing laid")
+
+
+## The pixels of `layout`'s shades that lie over a shown sprite drawn before them on screen (a wall's
+## art, `Walls` before `Shade`, at z 0): baked under the floor's, they would no longer darken it.
+func _shade_over_art(layout: Node) -> PackedStringArray:
+	var found := PackedStringArray()
+	var holder: Node = layout.get_node_or_null("Shade")
+	if holder == null:
+		return found
+	var before: Array[Sprite2D] = []
+	for node: Node in layout.find_children("*", "Sprite2D", true, false):
+		var sprite := node as Sprite2D
+		if sprite.texture == null or layout.get_node("Floor").is_ancestor_of(sprite) or sprite == layout.get_node("Floor"):
+			continue
+		if _index_path(sprite, layout) < _index_path(holder, layout) and _shown(sprite, layout) and not (sprite.z_as_relative == false and sprite.z_index < -2):
+			before.append(sprite)
+	var images: Dictionary = {}
+	for shade: Polygon2D in BakeScript.shades(layout):
+		var xf: Transform2D = _in(shade, layout)
+		var points: PackedVector2Array = xf * shade.polygon
+		var box := Rect2(points[0], Vector2.ZERO)
+		for p: Vector2 in points:
+			box = box.expand(p)
+		for sprite: Sprite2D in before:
+			var to_sprite: Transform2D = _in(sprite, layout).affine_inverse()
+			var rect: Rect2 = sprite.get_rect()
+			if not (_in(sprite, layout) * rect).intersects(box):
+				continue
+			if not images.has(sprite.texture):
+				var image: Image = sprite.texture.get_image()
+				image.convert(Image.FORMAT_RGBA8)
+				images[sprite.texture] = image
+			var image: Image = images[sprite.texture]
+			for y in range(floori(box.position.y), ceili(box.end.y)):
+				for x in range(floori(box.position.x), ceili(box.end.x)):
+					var at := Vector2(x + 0.5, y + 0.5)
+					if not Geometry2D.is_point_in_polygon(at, points):
+						continue
+					var local: Vector2 = to_sprite * at - rect.position
+					var texel := Vector2i(floori(local.x), floori(local.y))
+					if texel.x < 0 or texel.y < 0 or texel.x >= image.get_width() or texel.y >= image.get_height():
+						continue
+					if image.get_pixelv(texel).a > 0.0:
+						found.append("%s over %s at %s" % [shade.name, sprite.name, at])
+	return found
+
+
+## `node`'s place in the tree's drawing order under `layout` (its indices from the top).
+func _index_path(node: Node, layout: Node) -> Array:
+	var path: Array = []
+	var at: Node = node
+	while at != layout:
+		path.push_front(at.get_index())
+		at = at.get_parent()
+	return path
+
+
+func test_no_room_s_shade_lies_over_art_drawn_before_it() -> void:
+	var registry := root.get_node("/root/Registry") as RegistryScript
+	var rooms: int = 0
+	for item: Resource in registry.get_all(&"rooms"):
+		var room := item as RoomBase
+		if room == null or room.scene == null:
+			continue
+		var layout: Node = own(room.build())
+		if BakeScript.shades(layout).is_empty():
+			continue
+		rooms += 1
+		var over: PackedStringArray = _shade_over_art(layout)
+		check(over.is_empty(), "%s: a shade over a wall's art, which the bake would put under it (%d px; %s)" % [room.id, over.size(), ", ".join(over.slice(0, 3))])
+	check(rooms >= 5, "rooms with shades checked (%d)" % rooms)
+
+
+func test_a_layout_the_bake_cannot_draw_whole_is_left_as_it_is() -> void:
+	var layout: Node = own(_room().build())
+	check(BakeScript.bakeable(layout), "the crypt room bakes")
+	var odd := Node2D.new()
+	layout.get_node("Shade").add_child(odd)
+	check(not BakeScript.bakeable(layout) and _bake().bake(layout) == null, "a shade holder with something but plain polygons: not baked")
+	odd.free()
+	(layout.get_node("Floor") as Sprite2D).material = CanvasItemMaterial.new()
+	check(_bake().bake(layout) == null, "a floor with a material of its own: not baked")
+
+
+func test_the_shader_draws_premultiplied_and_adds_the_glow() -> void:
+	var code: String = BakeScript.SHADER.code
+	check(code.contains("render_mode blend_premul_alpha"), "drawn premultiplied")
+	check(BakeScript.glow_material().get_shader_parameter(&"glow") == true and BakeScript.shown_material().get_shader_parameter(&"glow") != true, "the glow's material adds, the floor's shows")

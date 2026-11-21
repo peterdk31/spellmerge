@@ -830,6 +830,12 @@ The owner decided on 2026-11-21 to move toward more detailed art (64 x 64 sprite
 
   The draw calls and primitives do not change with the picture. By pass at 1280 x 720 (1p near web, `--off=`, medians of 2, GPU): the mist **18 → 10 ms**; the light with the mist 33 → 25 ms, so the light alone stays about 15 ms. On llvmpipe what is left of the light is the picture's own pixels: the screen copy the apply rect multiplies and its full-size rect, which no pass can make smaller (a multiply blend cannot brighten in an 8-bit target); the passes themselves take about 5 to 6 ms (`light passes` in the `gpu` line). On a GPU, where the per-pixel arithmetic (the rooms' tints, the bands, the mist's noise) weighs more against the fill, the gain should be larger; the owner's GPU and web runs are the measure. The mist skip (1p near web and start web, Feel's spectacle step, medians of 3): 2.54 → 2.07 ms and 2.33 → 1.99 ms.
 
+### Answered by the owner (2026-11-21, on #902)
+
+1. **#902 merges whole**; grid lighting and one pass build on it (next PRs).
+2. **The lit picture at 1280 x 720 looks fine**, and blockier light is acceptable (grid lighting at 8 to 16 px cells is in line).
+3. **The 64 x 64 art step is the same world with finer art:** world tiles stay 32 units and 64 x 64 art is drawn at half size, so the simulation is untouched; the HUD and the font are redrawn at 2x detail at the same on-screen size. (So the cameras' zoom 1 stays PictureGrid.SIZE of world, as #902 made it.)
+
 ## What stands unseen is hidden one by one; the benchmark on a fixed clock (2026-11-21)
 
 The owner decided two follow-ups on #899: hide what stands in unvisited rooms one by one, so the cover over them and #897's z-21 void-mote layer can go, the look unchanged (the background with motes flying about, secrets hidden until found, the reveal Smooth), view only; and let the benchmark play its fights from a fixed recording, so each run is the same and the fight rows stop jumping.

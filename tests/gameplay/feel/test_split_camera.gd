@@ -233,28 +233,32 @@ func test_a_merge_ends_on_the_one_picture_and_only_the_divider_shrinks() -> void
 	var b: Node2D = _wizard(1, _rooms[7])
 	_frames(120)
 	check_equal(_split.views.count, 2, "apart: two views")
-	# B walks back to A; the views ease onto each other and the one picture.
-	var stages: PackedInt32Array = PackedInt32Array([_split.stage_of(0), _split.stage_of(1)])
-	var last: Array[Transform2D] = [_split.views.to_screen[0], _split.views.to_screen[1]]
+	# B walks back to A; the views ease onto each other and the one picture. By slot: each view's
+	# divider and picture the last frame it was drawn, with the one picture drawn that frame.
+	var stages := {}
+	var last := {}
+	var last_root := {}
 	var frames: int = 0
 	while _split.views.count > 0 and frames < 4000:
 		var to: Vector2 = _rooms[2] + Vector2(48.0, 0.0) - b.global_position
 		b.global_position += to.limit_length(6.0)
 		_frame()
 		frames += 1
-		if _split.views.count > 0:
-			for view in _split.views.count:
-				check(absi(_split.stage_of(view) - stages[mini(view, 1)]) <= 1, "a divider changes a pixel a frame at most")
-			for view in _split.views.count:
-				stages[mini(view, 1)] = _split.stage_of(view)
-				last[mini(view, 1)] = _split.views.to_screen[view]
+		for view in _split.views.count:
+			var slot: int = _split.slot_of(view)
+			if stages.has(slot):
+				check(absi(_split.stage_of(view) - int(stages[slot])) <= 1, "a divider changes a pixel a frame at most")
+			stages[slot] = _split.stage_of(view)
+			last[slot] = _split.views.to_screen[view]
+			last_root[slot] = _root_transform()
 	check_equal(_split.views.count, 0, "together again: one picture")
 	check(not _split.split, "not split")
-	var drawn: Transform2D = _root_transform()
-	for view in 2:
-		check(_gap(last[view], drawn) < SplitCameraScript.SETTLED * 4.0, "the last view's picture was the one drawn now (%.4f px off)" % _gap(last[view], drawn))
-	for view in 2:
-		check_equal(stages[view], 0, "the divider had shrunk out")
+	check_equal(stages.size(), 2, "both views were seen")
+	for slot in last.keys():
+		var off: float = _gap(last[slot], last_root[slot])
+		check(off < SplitCameraScript.SETTLED * 4.0, "the last view's picture was the one drawn then (%.4f px off)" % off)
+		# Its divider had shrunk to a pixel (the next width, none, is its going).
+		check(int(stages[slot]) <= 1, "the divider had shrunk out (%d)" % int(stages[slot]))
 
 
 func test_this_machines_seats_only() -> void:

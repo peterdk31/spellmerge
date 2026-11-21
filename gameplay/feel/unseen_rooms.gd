@@ -44,6 +44,10 @@ var _hidden: PackedByteArray = PackedByteArray()
 ## What every switch was last laid for: the dark's changes, the regions' fits, the marks' layers,
 ## the cover's rooms and the layouts handed over (-1: not yet).
 var _laid: PackedInt64Array = PackedInt64Array([-1, -1, -1, -1, -1])
+## The same this frame, written in place (nothing is made a frame).
+var _now: PackedInt64Array = PackedInt64Array([0, 0, 0, 0, 0])
+## The motes' regions switched last (another pool's, a new "Particles" ring, are switched whole).
+var _regions: MoteRegionsScript = null
 ## The places' wanted states this frame (1: off), worked out in place.
 var _wanted: PackedByteArray = PackedByteArray()
 var _handed: int = 0
@@ -75,9 +79,16 @@ func step(dark: UnseenDarkScript, grid: RoomGrid, seen: ViewBoxesScript, marks: 
 	var places: int = maxi(_layouts.size(), marks.layer_count() if marks != null else 0)
 	if regions != null:
 		places = maxi(places, regions.places)
-	var now := PackedInt64Array([dark.void_changes(), regions.fits if regions != null else 0, marks.layer_count() if marks != null else 0, cover.count() if cover != null else 0, _handed])
-	var all: bool = now != _laid or _hidden.size() != places
-	_laid = now
+	_now[0] = dark.void_changes()
+	_now[1] = regions.fits if regions != null else 0
+	_now[2] = marks.layer_count() if marks != null else 0
+	_now[3] = cover.count() if cover != null else 0
+	_now[4] = _handed
+	var all: bool = _now != _laid or _hidden.size() != places or regions != _regions
+	if all:
+		for k in _now.size():
+			_laid[k] = _now[k]
+	_regions = regions
 	_wanted.resize(places)
 	var viewed: bool = seen != null and not seen.is_empty() and grid != null
 	var grid_places: int = grid.places() if grid != null else 0

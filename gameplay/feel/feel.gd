@@ -136,6 +136,7 @@ const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
+const RoomsViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
@@ -571,6 +572,8 @@ var _unseen: UnseenDarkScript = null
 ## What the rooms nobody has entered hold, not drawn under their dark (`unseen_rooms.gd`; the owner,
 ## 2026-11-21).
 var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
+## The one picture's box as the party camera stands this frame, for `_unseen_rooms` (`_rooms_seen`).
+var _rooms_seen_box: RoomsViewBoxesScript = RoomsViewBoxesScript.new()
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
 var _teleports: TeleportLooksScript = null
 ## The black void under a biome's slabs (`void_backdrop.gd`; the owner, 2026-11-19).
@@ -1229,7 +1232,7 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 			_spectacle.set_void_covers(_unseen.void_covers(), _unseen.void_changes())
 		# What those rooms hold is not drawn under the dark, nor what lies out of every view (the
 		# owner, 2026-11-21).
-		_unseen_rooms.step(_unseen, grid, _spectacle.view_boxes() if _spectacle != null else null, _spectacle.marks if _spectacle != null else null, _spectacle.pool.regions if _spectacle != null and _spectacle.pool != null else null, _cover_rooms)
+		_unseen_rooms.step(_unseen, grid, _rooms_seen(), _spectacle.marks if _spectacle != null else null, _spectacle.pool.regions if _spectacle != null and _spectacle.pool != null else null, _cover_rooms)
 	if _teleports != null:
 		_teleports.table = table
 		_teleports.step(real_delta)
@@ -2637,6 +2640,24 @@ func teleport_looks() -> TeleportLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## The parts of the world drawn this frame, for what lies out of every view (`unseen_rooms.gd`): the
+## split's views' boxes (`ScreenViews`, laid this frame), else the party camera's picture where it
+## was put this frame (`PartyCamera.visible_rect`): the viewport's canvas transform follows the
+## camera only after this frame's process, a frame late, and on a long pan a room at the leading
+## edge would come in a frame after its place on screen. Without a party camera, the spectacle's.
+func _rooms_seen() -> RoomsViewBoxesScript:
+	if _spectacle == null:
+		return null
+	var split: ScreenViews = ScreenViews.on(get_viewport()) if is_inside_tree() else null
+	if split != null and split.is_split():
+		return _spectacle.view_boxes()
+	var box: Rect2 = party_camera.visible_rect()
+	if not box.has_area():
+		return _spectacle.view_boxes()
+	_rooms_seen_box.set_one(box)
+	return _rooms_seen_box
 
 
 ## What the unvisited rooms hold, not drawn (for tests).

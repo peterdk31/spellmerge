@@ -839,7 +839,7 @@ func _finish(failed: Array[String]) -> void:
 		SessionRules.machine().shot_cap = _default_cap
 		_projectiles.call("set_cap", _default_cap)
 	if failed.is_empty():
-		print("%s OK: %d scenarios, 4 players with built spells, enemies and shots at the targets, no errors logged" % [result_word, scenarios.size()])
+		print("%s OK: %d scenarios, players with built spells, enemies and shots at the targets, no errors logged" % [result_word, scenarios.size()])
 		get_tree().quit(0)
 	else:
 		for reason in failed:

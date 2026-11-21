@@ -164,7 +164,10 @@ func _fight_rooms(map: BiomeMap, count: int, smallest: bool = false) -> PackedIn
 	for room in map.rooms():
 		if map.room_kinds[room] == FIGHT_KIND:
 			fights.append(room)
-	fights.sort_custom(func(a: int, b: int) -> bool: return ((biome.call(&"room_rect", a) as Rect2).get_area() > (biome.call(&"room_rect", b) as Rect2).get_area()) != smallest)
+	fights.sort_custom(func(a: int, b: int) -> bool:
+		var area_a: float = (biome.call(&"room_rect", a) as Rect2).get_area()
+		var area_b: float = (biome.call(&"room_rect", b) as Rect2).get_area()
+		return area_a < area_b if smallest else area_a > area_b)
 	var out := PackedInt32Array()
 	if fights.is_empty():
 		out.append(0)

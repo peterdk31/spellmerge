@@ -669,6 +669,26 @@ func test_a_place_out_of_every_view_draws_nothing_of_its_own() -> void:
 	check(not rooms.is_hidden(0) and not rooms.is_hidden(bridge) and rooms.is_hidden(1), "with no view box none is out of view")
 
 
+## What counts as on screen for that follows the party camera as it was moved this frame, not the
+## viewport's canvas transform, which follows a frame late (the review's: on a long pan a room at
+## the leading edge came in a frame after its place on screen).
+func test_the_view_rooms_are_switched_by_is_where_the_camera_is_this_frame() -> void:
+	_start(1)
+	tick.run(DT)
+	var camera := Camera2D.new()
+	root.add_child(camera)
+	camera.make_current()
+	(feel.get(&"party_camera") as Object).call(&"follow", camera)
+	var before: Rect2 = (feel.get_viewport().get_canvas_transform().affine_inverse() * feel.get_viewport().get_visible_rect())
+	camera.position += Vector2(3000.0, 0.0)
+	var seen: Object = feel.call(&"_rooms_seen")
+	var box: Rect2 = (seen.get(&"boxes") as Array)[0]
+	var wanted: Rect2 = (feel.get(&"party_camera") as Object).call(&"visible_rect")
+	check(box.is_equal_approx(wanted), "the box is the camera's picture as it stands now (%s, %s)" % [box, wanted])
+	check(not box.is_equal_approx(before), "not the canvas transform's of the frame before")
+	camera.queue_free()
+
+
 ## The void's pool is made and freed with the motes' pool (the "Particles" setting's cap: VOID_SHARE of
 ## it, twice over; none with no motes) and follows the particle amount and the split's share.
 func test_the_void_pool_follows_the_motes_settings() -> void:

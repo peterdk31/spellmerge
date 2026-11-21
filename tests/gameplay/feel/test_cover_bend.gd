@@ -161,7 +161,9 @@ func test_a_view_switched_off_out_of_reach_takes_the_bodies_only_when_shown() ->
 	lead.step(2.0, table, Vector2.ZERO)
 	other.step_with(lead.bodies(), lead.body_count(), 2.0, null, Rect2(), -1, Callable(), lead.found_box())
 	check(other.walked_at(other.layout.cell_of(Vector2(200, 200))) >= 2.0, "in reach: walked though off")
-	check_equal(other.body_count(), 2, "and taken")
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(3000, 3000), "its batches not told while off")
+	other.visible = true
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(200, 200), "shown: told the frame's bodies")
 	check_equal((own(CoverScript.new(0)) as CoverScript).found_box(), CoverScript.NOWHERE, "a view that found none: nowhere")
 
 

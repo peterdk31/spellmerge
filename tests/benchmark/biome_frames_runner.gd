@@ -22,6 +22,8 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##  - `... feel parts`: Feel's step by part (`Feel.profile_parts`), milliseconds a drawn frame;
 ##  - `... worst frames`: the slowest WORST frames, each with its ticks, the tick's time and the GPU's.
 ## With `--profile` the tree profile rides along (each script's process time: the HUD's among them).
+## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
+## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
 ## `user://biome_frames/<label>.png` (one slow frame, outside the averages' sense).
 ##
@@ -31,6 +33,7 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##
 ## Started by `biome_frames.gd` (it needs a window: a GPU, or `xvfb-run`, where llvmpipe draws).
 
+const DrawCensusScript := preload("res://tests/benchmark/draw_census.gd")
 const SEEDS: PackedInt64Array = [11, 23, 37]
 ## A map with fewer rooms than this is reported (the crypt makes 12 to 16; the pass measures 16).
 const ROOMS_WANTED: int = 16
@@ -72,6 +75,9 @@ var _counting: bool = false
 ## `--shots`: whether to save a screen a scenario, and whether this scenario's is saved.
 var _shots: bool = false
 var _shot_taken: bool = false
+## `--census`: whether to print a draw census a scenario, and whether this scenario's is printed.
+var _census: bool = false
+var _census_taken: bool = false
 const SHOTS_DIR: String = "user://biome_frames"
 
 
@@ -83,6 +89,7 @@ func _init() -> void:
 	result_word = "BIOME FRAMES"
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	_shots = args.has("--shots")
+	_census = args.has("--census")
 	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
 	# a scenario plays the same (stress_runner.gd's `fixed_frames`); `--real-clock` as the game runs.
 	fixed_frames = not args.has("--real-clock")
@@ -154,6 +161,7 @@ func _scenario_started(scenario: Dictionary) -> void:
 	_rescan_left = 0.0
 	_counting = false
 	_shot_taken = false
+	_census_taken = false
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
 
@@ -255,6 +263,13 @@ func _process(delta: float) -> void:
 	if _shots and not _shot_taken and _elapsed >= warm_up + measure * 0.5:
 		_shot_taken = true
 		_save_shot(String(rows[scenarios[_current]]["label"]))
+	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:
+		_census_taken = true
+		DrawCensusScript.report(get_tree(), String(rows[scenarios[_current]]["label"]))
+		if (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--census-calls"):
+			var probe := DrawCensusScript.CallProbe.new()
+			add_child(probe)
+			probe.start(get_tree(), String(rows[scenarios[_current]]["label"]))
 	var now: int = Time.get_ticks_usec()
 	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
 	var tick_usec: int = _tick_usec(tick)

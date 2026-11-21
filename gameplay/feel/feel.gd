@@ -135,6 +135,7 @@ const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
@@ -567,6 +568,9 @@ var _locks: LockLooksScript = null
 ## A biome's secret runes (`rune_looks.gd`; the owner, 2026-11-20).
 var _runes: RuneLooksScript = null
 var _unseen: UnseenDarkScript = null
+## What the rooms nobody has entered hold, not drawn under their dark (`unseen_rooms.gd`; the owner,
+## 2026-11-21).
+var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
 var _teleports: TeleportLooksScript = null
 ## The black void under a biome's slabs (`void_backdrop.gd`; the owner, 2026-11-19).
@@ -949,6 +953,7 @@ func _ready() -> void:
 	_unseen.pieces = _hearing
 	add_child(_unseen)
 	_unseen.bind(events)
+	_unseen_rooms.bind(events)
 	_teleports = TeleportLooksScript.new()
 	_teleports.name = "TeleportLooks"
 	add_child(_teleports)
@@ -1222,6 +1227,9 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		# An unvisited room is the void (the owner, 2026-11-21): the void's motes drift over its dark.
 		if _spectacle != null:
 			_spectacle.set_void_covers(_unseen.void_covers(), _unseen.void_changes())
+		# What those rooms hold is not drawn under the dark, nor what lies out of every view (the
+		# owner, 2026-11-21).
+		_unseen_rooms.step(_unseen, grid, _spectacle.view_boxes() if _spectacle != null else null, _spectacle.marks if _spectacle != null else null, _spectacle.pool.regions if _spectacle != null and _spectacle.pool != null else null, _cover_rooms)
 	if _teleports != null:
 		_teleports.table = table
 		_teleports.step(real_delta)
@@ -2629,6 +2637,11 @@ func teleport_looks() -> TeleportLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## What the unvisited rooms hold, not drawn (for tests).
+func unseen_rooms() -> UnseenRoomsScript:
+	return _unseen_rooms
 
 
 ## The black void under a biome's slabs (for tests).

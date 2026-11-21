@@ -265,6 +265,18 @@ func layer_drawn(k: int) -> int:
 	return _pieces[k].batch.multimesh.visible_instance_count if k >= 0 and k < _pieces.size() and _pieces[k].batch != null else 0
 
 
+## Whether layer `k` is drawn on the screen (`set_layer_shown`).
+func layer_shown(k: int) -> bool:
+	return k >= 0 and k < _pieces.size() and _pieces[k].sprite != null and _pieces[k].sprite.visible
+
+
+## Layer `k` drawn on the screen (`shown`) or not (a room nobody has entered, under the void's dark:
+## unseen_rooms.gd). Its stamps are still drawn into it, so shown again it is as it stands.
+func set_layer_shown(k: int, shown: bool) -> void:
+	if k >= 0 and k < _pieces.size() and _pieces[k].sprite != null:
+		_pieces[k].sprite.visible = shown
+
+
 ## Layer `k`'s stamps' material (null for none; for tests).
 func layer_material(k: int) -> ShaderMaterial:
 	return _pieces[k].material if k >= 0 and k < _pieces.size() else null

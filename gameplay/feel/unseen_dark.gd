@@ -149,6 +149,14 @@ func covered_of(place: int) -> Rect2:
 	return _covers[place] if build_of(place) == HIDDEN else Rect2()
 
 
+## Whether room `place` is covered whole now (unvisited, its reveal not begun): nothing of it shows,
+## so what it holds need not be drawn (unseen_rooms.gd). A secret room's hidden bridge is not (its
+## dark is a part of its place).
+func covers_whole(place: int) -> bool:
+	var stage: int = stage_of(place)
+	return stage >= 0 and BLOCK_SIDES[stage] >= BLOCK
+
+
 ## Bridge `place`'s build (a secret room's bridge: HIDDEN, or frames since found, `built_at` once
 ## whole); 0 for any other place.
 func build_of(place: int) -> int:

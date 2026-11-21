@@ -42,6 +42,7 @@ extends Control
 
 const GlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
+const IconAtlasScript := preload("res://hud/widgets/icon_atlas.gd")
 
 const ICON: float = 8.0
 ## One icon plus the 1 px between two icons.
@@ -195,13 +196,13 @@ func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
 		_cast_first.append(_icons.size())
 		_cast_size.append(slots.size())
 		for slot in slots:
-			_icons.append(icons[slot] if slot >= 0 and slot < icons.size() else null)
+			_icons.append(IconAtlasScript.region_of(icons[slot]) if slot >= 0 and slot < icons.size() else null)
 			_wasted.append(1 if wasted.has(slot) else 0)
 	if casts.is_empty():
 		var cards: Array = plan.get("cards", [])
 		for slot in cards.size():
 			if StringName(cards[slot]) != &"":
-				_icons.append(icons[slot] if slot < icons.size() else null)
+				_icons.append(IconAtlasScript.region_of(icons[slot]) if slot < icons.size() else null)
 				_wasted.append(1)
 		if not _icons.is_empty():
 			_cast_first.append(0)
@@ -286,6 +287,12 @@ func mana_line() -> MeterScript:
 ## The cards shown in read order (for tests): how many, and how many are greyed.
 func card_count() -> int:
 	return _icons.size()
+
+
+## The texture card `index` of the row (in read order) is drawn with: its icon's copy on the
+## shared icon page (`IconAtlas`), so the row's icons are one draw call (null for none; tests).
+func card_texture(index: int) -> Texture2D:
+	return _icons[index] if index >= 0 and index < _icons.size() else null
 
 
 func wasted_count() -> int:
@@ -476,24 +483,28 @@ func _draw_cards() -> void:
 	# The insides of the next cast's frame and of every frame, for the `NEXT_CAST` shade.
 	var next_inside := Rect2()
 	var all_inside := Rect2()
+	# Three passes, each a run of one kind (the frames' fills, the icons, all one page of
+	# `IconAtlas`, then the strikes and the frames' edges), so the strip is three draw calls
+	# however many cards it shows; nothing of one pass overlaps another's in a way the order shows
+	# (an icon lies inside its fill, a strike over its icon, an edge round its own frame).
 	for c in _cast_size.size():
-		var first: int = _cast_first[c]
-		var count: int = _cast_size[c]
-		var x: float = _cast_x[c] - float(_scroll)
-		var box := Rect2(x, 0.0, count * ICON_STEP + 1.0, BOX_HEIGHT)
-		if box.end.x <= 0.0 or box.position.x >= view:
+		var box: Rect2 = _cast_box(c, view)
+		if box.size.x <= 0.0:
 			continue
 		var is_next: bool = c == next and _firing != -1
-		var short: bool = is_short(c)
-		# A recharge keeps the next cast marked on the button style (dashed), and drops the mark
-		# on the next-cast style (the shade covers the whole cycle).
 		var marked: bool = is_next and (on_button or not recharging)
 		_strip.draw_rect(box, NEXT_FILL if marked else FILL)
-		for i in count:
-			var at := Rect2(x + 1.0 + i * ICON_STEP, 1.0, ICON, ICON)
-			var wasted: bool = _wasted[first + i] == 1
+	for c in _cast_size.size():
+		var box: Rect2 = _cast_box(c, view)
+		if box.size.x <= 0.0:
+			continue
+		var first: int = _cast_first[c]
+		var is_next: bool = c == next and _firing != -1
+		var short: bool = is_short(c)
+		for i in _cast_size[c]:
+			var at := Rect2(box.position.x + 1.0 + i * ICON_STEP, 1.0, ICON, ICON)
 			var tint: Color = Color.WHITE
-			if wasted:
+			if _wasted[first + i] == 1:
 				tint = WASTE_TINT
 			elif short:
 				tint = SHORT_TINT
@@ -504,8 +515,20 @@ func _draw_cards() -> void:
 				_strip.draw_texture_rect(icon, at, false, tint)
 			else:
 				_strip.draw_rect(at.grow(-1.0), PLACEHOLDER * tint)
-			if wasted:
-				_strip.draw_line(at.position + Vector2(0.0, ICON), at.position + Vector2(ICON, 0.0), STRIKE, 1.0)
+	for c in _cast_size.size():
+		var box: Rect2 = _cast_box(c, view)
+		if box.size.x <= 0.0:
+			continue
+		var first: int = _cast_first[c]
+		var is_next: bool = c == next and _firing != -1
+		var short: bool = is_short(c)
+		# A recharge keeps the next cast marked on the button style (dashed), and drops the mark
+		# on the next-cast style (the shade covers the whole cycle).
+		var marked: bool = is_next and (on_button or not recharging)
+		for i in _cast_size[c]:
+			if _wasted[first + i] == 1:
+				var at := Vector2(box.position.x + 1.0 + i * ICON_STEP, 1.0)
+				_strip.draw_line(at + Vector2(0.0, ICON), at + Vector2(ICON, 0.0), STRIKE, 1.0)
 		if marked and recharging:
 			_draw_dashed(box, GOLD)
 			_drawn_dashed = c
@@ -543,6 +566,15 @@ func _draw_cards() -> void:
 		_draw_arrow(-_arrow_out(_left_in), -1, GOLD if next_left else MUTED)
 	if _right_in > 0:
 		_draw_arrow(view - ARROW_WIDTH + _arrow_out(_right_in), 1, GOLD if next_right else MUTED)
+
+
+## Cast `c`'s frame on the strip as it is scrolled now (empty when it is out of the strip's
+## `view` width).
+func _cast_box(c: int, view: float) -> Rect2:
+	var box := Rect2(_cast_x[c] - float(_scroll), 0.0, _cast_size[c] * ICON_STEP + 1.0, BOX_HEIGHT)
+	if box.end.x <= 0.0 or box.position.x >= view:
+		return Rect2()
+	return box
 
 
 ## How far past its end an arrow `slid` frames in is still, in whole pixels.

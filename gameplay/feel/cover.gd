@@ -387,13 +387,15 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 ## it draws then as if it had taken them every frame.
 func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable(), box: Rect2 = EVERYWHERE) -> void:
 	if not is_visible_in_tree() and not _reached_by(box):
-		# Held as it is: the one the batches of the finding view hold, which it never writes.
+		# Held as it is (the finding view's newest, which it writes again only two frames on, by then
+		# held here no more: copy on write keeps the values either way).
 		_due_found = found
 		_due_count = count
 		_bodies_due = true
 		_draw_idle(now, pool, view, stirs_version, hand_stirs)
 		return
 	_bodies_due = false
+	_due_found = PackedVector2Array()
 	_take_found(found, count)
 	_draw_frame(now, pool, view, stirs_version, hand_stirs)
 
@@ -512,6 +514,7 @@ func _on_visibility_changed() -> void:
 		if _bodies_due:
 			_bodies_due = false
 			_take_found(_due_found, _due_count)
+			_due_found = PackedVector2Array()
 			_take_bodies()
 		_hand_batches()
 

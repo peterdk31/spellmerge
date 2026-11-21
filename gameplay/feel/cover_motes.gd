@@ -146,7 +146,7 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 	_last = now
 	var near: Rect2 = view.grow(VIEW_MARGIN) if view.has_area() else Rect2()
 	var budget: int = MOST_A_FRAME
-	if near.has_area() and _layout != null and not near.intersects(_layout_box(), true):
+	if near.has_area() and _layout != null and not near.intersects(_layout.rect(), true):
 		_owe_far(dt, pool)
 		return
 	for stream in _streams:
@@ -187,11 +187,6 @@ func _owe_far(dt: float, pool: MotesScript) -> void:
 			continue
 		var owed: float = minf(stream.owed + stream.look.rate * float(cells.size()) * dt, float(MOST_A_FRAME))
 		stream.owed = owed - floorf(owed)
-
-
-## The box every cell's middle lies in.
-func _layout_box() -> Rect2:
-	return Rect2(_layout.origin, Vector2(float(_layout.columns * CoverLayout.CELL), float(_layout.rows * CoverLayout.CELL)))
 
 
 ## One mote of kind `k` off `stream`, round the middle `middle` of a cell, into `pool`.

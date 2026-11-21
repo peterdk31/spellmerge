@@ -332,7 +332,7 @@ func step(delta: float) -> void:
 		var room: CoverRoom = _rooms[number]
 		if not room.plays():
 			continue
-		if room.has_active() and (grid == null or grid.is_awake(number)):
+		if grid == null or grid.is_awake(number):
 			room.step_cells(delta, game, number)
 		if not may_harm:
 			may_harm = not room.harms_nobody()

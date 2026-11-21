@@ -162,7 +162,7 @@ func test_a_view_switched_off_out_of_reach_takes_the_bodies_only_when_shown() ->
 	other.step_with(lead.bodies(), lead.body_count(), 2.0, null, Rect2(), -1, Callable(), lead.found_box())
 	check(other.walked_at(other.layout.cell_of(Vector2(200, 200))) >= 2.0, "in reach: walked though off")
 	check_equal(other.body_count(), 2, "and taken")
-	check_equal(CoverScript.new(0).found_box(), CoverScript.NOWHERE, "a view that found none: nowhere")
+	check_equal((own(CoverScript.new(0)) as CoverScript).found_box(), CoverScript.NOWHERE, "a view that found none: nowhere")
 
 
 func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:

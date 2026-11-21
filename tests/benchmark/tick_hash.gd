@@ -5,7 +5,7 @@ extends "res://tests/bots/playtest.gd"
 ##  - `--hash-every=N`: the whole game's state hash (`SimHash.whole` of `Tick.state_areas()`) every N
 ##    ticks from the hub on, each written as a line `tick hash` to `--hash-out=PATH` (default
 ##    `user://tick_hash.txt`), so two checkouts' runs of the same seed and players are compared line
-##    by line (`diff`): a change that keeps the game exactly the same leaves the file the same;
+##    by line (`cmp`): a change that keeps the game exactly the same leaves the file the same;
 ##  - `--profile-steps`: each of the Tick's steps timed from a second into the run on, the biome's lay left out (`Tick.profile_steps`), printed
 ##    as `BENCH: tick steps` (ms a tick, the largest first), with the ticks run.
 ## Hashing costs far more than a tick, so a timed run hashes nothing (pass one or the other).
@@ -23,6 +23,7 @@ var _profile: bool = false
 var _hashes: PackedStringArray = PackedStringArray()
 var _tick: TickScript = null
 var _ticks_profiled: int = 0
+var _profile_begun: bool = false
 var _projectiles: Node = null
 ## The projectile manager's parts (its `step_profile`, its last step's), summed after every tick.
 var _projectile_sums: PackedInt64Array = PackedInt64Array()
@@ -55,7 +56,8 @@ func take() -> void:
 func _on_ticked_profiled() -> void:
 	if not _run_started or _ticks - _run_tick < 60:
 		return
-	if _ticks_profiled == 0 and _tick.step_profile.is_empty():
+	if not _profile_begun:
+		_profile_begun = true
 		_tick.profile_steps(Time.get_ticks_usec)
 		_projectiles = root.get_node_or_null("Projectiles")
 		if _projectiles != null:
@@ -78,7 +80,7 @@ func _on_ticked() -> void:
 		return
 	var walk := StateWalk.new()
 	var whole: int = SimHash.whole(SimHash.areas(_tick.state_areas(), walk))
-	_hashes.append("%d %d %d" % [_ticks, at, whole])
+	_hashes.append("%d %d" % [at, whole])
 
 
 ## The Tick's steps, ms a tick over the ticks profiled, the largest first.

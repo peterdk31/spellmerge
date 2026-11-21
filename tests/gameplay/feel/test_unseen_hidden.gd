@@ -131,21 +131,36 @@ func test_an_unvisited_rooms_bodies_and_what_lies_there_are_hidden_until_its_rev
 	check(dark.landing_rects().has(east_end), "the court's still is")
 
 
-## A player's own wizard is never hidden (the review's: one walking in over the bridge's end inside
-## the room's rectangle, still the bridge's place, popped out whole for the frames before the reveal).
-func test_a_wizard_on_a_bridges_end_inside_an_unvisited_room_stays_drawn() -> void:
+## A player's wizard on a bridge's end inside an unvisited room's rectangle (still the bridge's
+## place, the room not entered) is hidden there as the dark covered it (the owner, 2026-11-21, on
+## #901), and drawn again from the room's reveal; on the bridge outside the rectangle it is drawn.
+func test_a_wizard_on_a_bridges_end_inside_an_unvisited_room_is_hidden_like_under_the_dark() -> void:
 	var map: BiomeMap = BiomeMaps.split(registry)
 	_start(map)
 	var bridge: int = map.rooms()
 	var end_of: Rect2 = _grid().place_rect(WEST).intersection(_grid().place_rect(bridge))
 	var wizard := flow.get_wizard(0) as Actor
-	var at: Vector2 = _grid().nearest_ground(end_of.get_center(), 4.0)
-	wizard.global_position = at
+	wizard.global_position = _grid().nearest_ground(end_of.get_center(), 4.0)
 	tick.run(DT)
 	_step()
 	check(_dark().mask.hides(wizard.global_position), "its feet are in the unvisited room's rectangle")
-	check(_grid().place_at(wizard.global_position) != WEST or not _dark().covers_whole(WEST), "on the bridge's place, the room not entered")
-	check(wizard.visible, "the wizard is drawn")
+	check(_dark().covers_whole(WEST), "the room not entered")
+	check(not wizard.visible, "the wizard is not drawn there")
+	# Back onto the bridge, outside the rectangle: drawn again.
+	wizard.global_position = _grid().nearest_ground(Vector2(end_of.end.x + 24.0, end_of.get_center().y), 4.0)
+	tick.run(DT)
+	_step()
+	check(not _dark().mask.hides(wizard.global_position), "out of the rectangle")
+	check(wizard.visible, "drawn on the bridge")
+	# Into the room: drawn from its reveal's first stage.
+	wizard.global_position = _grid().nearest_ground(_grid().place_rect(WEST).get_center(), 10.0)
+	tick.run(DT)
+	_dark().step(0.0, _grid())
+	_dark().advance()
+	_step()
+	check(not _dark().covers_whole(WEST), "a stage into its reveal")
+	check(wizard.visible, "drawn again under the opening blocks")
+
 
 func test_items_coins_and_light_spots_in_an_unvisited_room_are_left_out() -> void:
 	var map: BiomeMap = BiomeMaps.split(registry)

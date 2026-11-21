@@ -8,7 +8,9 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Shots: the wizard on the nave's west bridge, the antechamber unvisited with all of it in it: only
 ## the void and its motes show there (unseen_hidden, a 4x crop over the room's edge,
-## unseen_hidden_crop; it fails when more than a few of the room's pixels are lit); frozen mid-way
+## unseen_hidden_crop; it fails when more than a few of the room's pixels are lit); the wizard on the
+## bridge's end inside the antechamber's rectangle, not yet in it, hidden as the dark covered it
+## (unseen_hidden_wizard, its crop); frozen mid-way
 ## through its reveal, the foes and the pickups coming in under the opening blocks
 ## (unseen_hidden_reveal, its crop); and the room revealed (unseen_hidden_revealed, its crop).
 
@@ -50,6 +52,7 @@ func take() -> void:
 	# the view (their life is 3 to 4 s).
 	wizard.global_position = west_mouth + Vector2(-40.0, 0.0)
 	await settle(300)
+	var dark := feel.call(&"unseen_dark") as UnseenDarkScript
 	var image: Image = await grab()
 	var lit: float = _lit_share(image, grid.place_rect(WEST))
 	print("SHOT: the unvisited antechamber's pixels lit: %.2f%%" % (lit * 100.0))
@@ -59,8 +62,20 @@ func take() -> void:
 		return
 	save(image, "unseen_hidden")
 	save_crop(image, on_screen(edge + Vector2(-40.0, 0.0)), "unseen_hidden_crop", Vector2i(80, 45))
+	# The wizard on the bridge's end inside the antechamber's rectangle (the bridge's place, the room
+	# not entered): hidden there as the dark covered it (the owner, 2026-11-21, on #901).
+	var bridge_end: Rect2 = grid.place_rect(WEST).intersection(grid.place_rect(map.rooms()))
+	wizard.global_position = grid.nearest_ground(bridge_end.get_center(), 4.0)
+	await settle(10)
+	if dark.stage_of(WEST) != UnseenDarkScript.BLOCK_SIDES.size() - 1:
+		fail("the antechamber was entered from the bridge's end")
+		return
+	image = await grab()
+	save(image, "unseen_hidden_wizard")
+	save_crop(image, on_screen(bridge_end.get_center()), "unseen_hidden_wizard_crop", Vector2i(80, 45))
+	wizard.global_position = west_mouth + Vector2(-40.0, 0.0)
+	await settle(10)
 	# Into the antechamber with Feel held, its dark stepped by hand to the reveal's middle stage.
-	var dark := feel.call(&"unseen_dark") as UnseenDarkScript
 	feel.process_mode = Node.PROCESS_MODE_DISABLED
 	wizard.global_position = edge + Vector2(-24.0, 0.0)
 	await settle(4)

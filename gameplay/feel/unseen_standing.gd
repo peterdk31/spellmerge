@@ -5,9 +5,9 @@ extends RefCounted
 ## (`unseen_mask.gd`), and each room's floor mist (the spectacle's) whose room is. From the frame the
 ## room's reveal begins they are drawn again, as they stand, under its opening blocks. A body's
 ## shadow and its carried light go with it (both draw only a body drawn in its tree; Feel steps this
-## before them). A player's own body (a seat's wizard, or a body a seat drives) is never hidden: a
-## wizard walking in over a bridge's end inside the room's rectangle (still the bridge's place
-## until it passes the mouth) stays drawn, never popping out for the frames before the reveal.
+## before them). A player's wizard is hidden there too, as the dark covered it (the owner,
+## 2026-11-21, on #901): one on a bridge's end inside an unvisited room's rectangle (still the
+## bridge's place until it passes the mouth) is not drawn until the room's reveal begins.
 ##
 ## View only: it sets `visible` (no member of any simulation script, and nothing in the game reads
 ## it) and reads the bodies' places. It shows again only what it hid, so a body another look hides
@@ -64,7 +64,7 @@ func _step_bodies(mask: UnseenMaskScript, table: ActorsScript) -> void:
 			_hid[id] = 0
 			_hidden_count -= 1
 		var mine: bool = _hid[id] != 0
-		var hide: bool = not mask.is_empty() and not _is_players(table, id) and mask.hides(body.global_position)
+		var hide: bool = not mask.is_empty() and mask.hides(body.global_position)
 		if hide and not mine:
 			if body.visible:
 				body.visible = false
@@ -78,16 +78,6 @@ func _step_bodies(mask: UnseenMaskScript, table: ActorsScript) -> void:
 		# A body it hid that went (freed, or its id handed to another) is no longer its to show.
 		_hid.fill(0)
 		_hidden_count = 0
-
-
-## Whether body `id` is a player's: a seat drives it, or it is a seat's own wizard.
-static func _is_players(table: ActorsScript, id: int) -> bool:
-	if table.seat_of(id) != ActorsScript.NONE:
-		return true
-	for seat in ActorsScript.SEATS:
-		if table.home_of_seat(seat) == id:
-			return true
-	return false
 
 
 func _switch_mist(mask: UnseenMaskScript, mist: MistScript) -> void:

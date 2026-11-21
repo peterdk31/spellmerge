@@ -170,6 +170,15 @@ func test_the_light_has_a_buffer_a_view_and_names_each_view_to_its_readers() -> 
 		check_equal(copy.z_index, item.z_index, "at its z")
 		check(light.readers.copy_of(item, 3) == null, "no copy for a view not drawn")
 	_check_each_view_reads_its_own(light, 3)
+	# The third view's copy takes this frame's grid (the review's: it once took last frame's, a cell off
+	# for a frame as the view moved): the view moved, one draw's `follow`, its numbers the grid's own.
+	third.global_position += Vector2(37.0, 23.0)
+	_frames(1)
+	light.follow()
+	var third_copy: CanvasItem = light.readers.copy_of(before, 2)
+	var grid_now := Vector4(light.grid.view_origin[4], light.grid.view_origin[5], light.grid.view_at[4], light.grid.view_at[5])
+	check_equal((third_copy.material as ShaderMaterial).get_shader_parameter(&"light_grid_view_2"), grid_now, "the third view's copy reads this frame's grid")
+	check_equal((third_copy.material as ShaderMaterial).get_shader_parameter(&"light_grid_size_2"), Vector4(light.grid.view_size[4], light.grid.view_size[5], 0.0, 0.0), "and its size")
 	reader.set_shader_parameter(&"sim_time", 13.5)
 	light.follow()
 	check_equal(float((light.readers.copy_of(before, 2).material as ShaderMaterial).get_shader_parameter(&"sim_time")), 13.5, "a uniform set on the item's material reaches the third view's")

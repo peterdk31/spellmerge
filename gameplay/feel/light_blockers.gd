@@ -20,7 +20,7 @@ extends RefCounted
 ##   shrinks down to its base with it, so the light comes back over the rubble a band at a time as
 ##   the shaft falls, never in one jump.
 ##
-## Up to MAX boxes (LightGrid's and its kernel's MAX_BLOCKERS), the walls first; any past it are left out (every
+## Up to MAX boxes (LightGrid.BLOCKERS_MOST, its kernel's checked against it), the walls first; any past it are left out (every
 ## room's are counted by a test). `lit_as` and `shade_between` are the pick the grid lights by (for
 ## the bodies' shadows and the tests).
 

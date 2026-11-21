@@ -348,7 +348,7 @@ const RAY_PATH_START: int = 80
 const DRAW_STRIDE: int = 16
 ## The floats of a shot's row (its transform's free ones, `MODEL_MATRIX[2].x` and `.y` to a shader)
 ## that carry how far and how bright it lights the room (`_look_light_reach`,
-## `_look_light_intensity`; Feel's `light.gdshader`). No shot shader reads them.
+## `_look_light_intensity`; Feel's grid lighting, `light_grid.gd`). No shot shader reads them.
 const LIGHT_REACH_FLOAT: int = 2
 const LIGHT_INTENSITY_FLOAT: int = 6
 ## The bounds of a shot's light multipliers (`set_light`; a card's `look_light_intensity` and
@@ -809,7 +809,7 @@ var _body: PackedByteArray = PackedByteArray()
 ## How bright and how far each shot lights the room, times the shot light's own (its card's
 ## `look_light_intensity` and `look_light_reach`, `set_looks`, `set_light`; 1 for a plain shot):
 ## written into its row's free floats (`MODEL_MATRIX[2].y` and `.x`, LIGHT_INTENSITY_FLOAT and
-## LIGHT_REACH_FLOAT), which Feel's spell light reads (`light.gdshader`). Drawn only (VIEW).
+## LIGHT_REACH_FLOAT), which Feel's grid lighting reads (`light_grid.gd`). Drawn only (VIEW).
 var _look_light_intensity: PackedFloat32Array = PackedFloat32Array()
 var _look_light_reach: PackedFloat32Array = PackedFloat32Array()
 var _carrier_card_ids: Array[StringName] = []
@@ -5459,6 +5459,10 @@ func _ray_keep(nodes: Array, alongs: Array, points: Array, heads: Array, found: 
 
 func update_draw(fraction: float = -1.0) -> void:
 	spark_birth_count = 0
+	# Last frame's rows let go before this frame's are written (no copy of a buffer still held).
+	for batch in _light_rows.size():
+		_light_rows[batch] = _no_rows
+		_light_counts[batch] = 0
 	if _draw_node == null:
 		drawn = 0
 		_end_count = 0
@@ -5470,10 +5474,6 @@ func update_draw(fraction: float = -1.0) -> void:
 		return
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
-	# Last frame's rows let go before this frame's are written (no copy of a buffer still held).
-	for batch in _light_rows.size():
-		_light_rows[batch] = _no_rows
-		_light_counts[batch] = 0
 	fraction = clampf(fraction, 0.0, 1.0)
 	for node in _nodes:
 		_set_sim_time(node)

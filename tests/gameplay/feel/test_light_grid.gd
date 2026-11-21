@@ -10,11 +10,13 @@ const NativeScript := preload("res://core/native/native.gd")
 const ROWS: int = 160
 
 
-## A grid over two views (one zoomed in, one far off), its tints set, boxes that block light.
-func _grid() -> LightGridScript:
+## A grid of `cell` px over views (one zoomed in, one far off; a third over the first's middle with
+## `overlap`), its tints set, boxes that block light.
+func _grid(cell: float = LightGridScript.CELL, overlap: bool = false) -> LightGridScript:
 	var grid := LightGridScript.new()
-	var boxes := PackedVector4Array([Vector4(-40.0, -30.0, 600.0, 330.0), Vector4(1985.0, 993.0, 2310.0, 1170.0)])
-	grid.fit(boxes, 2)
+	grid.set_cell(cell)
+	var boxes := PackedVector4Array([Vector4(-40.0, -30.0, 600.0, 330.0), Vector4(1985.0, 993.0, 2310.0, 1170.0), Vector4(150.0, 90.0, 470.0, 270.0)])
+	grid.fit(boxes, 3 if overlap else 2)
 	var tints := PackedColorArray()
 	tints.resize(32)
 	for layer in 32:
@@ -107,6 +109,9 @@ static func _light(grid: LightGridScript) -> void:
 	grid.add_beam(path, path.size(), 24.0, Color(0.9, 0.5, 0.2))
 	var far := PackedVector3Array([Vector3(2000.0, 1100.0, 0.0), Vector3(2300.0, 1000.0, 0.0)])
 	grid.add_beam(far, far.size(), 18.0, Color(0.2, 0.6, 1.0))
+	# A piece of no length (a beam's two points the same), and a beam lit by fewer points than its path.
+	var still := PackedVector3Array([Vector3(400.0, 200.0, 0.0), Vector3(400.0, 200.0, 0.0), Vector3(450.0, 260.0, 0.0), Vector3(9999.0, 9999.0, 0.0)])
+	grid.add_beam(still, 3, 20.0, Color(0.5, 1.0, 0.4))
 	grid.bake()
 
 
@@ -154,10 +159,23 @@ func test_the_native_kernel_lights_the_grid_as_the_gdscript_to_the_byte() -> voi
 	if not NativeScript.loaded():
 		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
 		return
-	var script_grid: LightGridScript = _grid()
+	_check_native(LightGridScript.CELL, false)
+
+
+## At a 12 px cell (not exact in binary sums) and with a view over another's middle (rows lit in two
+## views at once), the kernel and the GDScript still agree to the byte.
+func test_the_native_kernel_agrees_at_a_coarser_cell_and_overlapping_views() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
+		return
+	_check_native(12.0, true)
+
+
+func _check_native(cell: float, overlap: bool) -> void:
+	var script_grid: LightGridScript = _grid(cell, overlap)
 	check(not script_grid.use_native(false), "the GDScript")
 	_light(script_grid)
-	var native_grid: LightGridScript = _grid()
+	var native_grid: LightGridScript = _grid(cell, overlap)
 	check(native_grid.use_native(true), "the kernel matches the grid's numbers and members")
 	_light(native_grid)
 	var differ: int = 0
@@ -169,14 +187,14 @@ func test_the_native_kernel_lights_the_grid_as_the_gdscript_to_the_byte() -> voi
 			if first_differ < 0:
 				first_differ = i
 	check(native_grid.rgb.to_byte_array() == script_grid.rgb.to_byte_array(), "every cell's light the same to the bit (%d channels differ, the first %d)" % [differ, first_differ])
-	check(native_grid.bytes == script_grid.bytes, "and every byte handed to the texture")
+	check(native_grid.baked() == script_grid.baked(), "and every byte handed to the texture")
 	var lit: int = 0
 	var blocked: int = 0
 	for c in script_grid.atlas_width * script_grid.atlas_height:
 		if script_grid.rgb[c * 3] + script_grid.rgb[c * 3 + 1] + script_grid.rgb[c * 3 + 2] > 0.0:
 			lit += 1
 	# The same lights with no boxes light more: the boxes were reached.
-	var open: LightGridScript = _grid()
+	var open: LightGridScript = _grid(cell, overlap)
 	open.set_blockers(PackedVector4Array(), PackedVector4Array(), 0)
 	_light(open)
 	if open.rgb != script_grid.rgb:

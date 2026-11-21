@@ -1065,9 +1065,9 @@ func set_mote_density(density: float) -> float:
 
 
 ## The screen split into `views` (their viewports, in the split screen's order; empty: one
-## picture): the light follows each (a buffer a view; `extra_downscale` how much smaller those past
-## the first are), and the motes throw `share` of their count (the split's fallbacks; 1 and
-## SpellLight.DOWNSCALE: none). Called every drawn frame; nothing changes while it is the same.
+## picture): the light follows each (a grid a view; `extra_downscale`, the split's cheaper light once,
+## changes nothing now: SpellLight.DOWNSCALE), and the motes throw `share` of their count (the split's
+## fallback; 1: none). Called every drawn frame; nothing changes while it is the same.
 func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int = SpellLightScript.DOWNSCALE) -> void:
 	var next_share: float = clampf(share, 0.0, 1.0) if views.size() > 1 else 1.0
 	if next_share != split_share:

@@ -454,7 +454,7 @@ PackedStringArray MoteKernel::check_light_grid(Object *object) const {
 			(int64_t)object->get("MATERIALS") == LG_MATERIALS && (int64_t)object->get("ENEMY_PLAYER") == LG_ENEMY_PLAYER &&
 			(int64_t)object->get("KIND_COUNT") == LG_KIND_COUNT && (int64_t)object->get("ENEMY_RAMP") == LG_ENEMY_RAMP &&
 			(int64_t)object->get("EXACT") == LG_EXACT && (int64_t)object->get("PALETTE_MOST") == LG_PALETTE_MOST &&
-			(double)object->get("INFUSION_MARK") == LG_INFUSION_MARK;
+			(double)object->get("INFUSION_MARK") == LG_INFUSION_MARK && (int64_t)object->get("BLOCKERS_MOST") == LG_BLOCKERS_MOST;
 	const PackedFloat64Array shades = object->get("SHADES");
 	const PackedFloat64Array base = object->get("P_BASE");
 	const PackedFloat64Array light = object->get("P_LIGHT");

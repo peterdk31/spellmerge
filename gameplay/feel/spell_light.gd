@@ -353,7 +353,6 @@ func release() -> void:
 func follow() -> void:
 	if _spots_dirty and is_inside_tree():
 		draw_spots()
-	readers.follow(_views)
 	var root: Viewport = get_viewport()
 	if root != null:
 		var by: int = PictureGridScript.scale_of(root.get_visible_rect().size) if fixed_resolution else 1
@@ -374,6 +373,8 @@ func follow() -> void:
 			_fit_passes(k, shown)
 			count += 1
 	_light_grid(count)
+	# After the grid is handed over: the copies a view take this frame's grid, not last frame's.
+	readers.follow(_views)
 
 
 ## The part of the world `view` shows (x0, y0, x1, y1).

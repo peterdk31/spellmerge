@@ -35,11 +35,12 @@ const NativeScript := preload("res://core/native/native.gd")
 
 ## The cell's size (world px each way) by default.
 const CELL: float = 8.0
-## The cell sizes a quality setting may pick from (whole divisors of the 32 px grid, no finer than 4).
+## The cell sizes a quality setting may pick from (no finer than 4).
 const CELLS: PackedFloat32Array = [8.0, 12.0, 16.0]
 ## The most views a grid each (ScreenViews.VIEWS_MOST).
 const VIEWS_MOST: int = 4
-## The most cells a view's grid may have each way (a view zoomed out past this is cut at its middle).
+## The most cells a view's grid may have each way (a view zoomed out past this is cut at its right and
+## bottom).
 const VIEW_CELLS_MOST: int = 512
 ## Floats a light row holds (SpellLight.STRIDE: a 2D transform, a colour, custom data).
 const STRIDE: int = 16
@@ -79,6 +80,8 @@ const KIND_COUNT: int = 22
 const ENEMY_RAMP: int = 23
 const EXACT: int = 24
 const PALETTE_MOST: int = 4
+## The most boxes that block light (LightBlockers.MAX; the kernel's checked against it).
+const BLOCKERS_MOST: int = LightBlockersScript.MAX
 ## The infusion table's mark (InfusionTable.MARK): a tint whose alpha is near it is an infusion's.
 const INFUSION_MARK: float = 128.0 / 255.0
 
@@ -90,13 +93,15 @@ var view_count: int = 0
 var view_origin: PackedFloat64Array = PackedFloat64Array()
 var view_size: PackedInt32Array = PackedInt32Array()
 var view_at: PackedInt32Array = PackedInt32Array()
-## The atlas's room (cells each way; it only grows) and how much of it is used. Read only.
+## The atlas's room (cells each way; it only grows). Read only.
 var atlas_width: int = 1
 var atlas_height: int = 1
 ## The light at every cell of the atlas this frame (r, g, b), and the bytes handed to the texture
-## (r, g, b, 255 a cell). Read only.
+## (r, g, b, 255 a cell; two buffers written in turn, `bytes` this frame's, so the one the texture's
+## picture still holds is never written: no copy a frame). Read only.
 var rgb: PackedFloat32Array = PackedFloat32Array()
 var bytes: PackedByteArray = PackedByteArray()
+var _bytes_other: PackedByteArray = PackedByteArray()
 ## The boxes that block light (`set_blockers`, LightBlockers' lists) and how many. Read only.
 var blocker_boxes: PackedVector4Array = PackedVector4Array()
 var blocker_bodies: PackedVector4Array = PackedVector4Array()
@@ -152,7 +157,7 @@ func use_tints(table: PackedColorArray) -> void:
 func set_blockers(boxes: PackedVector4Array, bodies: PackedVector4Array, count: int) -> void:
 	blocker_boxes = boxes
 	blocker_bodies = bodies
-	blocker_count = clampi(count, 0, mini(LightBlockersScript.MAX, mini(boxes.size(), bodies.size())))
+	blocker_count = clampi(count, 0, mini(BLOCKERS_MOST, mini(boxes.size(), bodies.size())))
 
 
 ## A grid for each of the first `count` world boxes of `boxes` (x0, y0, x1, y1; the views' parts of the
@@ -279,9 +284,19 @@ func bake() -> void:
 			bytes[c * 4 + 2] = int(minf(rgb[c * 3 + 2], 1.0) * 255.0 + 0.5)
 	_image.set_data(atlas_width, atlas_height, false, Image.FORMAT_RGBA8, bytes)
 	texture.update(_image)
+	# The picture holds this frame's bytes now (and lets go of last frame's): the next frame writes
+	# the other buffer.
+	var held: PackedByteArray = bytes
+	bytes = _bytes_other
+	_bytes_other = held
 
 
-## The light at world point `at` in view `view` this frame (r, g, b; for tests and the shadows).
+## The bytes the last `bake` wrote and handed to the texture (for tests).
+func baked() -> PackedByteArray:
+	return _bytes_other
+
+
+## The light at world point `at` in view `view` this frame (r, g, b; for tests).
 func light_at(view: int, at: Vector2) -> Color:
 	if view < 0 or view >= view_count:
 		return Color.BLACK
@@ -299,13 +314,15 @@ func _grow(width: int, height: int) -> void:
 	atlas_height = height
 	rgb.resize(width * height * 3)
 	rgb.fill(0.0)
+	bytes = PackedByteArray()
 	bytes.resize(width * height * 4)
 	bytes.fill(255)
 	for c in width * height:
 		bytes[c * 4] = 0
 		bytes[c * 4 + 1] = 0
 		bytes[c * 4 + 2] = 0
-	_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, bytes)
+	_bytes_other = bytes.duplicate()
+	_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, _bytes_other)
 	texture = ImageTexture.create_from_image(_image)
 
 
@@ -471,7 +488,9 @@ func look_glow(cr: float, cg: float, cb: float, who: int, b0: int, b1: int, b2: 
 		hi = _shade(first, 2)
 	var glow: Vector3 = _mix(mid, hi, 0.35)
 	if first >= 0 and not own_infusions:
-		var materials := PackedInt32Array([first, -1, -1, -1])
+		# The palette's materials (shot_look's `palette_of`), the first the core's: four locals, no array.
+		var m1: int = -1
+		var m2: int = -1
 		var count: int = 1
 		for layer in range(1, KIND_COUNT + 1):
 			if count < PALETTE_MOST and _bit_set(b0, b1, b2, layer):
@@ -479,11 +498,14 @@ func look_glow(cr: float, cg: float, cb: float, who: int, b0: int, b1: int, b2: 
 				var m: int = first
 				if absf(t.a - INFUSION_MARK) < 0.1:
 					m = material_of(t.r, t.g, t.b)
-				if m != materials[0] and m != materials[1] and m != materials[2]:
-					materials[count] = m
+				if m != first and m != m1 and m != m2:
+					if count == 1:
+						m1 = m
+					elif count == 2:
+						m2 = m
 					count += 1
 		if count > 1:
-			var glows: int = materials[2] if count > 2 else materials[1]
+			var glows: int = m2 if count > 2 else m1
 			glow = _mix(_shade(glows, 1), _shade(glows, 2), 0.35)
 	return glow
 

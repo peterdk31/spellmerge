@@ -54,6 +54,10 @@ const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const STRESS_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const PLAYERS: int = 4
+## The players a scenario: its row's "players" (1 to 4), else PLAYERS. A row may also set "fill" (the
+## filler shots kept flying, else its "shots", the cap) and "idle" (the bots stand, casting nothing:
+## the light load of a room walked through, against the crowd's).
+var players: int = PLAYERS
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
 ## whether hit particles start. The web and desktop scenarios follow the caps on purpose (each
 ## budget is its cap). `desktop_only` scenarios are left out of a web build (`scenarios_for`).
@@ -160,6 +164,8 @@ var _casts: Array[int] = [0, 0, 0, 0]
 var _current: int = -1
 var _target_enemies: int = 0
 var _target_shots: int = 0
+var _target_fill: int = 0
+var _idle: bool = false
 var _elapsed: float = 0.0
 var _measuring: bool = false
 var _active: bool = false
@@ -281,6 +287,9 @@ func _next_scenario() -> void:
 	var scenario: Dictionary = rows[scenarios[_current]]
 	_target_enemies = scenario["enemies"]
 	_target_shots = scenario["shots"]
+	_target_fill = int(scenario.get("fill", _target_shots))
+	players = int(scenario.get("players", PLAYERS))
+	_idle = bool(scenario.get("idle", false))
 	_rng.seed = SEED
 	_casts = [0, 0, 0, 0]
 	_peak_enemies = 0
@@ -311,9 +320,9 @@ func _next_scenario() -> void:
 	# machine's "Max shots" for its run.
 	SessionRules.machine().shot_cap = _target_shots
 	_projectiles.call("set_cap", _target_shots)
-	for index in PLAYERS:
+	for index in players:
 		var bot := BotScript.new()
-		if not bot.join(index, BotScript.Mode.FIGHTER, _input, _flow):
+		if not bot.join(index, BotScript.Mode.IDLER if _idle else BotScript.Mode.FIGHTER, _input, _flow):
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
@@ -357,7 +366,7 @@ func _start_measuring(scenario: Dictionary) -> void:
 		return
 	_wizards.clear()
 	_downs.clear()
-	for index in PLAYERS:
+	for index in players:
 		var wizard := _flow.call("get_wizard", index) as Actor
 		if wizard == null:
 			_finish(["the wizard of player %d is missing" % (index + 1)])
@@ -375,7 +384,7 @@ func _start_measuring(scenario: Dictionary) -> void:
 			if not wizard.caster.has_staff(at + 1):
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
-	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
+	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], players, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_start_tick_profile()
 	_scenario_started(scenario)
 	_active = true
@@ -551,10 +560,10 @@ func _top_up_enemies() -> void:
 
 ## Fill the manager up to the target with plain shots, cast by the players' wizards in turn.
 func _top_up_shots() -> void:
-	var missing: int = _target_shots - int(_projectiles.call("get_count"))
-	var count: int = mini(missing, maxi(TOP_UP_PER_STEP, _target_shots / TOP_UP_SHARE))
+	var missing: int = _target_fill - int(_projectiles.call("get_count"))
+	var count: int = mini(missing, maxi(TOP_UP_PER_STEP, _target_fill / TOP_UP_SHARE))
 	for i in count:
-		var owner_index: int = i % PLAYERS
+		var owner_index: int = i % players
 		var wizard := _flow.call("get_wizard", owner_index) as Actor
 		if wizard == null:
 			continue
@@ -565,7 +574,7 @@ func _top_up_shots() -> void:
 
 
 func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
-	if player >= 0 and player < PLAYERS:
+	if player >= 0 and player < players:
 		_casts[player] += 1
 
 
@@ -623,11 +632,11 @@ func _end_scenario() -> void:
 	print("BENCH: stress %s: shots dropped by the cap %d, trigger fires that waited for a later step %d (measured window)" % [label, int(_projectiles.get("dropped")) - _dropped_at, _fires_waited() - _waited_at])
 	if mean_enemies < float(_target_enemies) * REACH:
 		_failures.append("%s: on average only %.0f of %d enemies stood" % [label, mean_enemies, _target_enemies])
-	if mean_shots < float(_target_shots) * REACH:
-		_failures.append("%s: on average only %.0f of %d shots flew" % [label, mean_shots, _target_shots])
-	if _hits == 0:
+	if mean_shots < float(_target_fill) * REACH:
+		_failures.append("%s: on average only %.0f of %d shots flew" % [label, mean_shots, _target_fill])
+	if _hits == 0 and not _idle and _target_enemies > 0:
 		_failures.append("%s: no spell shot hit anything" % label)
-	for index in PLAYERS:
+	for index in (0 if _idle else players):
 		if _casts[index] == 0:
 			_failures.append("%s: bot %d never cast a spell while measured" % [label, index + 1])
 	if _probe == null or int(_probe.call("frame_count")) == 0:

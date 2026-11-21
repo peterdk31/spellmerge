@@ -332,9 +332,22 @@ func _report_more(label: String) -> void:
 	for i in frames:
 		by_views[clampi(_frame_views[i], 0, 4)] += 1
 	var row: Dictionary = rows[scenarios[_current]]
-	if row.get("spread", "apart") == "apart" and by_views[4] < frames / 2:
-		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew fewer than 4 views (%s): not a four-way split" % [label, str(by_views)])
+	var apart_views: int = clampi(_wizards.size(), 1, 4)
+	if row.get("spread", "apart") == "apart" and by_views[apart_views] < frames / 2:
+		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew other than %d views (%s): not a %d-way split" % [label, apart_views, str(by_views), apart_views])
 	print("BENCH: biome frames %s frame: avg %.2f ms, p95 %.2f ms, worst %.2f ms over %d frames, %.2f views a frame (frames by views 0-4: %s)" % [label, total / float(frames), sorted[int(float(frames - 1) * 0.95)], sorted[frames - 1], frames, float(views) / float(frames), str(by_views)])
+	var tick_total: float = 0.0
+	var ticks_total: int = 0
+	var gpu_total: float = 0.0
+	for i in frames:
+		tick_total += _frame_tick_ms[i]
+		ticks_total += _frame_ticks[i]
+		gpu_total += _frame_gpu_ms[i]
+	var cpu_total: float = 0.0
+	for kind: String in _cpu_by_kind:
+		cpu_total += _cpu_by_kind[kind]
+	# The frame apart: the simulation (the Tick's steps), the renderer's GPU time and its CPU time.
+	print("BENCH: biome frames %s split (ms a frame): frame %.2f, sim %.2f (%.2f ticks), gpu %.2f, renderer cpu %.2f" % [label, total / float(frames), tick_total / float(frames), float(ticks_total) / float(frames), gpu_total / float(frames), cpu_total / float(frames)])
 	var kinds: Array = _gpu_by_kind.keys()
 	kinds.sort_custom(func(a: String, b: String) -> bool: return _gpu_by_kind[a] > _gpu_by_kind[b])
 	var parts := PackedStringArray()

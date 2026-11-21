@@ -57,6 +57,10 @@ var _frame_views: PackedInt32Array = PackedInt32Array()
 var _frame_ticks: PackedInt32Array = PackedInt32Array()
 var _frame_tick_ms: PackedFloat32Array = PackedFloat32Array()
 var _frame_gpu_ms: PackedFloat32Array = PackedFloat32Array()
+## Each measured frame's draw calls and primitives (`RenderingServer.get_rendering_info`): the work
+## drawn, which unlike the times does not move with a busy machine.
+var _frame_calls: PackedInt32Array = PackedInt32Array()
+var _frame_primitives: PackedInt32Array = PackedInt32Array()
 var _last_usec: int = 0
 var _ticks_seen: int = 0
 var _tick_usec_seen: int = 0
@@ -198,6 +202,8 @@ func _measuring_started() -> void:
 	_frame_ticks.clear()
 	_frame_tick_ms.clear()
 	_frame_gpu_ms.clear()
+	_frame_calls.clear()
+	_frame_primitives.clear()
 	_gpu_by_kind.clear()
 	_cpu_by_kind.clear()
 	_last_usec = Time.get_ticks_usec()
@@ -241,6 +247,8 @@ func _process(delta: float) -> void:
 	_frame_ticks.append((tick.count if tick != null else 0) - _ticks_seen)
 	_frame_tick_ms.append(float(tick_usec - _tick_usec_seen) / 1000.0)
 	_frame_gpu_ms.append(gpu)
+	_frame_calls.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	_frame_primitives.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
 	_last_usec = now
 	_ticks_seen = tick.count if tick != null else 0
 	_tick_usec_seen = tick_usec
@@ -339,7 +347,11 @@ func _report_more(label: String) -> void:
 	var tick_total: float = 0.0
 	var ticks_total: int = 0
 	var gpu_total: float = 0.0
+	var calls_total: float = 0.0
+	var primitives_total: float = 0.0
 	for i in frames:
+		calls_total += _frame_calls[i]
+		primitives_total += _frame_primitives[i]
 		tick_total += _frame_tick_ms[i]
 		ticks_total += _frame_ticks[i]
 		gpu_total += _frame_gpu_ms[i]
@@ -347,7 +359,7 @@ func _report_more(label: String) -> void:
 	for kind: String in _cpu_by_kind:
 		cpu_total += _cpu_by_kind[kind]
 	# The frame apart: the simulation (the Tick's steps), the renderer's GPU time and its CPU time.
-	print("BENCH: biome frames %s split (ms a frame): frame %.2f, sim %.2f (%.2f ticks), gpu %.2f, renderer cpu %.2f" % [label, total / float(frames), tick_total / float(frames), float(ticks_total) / float(frames), gpu_total / float(frames), cpu_total / float(frames)])
+	print("BENCH: biome frames %s split (ms a frame): frame %.2f, sim %.2f (%.2f ticks), gpu %.2f, renderer cpu %.2f; %.0f draw calls, %.0f primitives a frame" % [label, total / float(frames), tick_total / float(frames), float(ticks_total) / float(frames), gpu_total / float(frames), cpu_total / float(frames), calls_total / float(frames), primitives_total / float(frames)])
 	var kinds: Array = _gpu_by_kind.keys()
 	kinds.sort_custom(func(a: String, b: String) -> bool: return _gpu_by_kind[a] > _gpu_by_kind[b])
 	var parts := PackedStringArray()

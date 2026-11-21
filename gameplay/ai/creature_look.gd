@@ -138,6 +138,7 @@ func setup(owner_actor: Actor) -> void:
 			_face_part = part
 	if _face_part != null:
 		_face_rest = _in_actor(_face_part).affine_inverse()
+	_put_on_page()
 	# Connected once, on its own actor (not the bus, where a listener per enemy was called for
 	# every hit on anyone).
 	if not actor.damaged.is_connected(_on_damaged):
@@ -145,6 +146,25 @@ func setup(owner_actor: Actor) -> void:
 	# A boss's phase may bring another body sprite (enemy AI AI7).
 	if actor.phases != null and not actor.phases.started.is_connected(_on_phase_started):
 		actor.phases.started.connect(_on_phase_started)
+
+
+## A body of one sprite wearing the shared face puts its art and its face's sheets on one page, its
+## kind's (`TexturePage`), so the body and the face are one draw call and a crowd of its kind one too
+## (the owner's choice of 2026-11-21, after #900). Its poses' strips go on the page as well; a
+## layered body, a boss's phases or a face of its own keep their art.
+func _put_on_page() -> void:
+	if sprite == null or sprite.texture == null or not _parts.is_empty() or _face == null or _face.art != null or actor.phases != null:
+		return
+	var paged: Array[Texture2D] = TexturePage.regions_of([_scene_texture, windup_texture, hurt_texture, Face.EYES_SHEET, Face.BROWS_SHEET] as Array[Texture2D])
+	if paged.size() != 5 or not (paged[0] is AtlasTexture):
+		return
+	if sprite.texture == _idle_texture:
+		sprite.texture = paged[0]
+	_idle_texture = paged[0]
+	_scene_texture = paged[0]
+	windup_texture = paged[1]
+	hurt_texture = paged[2]
+	_face.wear_sheets(paged[3], paged[4])
 
 
 ## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.

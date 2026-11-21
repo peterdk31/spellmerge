@@ -136,6 +136,7 @@ const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const RuneLooksScript := preload("res://gameplay/feel/rune_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
+const DecalPagesScript := preload("res://gameplay/feel/decal_pages.gd")
 const RoomsViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
@@ -572,6 +573,8 @@ var _unseen: UnseenDarkScript = null
 ## What the rooms nobody has entered hold, not drawn under their dark (`unseen_rooms.gd`; the owner,
 ## 2026-11-21).
 var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
+## Each laid room's decals (the candles, a torch) drawn from one page each (`decal_pages.gd`).
+var _decal_pages: DecalPagesScript = DecalPagesScript.new()
 ## The one picture's box as the party camera stands this frame, for `_unseen_rooms` (`_rooms_seen`).
 var _rooms_seen_box: RoomsViewBoxesScript = RoomsViewBoxesScript.new()
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
@@ -957,6 +960,7 @@ func _ready() -> void:
 	add_child(_unseen)
 	_unseen.bind(events)
 	_unseen_rooms.bind(events)
+	_decal_pages.bind(events)
 	_teleports = TeleportLooksScript.new()
 	_teleports.name = "TeleportLooks"
 	add_child(_teleports)

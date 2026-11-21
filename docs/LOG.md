@@ -2,6 +2,26 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-21: Baked floors; an enemy and a candle one draw call each
+
+The owner's choice after #900 (round two of the draw calls, part A), for the web build with one player first. Three wins, each guarded by a structural test:
+
+- **A room's floor in one call, not seven** (`gameplay/feel/ground/floor_bake.gd`): once a room's ground is drawn, its floor, rock face, glow and its walls' shades are drawn once into a viewport of the floor's size, in the screen's order (the glow added by `floor_bake.gdshader`, which keeps the texture premultiplied, so over a pit's clear pixels the glow is only light), and from the next frame the `Floor` shows that texture and the four layers are hidden and let go. Memory, a 16-room crypt biome with its 14 walkways: about 19 MB of baked floors (rooms 1.0 MB each on average, walkways 0.2), in place of the drawn floors, rock faces and glows (about 43 MB). `test_floor_bake.gd`.
+- **An enemy's body and face on one page a kind** (`TexturePage`, core/base; `CreatureLook` and `Face.wear_sheets`): the body, its poses' strips and the eye and brow sheets copied side by side at a kind's first spawn. `test_enemy_page.gd`, `tests/core/test_texture_page.gd`.
+- **A candle's wax and flame on one page** (`gameplay/feel/decal_pages.gd`, the torch's bracket and flame too): built at load from the existing art, the flame's frames a copy with the same frames, durations, speed and loop, playing on from its frame. `test_decal_pages.gd`.
+
+The same pixels, held against the old drawing in one frozen frame (`tests/screenshots/shot_baked_floors.gd`: the enemies, the candles, the floor, its rock face and glow pixel for pixel), but where something lies between the layers on screen: ground cover, a floor mark, the floor mist or a shot on the floor now lies over a wall's shade and the glow, not under (a cobweb under a sarcophagus's shade is no longer darkened: up to 45 of 255 on its pixels; the mist over the shades, 1 to 4; round a pit under the shaft's light, up to 9). Medians of 3, main then this branch (play_frames, llvmpipe on this 4-core container, whose frame times are many times last round's and swing widely between runs; the 2p and 4p scenarios' states differ run to run, so their counts are noisy):
+
+| scenario | draw calls | primitives | Feel ms | sim ms | frame ms |
+|---|---|---|---|---|---|
+| 1p start web | 63 → 54 | 6322 → 6477 | 2.95 → 3.33 | 0.99 → 1.34 | 22.3 → 27.2 |
+| 1p near web | 86 → 71 | 6305 → 6511 | 3.71 → 3.83 | 2.48 → 2.30 | 43.7 → 33.5 |
+| 1p far web | 158 → 139 | 18718 → 18966 | 4.21 → 5.03 | 4.71 → 6.00 | 42.2 → 45.6 |
+| 2p apart dynamic | 274 → 278 | 15130 → 21270 | 5.41 → 6.06 | 9.50 → 10.87 | 48.3 → 59.6 |
+| 4p apart equal | 603 → 567 | 34130 → 42376 | 8.03 → 8.46 | 20.08 → 21.45 | 137.2 → 99.8 |
+
+The one-player draw calls fall by 9, 15 and 19, every run (near: 84, 86, 87 on main, 70, 71, 71 here). Feel adds nothing a frame (the bake's step walks an empty list once every floor is shown); its and the simulation's milliseconds move as much between runs as between the two (the simulation is untouched). No change to the simulation or the native kernels.
+
 ## 2026-11-21: Fewer draw calls and less of Feel a frame
 
 The owner's ask: "find more ways to bring down the frame time ... reduce draw calls or something else", for the web build with one player first. Profiled first with a new draw census (`tests/benchmark/draw_census.gd`: `--census` on the play and biome frames, and `--census-calls`, which pauses the tree and hides each part in turn to tell its draw calls) and the tree profile. One wizard idle in a fight room drew 98 draw calls: the world's actors about 3 each (the body and the face's two sheets), each candle 2, a room's shades 4 and floor 3, and the HUD's one corner panel 36 (a staff row's strip up to 9: fill, icon, frame card by card, an icon a texture); in a fight 15 foes' faces 30 and the damage numbers 16. On the CPU Feel's step was 5 to 6.5 ms a frame on this machine (native; several times that in WASM): every room's cover view handed its shader the clock and the bodies though all but the few in view are switched off (0.93 ms), and the shut Y map settled every piece's look each frame (0.5 ms).

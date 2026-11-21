@@ -64,6 +64,7 @@ extends Node
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const LIGHT_SHADER: Shader = preload("res://gameplay/feel/light.gdshader")
 const APPLY_SHADER: Shader = preload("res://gameplay/feel/light_apply.gdshader")
 const BEAM_SHADER: Shader = preload("res://gameplay/feel/light_beam.gdshader")
@@ -158,6 +159,11 @@ var _spots_dirty: bool = true
 var _spot_buffer: PackedFloat32Array = PackedFloat32Array()
 ## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
 var spots_written: int = 0
+## Where nothing is drawn because nobody has seen it yet (`hide_unseen`: Feel's `UnseenDark.mask`;
+## null: drawn everywhere): a room's light spot there gives no light, so nothing of an unvisited room
+## glows over the void. Read only.
+var unseen: UnseenMaskScript = null
+var _unseen_changes: int = -1
 ## The views the buffers follow while the screen is split (`use_views`; empty: the one picture,
 ## this node's viewport), the buffers of the views past the first (made as needed, kept), how
 ## much smaller they are, and the materials that read the light by the screen besides the apply
@@ -692,8 +698,19 @@ static func beam_light_mesh() -> ArrayMesh:
 	return _beam_mesh
 
 
-## Write the room's light spots (every node in `LightSpot.GROUP` in the tree) into the spots'
-## batch: done when one comes or goes (`follow`), not every frame.
+## The spots left out where `mask` hides (null: none), written again when it changes.
+func hide_unseen(mask: UnseenMaskScript) -> void:
+	var changes: int = mask.changes if mask != null else -1
+	if mask == unseen and changes == _unseen_changes:
+		return
+	unseen = mask
+	_unseen_changes = changes
+	_spots_dirty = true
+
+
+## Write the room's light spots (every node in `LightSpot.GROUP` in the tree, but where `unseen`
+## hides) into the spots' batch: done when one comes or goes or the mask changes (`follow`), not
+## every frame.
 func draw_spots() -> void:
 	_spots_dirty = false
 	var found: Array[Node] = get_tree().get_nodes_in_group(LightSpot.GROUP)
@@ -703,9 +720,11 @@ func draw_spots() -> void:
 		var spot := node as Node2D
 		if spot == null or not spot.is_inside_tree() or spot.is_queued_for_deletion():
 			continue
+		var where: Vector2 = spot.global_position
+		if unseen != null and unseen.hides(where):
+			continue
 		var reach: float = LightSpot.reach_of(spot)
 		var colour: Color = _colour_of(spot)
-		var where: Vector2 = spot.global_position
 		# A seed from where it is, so two torches flicker out of step and a run is the same.
 		var seed: float = fposmod(where.x * 0.137 + where.y * 0.311, 1.0)
 		write_spot_row(_spot_buffer, at, where, reach, colour, LightSpot.strength_of(spot), LightSpot.flicker_of(spot), seed)

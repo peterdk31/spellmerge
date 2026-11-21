@@ -181,14 +181,22 @@ func _process(_delta: float) -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	step_physics()
+
+
+## One physics step: the ticks the frames service says are due, each `run`; returns how many ran.
+## The engine's physics step calls it; a benchmark's fixed clock calls it once a drawn frame instead
+## (tests/benchmark/fixed_steps.gd, the engine's step switched off), never the game.
+func step_physics() -> int:
 	# First, also under a picture's pause: a live replay's feed reads what arrived and sends.
 	var due: int = frames.begin_step(DT) if frames != null and frames.auto_tick else 1
 	# A pause not the sim's (the pause menu while a replay plays): the picture's alone, so no tick
 	# (the replay waits).
 	if get_tree().paused and not _shown_stopped:
-		return
+		return 0
 	for i in due:
 		run(DT)
+	return due
 
 
 ## One tick of `delta` seconds (the game's is always DT), in the written order (see the class doc).

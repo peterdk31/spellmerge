@@ -9,6 +9,7 @@ extends Node2D
 ## it. It allocates only as coins come and go.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Under the bodies, as the items on the ground.
 const Z: int = 0
@@ -25,6 +26,10 @@ const GOLD_DARK: Color = Color(0.71, 0.45, 0.13)
 const GLINT: Color = Color(1.0, 0.97, 0.8)
 const SHADOW: Color = Color(0.05, 0.04, 0.08, 0.35)
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## By coin number: [where, how far it has come in (0 to `_whole_frames`, in frames), whether it goes].
 var _coins: Dictionary = {}
 var _clock: float = 0.0
@@ -102,6 +107,8 @@ func _draw() -> void:
 	for coin: int in _coins:
 		var row: Array = _coins[coin]
 		var at: Vector2 = (row[0] as Vector2).round()
+		if unseen != null and unseen.hides(at):
+			continue
 		var stage: int = _stage_of(float(row[1]))
 		var half: int = STAGES[stage]
 		# Going, it lifts a pixel a stage as it shrinks.

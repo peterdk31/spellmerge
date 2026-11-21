@@ -16,6 +16,7 @@ extends Node2D
 ## it. It allocates only as items come and go.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Under the bodies, as the items on the ground.
 const Z: int = 0
@@ -42,6 +43,10 @@ const GOLD: PackedColorArray = [Color("b8801f"), Color("f2c230"), Color("fff3a6"
 const OUTLINE: Color = Color("14121f")
 const SHADOW: Color = Color(0.05, 0.04, 0.08, 0.35)
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## By offer number: [where, its player, frames come in, going, forgotten].
 var _items: Dictionary = {}
 var _clock: float = 0.0
@@ -131,6 +136,8 @@ func _draw() -> void:
 
 func _draw_item(offer: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
+	if unseen != null and unseen.hides(at):
+		return
 	var first: int = clampi(int(row[1]), 0, 3) * 3
 	var share: float = STAGES[clampi(floori(float(row[2]) / STAGE_FRAMES), 0, STAGES.size() - 1)]
 	var bob: float = roundf(sin((_clock * BOB_RATE + float(offer) * 0.37) * PI) * BOB)

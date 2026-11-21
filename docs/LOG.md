@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-21: The light at a fixed resolution
+
+The owner's decision after #899: before the 64 x 64 art in a 1280 x 720 picture, make the lights cheaper. The light buffers, the apply rect's factor and the mist's billows are now drawn at 640 x 360 a view however big the picture is (`gameplay/feel/picture_grid.gd`, the one place that says so; `light_passes.gd`: a pass a view) and taken whole for each block of the picture, never blurred. At 640 x 360 there are no passes and nothing changes: one frozen frame of three crypt rooms drawn with the new shaders and main's differs by 0 pixels. The cameras' zoom 1 is 640 x 360, so a bigger picture shows the same world. The benchmarks take `--picture=1280x720` and `--light-at-picture`. On llvmpipe at 1280 x 720 (medians of 3, frame / GPU): near 77.2 / 61.4 → 77.8 / 59.2 ms, far 95.7 / 69.9 → 86.6 / 62.8, start 61.9 / 46.7 → 63.0 / 47.7, two views apart 109.1 / 72.3 → 100.4 / 69.6, four views Equal 168.0 / 106.4 → 160.3 / 106.4; at 640 x 360 main draws the same frames in 41.0 / 25.2, 58.9 / 31.6, 31.8 / 18.7, 70.5 / 35.2 and 138.4 / 76.6. The mist's share halved (18 → 10 ms GPU); the light alone stays about 15 ms, the picture-sized screen copy and multiply it cannot shed, so most of the 1280 x 720 cost on llvmpipe remains, and the GPU and web runs are the measure. Also: a room's mist out of every view is no longer stepped (#900's measure: Feel's spectacle step 2.54 → 2.07 ms in a fight room). Details: docs/milestones/connected-biomes.md, "The light at a fixed resolution".
+
 ## 2026-11-21: What stands unseen is hidden one by one; the benchmark's fights from a fixed script
 
 The owner's two follow-ups on #899 (docs/milestones/connected-biomes.md, "What stands unseen is hidden one by one").

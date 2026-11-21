@@ -29,10 +29,13 @@ extends RefCounted
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
+const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
 
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0
-## The view never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more).
+## The view never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more). Every zoom and
+## margin here is at PictureGrid.SIZE: a picture `PictureGrid.scale_of` times bigger draws the camera
+## that many times the zoom (`_grid`), the same world, finer.
 const MAX_ZOOM: float = 1.0
 const MIN_ZOOM: float = 0.5
 ## How fast the camera eases to its target, per second (higher is snappier).
@@ -42,7 +45,7 @@ const LIMIT_UNSET: float = 1000000.0
 
 ## The camera being driven (Feel's current one), or null.
 var camera: Camera2D = null
-## Where the camera is heading, and its zoom there (1 = no zoom).
+## Where the camera is heading, and its zoom there (1 = no zoom, at PictureGrid.SIZE).
 var target_position: Vector2 = Vector2.ZERO
 var target_zoom: float = 1.0
 
@@ -144,7 +147,7 @@ func snap() -> void:
 	if not _valid() or _party.size.x < 0.0:
 		return
 	_aim()
-	camera.zoom = Vector2(target_zoom, target_zoom)
+	camera.zoom = Vector2.ONE * (target_zoom * _grid())
 	camera.position = _clamp_centre(target_position, target_zoom)
 
 
@@ -155,9 +158,9 @@ func step(delta: float) -> void:
 	_aim()
 	var weight: float = 1.0 - exp(-FOLLOW_SPEED * delta)
 	var at: Vector2 = camera.position.lerp(target_position, weight)
-	var zoom: float = lerpf(camera.zoom.x, target_zoom, weight)
+	var zoom: float = lerpf(camera.zoom.x / _grid(), target_zoom, weight)
 	zoom = _zoom_to_hold(at, zoom)
-	camera.zoom = Vector2(zoom, zoom)
+	camera.zoom = Vector2.ONE * (zoom * _grid())
 	camera.position = _clamp_centre(at, zoom)
 
 
@@ -165,8 +168,8 @@ func step(delta: float) -> void:
 func visible_rect() -> Rect2:
 	if not _valid():
 		return Rect2()
-	var size: Vector2 = _picture() / camera.zoom.x
-	var centre: Vector2 = _clamp_centre(camera.position, camera.zoom.x)
+	var size: Vector2 = _picture() / (camera.zoom.x / _grid())
+	var centre: Vector2 = _clamp_centre(camera.position, camera.zoom.x / _grid())
 	return Rect2(centre - size * 0.5, size)
 
 
@@ -217,11 +220,22 @@ func _clamp_centre(centre: Vector2, zoom: float) -> Vector2:
 	return Vector2(x, y)
 
 
-## The picture's size at zoom 1: what the camera's viewport shows (out of the tree, the project's).
+## The picture's size at zoom 1 in PictureGrid.SIZE's pixels: what the camera's viewport shows (out of
+## the tree, the project's), over `_grid`.
 func _picture() -> Vector2:
+	return _screen() / _grid()
+
+
+## The camera's viewport's size (px; out of the tree, the project's).
+func _screen() -> Vector2:
 	if camera.is_inside_tree():
 		return camera.get_viewport_rect().size
 	return Vector2(ProjectSettings.get_setting("display/window/size/viewport_width"), ProjectSettings.get_setting("display/window/size/viewport_height"))
+
+
+## How many times bigger than PictureGrid.SIZE the camera's picture is.
+func _grid() -> float:
+	return float(PictureGridScript.scale_of(_screen()))
 
 
 func _valid() -> bool:

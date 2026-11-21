@@ -801,6 +801,41 @@ The owner reported worse performance on 2026-11-21 (the web build, one player), 
 - **Out of view:** a place whose rectangle grown by 160 px (its motes' reach, its lip, a frame's camera move) meets none of the views' boxes is switched off the same way; the boxes are the split's, else the party camera's picture as moved that frame.
 - View only; nothing in the simulation. Tests in `tests/gameplay/feel/test_biome_sound_and_look.gd`; measured by `tests/benchmark/play_frames.gd`.
 
+
+## The light at a fixed resolution (2026-11-21)
+
+The owner decided on 2026-11-21 to move toward more detailed art (64 x 64 sprites at the same on-screen size, in a 1280 x 720 picture). #899 measured 1280 x 720 at nearly double the frame time on llvmpipe, all of it pixel fill, and the owner chose to make the lights cheaper first, then measure again, before any art work. View only; the shipped picture stays 640 x 360 (project.godot).
+
+- **One place says the light's resolution:** `gameplay/feel/picture_grid.gd` (`PictureGrid.SIZE`, 640 x 360 a view; `scale_of(picture)`, the whole times a picture holds it, 1 for the shipped picture). Nothing in the passes names 640 x 360 any more.
+- **The buffers keep their size:** a light buffer is DOWNSCALE (4) times smaller than its view at PictureGrid.SIZE, so 160 x 90 for the whole screen at 640 x 360 and at 1280 x 720 alike (before, 320 x 180 at 1280 x 720).
+- **What is worked out a pixel at a time is drawn at that resolution** (`light_passes.gd`: a SubViewport a view, `scale` times smaller than its view, drawing the world through the view's transform scaled down by exactly `scale`; the passes share one world):
+  - the apply rect's factor (the room's dark, its tints, the light's bands in its hue): one rect a view on its view's layer, `light_factor.gdshader`, reading its view's buffer (`SpellLight.factor_passes`);
+  - the mist's billows (the mask, the stirs, the parting, the noise): each room's mist has a twin in the pass under the light (`mist_pass.gdshader`, `SpellLight.under_holder`), with its numbers.
+- **Sampled up in whole blocks** (docs/STYLE.md, "Pixels stay hard"): the apply rect and the mist in the picture take their view's pass pixel whole for each block (`light_passes.gdshaderinc`, `texelFetch`), the numbers packed exactly into the pass's 8 bits (`light_pack.gdshaderinc`: the factor 10 bits a channel, 1.0 exact; the mist's thickness 16 bits). The mist is lit by the light at its block's middle, where its pass read it. A reader takes two pass samplers, not four (WebGL2 promises 16 texture units): the second view's in `light_pass_1`, the first view's and the copies' own in `light_pass_0` (`ViewReaders.set_view_uniform`).
+- **At 640 x 360 nothing changes:** there are no passes, and the readers work everything out where they are drawn, by the same includes (`light_apply.gdshaderinc`, `mist_density.gdshaderinc`). Checked on one frozen frame (the game paused, Feel stopped, the torches' flicker hidden) of arena_02, arena_04 and the broom's hall in a fight, drawn with this branch's shaders and main's: 0 pixels differ.
+- **Split views:** a view's box is snapped to `BOX_SNAP` times the scale (16 px at 1280 x 720) and padded `BOX_PAD` times it, so its buffer's texels and its blocks fall where the whole screen's would; the void quarter has no pass and works its light out where it is drawn.
+- **The cameras' zoom 1 is PictureGrid.SIZE** (`party_camera.gd`, `split_camera.gd`, and the places' margins): a bigger picture draws the same world finer, as #899's 1280 x 720 measure did by hand.
+- **The A/B and the switch:** `tests/benchmark/play_frames.gd` and `biome_frames.gd` take `--picture=1280x720` (the root's `content_scale_size`) and `--light-at-picture` (`SpellLight.fixed_resolution` false: the light at the picture's own resolution, as before).
+- **A room's mist out of every view is not stepped** (#900's measure: a biome's 14 mists stepped every frame, about 0.4 ms native): stepped again within 160 px of a view, its clock and stirs handed anew.
+- Tests: `tests/gameplay/feel/test_light_resolution.gd` (the scale; no pass at 640 x 360; the buffer's size, the passes, the factor rect and the readers' bindings at 1280 x 720 and back; the mist's twin, with its numbers, through a room in Feel, out of the tree and back; the copies' own pass; split boxes on the blocks' grid; the party camera's world), `test_mist.gd` (the shared include; the mist out of view not stepped). Screenshots: `tests/screenshots/shot_light_resolution.gd`.
+- **Measured** (`play_frames.gd` under xvfb on llvmpipe, 4 cores, the web's load where the row says so; medians of 3, frame / GPU ms; 2p and 4p at the desktop's load):
+
+  | scenario | 640 x 360 main | 1280 x 720 main | 1280 x 720 this | 640 x 360 this (1 run) |
+  | --- | --- | --- | --- | --- |
+  | 1p near web | 41.0 / 25.2 | 77.2 / 61.4 | 77.8 / 59.2 | 35.3 / 20.6 |
+  | 1p far web | 58.9 / 31.6 | 95.7 / 69.9 | 86.6 / 62.8 | 47.0 / 25.6 |
+  | 1p start web | 31.8 / 18.7 | 61.9 / 46.7 | 63.0 / 47.7 | 29.2 / 17.1 |
+  | 2p apart dynamic | 70.5 / 35.2 | 109.1 / 72.3 | 100.4 / 69.6 | 64.5 / 33.7 |
+  | 4p apart equal | 138.4 / 76.6 | 168.0 / 106.4 | 160.3 / 106.4 | 123.9 / 66.8 |
+
+  The draw calls and primitives do not change with the picture. By pass at 1280 x 720 (1p near web, `--off=`, medians of 2, GPU): the mist **18 → 10 ms**; the light with the mist 33 → 25 ms, so the light alone stays about 15 ms. On llvmpipe what is left of the light is the picture's own pixels: the screen copy the apply rect multiplies and its full-size rect, which no pass can make smaller (a multiply blend cannot brighten in an 8-bit target); the passes themselves take about 5 to 6 ms (`light passes` in the `gpu` line). On a GPU, where the per-pixel arithmetic (the rooms' tints, the bands, the mist's noise) weighs more against the fill, the gain should be larger; the owner's GPU and web runs are the measure. The mist skip (1p near web and start web, Feel's spectacle step, medians of 3): 2.54 → 2.07 ms and 2.33 → 1.99 ms.
+
+### Answered by the owner (2026-11-21, on #902)
+
+1. **#902 merges whole**; grid lighting and one pass build on it (next PRs).
+2. **The lit picture at 1280 x 720 looks fine**, and blockier light is acceptable (grid lighting at 8 to 16 px cells is in line).
+3. **The 64 x 64 art step is the same world with finer art:** world tiles stay 32 units and 64 x 64 art is drawn at half size, so the simulation is untouched; the HUD and the font are redrawn at 2x detail at the same on-screen size. (So the cameras' zoom 1 stays PictureGrid.SIZE of world, as #902 made it.)
+
 ## What stands unseen is hidden one by one; the benchmark on a fixed clock (2026-11-21)
 
 The owner decided two follow-ups on #899: hide what stands in unvisited rooms one by one, so the cover over them and #897's z-21 void-mote layer can go, the look unchanged (the background with motes flying about, secrets hidden until found, the reveal Smooth), view only; and let the benchmark play its fights from a fixed recording, so each run is the same and the fight rows stop jumping.

@@ -17,11 +17,15 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##  - `BENCH: biome frames <label> map`: the seed, the map's rooms and the rooms the wizards stand in;
 ##  - `... frame`: the frame's average, p95 and worst, and the views drawn a frame;
 ##  - `... gpu`: each kind of viewport's render time a frame (the split's views, the light buffers,
-##    the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
+##    the light's passes, the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
 ##    viewport timing (no GPU timer queries on the web: there only the frame is a measure);
 ##  - `... feel parts`: Feel's step by part (`Feel.profile_parts`), milliseconds a drawn frame;
 ##  - `... worst frames`: the slowest WORST frames, each with its ticks, the tick's time and the GPU's.
 ## With `--profile` the tree profile rides along (each script's process time: the HUD's among them).
+## `--picture=WxH` draws the game's picture at that size (the root's `content_scale_size`; the shipped
+## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer and the light keeps its
+## resolution (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
+## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
@@ -93,6 +97,23 @@ func _init() -> void:
 	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
 	# a scenario plays the same (stress_runner.gd's `fixed_frames`); `--real-clock` as the game runs.
 	fixed_frames = not args.has("--real-clock")
+
+
+func _enter_tree() -> void:
+	var picture: Vector2i = picture_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args())
+	if picture != Vector2i.ZERO:
+		get_tree().root.content_scale_size = picture
+		print("BENCH: biome frames picture %dx%d" % [picture.x, picture.y])
+
+
+## The picture `--picture=WxH` asks for among `args` (zero: none asked, the project's).
+static func picture_asked(args: PackedStringArray) -> Vector2i:
+	for arg in args:
+		if arg.begins_with("--picture="):
+			var parts: PackedStringArray = arg.trim_prefix("--picture=").split("x")
+			if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+				return Vector2i(maxi(parts[0].to_int(), 1), maxi(parts[1].to_int(), 1))
+	return Vector2i.ZERO
 
 
 ## Every scenario: for each seed, the two splits apart at the desktop's and the web's load, and the
@@ -346,8 +367,8 @@ func _scan_viewports() -> void:
 		_timed_kind.append(_kind_of(viewport, root))
 
 
-## What a viewport draws, for the report: the root, a split view, the void view, a light buffer,
-## the floor marks, or another.
+## What a viewport draws, for the report: the root, a split view, the void view, a light buffer, a
+## pass at the light's resolution, the floor marks, or another.
 static func _kind_of(viewport: Viewport, root: Viewport) -> String:
 	if viewport == root:
 		return "root"
@@ -358,6 +379,9 @@ static func _kind_of(viewport: Viewport, root: Viewport) -> String:
 		return "views"
 	if named == "VoidView":
 		return "void view"
+	if parent == "LightFactor" or parent == "LightUnder":
+		# The passes at the light's resolution (a picture bigger than PictureGrid.SIZE: SpellLight's).
+		return "light passes"
 	if path.contains("Light") or parent.contains("Light") or named.contains("Light") or named.contains("light"):
 		return "light buffers"
 	if path.contains("Mark") or named.contains("Mark"):

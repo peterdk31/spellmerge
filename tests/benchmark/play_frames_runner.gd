@@ -4,6 +4,8 @@ extends "res://tests/benchmark/biome_frames_runner.gd"
 ## measures and its `BENCH:` lines (biome_frames_runner.gd), with the load a room walked through
 ## or fought in has, not the stress crowd and the shot cap: 1 to 4 players, no filler shots.
 ##
+## Each at the desktop's defaults, and the one wizard's also at the web's ("web": the web build's
+## mote ring, `MoteCap.DEFAULT_WEB`, and shot cap), where the owner plays:
 ##  - **1p near**: one wizard standing in a fight room with no foe, the camera at its own zoom (the
 ##    room, the void round it and the rooms not yet entered on screen);
 ##  - **1p far**: one wizard fighting a few foes round it, the camera zoomed out to hold them
@@ -32,6 +34,8 @@ func _init() -> void:
 static func play_rows() -> Array[Dictionary]:
 	var cap: int = ProjectileManagerScript.DEFAULT_CAP_DESKTOP
 	var out: Array[Dictionary] = []
+	out.append(_row("1p near web", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
+	out.append(_row("1p far web", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
 	out.append(_row("1p near", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, cap))
 	out.append(_row("1p far", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 	for players: int in [2, 3, 4]:
@@ -41,5 +45,13 @@ static func play_rows() -> Array[Dictionary]:
 	return out
 
 
-static func _row(label: String, players: int, enemies: int, idle: bool, spread: String, split: int, cap: int) -> Dictionary:
-	return {"label": label, "players": players, "enemies": enemies, "shots": cap, "fill": 0, "idle": idle, "seed": PLAY_SEED, "spread": spread, "split": split}
+static func _row(label: String, players: int, enemies: int, idle: bool, spread: String, split: int, cap: int, motes: int = MoteCap.DEFAULT_DESKTOP) -> Dictionary:
+	return {"label": label, "players": players, "enemies": enemies, "shots": cap, "fill": 0, "idle": idle, "seed": PLAY_SEED, "spread": spread, "split": split, "motes": motes}
+
+
+## The scenario's mote ring (the "Particles" setting) taken before its run starts.
+func _start_play(scenario: Dictionary) -> void:
+	if _feel != null and _feel.has_method(&"set_mote_cap"):
+		var taken: int = int(_feel.call(&"set_mote_cap", int(scenario.get("motes", MoteCap.DEFAULT_DESKTOP))))
+		print("BENCH: play frames %s: mote ring %d rows" % [scenario["label"], taken])
+	super(scenario)

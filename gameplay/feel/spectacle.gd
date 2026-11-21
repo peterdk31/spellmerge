@@ -205,6 +205,9 @@ var stirs: StirsScript = StirsScript.new()
 ## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
 var spot_stirs: SpotStirsScript = SpotStirsScript.new()
 
+## How far out of every view a room's mist is still stepped (world px): its lip and a frame's camera
+## move, as UnseenRooms.REACH.
+const MIST_STEP_REACH: float = 160.0
 ## The room's low floor mist (atmosphere F; null with spell light off, or "Fog" off once faded out),
 ## over the floor, the marks and the bodies' shadows and under every body. Read only.
 var mist: MistScript = null
@@ -435,11 +438,20 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
 		shadows.step_in(table, now, seen, blockers)
-	if mist != null:
+	if mist != null and _mist_seen(mist, seen):
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	for later: MistScript in room_mists:
-		later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+		if _mist_seen(later, seen):
+			later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	_free_faded()
+
+
+## Whether `drawn`'s room is near a view (within MIST_STEP_REACH of `seen`'s boxes; none known: yes): a
+## mist out of every view is not stepped (#900's measure: a biome's mists stepped every frame cost
+## about 0.4 ms native). Stepped again as it nears a view, its clock and the stirs are handed anew and
+## its parting moves on by at most a step's worth (MistParting clamps the time), before it shows.
+static func _mist_seen(drawn: MistScript, seen: ViewBoxesScript) -> bool:
+	return seen == null or seen.is_empty() or seen.intersects(Rect2(drawn.room_origin, drawn.room_size), MIST_STEP_REACH)
 
 
 ## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world

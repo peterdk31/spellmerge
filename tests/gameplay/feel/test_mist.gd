@@ -20,6 +20,7 @@ const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 
 const FRAME: float = 1.0 / 60.0
 const CRYPT_ROOMS: Array[StringName] = [&"arena_01", &"arena_02", &"arena_03", &"arena_04", &"boss_broom"]
@@ -467,3 +468,21 @@ func test_the_bodies_handed_over_are_copied() -> void:
 	check_equal(spectacle._feet_count, 2, "")
 	spectacle.hand_bodies(feet, 5)
 	check_equal(spectacle._feet_count, 2, "never more than were handed")
+
+
+## A mist out of every view is not stepped (#900's measure), one near a view is, and with no view known
+## every mist is.
+func test_a_mist_out_of_every_view_is_not_stepped() -> void:
+	var near: MistScript = own(MistScript.new(0)) as MistScript
+	near.lay(SIZE, [] as Array[Rect2], [] as Array[Rect2], Vector2(0.0, 0.0))
+	var far: MistScript = own(MistScript.new(0)) as MistScript
+	far.lay(SIZE, [] as Array[Rect2], [] as Array[Rect2], Vector2(4000.0, 0.0))
+	var seen := ViewBoxesScript.new()
+	seen.set_one(Rect2(Vector2(-100.0, -50.0), Vector2(640.0, 360.0)))
+	check(SpectacleScript._mist_seen(near, seen), "a mist in view is stepped")
+	check(not SpectacleScript._mist_seen(far, seen), "one far out of view is not")
+	var edge: MistScript = own(MistScript.new(0)) as MistScript
+	edge.lay(SIZE, [] as Array[Rect2], [] as Array[Rect2], Vector2(540.0 + SpectacleScript.MIST_STEP_REACH - 1.0, 0.0))
+	check(SpectacleScript._mist_seen(edge, seen), "one just within the reach past a view's edge is")
+	seen.set_one(Rect2())
+	check(SpectacleScript._mist_seen(far, seen), "with no view known every mist is")

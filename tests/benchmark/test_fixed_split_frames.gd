@@ -23,6 +23,11 @@ class Runner extends "res://tests/benchmark/play_frames_runner.gd":
 		var camera: Object = screen.get("camera") as Object if screen != null else null
 		if camera == null:
 			return super()
+		if get_viewport().get_camera_2d() == null:
+			# No current camera (Flow._make_current): both runs alike would still hash the same.
+			var none: String = "%s: no current camera while measured" % rows[scenarios[_current]]["label"]
+			if not _failures.has(none):
+				_failures.append(none)
 		var views: ScreenViews = camera.get("views") as ScreenViews
 		var parts: Array = [super(), camera.get("split"), views.count]
 		for view in views.count:

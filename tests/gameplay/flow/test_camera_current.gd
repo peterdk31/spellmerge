@@ -2,10 +2,10 @@ extends "res://tests/support/suite.gd"
 ## A run's camera is the current one even when the run starts inside a group call (gameplay/flow/
 ## flow.gd, `_make_current`; found on the benchmark's fixed clock, 2026-11-21: in some processes a
 ## run had no current camera, so the split and the party camera framed nothing). Godot skips, for the
-## rest of a group call, the nodes that left a group during it, by their address; a camera made where
-## the old one was just freed is skipped by its own `make_current` (a group call too), which then does
-## nothing. Here the old camera is freed and a new one made inside a group call, as a run's restart
-## does; Flow's helper makes it current by the end of the frame.
+## rest of a group call (or a processing pass), the nodes that left a group during it, by their
+## address; a camera made where a node freed earlier in it was is skipped by its own `make_current` (a
+## group call too), which then does nothing. Here a camera is freed and a new one made inside a group
+## call; Flow's helper makes it current by the frame's end.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const GROUP: StringName = &"test_camera_current_probe"
@@ -59,3 +59,5 @@ func test_a_camera_made_inside_a_group_call_is_current_by_the_frame_end() -> voi
 			skipped += 1
 		check(got[1], "try %d: the new camera is the current one by the frame's end (its own make_current took: %s)" % [i, got[0]])
 	print("CAMERA CURRENT: the plain make_current was skipped in %d of %d tries" % [skipped, TRIES])
+	# Else the swap showed nothing (the freed camera's memory never reused): the case is not tested.
+	check(skipped > 0, "the swap reproduces the skipped make_current (%d of %d tries)" % [skipped, TRIES])

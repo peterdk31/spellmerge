@@ -233,7 +233,7 @@ const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat"
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
 ## room's camera.
-const VIEW: Array[StringName] = [&"_add_camera", &"_add_camera_over", &"_make_current"]
+const VIEW: Array[StringName] = [&"_add_camera", &"_add_camera_over", &"_make_current", &"_make_current_later"]
 
 ## Why Flow needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
 const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's members itself"
@@ -1277,16 +1277,26 @@ func _add_camera_over(parent: Node2D, area: Rect2) -> void:
 	parent.add_child(camera)
 
 
-## `camera` made the viewport's current one; again at the frame's end when that did not take. A run
-## started inside a group call (the frames service's) while the old world's camera had just left the
-## tree: Godot skips, for the rest of that call, the nodes that left a group during it, by their
-## address, and a new camera made where the old one was freed is skipped too, so its `make_current`
-## did nothing and the run had no camera (the split and the party camera framed nothing; on the
-## benchmark's fixed clock, a run in some processes and not others). Deferred, it runs outside the call.
+## `camera` made the viewport's current one; again when the frame's deferred calls run (before it is
+## drawn) when that did not take. Godot keeps, through a processing pass (the nodes' `_process` or
+## `_physics_process`, where runs start) or a group call, a list of the nodes that left a group during
+## it, by their address, and skips them; a camera made at the address of a node freed earlier in the
+## pass is skipped by its own `make_current` (a group call), which then does nothing, and the run had
+## no camera (the split and the party camera framed nothing; on the benchmark's fixed clock, a run in
+## some processes and not others). Deferred, it runs outside the pass.
 static func _make_current(camera: Camera2D) -> void:
 	camera.make_current()
 	if not camera.is_current():
-		camera.make_current.call_deferred()
+		_make_current_later.call_deferred(camera.get_instance_id())
+
+
+## The camera of instance `id` made current, if it is still in the tree and enabled and no other
+## camera was made current meanwhile (a run stopped, or its camera replaced, before the deferred
+## calls ran).
+static func _make_current_later(id: int) -> void:
+	var camera := instance_from_id(id) as Camera2D
+	if camera != null and camera.is_inside_tree() and camera.enabled and camera.get_viewport().get_camera_2d() == null:
+		camera.make_current()
 
 
 func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], party: PartyLoadout = null) -> void:

@@ -60,6 +60,8 @@ var _stale: bool = false
 ## The stirs' version last handed over (-1: hand them at the next step), and Feel's clock then.
 var _stirs_version: int = -1
 var _now: float = -1.0
+## Whether its room is one nobody has seen yet (`set_unseen`): not drawn, the void shows there.
+var _unseen: bool = false
 
 
 ## Mist drawn at `z` (the spectacle's MARK_Z).
@@ -123,9 +125,19 @@ func use_light(buffer: Texture2D) -> void:
 	(material as ShaderMaterial).set_shader_parameter(&"light_buffer", buffer)
 
 
-## Shown when there is a mist and a room to lay it in; the mask built again when it is stale.
+## Not drawn while its room is one nobody has seen yet (`unseen_standing.gd`), drawn as it stands
+## again from the room's reveal.
+func set_unseen(unseen: bool) -> void:
+	if unseen == _unseen:
+		return
+	_unseen = unseen
+	_refresh()
+
+
+## Shown when there is a mist and a room to lay it in, not unseen; the mask built again when it is
+## stale.
 func _refresh() -> void:
-	var shown: bool = mist != null and room_size.x > 0.0 and room_size.y > 0.0
+	var shown: bool = mist != null and room_size.x > 0.0 and room_size.y > 0.0 and not _unseen
 	visible = shown
 	if not shown:
 		return

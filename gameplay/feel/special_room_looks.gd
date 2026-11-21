@@ -19,6 +19,7 @@ extends Node2D
 ## real time.
 
 const EventsScript := preload("res://core/events/events.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Over the floor and its coins, under the bodies' looks.
 const Z: int = 0
@@ -50,6 +51,10 @@ const WOOD: PackedColorArray = [Color("3d2a2e"), Color("7a4a35"), Color("b27a4a"
 const BOARD: Vector2 = Vector2(14.0, 10.0)
 const POST: float = 12.0
 
+## Where nothing is drawn because nobody has seen it yet (Feel's `UnseenDark.mask`; null: drawn
+## everywhere): what lies there is left out, and drawn as it stands from the room's reveal (Feel
+## draws this again whenever the mask changes).
+var unseen: UnseenMaskScript = null
 ## Shelf items by number: [at, choice view, price, frames come in, going].
 var _items: Dictionary = {}
 ## Fountains by room: [area, pixels of water drawn, wanted pixels, frames come in, forgotten].
@@ -221,6 +226,8 @@ func _draw() -> void:
 
 func _draw_pool(row: Array) -> void:
 	var area: Rect2 = (row[0] as Rect2)
+	if unseen != null and unseen.hides(area.get_center()):
+		return
 	var share: float = _share(float(row[3]))
 	var box := Rect2i(Vector2i(area.position.round()), Vector2i(area.size.round()))
 	# The basin's rim comes in from the bottom up by stages; the water within it.
@@ -252,6 +259,8 @@ func _draw_pool(row: Array) -> void:
 
 func _draw_item(item: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
+	if unseen != null and unseen.hides(at):
+		return
 	var share: float = _share(float(row[3]))
 	var choice: Dictionary = row[1]
 	if StringName(str(choice.get("kind", ""))) == EventsScript.SHELF_SIGN:
@@ -323,6 +332,8 @@ func _draw_number(value: int, at: Vector2) -> void:
 
 func _draw_key(key: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
+	if unseen != null and unseen.hides(at):
+		return
 	var share: float = _share(float(row[1]))
 	var lift: float = 4.0 + _bob(key)
 	draw_rect(Rect2(at + Vector2(-3.0, 0.0), Vector2(7.0, 1.0)), Color(0.05, 0.04, 0.08, 0.35))

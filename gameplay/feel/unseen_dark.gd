@@ -6,37 +6,43 @@ extends Node2D
 ## A room (not a walkway) is visited once the party's map says it was entered (`rooms_seen`, Flow's
 ## state, connected biomes CB9: a room shown on the map but never entered stays dark), so a machine
 ## that joins mid-run (a restore, told `again`) draws the rooms entered before it came lit, as they
-## stand, never played in. An unvisited room's place is covered whole in the void's black
-## (`VoidBackdrop.COLOUR`): nothing in it shows, so it is one with the void round it, and the void's
+## stand, never played in. An unvisited room's place is one with the void round it, and the void's
 ## motes drift over it as over the void (the owner, 2026-11-21: an unseen room looks like the
-## background, its motes drifting about): what it covers whole is told to the spectacle
-## (`void_covers`), which gives the void's motes off there too and draws them over it. Once visited it
-## opens by **shrinking blocks** (docs/STYLE.md, "Smooth"): the place is cut into BLOCK px squares,
+## background, its motes drifting about): nothing of it is drawn, and nothing over it (the owner,
+## 2026-11-21, on #899): what it would cover whole is its `mask` (`unseen_mask.gd`), which every look
+## asks of what it draws, so what stands there is hidden one by one (`unseen_rooms.gd`,
+## `unseen_standing.gd`, the looks of what lies on a floor); and it is told to the spectacle
+## (`void_covers`), which gives the void's motes off there too. Only where a neighbour's floor reaches
+## into it (a bridge's end, under the room's lip once drawn) does the void's black lie, under
+## everything else (`LANDING_Z`, `landing_rects`). Once visited it opens by **shrinking blocks** (docs/STYLE.md, "Smooth"): the place is cut into BLOCK px squares,
 ## each a black square at its middle that shrinks a stage a frame at FPS (BLOCK_SIDES: 8, 6, 4, 2,
 ## then none), so the room shows through a widening grid; whole pixels, never a fade or a blur. Fine
 ## and quick (the owner, 2026-11-20, #883: 16 px blocks at 12 fps read as a hard grid of black lines
 ## mid-way): 8 px blocks over `reveal_seconds()`, still 3 frames between covered and lit, and never
 ## more than a stage a drawn frame however slow the frame (a frame under 24 fps opens it slower). A
-## stage is a tiled texture made once (the solid stage a plain rectangle); it lines up with the
+## stage is a tiled texture made once (the solid stage is never drawn); it lines up with the
 ## world's pixels, as every place stands on the 32 px grid.
 ##
 ## **A secret room's bridge** (the owner, 2026-11-20: "the bridge to a secret room is hidden until the
 ## secret is found"): a bridge with a secret room at an end (its kind's door `secret`,
 ## `KindSymbol.hidden_until_opened`) that is not opened yet (Feel's room hearing, `is_opened`: Flow's
-## `rooms_opened`) is covered whole in the same black, so it is pure void and the doorway it leaves
-## from is the room's lip (its rock stands there, `LockDoors`). Found, it **builds** out from the room
+## `rooms_opened`) is hidden whole, so it is pure void and the doorway it leaves from is the room's
+## lip (its rock stands there, `LockDoors`): its rectangle is in the mask (nothing on it drawn) and
+## its floor under the void's black at LANDING_Z. Found, it **builds** out from the room
 ## it hangs off (`build_of`): its BLOCK px cells in bands BAND px deep by their distance from that
 ## room, each band shrinking through BLOCK_SIDES a frame after the band before it, so the causeway
 ## lays itself toward the secret room a band a frame (3 frames and more between covered and shown for
 ## every pixel, whole pixels); then the room opens as any room, once entered. A restore or a new
 ## world draws it as it stands.
 ##
-## A child of Feel, top level (world space), over the bodies (what stands in a dark room is dark too)
-## and under the screen's layers. Feel steps it once a frame (`step`).
+## A child of Feel, top level (world space), its reveal's blocks over the bodies (what stands in a
+## room opening is dark too as its blocks shrink) and under the screen's layers. Feel steps it once a
+## frame (`step`).
 
 const EventsScript := preload("res://core/events/events.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
+const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Over the bodies and the world's looks, under the labels (22) and the screen's layers.
 const Z: int = 20
@@ -48,6 +54,10 @@ const BLOCK: int = 8
 const BLOCK_SIDES: PackedInt32Array = [0, 2, 4, 6, 8]
 ## How deep a band of a secret room's bridge builds in at a time (pixels from the room it leaves).
 const BAND: float = 32.0
+## The black over a neighbour's floor in what it covers whole (`_landing_rects`): over the pieces'
+## floors (`RoomBase.FLOOR_Z` and the layers on it, under 0) and under every body, look and mote,
+## which are hidden there one by one (`mask`), so the void's motes drift over it as over the void.
+const LANDING_Z: int = 0
 ## A bridge's build when hidden (none of it shown).
 const HIDDEN: int = -1
 ## How far out of the room it leaves a hidden bridge's dark begins (pixels past the socket: the
@@ -61,6 +71,9 @@ const DARK: Color = VoidBackdropScript.COLOUR
 
 ## The pieces (Feel's room hearing: which places are walkways).
 var pieces: RoomHearingScript = null
+## Where nothing is drawn now (what it covers whole: `void_covers`), which every look asks of what
+## it draws (`unseen_mask.gd`). Read only.
+var mask: UnseenMaskScript = UnseenMaskScript.new()
 
 ## By place: its rectangle, whether it is a room, the stage drawn (0 lit ... the last).
 var _rects: Array[Rect2] = []
@@ -82,7 +95,7 @@ var _bands: Array[PackedInt32Array] = []
 ## The room hearing's `done_again` read last (a restore: drawn as it stands).
 var _read_again: int = 0
 ## What it covers whole now, one rectangle a place (`void_covers`; none: an empty one): the void shows
-## there, so the void's motes are given off and drawn over them too (the owner, 2026-11-21). The one
+## there, so the void's motes are given off over them too (the owner, 2026-11-21). The one
 ## array, sized with the places and written in place only when a stage changes; how many times it
 ## was (`void_changes`).
 var _void_rects: Array[Rect2] = []
@@ -90,6 +103,12 @@ var _void_changes: int = 0
 var _laid_places: int = -1
 var _laid_world: int = -1
 var _clock: float = 0.0
+## Where a neighbour's floor reaches into what it covers whole (each bridge's end inside an unvisited
+## room's rectangle, under the room's lip once it is drawn) and each hidden secret way: those pieces
+## are drawn, so the void's black lies over them there, under everything else (`LANDING_Z`), written
+## with the covers (`_changed`), drawn by `_landings`.
+var _landing_rects: Array[Rect2] = []
+var _landings: Node2D = null
 
 
 func _ready() -> void:
@@ -99,6 +118,12 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	for stage in BLOCK_SIDES.size():
 		_textures.append(block_texture(BLOCK_SIDES[stage]))
+	_landings = Node2D.new()
+	_landings.name = "Landings"
+	_landings.z_as_relative = false
+	_landings.z_index = LANDING_Z
+	_landings.draw.connect(_draw_landings)
+	add_child(_landings)
 
 
 ## How long a room's dark takes to open, from covered to lit (seconds): a stage a frame at FPS.
@@ -149,9 +174,9 @@ func covered_of(place: int) -> Rect2:
 	return _covers[place] if build_of(place) == HIDDEN else Rect2()
 
 
-## Whether room `place` is covered whole now (unvisited, its reveal not begun): nothing of it shows,
-## so what it holds need not be drawn (unseen_rooms.gd). A secret room's hidden bridge is not (its
-## dark is a part of its place).
+## Whether room `place` is covered whole now (unvisited, its reveal not begun): nothing of it is
+## drawn (unseen_rooms.gd switches its own drawing off; what stands in it is hidden by the `mask`). A
+## secret room's hidden bridge is not (its hidden part is a part of its place).
 func covers_whole(place: int) -> bool:
 	var stage: int = stage_of(place)
 	return stage >= 0 and BLOCK_SIDES[stage] >= BLOCK
@@ -288,7 +313,7 @@ func _lay(grid: RoomGrid, places: int) -> void:
 
 ## The rectangles the dark covers whole now, by place (each unvisited room's, each hidden secret
 ## room's bridge's: `covered_of`; an empty one for a place it does not), where an unseen room is the
-## void itself: the spectacle gives the void's motes off over them and draws them over the dark
+## void itself: nothing is drawn there (`mask`) and the spectacle gives the void's motes off over them
 ## (`Spectacle.void_air`, `void_pool`). The same array every call, written in place when a stage
 ## changes (`void_changes` counts the writes); read only.
 func void_covers() -> Array[Rect2]:
@@ -306,7 +331,35 @@ func _changed() -> void:
 	for place in _rects.size():
 		_void_rects[place] = covered_of(place)
 	_void_changes += 1
+	mask.lay(_void_rects)
+	_lay_landings()
 	queue_redraw()
+
+
+## The neighbours' floors in what it covers whole, from the covers now (in place).
+func _lay_landings() -> void:
+	_landing_rects.clear()
+	for place in _rects.size():
+		if covers_whole(place):
+			for other in _rects.size():
+				if _room[other] == 0:
+					var inside: Rect2 = _rects[place].intersection(_rects[other])
+					if inside.has_area():
+						_landing_rects.append(inside)
+		elif build_of(place) == HIDDEN:
+			_landing_rects.append(_covers[place])
+	if _landings != null:
+		_landings.queue_redraw()
+
+
+## The rectangles of black under everything over the neighbours' floors (for tests).
+func landing_rects() -> Array[Rect2]:
+	return _landing_rects
+
+
+func _draw_landings() -> void:
+	for rect in _landing_rects:
+		_landings.draw_rect(rect, DARK)
 
 
 ## Bridge `place`, when a secret room stands at an end (its real ends, as Flow put them on its layout:
@@ -354,10 +407,9 @@ func _draw() -> void:
 			_draw_bridge(place)
 			continue
 		var stage: int = _stage[place]
-		if stage <= 0:
-			continue
-		if BLOCK_SIDES[stage] >= BLOCK:
-			draw_rect(_rects[place], DARK)
+		# Covered whole, nothing is drawn: what the room holds is hidden one by one (`mask`), and the
+		# void shows through.
+		if stage <= 0 or BLOCK_SIDES[stage] >= BLOCK:
 			continue
 		var texture: ImageTexture = _textures[stage] if stage < _textures.size() else null
 		if texture != null:
@@ -368,7 +420,6 @@ func _draw() -> void:
 func _draw_bridge(place: int) -> void:
 	var rect: Rect2 = _covers[place]
 	if _build[place] == HIDDEN:
-		draw_rect(rect, DARK)
 		return
 	var columns: int = ceili(rect.size.x / float(BLOCK))
 	var bands: PackedInt32Array = _bands[place]

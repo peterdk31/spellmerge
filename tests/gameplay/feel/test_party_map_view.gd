@@ -675,6 +675,23 @@ func test_the_map_shows_the_rooms_seen_the_bridges_from_them_and_the_kinds_they_
 	check_equal(view.shade_of(WEST), 3, "with every map shut, as it stands: the stone's light")
 
 
+## The performance pass (2026-11-21): with every map shut, a frame settles nothing (the looks are
+## drawn only once a map opens); read, or a map opening, they are settled as the frame left them.
+func test_a_shut_map_settles_its_looks_only_when_read_or_opened() -> void:
+	var map: BiomeMap = _start(1)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.waits_to_settle(), "a shut map's frame settles nothing")
+	view.advance()
+	check(not view.waits_to_settle(), "a map's step settles it first")
+	check_equal(view.shade_of(WEST), 3, "to the looks as they stand: the stone's light")
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check_equal(view.shade_of(WEST), 3, "and read, the same")
+	check(not view.waits_to_settle(), "read, it is settled")
+
+
 ## The owner, 2026-11-20: "There should be no dead ends!" On the map no bridge ends in the dark: each
 ## drawn bridge's far room is drawn too; a secret room not yet found is not, and so neither is its
 ## bridge, until its rock is broken.

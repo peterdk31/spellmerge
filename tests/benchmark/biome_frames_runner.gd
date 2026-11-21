@@ -17,7 +17,7 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##  - `BENCH: biome frames <label> map`: the seed, the map's rooms and the rooms the wizards stand in;
 ##  - `... frame`: the frame's average, p95 and worst, and the views drawn a frame;
 ##  - `... gpu`: each kind of viewport's render time a frame (the split's views, the light buffers,
-##    the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
+##    the light's passes, the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
 ##    viewport timing (no GPU timer queries on the web: there only the frame is a measure);
 ##  - `... feel parts`: Feel's step by part (`Feel.profile_parts`), milliseconds a drawn frame;
 ##  - `... worst frames`: the slowest WORST frames, each with its ticks, the tick's time and the GPU's.
@@ -343,8 +343,8 @@ func _scan_viewports() -> void:
 		_timed_kind.append(_kind_of(viewport, root))
 
 
-## What a viewport draws, for the report: the root, a split view, the void view, a light buffer,
-## the floor marks, or another.
+## What a viewport draws, for the report: the root, a split view, the void view, a light buffer, a
+## pass at the light's resolution, the floor marks, or another.
 static func _kind_of(viewport: Viewport, root: Viewport) -> String:
 	if viewport == root:
 		return "root"
@@ -355,6 +355,9 @@ static func _kind_of(viewport: Viewport, root: Viewport) -> String:
 		return "views"
 	if named == "VoidView":
 		return "void view"
+	if parent == "LightFactor" or parent == "LightUnder":
+		# The passes at the light's resolution (a picture bigger than PictureGrid.SIZE: SpellLight's).
+		return "light passes"
 	if path.contains("Light") or parent.contains("Light") or named.contains("Light") or named.contains("light"):
 		return "light buffers"
 	if path.contains("Mark") or named.contains("Mark"):

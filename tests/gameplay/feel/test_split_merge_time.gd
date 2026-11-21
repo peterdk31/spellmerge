@@ -416,3 +416,81 @@ func test_no_flicker_at_join_reach() -> void:
 			count = _split.views.count
 	check_equal(changes, 0, "swaying about JOIN_REACH: no view made or lost")
 	check_equal(_split.views.view_of_seat(0), _split.views.view_of_seat(1), "the pair still shares one")
+
+
+# --- The merge clock (the review of 2026-11-21) ----------------------------------------------------
+
+## A merge lands at its time whatever that time is (0.35 s never did with the clock in 32 bits: it
+## stopped a hair short, the pull fell to none and the view froze), and the pull is 1 once there.
+func test_the_merge_clock_lands_at_any_time() -> void:
+	for time: float in [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.7]:
+		var clock := PackedFloat64Array([0.0])
+		var frames: int = 0
+		var landed: bool = false
+		while frames < 200 and not landed:
+			var was: float = clock[0]
+			clock[0] = SplitCameraScript.merge_clock(was, FRAME, time)
+			landed = clock[0] >= time
+			if landed:
+				check_equal(SplitCameraScript.merge_pull(was, clock[0], time), 1.0, "%.2f s: on its target once landed" % time)
+			frames += 1
+		check(landed and frames <= int(ceil(time / FRAME)) + 1, "a %.2f s merge lands in %d frames" % [time, frames])
+
+
+## A pair's merging view, landed on its partner's picture and waiting for its anchor, gets a new
+## target when the far seat comes back and the split ends: it eases onto the one picture from rest
+## (no jump, its divider back while the pictures differ) and goes only once on it, never at once
+## with its partner's picture handed to the cells round it.
+func test_a_landed_view_given_a_new_target_eases_onto_it() -> void:
+	if _rooms.size() < 12:
+		check(false, "the biome's rooms were read")
+		return
+	var a: Node2D = _body(ActorsScript.TEAM_WIZARDS, 0, _rooms[2])
+	var b: Node2D = _body(ActorsScript.TEAM_WIZARDS, 1, _rooms[2] + Vector2(SplitCameraScript.LEAVE_REACH + 60.0, 0.0))
+	var far: Node2D = _body(ActorsScript.TEAM_WIZARDS, 2, _rooms[10])
+	for i in 120:
+		_frame()
+	check_equal(_split.views.count, 3, "a view each")
+	# B walks to A until the view it leaves has landed (merging, its divider gone, still drawn).
+	var landed: int = -1
+	var frames: int = 0
+	while landed < 0 and frames < 2000:
+		b.global_position += (a.global_position + Vector2(48.0, 0.0) - b.global_position).limit_length(PACE * FRAME)
+		_frame()
+		frames += 1
+		for view in _split.views.count:
+			if _split.is_merging(view) and _split.stage_of(view) == 0:
+				landed = _split.slot_of(view)
+	check(landed >= 0, "the pair's merging view landed and waits for its anchor")
+	if landed < 0:
+		return
+	# The far seat comes back within the fit: the split ends, every view merges into the one picture.
+	far.global_position = a.global_position + Vector2(400.0, 0.0)
+	var last := Transform2D()
+	var last_root := Transform2D()
+	var gap0: float = -1.0
+	var seen: bool = false
+	for i in 120:
+		_frame()
+		var view: int = -1
+		for v in _split.views.count:
+			if _split.slot_of(v) == landed:
+				view = v
+		if view < 0:
+			if seen:
+				var off: float = _gap(last, last_root)
+				check(off < SplitCameraScript.SETTLED * 4.0, "it went only once on the one picture (%.3f px off)" % off)
+			break
+		if gap0 < 0.0:
+			# How far its picture is from the one picture as the split ends (screen pixels).
+			gap0 = _gap(last, _holder.get_canvas_transform())
+		if seen:
+			# An ease from rest over MERGE_TIME moves at most about 8% of the way a frame; snapping
+			# to the new target (the bug) would move all of it.
+			var moved: float = _gap(_split.views.to_screen[view], last)
+			check(moved <= maxf(SPIKE_FREE, gap0 * 0.12), "its picture eased onto the new one (%.2f px a frame, %.2f px to go at the start)" % [moved, gap0])
+		seen = true
+		last = _split.views.to_screen[view]
+		last_root = _holder.get_canvas_transform()
+	check(seen, "it was still drawn after the split ended")
+	check_equal(_split.views.count, 0, "then the one picture")

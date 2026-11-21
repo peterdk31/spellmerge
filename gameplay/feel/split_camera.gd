@@ -89,7 +89,7 @@ const SHRINK_FROM: float = 1.0
 ## How long a merging view takes to land on the picture it merges into (real seconds from the
 ## merge's start; the owner's report of 2026-11-21: the divider stayed for seconds once the players
 ## were together, and for good while they walked on or fought). What is left of the gap follows a
-## smoothstep to none over this time (`_merge_pull`), so it sets off from rest and lands even on a
+## smoothstep to none over this time (`merge_pull`), so it sets off from rest and lands even on a
 ## picture that keeps moving; it used to ease at the party camera's pull and go only once within
 ## SETTLED, which a moving picture (the wizards walking on, close foes in a fight, the party
 ## camera's own easing) never let it reach.
@@ -110,6 +110,8 @@ const PANE_ANCHOR_STEP: float = 12.0
 const FREE: int = 0
 const LIVE: int = 1
 const MERGING: int = 2
+## A merging slot's target before its first eased frame.
+const UNSET: int = -2
 
 ## The views as last laid out (count, cells, transforms, anchors, seats). Read only.
 var views: ScreenViewsScript = ScreenViewsScript.new()
@@ -154,8 +156,12 @@ var _anchored: PackedByteArray = PackedByteArray()
 var _born: PackedByteArray = PackedByteArray()
 ## By slot: how far a merging view's picture is from its target's (screen pixels).
 var _merge_gap: PackedFloat32Array = PackedFloat32Array()
-## By slot: real seconds since it began merging (up to MERGE_TIME, when it is on its target).
-var _merge_age: PackedFloat32Array = PackedFloat32Array()
+## By slot: real seconds since it began merging onto its target (up to MERGE_TIME, when it is on
+## it; 64-bit, so the clock stopped at MERGE_TIME is MERGE_TIME whatever its value), and that target
+## (`_merge_target`; UNSET before its first eased frame). A new target restarts the clock, so the
+## view eases onto it from rest rather than snapping to it.
+var _merge_age: PackedFloat64Array = PackedFloat64Array()
+var _merge_into: PackedInt32Array = PackedInt32Array()
 ## By seat: its box's middle and its box (each seat's own body and the actor it drives).
 var _point: PackedVector2Array = PackedVector2Array()
 var _box: Array[Rect2] = []
@@ -205,6 +211,7 @@ func _init() -> void:
 	_born.resize(VIEWS_MOST)
 	_merge_gap.resize(VIEWS_MOST)
 	_merge_age.resize(VIEWS_MOST)
+	_merge_into.resize(VIEWS_MOST)
 	_point.resize(ActorsScript.SEATS)
 	_box.resize(ActorsScript.SEATS)
 	_group_of.resize(ActorsScript.SEATS)
@@ -546,6 +553,7 @@ func _begin_merge(slot: int) -> void:
 		return
 	_state[slot] = MERGING
 	_merge_age[slot] = 0.0
+	_merge_into[slot] = UNSET
 
 
 ## A free slot for a new view of the seats `held`, started as the picture they were in: the slot
@@ -618,18 +626,25 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 			continue
 		var into: int = _merge_target(slot)
 		_kin[slot] = into
+		if _merge_into[slot] != UNSET and _merge_into[slot] != into:
+			# Another target (its target merging on, or the split ending): eased onto from rest.
+			_merge_age[slot] = 0.0
+		_merge_into[slot] = into
 		var to_centre: Vector2 = _centre[into] if into >= 0 else root_centre
 		var to_zoom: float = _zoom[into] if into >= 0 else root_zoom
 		var was: float = _merge_age[slot]
-		_merge_age[slot] = minf(was + maxf(delta, 0.0), MERGE_TIME)
+		_merge_age[slot] = merge_clock(was, delta, MERGE_TIME)
 		var landed: bool = _merge_age[slot] >= MERGE_TIME
-		var pull: float = _merge_pull(was, _merge_age[slot])
+		var pull: float = merge_pull(was, _merge_age[slot], MERGE_TIME)
 		_zoom[slot] = to_zoom if landed else lerpf(_zoom[slot], to_zoom, pull)
 		_centre[slot] = to_centre if landed else _clamp(_centre[slot].lerp(to_centre, pull), _zoom[slot], limits, screen)
 		var gap: float = _picture_gap(_centre[slot], _zoom[slot], to_centre, to_zoom, screen)
 		_merge_gap[slot] = gap
 		if gap < SHRINK_FROM or landed:
 			_stage[slot] = maxi(_stage[slot] - 1, 0)
+		else:
+			# Pictures apart again (a new target): the divider between them grows back.
+			_stage[slot] = mini(_stage[slot] + 1, DIVIDER_WIDTH)
 		var on_target: bool = into < 0 or _shown[slot].distance_to(_shown[into]) <= VoronoiCellsScript.MIN_GAP * 2.0
 		# Back into the one picture only once the blank quarter has moved out (it is drawn while
 		# any view is).
@@ -643,14 +658,23 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 			_kin[slot] = -1
 
 
+## A merge clock at `was` seconds moved on by a drawn frame of `delta`, stopping at `time` (exactly
+## `time` once there, in 64 bits).
+static func merge_clock(was: float, delta: float, time: float) -> float:
+	return minf(was + maxf(delta, 0.0), time)
+
+
 ## The share of the way to its target a merging view's picture eases over a drawn frame whose
-## merge clock went from `was` to `now` (seconds): what is left of the gap follows a smoothstep from
-## all of it at 0 to none at MERGE_TIME, so it starts gently and ends on the target (1 once there).
-static func _merge_pull(was: float, now: float) -> float:
-	var left_was: float = 1.0 - _smooth(was / MERGE_TIME)
+## merge clock went from `was` to `now` (seconds; the merge lasting `time`): what is left of the gap
+## follows a smoothstep from all of it at 0 to none at `time`, so it starts gently and ends on the
+## target (1 once there).
+static func merge_pull(was: float, now: float, time: float) -> float:
+	if now >= time:
+		return 1.0
+	var left_was: float = 1.0 - _smooth(was / time)
 	if left_was <= 0.0:
 		return 1.0
-	return clampf(1.0 - (1.0 - _smooth(now / MERGE_TIME)) / left_was, 0.0, 1.0)
+	return clampf(1.0 - (1.0 - _smooth(now / time)) / left_was, 0.0, 1.0)
 
 
 ## Smoothstep of `t` (kept to 0..1).
@@ -856,10 +880,11 @@ func _merging_into(slot: int) -> int:
 
 
 ## Where slot `slot`'s anchor is drawn this frame, its own place being `own`: on it once it got
-## there; else moved toward it (a live view, by at most ANCHOR_STEP) or onto its target's anchor (a
-## merging one, by at most MERGE_ANCHOR_STEP).
+## there; else moved toward it by at most ANCHOR_STEP, or (a merging view whose picture is its
+## target's) onto its target's anchor by at most MERGE_ANCHOR_STEP.
 func _anchor_of(slot: int, own: Vector2) -> Vector2:
 	var aim: Vector2 = own
+	var step: float = ANCHOR_STEP
 	if _state[slot] == MERGING:
 		var into: int = _merge_target(slot)
 		_anchored[slot] = 0
@@ -867,11 +892,12 @@ func _anchor_of(slot: int, own: Vector2) -> Vector2:
 		# then swing anyhow (the same picture either side), and its lines to the others move on.
 		if into >= 0 and _shown[into].is_finite() and _merge_gap[slot] < SHRINK_FROM:
 			aim = _shown[into]
+			step = MERGE_ANCHOR_STEP
 	elif _anchored[slot] != 0 or not _shown[slot].is_finite():
 		_shown[slot] = own
 		_anchored[slot] = 1
 		return own
-	_shown[slot] = _shown[slot].move_toward(aim, MERGE_ANCHOR_STEP if _state[slot] == MERGING else ANCHOR_STEP)
+	_shown[slot] = _shown[slot].move_toward(aim, step)
 	if _state[slot] == LIVE and _shown[slot].distance_to(own) < 0.5:
 		_anchored[slot] = 1
 	return _shown[slot]

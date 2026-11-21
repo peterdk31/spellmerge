@@ -23,6 +23,7 @@ const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
 
@@ -561,6 +562,131 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 		dark.advance()
 		stages.append(dark.stage_of(1))
 	check_equal(stages, [2, 1, 0] as Array[int], "the reveal still opens a stage a frame")
+
+
+## A room nobody has entered draws nothing of its own under its dark (the owner, 2026-11-21, after
+## the report of worse performance): its layout, its floor marks' layer, its motes' chunks and its
+## ground cover are switched off, the start room's and the bridges' never; from its reveal's first
+## stage all of it is drawn again, under the opening blocks.
+func test_an_unvisited_room_draws_nothing_of_its_own_until_its_reveal() -> void:
+	var map: BiomeMap = _start(1)
+	var spectacle: Node = feel.call(&"spectacle")
+	var pool: MotesScript = spectacle.get(&"pool") as MotesScript
+	pool.use_places(_grid())
+	feel.call(&"_step_rooms", 0.0, 1)
+	var rooms: UnseenRoomsScript = feel.call(&"unseen_rooms") as UnseenRoomsScript
+	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+	var marks: Object = spectacle.get(&"marks")
+	var cover: Object = feel.get(&"_cover_rooms")
+	var bridge: int = map.rooms()
+	check(dark.covers_whole(1) and dark.covers_whole(2) and not dark.covers_whole(0), "the unvisited rooms are covered whole, the start room not")
+	check(not dark.covers_whole(bridge), "nor a bridge")
+	for place: int in [0, 1, 2, bridge]:
+		var off: bool = place == 1 or place == 2
+		check_equal(rooms.is_hidden(place), off, "place %d switched %s" % [place, "off" if off else "on"])
+		var layout := flow.biome.room_layout(place) as CanvasItem if place < map.rooms() else null
+		check(layout != null or place >= map.rooms(), "room %d has a layout" % place)
+		if layout != null:
+			check_equal(layout.visible, not off, "place %d's layout drawn: %s" % [place, not off])
+		check_equal(pool.regions.region_shown(place + 1), not off, "place %d's motes drawn: %s" % [place, not off])
+		if marks != null and int(marks.call(&"layer_count")) > place:
+			check_equal(bool(marks.call(&"layer_shown", place)), not off, "place %d's marks drawn: %s" % [place, not off])
+		var room_cover: Object = cover.call(&"view_of", place) if cover != null else null
+		if room_cover is CanvasItem:
+			check_equal((room_cover as CanvasItem).visible, not off, "place %d's cover drawn: %s" % [place, not off])
+	# A mote of the hidden room is still copied to its chunk, which is not drawn.
+	var inside: Vector2 = _grid().place_rect(1).get_center()
+	pool.throw_part(0, inside, Vector2.RIGHT, 0, Color.WHITE, 4, 2.0, 0.0, 0.0, false)
+	var now: float = spectacle.get(&"_clock") + 0.01
+	pool.step(now)
+	var drawn: int = 0
+	var copied: int = 0
+	for c in pool.regions.chunks_made():
+		if pool.regions.region_of_chunk(c) == 2:
+			copied += 1
+			if pool.regions.node_of(c).visible:
+				drawn += 1
+	check(copied > 0, "the hidden room's motes are copied to its chunk (%d)" % copied)
+	check_equal(drawn, 0, "and not drawn")
+	# Entered: from the reveal's first stage its drawing is on again, the court's still off.
+	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
+	tick.run(DT)
+	dark.step(0.0, _grid())
+	dark.advance()
+	check(not dark.covers_whole(1), "a stage into the reveal it is not covered whole")
+	feel.call(&"_step_rooms", 0.0, 1)
+	check(not rooms.is_hidden(1) and rooms.is_hidden(2), "its drawing on, the court's off")
+	check((flow.biome.room_layout(1) as CanvasItem).visible, "its layout drawn under the opening blocks")
+	check(pool.regions.region_shown(2), "its motes drawn")
+	var shown: int = 0
+	for c in pool.regions.chunks_made():
+		if pool.regions.region_of_chunk(c) == 2 and pool.regions.node_of(c).visible:
+			shown += 1
+	check(shown > 0, "its chunk drawn again as it stands")
+
+
+## A place out of every view draws nothing of its own either (the owner, 2026-11-21: "also hide rooms
+## out of view"), a margin past the view's box still counting as in it; a split's every view counts,
+## and with no view box none is out of view.
+func test_a_place_out_of_every_view_draws_nothing_of_its_own() -> void:
+	var map: BiomeMap = _start(1)
+	var spectacle: Node = feel.call(&"spectacle")
+	var pool: MotesScript = spectacle.get(&"pool") as MotesScript
+	pool.use_places(_grid())
+	feel.call(&"_step_rooms", 0.0, 1)
+	var rooms: UnseenRoomsScript = feel.call(&"unseen_rooms") as UnseenRoomsScript
+	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+	var marks: Object = spectacle.get(&"marks")
+	var cover: Object = feel.get(&"_cover_rooms")
+	var bridge: int = map.rooms()
+	var start: Rect2 = _grid().place_rect(0)
+	var seen := ViewBoxesScript.new()
+	var far := Rect2(_grid().place_rect(bridge).end + Vector2(10000.0, 10000.0), Vector2(64.0, 64.0))
+	seen.set_one(far)
+	rooms.step(dark, _grid(), seen, marks, pool.regions, cover)
+	check(rooms.is_hidden(0) and rooms.is_hidden(bridge), "with the view far off, the start room and the bridge are off")
+	check(not (flow.biome.room_layout(0) as CanvasItem).visible, "the start room's layout not drawn")
+	check(not pool.regions.region_shown(1), "nor its motes")
+	# Just past the margin, still off; within it, on.
+	seen.set_one(Rect2(start.end + Vector2(UnseenRoomsScript.MARGIN + 8.0, UnseenRoomsScript.MARGIN + 8.0), Vector2(64.0, 64.0)))
+	rooms.step(dark, _grid(), seen, marks, pool.regions, cover)
+	check(rooms.is_hidden(0), "a box past the margin leaves the start room off")
+	seen.set_one(Rect2(start.end + Vector2(UnseenRoomsScript.MARGIN - 8.0, UnseenRoomsScript.MARGIN - 8.0), Vector2(64.0, 64.0)))
+	rooms.step(dark, _grid(), seen, marks, pool.regions, cover)
+	check(not rooms.is_hidden(0), "within the margin it is on")
+	check((flow.biome.room_layout(0) as CanvasItem).visible and pool.regions.region_shown(1), "its layout and motes drawn again")
+	# A split: any view showing a place keeps it on; an unvisited room in view stays off.
+	seen.count = 2
+	seen.boxes[0] = far
+	seen.boxes[1] = _grid().place_rect(1)
+	rooms.step(dark, _grid(), seen, marks, pool.regions, cover)
+	var near_second: bool = _grid().place_rect(1).grow(UnseenRoomsScript.MARGIN).intersects(start)
+	check_equal(rooms.is_hidden(0), not near_second, "the start room is on only if the second view reaches it")
+	check(rooms.is_hidden(1), "the unvisited room in the second view stays off (its dark)")
+	check(not rooms.is_hidden(bridge) or not _grid().place_rect(bridge).grow(UnseenRoomsScript.MARGIN).intersects(_grid().place_rect(1)), "a bridge by the second view is on")
+	seen.set_one(Rect2())
+	rooms.step(dark, _grid(), seen, marks, pool.regions, cover)
+	check(not rooms.is_hidden(0) and not rooms.is_hidden(bridge) and rooms.is_hidden(1), "with no view box none is out of view")
+
+
+## What counts as on screen for that follows the party camera as it was moved this frame, not the
+## viewport's canvas transform, which follows a frame late (the review's: on a long pan a room at
+## the leading edge came in a frame after its place on screen).
+func test_the_view_rooms_are_switched_by_is_where_the_camera_is_this_frame() -> void:
+	_start(1)
+	tick.run(DT)
+	var camera := Camera2D.new()
+	root.add_child(camera)
+	camera.make_current()
+	(feel.get(&"party_camera") as Object).call(&"follow", camera)
+	var before: Rect2 = (feel.get_viewport().get_canvas_transform().affine_inverse() * feel.get_viewport().get_visible_rect())
+	camera.position += Vector2(3000.0, 0.0)
+	var seen: Object = feel.call(&"_rooms_seen")
+	var box: Rect2 = (seen.get(&"boxes") as Array)[0]
+	var wanted: Rect2 = (feel.get(&"party_camera") as Object).call(&"visible_rect")
+	check(box.is_equal_approx(wanted), "the box is the camera's picture as it stands now (%s, %s)" % [box, wanted])
+	check(not box.is_equal_approx(before), "not the canvas transform's of the frame before")
+	camera.queue_free()
 
 
 ## The void's pool is made and freed with the motes' pool (the "Particles" setting's cap: VOID_SHARE of

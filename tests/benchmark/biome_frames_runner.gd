@@ -57,6 +57,10 @@ var _frame_views: PackedInt32Array = PackedInt32Array()
 var _frame_ticks: PackedInt32Array = PackedInt32Array()
 var _frame_tick_ms: PackedFloat32Array = PackedFloat32Array()
 var _frame_gpu_ms: PackedFloat32Array = PackedFloat32Array()
+## Each measured frame's draw calls and primitives (`RenderingServer.get_rendering_info`): the work
+## drawn, which unlike the times does not move with a busy machine.
+var _frame_calls: PackedInt32Array = PackedInt32Array()
+var _frame_primitives: PackedInt32Array = PackedInt32Array()
 var _last_usec: int = 0
 var _ticks_seen: int = 0
 var _tick_usec_seen: int = 0
@@ -111,13 +115,19 @@ func _scenario_started(scenario: Dictionary) -> void:
 		return
 	if map.rooms() < ROOMS_WANTED:
 		print("BENCH: biome frames %s: the map has %d rooms, not %d" % [scenario["label"], map.rooms(), ROOMS_WANTED])
-	_rooms = _fight_rooms(map, 1 if scenario.get("spread", "apart") == "together" else _wizards.size())
-	_room_rects.clear()
+	# A row's "room": "largest" fight rooms (the default), the "smallest", or "start": the wizards
+	# left where the run put them (the start room, the rooms round it not yet entered).
+	var room_rule: String = String(scenario.get("room", "largest"))
 	var biome: Object = _flow.get(&"biome")
+	if room_rule == "start":
+		_rooms = PackedInt32Array([_room_of(map, _wizards[0].global_position)])
+	else:
+		_rooms = _fight_rooms(map, 1 if scenario.get("spread", "apart") == "together" else _wizards.size(), room_rule == "smallest")
+	_room_rects.clear()
 	for room in _rooms:
 		_room_rects.append(biome.call(&"room_rect", room) as Rect2)
 	var grid: RoomGrid = _projectiles.call(&"grid") as RoomGrid
-	for index in _wizards.size():
+	for index in (0 if room_rule == "start" else _wizards.size()):
 		var rect: Rect2 = _room_rects[index % _room_rects.size()]
 		var at: Vector2 = rect.get_center() + Vector2(24.0 * float(index / _room_rects.size()), 0.0)
 		if grid != null:
@@ -148,13 +158,16 @@ func _map() -> BiomeMap:
 ## `count` fight rooms of `map` far apart (the largest first, then each the room farthest from
 ## those taken, by their rects' middles), so wizards put in them part into a view each: rooms side
 ## by side can fit one picture, the party camera zoomed out over them.
-func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
+func _fight_rooms(map: BiomeMap, count: int, smallest: bool = false) -> PackedInt32Array:
 	var biome: Object = _flow.get(&"biome")
 	var fights: Array[int] = []
 	for room in map.rooms():
 		if map.room_kinds[room] == FIGHT_KIND:
 			fights.append(room)
-	fights.sort_custom(func(a: int, b: int) -> bool: return (biome.call(&"room_rect", a) as Rect2).get_area() > (biome.call(&"room_rect", b) as Rect2).get_area())
+	fights.sort_custom(func(a: int, b: int) -> bool:
+		var area_a: float = (biome.call(&"room_rect", a) as Rect2).get_area()
+		var area_b: float = (biome.call(&"room_rect", b) as Rect2).get_area()
+		return area_a < area_b if smallest else area_a > area_b)
 	var out := PackedInt32Array()
 	if fights.is_empty():
 		out.append(0)
@@ -175,6 +188,15 @@ func _fight_rooms(map: BiomeMap, count: int) -> PackedInt32Array:
 				best = room
 		out.append(best)
 	return out
+
+
+## The room of `map` whose rect holds `at` (0 when none does).
+func _room_of(map: BiomeMap, at: Vector2) -> int:
+	var biome: Object = _flow.get(&"biome")
+	for room in map.rooms():
+		if (biome.call(&"room_rect", room) as Rect2).has_point(at):
+			return room
+	return 0
 
 
 ## The crowd shared out over the rooms the wizards stand in, each on clear ground.
@@ -198,6 +220,8 @@ func _measuring_started() -> void:
 	_frame_ticks.clear()
 	_frame_tick_ms.clear()
 	_frame_gpu_ms.clear()
+	_frame_calls.clear()
+	_frame_primitives.clear()
 	_gpu_by_kind.clear()
 	_cpu_by_kind.clear()
 	_last_usec = Time.get_ticks_usec()
@@ -241,6 +265,8 @@ func _process(delta: float) -> void:
 	_frame_ticks.append((tick.count if tick != null else 0) - _ticks_seen)
 	_frame_tick_ms.append(float(tick_usec - _tick_usec_seen) / 1000.0)
 	_frame_gpu_ms.append(gpu)
+	_frame_calls.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	_frame_primitives.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
 	_last_usec = now
 	_ticks_seen = tick.count if tick != null else 0
 	_tick_usec_seen = tick_usec
@@ -332,9 +358,26 @@ func _report_more(label: String) -> void:
 	for i in frames:
 		by_views[clampi(_frame_views[i], 0, 4)] += 1
 	var row: Dictionary = rows[scenarios[_current]]
-	if row.get("spread", "apart") == "apart" and by_views[4] < frames / 2:
-		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew fewer than 4 views (%s): not a four-way split" % [label, str(by_views)])
+	var apart_views: int = clampi(_wizards.size(), 1, 4)
+	if row.get("spread", "apart") == "apart" and by_views[apart_views] < frames / 2:
+		print("BENCH WARNING: biome frames %s: the wizards stood apart but most frames drew other than %d views (%s): not a %d-way split" % [label, apart_views, str(by_views), apart_views])
 	print("BENCH: biome frames %s frame: avg %.2f ms, p95 %.2f ms, worst %.2f ms over %d frames, %.2f views a frame (frames by views 0-4: %s)" % [label, total / float(frames), sorted[int(float(frames - 1) * 0.95)], sorted[frames - 1], frames, float(views) / float(frames), str(by_views)])
+	var tick_total: float = 0.0
+	var ticks_total: int = 0
+	var gpu_total: float = 0.0
+	var calls_total: float = 0.0
+	var primitives_total: float = 0.0
+	for i in frames:
+		calls_total += _frame_calls[i]
+		primitives_total += _frame_primitives[i]
+		tick_total += _frame_tick_ms[i]
+		ticks_total += _frame_ticks[i]
+		gpu_total += _frame_gpu_ms[i]
+	var cpu_total: float = 0.0
+	for kind: String in _cpu_by_kind:
+		cpu_total += _cpu_by_kind[kind]
+	# The frame apart: the simulation (the Tick's steps), the renderer's GPU time and its CPU time.
+	print("BENCH: biome frames %s split (ms a frame): frame %.2f, sim %.2f (%.2f ticks), gpu %.2f, renderer cpu %.2f; %.0f draw calls, %.0f primitives a frame" % [label, total / float(frames), tick_total / float(frames), float(ticks_total) / float(frames), gpu_total / float(frames), cpu_total / float(frames), calls_total / float(frames), primitives_total / float(frames)])
 	var kinds: Array = _gpu_by_kind.keys()
 	kinds.sort_custom(func(a: String, b: String) -> bool: return _gpu_by_kind[a] > _gpu_by_kind[b])
 	var parts := PackedStringArray()

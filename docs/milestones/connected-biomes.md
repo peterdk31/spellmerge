@@ -790,3 +790,12 @@ The owner decided on 2026-11-21: unvisited rooms should not be black; they shoul
 - **Motes by room** (#892): the void's pool is drawn by room as the motes' pool is, so the void's motes over a hidden room are in that room's chunk of the void's pool, none in the motes' pool's.
 - **The doorway signs and the Y map** are unchanged; a secret room and its bridge stay hidden until found (#895).
 - **Tests:** `tests/gameplay/feel/test_biome_sound_and_look.gd`: `test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it`, and `void_covers` in the reveal's and the hidden bridge's tests. Screenshots: `tests/screenshots/shot_unseen_void.gd`.
+
+## Unseen places are not drawn (2026-11-21)
+
+The owner reported worse performance on 2026-11-21 (the web build, one player), then asked to hide unvisited rooms and draw the background there, and to hide rooms out of view. Measured at every merge since #872 (docs/LOG.md, "What made the game slower"): #897's void motes over unvisited rooms cost a few milliseconds in the single view on llvmpipe, from rendering; no merge doubled a frame.
+
+- **Unvisited:** a room the dark covers whole (`UnseenDark.covers_whole`) has its layout, floor marks' layer, motes' chunks (the motes' pool's; the void's drift over it as #897 made it) and ground cover switched off (`gameplay/feel/unseen_rooms.gd`); from its reveal's first stage they are drawn again as they stand, under the opening blocks. The dark stays as the guard for anything else a room holds, so nothing shows that did not before.
+- **Out of view:** a place whose rectangle grown by 160 px (its motes' reach, its lip, a frame's camera move) meets none of the views' boxes is switched off the same way; the boxes are the split's, else the party camera's picture as moved that frame.
+- View only; nothing in the simulation. Tests in `tests/gameplay/feel/test_biome_sound_and_look.gd`; measured by `tests/benchmark/play_frames.gd`.
+

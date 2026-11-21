@@ -112,6 +112,9 @@ var _z: int = 0
 var _ring_rows: int = 1
 ## By region (0 the crossers): the z its chunks are drawn at (`set_region_z`; the pool's z by default).
 var _region_z: PackedInt32Array = PackedInt32Array()
+## By region: 1 while its chunks are not drawn (`set_region_shown`: a room nobody has entered, under
+## the void's dark, unseen_rooms.gd); their rows are still copied, so they show as they stand again.
+var _region_hidden: PackedByteArray = PackedByteArray()
 
 
 ## The regions of a ring of `cap` rows in chunks of `ring_rows`, their chunks under `parent`, drawn
@@ -202,7 +205,7 @@ func step(now: float) -> void:
 			node.multimesh.buffer = _buffers[c]
 			if node.multimesh.visible_instance_count != _fill[c]:
 				node.multimesh.visible_instance_count = _fill[c]
-			node.visible = true
+			node.visible = _region_hidden[region] == 0
 
 
 ## Region `region`'s chunks drawn at `z` from now on (its chunks now at once; one taken later at its
@@ -215,6 +218,22 @@ func set_region_z(region: int, z: int) -> void:
 	for c in _nodes.size():
 		if _region[c] == region:
 			_nodes[c].z_index = z
+
+
+## Region `region`'s chunks drawn (`shown`) or not from now on (its chunks now at once; one taken
+## later at its next upload). Its rows are copied either way, so shown again it draws as it stands.
+func set_region_shown(region: int, shown: bool) -> void:
+	if region < 0 or region >= _region_hidden.size() or (_region_hidden[region] == 0) == shown:
+		return
+	_region_hidden[region] = 0 if shown else 1
+	for c in _nodes.size():
+		if _region[c] == region:
+			_nodes[c].visible = shown and _fill[c] > 0
+
+
+## Whether region `region`'s chunks are drawn (`set_region_shown`; true for none).
+func region_shown(region: int) -> bool:
+	return region < 0 or region >= _region_hidden.size() or _region_hidden[region] == 0
 
 
 ## The z region `region`'s chunks are drawn at (the pool's for none; for tests).
@@ -346,6 +365,8 @@ func _take(grid: RoomGrid, count: int) -> void:
 	_open.fill(-1)
 	_region_z.resize(count + 1)
 	_region_z.fill(_z)
+	_region_hidden.resize(count + 1)
+	_region_hidden.fill(0)
 	fits += 1
 	# A chunk's box is set again when next written (its region's number may name another place).
 	_boxed.fill(-1)

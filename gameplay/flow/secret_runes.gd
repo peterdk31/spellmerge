@@ -13,7 +13,7 @@ extends RefCounted
 ##   (`LockDoors.lay`): the secret room's element touching the floor near it finds it, as a rock.
 ## - **The teleport** (`step`): once its secret room is open (`LockDoors.is_open`), a seat's own wizard
 ##   (not a foe it possesses), standing and not spawning in, whose feet come within REACH of either
-##   end's rune, in a room with no fight under way and not sealed (`MapTeleport.calm`), goes to the
+##   end's rune, both its rooms with no fight under way and not sealed (`MapTeleport.calm`), goes to the
 ##   other end alone and materializes there (`MapTeleport.arrive`: as a teleport from the map, the
 ##   stepped vanish where it left). Its seat's runes then rest REST seconds (`rest`, state), so a wizard
 ##   arriving beside a rune is not sent straight back; nobody else moves or waits.
@@ -30,8 +30,8 @@ const REACH: float = 12.0
 ## The side of a hidden rune's square, where its element finds it (`LockDoors.rock_of`), in pixels.
 const ROCK: float = 24.0
 ## Where a wizard arrives from the rune it teleports to (pixels from that rune's middle; then on
-## clear ground): beside it, out of its REACH.
-const ARRIVE: Vector2 = Vector2(0.0, 32.0)
+## clear ground), tried in order for the first that stays out of its REACH: beside it.
+const ARRIVE: Array[Vector2] = [Vector2(0.0, 32.0), Vector2(32.0, 0.0), Vector2(-32.0, 0.0), Vector2(0.0, -32.0), Vector2(0.0, 48.0)]
 ## How long a seat's runes rest after it teleported by one, in seconds.
 const REST: float = 1.0
 ## The radius a rune and an arrival are put on clear ground with (a wizard's footprint).
@@ -57,6 +57,9 @@ var _told: PackedInt32Array = PackedInt32Array()
 ## unset: as it is), keeping off what a room of kind `kind_of.call(room)` (a `RoomKind`, or null)
 ## holds and its props. Every seat rested; the view is told nothing yet (`tell_all`).
 func lay(map: BiomeMap, world: BiomeWorld, kind_of: Callable, on_ground: Callable = Callable()) -> void:
+	if not spots.is_empty():
+		# Runes of a biome before: the view forgets them first.
+		forget(false)
 	spots.resize(0)
 	arrivals.resize(0)
 	rest.fill(0.0)
@@ -77,7 +80,7 @@ func lay(map: BiomeMap, world: BiomeWorld, kind_of: Callable, on_ground: Callabl
 					keep_off.append(Rect2(prop, Vector2.ZERO).grow(PROP_CLEAR))
 			var spot: Vector2 = _put(SpecialPlaces.rune_spot(places, middle, keep_off), on_ground)
 			spots.append(spot)
-			arrivals.append(_put(spot + ARRIVE, on_ground))
+			arrivals.append(_arrival(spot, on_ground))
 
 
 ## No biome: no rune (the view told every one is forgotten, when there was one); every seat rested.
@@ -171,13 +174,13 @@ static func _may_go(wizard: Actor, body: Node2D) -> bool:
 
 
 ## The end of rune `rune` (of `map`) whose rune `wizard`'s feet stand on now, with its secret room
-## found and the room it stands in calm; NONE for none.
+## found and both its rooms calm (it never leaves a fight, nor goes into one past a seal); NONE for none.
 func _end_at(map: BiomeMap, rune: int, wizard: Actor, locks: LockDoors, life: RoomLife) -> int:
 	if not locks.is_open(map.rune_room(rune, 1)):
 		return NONE
 	for end in 2:
 		var room: int = map.rune_room(rune, end)
-		if wizard.room != room or (life != null and not MapTeleport.calm(room, life)):
+		if wizard.room != room or (life != null and not (MapTeleport.calm(room, life) and MapTeleport.calm(map.rune_room(rune, 1 - end), life))):
 			continue
 		if wizard.position.distance_squared_to(spot_of(rune, end)) <= REACH * REACH:
 			return end
@@ -198,6 +201,17 @@ func _tell_found(map: BiomeMap, locks: LockDoors) -> void:
 		_told[rune] = found
 		if events != null:
 			events.secret_rune_shown.emit(rune, spot_of(rune, 0), spot_of(rune, 1), locks.element_of(secret), found == 1)
+
+
+## Where a wizard arrives at the rune at `spot`: the first of ARRIVE that, on clear ground, stays out
+## of the rune's REACH (so it is not sent straight back), else the last tried.
+static func _arrival(spot: Vector2, on_ground: Callable) -> Vector2:
+	var at: Vector2 = spot
+	for offset: Vector2 in ARRIVE:
+		at = _put(spot + offset, on_ground)
+		if at.distance_to(spot) > REACH + 2.0:
+			return at
+	return at
 
 
 static func _put(spot: Vector2, on_ground: Callable) -> Vector2:

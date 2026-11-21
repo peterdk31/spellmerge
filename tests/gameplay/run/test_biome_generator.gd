@@ -908,6 +908,20 @@ func test_the_crypt_s_secret_rooms_take_every_way() -> void:
 		for room in map.rooms():
 			if map.room_kinds[room] == &"secret":
 				check_equal(_secret_way(map, room, shapes), MapRules.SECRET_BRIDGE, "seed %d: the bridge alone: secret room %d by a bridge" % [seed_value, room])
+	# A way weighed 0 is never taken, not even to fall back on (the review's): wall to wall alone
+	# never gives a bridge or a rune, however often the wall finds no place (then another attempt).
+	var only_walls := crypt.copied()
+	only_walls.biomes[0].secret_ways = PackedFloat32Array([0.0, 1.0, 0.0])
+	var walls: int = 0
+	for seed_value in range(1, 25):
+		var map: BiomeMap = BiomeGenerator.generate(only_walls, content, shapes, _sim(seed_value))
+		if not map.is_made():
+			continue
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret":
+				check_equal(_secret_way(map, room, shapes), MapRules.SECRET_WALL, "seed %d: wall to wall alone: secret room %d against a wall" % [seed_value, room])
+				walls += 1
+	check(walls > 0, "wall-to-wall rooms placed: %d" % walls)
 
 
 ## How secret room `room` of `map` is reached (`MapRules.SECRET_*`).
@@ -923,3 +937,41 @@ func _bridge_to(map: BiomeMap, room: int) -> int:
 		if map.end_room(bridge, 0) == room or map.end_room(bridge, 1) == room:
 			return bridge
 	return -1
+
+
+## The owner, 2026-11-20 (on #895): more rooms with more than one way in. The crypt's styles with no
+## loop pull lean toward placements that leave doorways for the extra entrances (`MapStyle.
+## entrance_pull`); over crypt seeds 1 to 200 the maps with an extra entrance and the bridges past a
+## tree are more than with no lean, every map still keeping every rule (the sweep's own checks).
+func test_the_styles_lean_toward_extra_entrances() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var leans: int = 0
+	for style: MapStyle in crypt.biomes[0].styles:
+		if style.loop_pull <= 0.0:
+			check(style.entrance_pull > 0.0, "the crypt's %s style leans toward extra entrances" % style.id)
+			leans += 1
+	check(leans >= 3, "the crypt's styles that close no loop lean")
+	var flat := crypt.copied()
+	for style: MapStyle in flat.biomes[0].styles:
+		style.entrance_pull = 0.0
+	var counts: Array = []
+	for definition: RunDefinition in [flat, crypt]:
+		var maps: int = 0
+		var extra: int = 0
+		var unsound: int = 0
+		for seed_value in range(1, 201):
+			var map: BiomeMap = BiomeGenerator.generate(definition, content, shapes, _sim(seed_value))
+			if not map.is_made() or not BiomeGenerator.rule_problems(map, definition.biomes[0], content, shapes).is_empty():
+				unsound += 1
+				continue
+			var past_tree: int = map.bridges() + map.runes() - (map.rooms() - 1)
+			extra += past_tree
+			maps += 1 if past_tree > 0 else 0
+		check_equal(unsound, 0, "every map made and sound")
+		counts.append([extra, maps])
+	print("bridges past a tree over crypt seeds 1 to 200 (bridges, maps): no lean %s, the crypt's lean %s" % [counts[0], counts[1]])
+	check(counts[1][0] > counts[0][0] and counts[1][1] > counts[0][1], "more extra bridges, in more maps, with the lean: %s against %s" % [counts[1], counts[0]])

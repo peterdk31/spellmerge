@@ -788,6 +788,9 @@ func test_a_sensed_secret_room_comes_in_through_its_own_void_light() -> void:
 	events.rooms_seen.emit(seen, false)
 	view.step(0.0, actors, 1, _grid(), views)
 	check(not view.draws(EAST), "shown but not found: the party's map does not draw a secret room")
+	for bridge in map.bridges():
+		if map.end_room(bridge, 0) == EAST or map.end_room(bridge, 1) == EAST:
+			check(not view.draws(map.rooms() + bridge), "nor its bridge (no bridge into the dark, the secret kept: the review's)")
 	check_equal(view.drawn_colour(0, EAST), Palette.shades_of(&"void")[1], "still sensed, in the void's faint light")
 	# Found (its rock broken), the party's map takes it over: it steps down through the void's shadow
 	# to the stone's, never in one jump (the review's).
@@ -801,6 +804,56 @@ func test_a_sensed_secret_room_comes_in_through_its_own_void_light() -> void:
 	var stone: PackedColorArray = Palette.shades_of(&"stone")
 	var voids: PackedColorArray = Palette.shades_of(&"void")
 	check_equal(looks, [voids[1], voids[0], stone[0]] as Array[Color], "void light, void shadow, then the stone's shadow of a room shown, a look a frame")
+
+
+## The owner, 2026-11-20 (on #895): a room only known through a bridge, drawn in the stone's shadow,
+## comes in through stages on an open map (a quarter of its pixels, half, all: whole pixels, never a
+## fade), not in one step; its bridge with it. Found here while the map is open: a secret room.
+func test_a_room_known_through_a_bridge_comes_in_by_stages() -> void:
+	var map: BiomeMap = _start_kinds(1, &"secret", &"fight")
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	var views: ScreenViewsScript = _two_views()
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), views)
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+	check_equal(view.in_stage_of(EAST), PartyMapViewScript.IN_STAGES, "the court, drawn as the map opened, whole")
+	check_equal(view.in_stage_of(WEST), 0, "the secret room not drawn")
+	var to_secret: int = -1
+	for bridge in map.bridges():
+		if map.end_room(bridge, 0) == WEST or map.end_room(bridge, 1) == WEST:
+			to_secret = map.rooms() + bridge
+	flow.locks.open(WEST, _grid())
+	view.step(0.0, actors, 1, _grid(), views)
+	var stages: Array[int] = []
+	var shades: Array[int] = []
+	var bridge_stages: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+		stages.append(view.in_stage_of(WEST))
+		shades.append(view.shade_of(WEST))
+		bridge_stages.append(view.in_stage_of(to_secret))
+	check_equal(stages.slice(0, 3), [1, 2, 3] as Array[int], "known through its bridge: a quarter, half, then all of it, a stage a frame")
+	check_equal(shades.slice(0, 3), [1, 1, 1] as Array[int], "in the stone's shadow all through")
+	check_equal(bridge_stages.slice(0, 3), [1, 2, 3] as Array[int], "its bridge with it")
+	check(PartyMapViewScript.IN_STAGES >= 3, "at least 3 stages (Smooth)")
+	# The thinned floors keep what the stage before drew.
+	var floor := Image.create(6, 4, false, Image.FORMAT_RGBA8)
+	floor.fill(Color.WHITE)
+	var quarter: Image = PartyMapViewScript.thinned(ImageTexture.create_from_image(floor), 1).get_image()
+	var half: Image = PartyMapViewScript.thinned(ImageTexture.create_from_image(floor), 2).get_image()
+	var kept: int = 0
+	var lost: int = 0
+	for y in 4:
+		for x in 6:
+			kept += 1 if half.get_pixel(x, y).a > 0.0 else 0
+			if quarter.get_pixel(x, y).a > 0.0 and half.get_pixel(x, y).a == 0.0:
+				lost += 1
+	check_equal(kept, 12, "half its pixels at the second stage")
+	check_equal(lost, 0, "the first stage's pixels kept at the second")
 
 
 func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reopens() -> void:

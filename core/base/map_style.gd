@@ -14,6 +14,11 @@ extends Resource
 ## - `loops`: how many extra bridges the generator closes between rooms already placed, where two
 ##   free sockets meet a bridge's ends (a loop), and `loop_pull` how much it favours placing a room
 ##   where such a bridge will fit (each such pair adds this much to a placement's weight of 1).
+## - `entrance_pull` (the owner, 2026-11-20, on #895: more rooms with more than one way in): in a style
+##   with no `loop_pull`, how much it favours, among a template's placements, one that leaves two free
+##   doorways a walkway apart where a bridge would keep the rules, for the extra entrances (step 5b)
+##   to join (each such pair adds this much to the placement's weight of 1). A small lean: the template
+##   is still picked by chance, then its placements weighed.
 
 ## The most loops a style may ask for (the editor's range; a rule change may not pass it either).
 const MOST_LOOPS: int = 8
@@ -34,6 +39,8 @@ const MOST_PULL: float = 10000.0
 @export_range(0, 8) var loops: int = 0
 ## How much it favours a placement where a loop's bridge will fit (0: not at all).
 @export_range(0.0, 10000.0, 0.1) var loop_pull: float = 0.0
+## How much it favours a placement that leaves doorways for an extra entrance (0: not at all).
+@export_range(0.0, 10000.0, 0.1) var entrance_pull: float = 0.0
 
 
 ## A style `of_id` of these numbers (tests, made-up content).
@@ -61,8 +68,8 @@ func problems(what: String) -> PackedStringArray:
 		found.append("%s: way_share %s; 0 to 1." % [named, way_share])
 	if not (branch_chain >= 0.0 and branch_chain <= 1.0):
 		found.append("%s: branch_chain %s; 0 to 1." % [named, branch_chain])
-	if not (hub_pull >= 0.0 and hub_pull <= MOST_PULL) or not (loop_pull >= 0.0 and loop_pull <= MOST_PULL):
-		found.append("%s: hub_pull %s and loop_pull %s; 0 to %s." % [named, hub_pull, loop_pull, MOST_PULL])
+	if not (hub_pull >= 0.0 and hub_pull <= MOST_PULL) or not (loop_pull >= 0.0 and loop_pull <= MOST_PULL) or not (entrance_pull >= 0.0 and entrance_pull <= MOST_PULL):
+		found.append("%s: hub_pull %s, loop_pull %s and entrance_pull %s; 0 to %s." % [named, hub_pull, loop_pull, entrance_pull, MOST_PULL])
 	if loops < 0 or loops > MOST_LOOPS:
 		found.append("%s: loops %d; 0 to %d." % [named, loops, MOST_LOOPS])
 	return found

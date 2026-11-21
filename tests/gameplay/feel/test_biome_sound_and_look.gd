@@ -239,10 +239,6 @@ func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 	check_equal(dark.stage_of(2), darkest, "the court stays dark")
 
 
-## The owner, 2026-11-20: the bridge to a secret room is hidden until the secret is found: pure void,
-## its doorway the room's lip (the rock stands there). Found, it builds out from the room it leaves
-## a band a frame, each pixel stepping through the dark's stages, toward the secret room; a restore
-## draws it as it stands, hidden or whole.
 ## The owner's secret ways (2026-11-20): a secret room standing wall to wall with the nave, joined by
 ## a seam: the seam is hidden as a secret room's bridge is (pure void, the nave's doorway its lip,
 ## never over the nave's slab), and once the cracked wall breaks it opens in stages, its end at the
@@ -270,6 +266,10 @@ func test_a_wall_to_wall_secret_rooms_seam_is_hidden_until_found_then_opens_in_s
 	check_equal(dark.covered_of(seam), Rect2(), "and is not covered once open")
 
 
+## The owner, 2026-11-20: the bridge to a secret room is hidden until the secret is found: pure void,
+## its doorway the room's lip (the rock stands there). Found, it builds out from the room it leaves
+## a band a frame, each pixel stepping through the dark's stages, toward the secret room; a restore
+## draws it as it stands, hidden or whole.
 func test_a_secret_rooms_bridge_is_hidden_until_found_then_builds_out_in_stages() -> void:
 	var map: BiomeMap = BiomeMaps.split(registry)
 	map.room_kinds[1] = &"secret"
@@ -335,8 +335,18 @@ func test_a_secret_rooms_bridge_is_hidden_until_found_then_builds_out_in_stages(
 ## bridge's own ends.
 func test_only_a_bridge_that_reaches_a_secret_room_is_hidden() -> void:
 	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
-	for seed_value: int in [73, 120]:
-		var map: BiomeMap = BiomeGenerator.generate(crypt, registry.run_content(), registry.piece_shapes(&"crypt"), Sim.seeded(seed_value))
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	# The first two seeds whose map has the case (a bridge touching a secret room it does not reach).
+	var seeds: Array[int] = []
+	for seed_value in range(1, 300):
+		var made: BiomeMap = BiomeGenerator.generate(crypt, registry.run_content(), shapes, Sim.seeded(seed_value))
+		if _bridge_beside_a_secret(made, shapes):
+			seeds.append(seed_value)
+			if seeds.size() == 2:
+				break
+	check_equal(seeds.size(), 2, "maps with a bridge beside a secret room it does not reach")
+	for seed_value: int in seeds:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, registry.run_content(), shapes, Sim.seeded(seed_value))
 		var fights: Array[RoomFight] = []
 		for room in map.rooms():
 			fights.append(RoomFight.new())
@@ -364,6 +374,16 @@ func test_only_a_bridge_that_reaches_a_secret_room_is_hidden() -> void:
 					beside = beside or flow.biome.bridge_rect(bridge).grow(RoomHearingScript.TOUCH).intersects(flow.biome.room_rect(room))
 		check(beside, "seed %d: a bridge lies beside a secret room it does not reach" % seed_value)
 		flow.stop_run()
+
+
+## True when a bridge of `map` lies within RoomHearing's TOUCH of a secret room it does not reach.
+func _bridge_beside_a_secret(map: BiomeMap, shapes: Dictionary) -> bool:
+	for bridge in map.bridges():
+		var rect: Rect2 = map.bridge_shape(bridge, shapes).rect_at(map.bridge_places[bridge]).grow(RoomHearingScript.TOUCH)
+		for room in map.rooms():
+			if map.room_kinds[room] == &"secret" and map.end_room(bridge, 0) != room and map.end_room(bridge, 1) != room and rect.intersects(map.room_shape(room, shapes).rect_at(map.room_places[room])):
+				return true
+	return false
 
 
 ## Each stage between covered and lit is a block of whole black pixels round a block's middle,

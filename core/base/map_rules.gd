@@ -55,7 +55,7 @@ const SECRET_WAYS: int = 3
 ## built out once its rock breaks), SECRET_WALL (wall to wall: the room against another's wall, the
 ## cracked wall a seam's short doorway, `RoomBase.seam`) and SECRET_RUNE (no join at all: a hidden rune
 ## in another room, once found, teleports a wizard to the room and back). A way that cannot be placed
-## falls back to the next of the three in that order. The default: the hidden bridge alone.
+## falls back to the others weighing above 0, in that order (a way weighed 0 is never taken). The default: the hidden bridge alone.
 @export var secret_ways: PackedFloat32Array = PackedFloat32Array([1.0, 0.0, 0.0])
 
 @export_group("Elites")

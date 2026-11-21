@@ -47,7 +47,7 @@ extends RefCounted
 ## it hangs off, their slabs' dark margins touching, by a seam: `RoomBase.seam`, the short doorway its
 ## cracked wall opens; the pair's GAP waived) or a **rune** (placed where a walkway off one of that
 ## room's free sockets would take it, but joined by no piece: a rune, `BiomeMap.add_rune`, the socket
-## left free). A way with no placement falls back to the others, in that order. The rules hold as for
+## left free). A way with no placement falls back to the others the rules weigh, in that order. The rules hold as for
 ## any dead end: one join, never a loop's or an extra entrance's.
 ##
 ## A line with no limit (the fights) fills the rooms past the fixed and chance ones only while a
@@ -636,7 +636,8 @@ class Growth:
 		var first: int = secret_dice.pick(0, weights) if secret_dice != null else MapRules.SECRET_BRIDGE
 		var order := PackedInt32Array([first])
 		for way in MapRules.SECRET_WAYS:
-			if way != first:
+			# Only a way the rules weigh: weighed 0, it is never taken, not even to fall back on.
+			if way != first and weights[way] > 0.0:
 				order.append(way)
 		var why: String = ""
 		for way: int in order:
@@ -722,7 +723,11 @@ class Growth:
 				hosts.append(room)
 		if hosts.is_empty():
 			return "every %s template hosting '%s' with %d sockets stands in the biome already." % [rules.biome, rule.kind, sockets]
-		var pull: float = style.loop_pull if not (rule.dead_end or rule.stands_deepest()) else 0.0
+		var opens: bool = not (rule.dead_end or rule.stands_deepest())
+		var pull: float = style.loop_pull if opens else 0.0
+		# A style with no loop pull may still lean toward doorways for the extra entrances, among the
+		# placements of the template picked (`MapStyle.entrance_pull`).
+		var lean: float = pull if pull > 0.0 else (style.entrance_pull if opens else 0.0)
 		while not hosts.is_empty():
 			# A style that closes loops weighs every template's placements at once (a loop's corner
 			# is rare, so it is looked for wherever it is); any other takes a template by chance.
@@ -736,7 +741,7 @@ class Growth:
 			var found_weights := PackedFloat32Array()
 			for host: RoomBase in trying:
 				for k in parents.size():
-					_gather(parents[k], weights[k], pull, host.id, rule.kind, found, found_weights)
+					_gather(parents[k], weights[k], lean, host.id, rule.kind, found, found_weights)
 			if found.is_empty():
 				continue
 			var pick: Array = found[dice.pick(Step.PLACE, found_weights)]

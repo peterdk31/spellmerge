@@ -199,6 +199,15 @@ func test_a_rune_takes_nobody_out_of_a_fight() -> void:
 	flow.life.set_flag(NAVE, RoomLife.SEALED, false)
 	_ticks(2)
 	check_equal(_wizard(0).room, SECRET, "unsealed, it goes")
+	# Nor into one past its seal (the review's): the nave sealed, the rune back takes nobody there.
+	_ticks(int((SecretRunes.REST + MapTeleport.ARRIVE_SECONDS) / DT) + 2)
+	flow.life.set_flag(NAVE, RoomLife.SEALED, true)
+	_put(0, flow.runes.spot_of(0, 1))
+	check_equal(_wizard(0).room, SECRET, "never into a sealed room")
+	flow.life.set_flag(NAVE, RoomLife.SEALED, false)
+	_ticks(2)
+	check_equal(_wizard(0).room, NAVE, "unsealed, it goes back")
+	check(_wizard(0).position.distance_to(flow.runes.spot_of(0, 0)) > SecretRunes.REACH, "arriving out of the rune's reach")
 
 
 func test_a_rune_teleport_is_the_same_after_a_snapshot_restore() -> void:

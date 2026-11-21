@@ -87,12 +87,14 @@ script = ExtResource("7_style")
 id = &"long"
 way_share = 0.75
 branch_chain = 0.2
+entrance_pull = 40.0
 
 [sub_resource type="Resource" id="style_branching"]
 script = ExtResource("7_style")
 id = &"branching"
 way_share = 0.4
 branch_chain = 0.6
+entrance_pull = 40.0
 
 [sub_resource type="Resource" id="style_loop"]
 script = ExtResource("7_style")
@@ -108,6 +110,7 @@ id = &"hub"
 way_share = 0.35
 branch_chain = 0.05
 hub_pull = 6.0
+entrance_pull = 40.0
 
 [sub_resource type="Resource" id="crypt"]
 script = ExtResource("2_rules")

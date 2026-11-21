@@ -39,10 +39,3 @@ vec4 light_pass_at(vec2 uv, vec2 pixel) {
 	}
 	return texelFetch(light_pass_0, at, 0);
 }
-
-// The middle of the block the picture's pixel at `uv` is in (a `SCREEN_UV`): where its pass read the
-// light, so what is read there is the block's whole.
-vec2 light_pass_middle(vec2 uv, vec2 pixel) {
-	float s = float(max(light_pass_scale, 1));
-	return (vec2(light_pass_block(uv, pixel)) + 0.5) * s * pixel;
-}

@@ -3,7 +3,7 @@ extends RefCounted
 ## lighting"): the spell light worked out on a coarse grid of world cells, CELL px each way, in
 ## place of a light buffer drawn by the GPU. The spell light's (`spell_light.gd`): it hands over the
 ## rows it is handed (the shots', runes', flashes', cues', spots' and carried lights', each in the
-## row format `light.gdshader` reads: ROWS_*), the live beams' paths and the boxes that block light;
+## row format the GPU's light read before, light.gdshader's: ROWS_*), the live beams' paths and the boxes that block light;
 ## this works the light out at each cell's middle with the shader's falloff and blocking, and writes
 ## one small texture (`texture`) that every reader of the light samples by its world place
 ## (`light_grid.gdshaderinc`): whole cells (hard steps, never blurred), then cut into the light's
@@ -16,7 +16,7 @@ extends RefCounted
 ## - **A frame:** `clear`, then `add_rows` for each batch of rows and `add_beam` for each beam, then
 ##   `bake` writes the bytes and hands them to the texture. Each light adds its colour times
 ##   (1 - its distance from its middle as a share of its reach)² at every cell whose middle it reaches
-##   (`light.gdshader`'s falloff, its ellipse along its way), blocked as the shader blocks it
+##   (the GPU light's falloff, its ellipse along its way), blocked as the shader blocks it
 ##   (`LightBlockers.shade_between`, the boxes near it only); the cells add up and are cut at 1.
 ## - **Native:** while the module is loaded, `add_rows`, `add_beam` and `bake` run in `MoteKernel`
 ##   (`light_grid_rows`, `light_grid_beam`, `light_grid_bake`), on this object's arrays in place, to
@@ -43,13 +43,13 @@ const VIEWS_MOST: int = 4
 const VIEW_CELLS_MOST: int = 512
 ## Floats a light row holds (SpellLight.STRIDE: a 2D transform, a colour, custom data).
 const STRIDE: int = 16
-## How the rows of `add_rows` read (SpellLight.ROWS_*; light.gdshader's).
+## How the rows of `add_rows` read (SpellLight.ROWS_*; the GPU light's once).
 const ROWS_SHOT: int = 0
 const ROWS_RUNE: int = 1
 const ROWS_FLASH: int = 2
 const ROWS_SPOT: int = 3
 const ROWS_CUE: int = 4
-## light.gdshader's numbers.
+## The GPU light's numbers (light.gdshader's, before grid lighting).
 const SHOT_STRENGTH: float = 0.9
 const RUNE_STRENGTH: float = 0.55
 const SHOT_REACH: float = 26.0
@@ -136,12 +136,16 @@ func set_cell(size: float) -> void:
 	cell = maxf(size, 4.0)
 
 
-## The infusion table (InfusionTable.of_registry: a tint a look layer, alpha MARK for one) the
-## colours' palettes read.
+## The infusion table (InfusionTable.of_registry or `published`: a tint a look layer, alpha above 0
+## for one) the colours' palettes read, as the shaders read it: each tint a byte a channel with alpha
+## INFUSION_MARK (InfusionTable.texture), every other layer none.
 func use_tints(table: PackedColorArray) -> void:
-	tints = table.duplicate()
-	if tints.size() < 32:
-		tints.resize(32)
+	for layer in tints.size():
+		var tint: Color = table[layer] if layer < table.size() else Color(0, 0, 0, 0)
+		if tint.a > 0.0:
+			tints[layer] = Color(roundf(tint.r * 255.0) / 255.0, roundf(tint.g * 255.0) / 255.0, roundf(tint.b * 255.0) / 255.0, INFUSION_MARK)
+		else:
+			tints[layer] = Color(0, 0, 0, 0)
 
 
 ## The boxes that block light (LightBlockers' `boxes` and `bodies`, `count` of them).
@@ -181,7 +185,7 @@ func clear() -> void:
 
 
 ## The light of the first `count` rows of `rows` (STRIDE floats each), read as `kind` says (ROWS_*):
-## `reach` and `pad` a flash's (light.gdshader's `flash_reach`, `flash_pad`), `now` the clock a spot's
+## `reach` and `pad` a flash's (the GPU light's `flash_reach`, `flash_pad`), `now` the clock a spot's
 ## flicker steps by, and `blocked` whether the boxes stop it (SpellLight.SHOTS_BLOCKED for shots and
 ## runes).
 func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad: float, now: float, blocked: bool) -> void:
@@ -305,7 +309,7 @@ func _grow(width: int, height: int) -> void:
 	texture = ImageTexture.create_from_image(_image)
 
 
-# --- One row (light.gdshader's vertex stage, then its fragment stage at each cell) ------------------
+# --- One row (the GPU light's vertex stage, then its fragment stage at each cell) ------------------
 
 func _row(rows: PackedFloat32Array, at: int, kind: int, reach: float, pad: float, now: float, blocked: bool) -> void:
 	var cx: float = rows[at + 3]

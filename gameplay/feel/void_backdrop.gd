@@ -5,7 +5,8 @@ extends Node2D
 ## of a split screen alike (they share the world). Its sparse drifting motes are the spectacle's
 ## (`Spectacle.void_air`). Outside a biome (a world with no places: the hub, a single room) it draws
 ## nothing and the world is as before. The dark of unentered rooms is the same black
-## (`unseen_dark.gd`), so a room nobody has been in is one with the void until it is lit.
+## (`unseen_dark.gd`), and the void's motes drift over it too (`Spectacle.void_pool`, drawn over that
+## dark), so a room nobody has been in is one with the void until it is lit.
 ##
 ## A child of Feel, top level (world space), at the lowest z there is. Drawn again only when the
 ## bounds change; nothing is allocated in a frame. View only.

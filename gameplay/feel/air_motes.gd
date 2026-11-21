@@ -29,6 +29,8 @@ const VIEW_MARGIN: float = 32.0
 const RING_SHARE: float = 0.125
 ## How many points a mote that must leave from outside every place tries (`give_off`'s `outside`).
 const OUTSIDE_TRIES: int = 4
+## No rectangles: nothing inside a place counts as the void (`give_off`'s `shown_void`).
+const NO_RECTS: Array[Rect2] = []
 
 ## The air given off (null: none), its colours as the ramp table's sources, and motes owed (a part
 ## of one). Read only.
@@ -92,17 +94,19 @@ static func area_of(view: Rect2, bounds: Rect2) -> Rect2:
 ## motes' ring at once (RING_SHARE for the room's air; a kind's air in each of its rooms takes a part
 ## of its own, gameplay/feel/kind_air.gd). With `outside` (a grid with places) a mote leaves only
 ## from a point in none of its places (the void between a biome's slabs, `void_air`): a point inside
-## one is drawn again up to OUTSIDE_TRIES times, then that mote is not given off.
-func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null) -> void:
+## one is drawn again up to OUTSIDE_TRIES times, then that mote is not given off. A point in one of
+## `shown_void`'s rectangles counts as outside (the places the void covers: an unvisited room is the
+## void until it is entered, the owner, 2026-11-21; `UnseenDark.void_covers`).
+func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null, shown_void: Array[Rect2] = NO_RECTS) -> void:
 	_one.set_one(view)
-	give_off_in(now, pool, _one, bounds, share, outside)
+	give_off_in(now, pool, _one, bounds, share, outside, shown_void)
 
 
 ## As `give_off`, over each of the views' boxes `seen` (each within VIEW_MARGIN, in `bounds`; none:
 ## all of `bounds`) at the rate for the floor they cover together, a part two views both show
 ## counted once (`ViewBoxes.pick`): split, each view's air is as thick as one picture's (the owner,
 ## 2026-11-20), and nothing is given off over the rooms and the void between the views.
-func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null) -> void:
+func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: Rect2, share: float = RING_SHARE, outside: RoomGrid = null, shown_void: Array[Rect2] = NO_RECTS) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
 	if look == null or pool == null:
@@ -129,10 +133,10 @@ func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: R
 		var at: Vector2 = _point(seen, bounds)
 		if outside != null:
 			var tries: int = 1
-			while at.is_finite() and outside.place_at(at) != RoomGrid.NO_PLACE and tries < OUTSIDE_TRIES:
+			while at.is_finite() and not is_void(at, outside, shown_void) and tries < OUTSIDE_TRIES:
 				at = _point(seen, bounds)
 				tries += 1
-			if at.is_finite() and outside.place_at(at) != RoomGrid.NO_PLACE:
+			if at.is_finite() and not is_void(at, outside, shown_void):
 				continue
 		if not at.is_finite():
 			continue
@@ -140,6 +144,16 @@ func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: R
 		pool.throw_part(k, at, look.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 		given_box = given_box.expand(at) if given > 0 else Rect2(at, Vector2.ZERO)
 		given += 1
+
+
+## Whether `at` shows the void: in none of `grid`'s places, or in one of `shown_void`'s rectangles.
+static func is_void(at: Vector2, grid: RoomGrid, shown_void: Array[Rect2]) -> bool:
+	if grid.place_at(at) == RoomGrid.NO_PLACE:
+		return true
+	for rect in shown_void:
+		if rect.has_point(at):
+			return true
+	return false
 
 
 ## A point to give a mote off from: in the views' boxes `seen` (INF: one in an earlier box's part,

@@ -72,10 +72,9 @@ static func may_go(wizard: Actor, driven: Node2D, life: RoomLife, map: BiomeMap)
 static func rooms_for(wizard: Actor, driven: Node2D, life: RoomLife, map: BiomeMap) -> int:
 	if not may_go(wizard, driven, life, map):
 		return 0
-	var rooms: int = 0
-	for room in mini(life.rooms(), 63):
-		if room != wizard.room and life.has(room, RoomLife.CLEARED):
-			rooms |= 1 << room
+	var rooms: int = life.rooms_with(RoomLife.CLEARED)
+	if wizard.room >= 0 and wizard.room < 63:
+		rooms &= ~(1 << wizard.room)
 	return rooms
 
 

@@ -33,7 +33,7 @@ const SEALED: int = 4
 const CLEARED: int = 8
 
 ## Not state: scratch reused each tick (the open ids, the places shots are in).
-const DERIVED: Array[StringName] = [&"_ids", &"_shot_places"]
+const DERIVED: Array[StringName] = [&"_ids", &"_shot_places", &"_places"]
 
 ## Each room's flags, by its number.
 var flags: PackedByteArray = PackedByteArray()
@@ -43,6 +43,8 @@ var fights: Array[RoomFight] = []
 var awake: PackedByteArray = PackedByteArray()
 var _ids: PackedInt32Array = PackedInt32Array()
 var _shot_places: PackedByteArray = PackedByteArray()
+## Scratch: each open body's place this tick, in `_ids`' order (`wake`).
+var _places: PackedInt32Array = PackedInt32Array()
 
 
 ## A biome's life begins: `rooms` rooms, each its fight of `room_fights` (a room past their end has
@@ -73,6 +75,15 @@ func rooms() -> int:
 ## True when room `room` has `flag` (ENTERED, STARTED, SEALED, CLEARED).
 func has(room: int, flag: int) -> bool:
 	return room >= 0 and room < flags.size() and (flags[room] & flag) != 0
+
+
+## The rooms below 63 that have `flag`, a bit a room (room `r` is `1 << r`).
+func rooms_with(flag: int) -> int:
+	var mask: int = 0
+	for room in mini(flags.size(), 63):
+		if (flags[room] & flag) != 0:
+			mask |= 1 << room
+	return mask
 
 
 func set_flag(room: int, flag: int, on: bool) -> void:
@@ -112,29 +123,34 @@ func tell_seals(grid: RoomGrid) -> void:
 
 ## One tick's waking (see the class doc): every open body's place made current (`Actor.find_room`),
 ## each place awake while a body that acts or a shot is in it, and every body of a sleeping place
-## asleep in the actor table (`Actors.set_asleep`), the rest awake; the places' sleep told to the
+## asleep in the actor table (`Actors.sleep_with_places`), the rest awake; the places' sleep told to the
 ## projectile manager's grid (`tell_awake`).
 func wake(table: ActorsScript, projectiles: ProjectileManagerScript) -> void:
 	if table == null or awake.is_empty():
 		return
 	awake.fill(0)
 	var count: int = table.open_ids(_ids)
+	if _places.size() < count:
+		_places.resize(count)
+	# Each body is looked up once: its place is kept for the second pass (the performance pass,
+	# 2026-11-21; the shots' places between move no body).
 	for n in count:
 		var body := table.node_of(_ids[n]) as Actor
-		if body == null or not body.is_inside_tree():
+		if body == null:
+			_places[n] = RoomGrid.NO_PLACE
 			continue
-		body.find_room()
-		if body.room >= 0 and body.room < awake.size() and keeps_awake(body, table):
-			awake[body.room] = 1
+		if body.is_inside_tree():
+			body.find_room()
+			# A place already awake is not asked again (`keeps_awake` changes nothing).
+			if body.room >= 0 and body.room < awake.size() and awake[body.room] == 0 and keeps_awake(body, table):
+				awake[body.room] = 1
+		_places[n] = body.room
 	if projectiles != null:
 		projectiles.shot_places(projectiles.grid(), _shot_places)
 		for place in mini(awake.size(), _shot_places.size()):
 			if _shot_places[place] != 0:
 				awake[place] = 1
-	for n in count:
-		var body := table.node_of(_ids[n]) as Actor
-		var place: int = body.room if body != null else RoomGrid.NO_PLACE
-		table.set_asleep(_ids[n], place >= 0 and place < awake.size() and awake[place] == 0)
+	table.sleep_with_places(_ids, count, _places, awake)
 	if projectiles != null:
 		tell_awake(projectiles.grid())
 

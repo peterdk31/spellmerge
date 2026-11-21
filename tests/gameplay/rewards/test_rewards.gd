@@ -888,3 +888,22 @@ func test_the_coins_held_all_along_are_state() -> void:
 	check(problems.is_empty(), "restored: %s" % [problems])
 	check_equal(foe.inventory.carried_kept(), 4, "the four held all along again")
 	check_equal(SimHash.of(foe.inventory), before, "the same state")
+
+
+## The performance pass (2026-11-21, round C): the standing wizards' feet are found once for every
+## coin lying (found again after a take); each coin still goes to the first seat whose feet reach it.
+func test_each_coin_goes_to_the_feet_that_reach_it() -> void:
+	_wizard(0, Vector2(0, 0))
+	_wizard(1, Vector2(300, 0))
+	_tick()
+	var picked: Array = []
+	_world.bus.item_picked_up.connect(func(actor: int, _kind: StringName, _id: StringName, at: Vector2) -> void: picked.append([actor, at]))
+	_rewards.lay_coin(Vector2(300, 4))
+	_rewards.lay_coin(Vector2(600, 0))
+	_rewards.lay_coin(Vector2(2, 0))
+	_tick()
+	check_equal(_rewards.coins_lying(), PackedVector2Array([Vector2(600, 0)]), "the coin nobody reaches lies there still")
+	check_equal(picked.size(), 2, "two taken")
+	var p1: int = _world.table.actor_of_seat(0)
+	var p2: int = _world.table.actor_of_seat(1)
+	check(picked.has([p2, Vector2(300, 4)]) and picked.has([p1, Vector2(2, 0)]), "each by the wizard standing on it (%s)" % str(picked))

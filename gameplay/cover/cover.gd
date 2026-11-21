@@ -334,9 +334,11 @@ func step(delta: float) -> void:
 			continue
 		if grid == null or grid.is_awake(number):
 			room.step_cells(delta, game, number)
-		may_harm = may_harm or room.may_harm()
-	# With every cell at rest, none harmful at rest and nobody harmed, no body can be harmed: the
-	# bodies are not looked at (what a room at rest costs, GC6).
+		if not may_harm:
+			may_harm = not room.harms_nobody()
+	# With no cell in a state that gives a status and nobody harmed, no body can be harmed: the
+	# bodies are not looked at (what a room at rest costs, GC6; a room's cobwebs no longer count
+	# while none of its cells is in a harming state, the performance pass, 2026-11-21).
 	if may_harm:
 		_affect_bodies(delta)
 	_flush()
@@ -364,14 +366,19 @@ func _affect_bodies(delta: float) -> void:
 	var count: int = actors.open_ids(_ids) if actors != null else 0
 	var old: int = 0
 	var harmed: int = 0
+	var asleep: PackedByteArray = actors.asleep if actors != null else PackedByteArray()
 	for n in count:
 		var id: int = _ids[n]
+		while old < _harm_ids.size() and _harm_ids[old] < id:
+			old += 1
+		if asleep[id] != 0 and (old >= _harm_ids.size() or _harm_ids[old] != id):
+			# Asleep and not being harmed: nothing to keep and nothing to ask (looked at first, the
+			# performance pass, 2026-11-21: most bodies of a biome sleep).
+			continue
 		var body := actors.node_of(id) as Node2D
 		if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 			continue
 		var key: int = actors.key_of(id)
-		while old < _harm_ids.size() and _harm_ids[old] < id:
-			old += 1
 		var kept: bool = old < _harm_ids.size() and _harm_ids[old] == id and _harm_keys[old] == key
 		if actors.asleep[id] != 0:
 			# Asleep with its place: its time waits as it is.
@@ -384,7 +391,8 @@ func _affect_bodies(delta: float) -> void:
 		var left: float = _harm_left[old] - delta if kept else 0.0
 		var at: Vector2 = body.global_position
 		var number: int = room_at(at)
-		var state: CoverState = _rooms[number].cover_state_at(_rooms[number].layout.cell_of(at)) if number >= 0 else null
+		# A room none of whose cells harms now gives nothing, whatever cell it stands in.
+		var state: CoverState = _rooms[number].cover_state_at(_rooms[number].layout.cell_of(at)) if number >= 0 and not _rooms[number].harms_nobody() else null
 		if state == null or state.status == &"":
 			# Out of harmful cover: its time runs on, and it is dropped once it is out.
 			if left > 0.0:

@@ -13,7 +13,9 @@ extends Node2D
 ##
 ## **A frame** (`step`): the first view finds the bodies (the nearest the camera's middle, as ever);
 ## every other view with cover takes the same ones (`step_with`), so they are gathered once. Every
-## view steps, wherever its room lies: the wind and a trample are look only, and cheap at rest.
+## view steps, wherever its room lies: the wind and a trample are look only, and cheap at rest. A
+## view switched off that no body found reaches (`found_box`) walks none of them and takes them only
+## when shown again, and a room far out of the picture rolls no motes (`CoverMotes.give_off`).
 ##
 ## Pure view: nothing here is the game's, and nothing here is read by the simulation.
 
@@ -102,7 +104,7 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 	for number in range(1, _views.size()):
 		var other: CoverScript = _views[number]
 		if other.layout != null and not other.batches().is_empty():
-			other.step_with(lead.bodies(), lead.body_count(), now, pool, view, stirs_version, hand_stirs)
+			other.step_with(lead.bodies(), lead.body_count(), now, pool, view, stirs_version, hand_stirs, lead.found_box())
 
 
 ## A view for piece `number`, a child of this node.

@@ -138,6 +138,27 @@ func test_none_with_the_particles_off_nor_far_from_the_view() -> void:
 	check(motes.given > 0, "a view over it: some")
 
 
+func test_a_room_far_from_the_view_rolls_nothing_and_comes_back_at_its_rate() -> void:
+	# The performance pass of 2026-11-21: a room whose every cell is far from the view rolls no dice
+	# (they were rolled and every mote passed by), keeping only the part of a mote it owes, so
+	# nothing it saved up bursts out when the view comes back.
+	var kind: CoverKind = _grass(20.0)
+	var motes: CoverMotesScript = _motes(kind)
+	var pool: MotesScript = _pool()
+	for x in 4:
+		motes.show(_cell(12 + x, 13), BURNING)
+	var rolled: int = motes._rng.state
+	_frames(motes, pool, 120, Rect2(2000, 2000, 320, 180))
+	check_equal(motes.given, 0, "far away: none given off")
+	check_equal(motes._rng.state, rolled, "and no dice rolled")
+	for stream in motes._streams:
+		check(stream.owed >= 0.0 and stream.owed < 1.0, "owing less than a mote (%f)" % stream.owed)
+	_frames(motes, pool, 1, Rect2(0, 0, 640, 360), 3.0)
+	check(motes.given <= 2, "back in view: a frame's worth, no burst (%d)" % motes.given)
+	_frames(motes, pool, 60, Rect2(0, 0, 640, 360), 3.0 + STEP)
+	check(motes.given >= 76 and motes.given <= 84, "then its rate, 20 a second from 4 cells (%d)" % motes.given)
+
+
 func test_at_most_a_frames_worth_at_once() -> void:
 	var kind: CoverKind = _grass(2000.0)
 	var motes: CoverMotesScript = _motes(kind)

@@ -71,8 +71,10 @@ func take() -> void:
 	if dark.stage_of(WEST) != 2:
 		fail("the antechamber's dark is at stage %d, not mid-way" % dark.stage_of(WEST))
 		return
-	# One step of Feel's rooms by hand, so what stands there is shown as the reveal has begun.
-	feel.call(&"_step_rooms", 0.0, 1)
+	# Feel's frame by hand, twice and with no time (the dark's stage stays), so what stands there is
+	# shown as the reveal has begun.
+	feel.call(&"step", 0.0)
+	feel.call(&"step", 0.0)
 	await settle(2)
 	image = await grab()
 	save(image, "unseen_hidden_reveal")

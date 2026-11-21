@@ -17,7 +17,9 @@ extends RefCounted
 ## **Out of view:** a place whose rectangle grown by MARGIN meets none of the views' boxes
 ## (`ViewBoxes`, the spectacle's: one box, or a box a split view) has the same switched off. Godot
 ## would not draw them there either, but it walks every node of every room each frame to find that
-## out; a room switched off is left out of that walk whole. MARGIN holds what a place draws past its
+## out; a room switched off is left out of that walk whole. **A hidden secret way** (a bridge to a
+## secret room not found yet, `UnseenDark.build_of` HIDDEN) has its marks, motes and cover off too,
+## so nothing of it shows over the void (its rim's dust among them), its layout under the dark's black. MARGIN holds what a place draws past its
 ## rectangle (its motes' reach, `MoteRegions.REACH`, and its lip) and a frame's move of the camera,
 ## so a place is on before it comes into a view. With no box (outside a tree) none is out of view.
 ##
@@ -35,12 +37,18 @@ const MoteRegionsScript := preload("res://gameplay/feel/mote_regions.gd")
 const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
 const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 
+## A place's drawing: on, off, or a hidden secret way's (all off but its layout, whose floor the
+## dark's black lies over: `UnseenDark.landing_rects`, so the floor round the doorway it leaves from,
+## which that black stops short of, is drawn as before).
+const SHOWN: int = 0
+const OFF: int = 1
+const WAY_HIDDEN: int = 2
 ## How far past a view's box a place still counts as in view (world px; see above).
 const MARGIN: float = 160.0
 
 ## By piece number (`room_built`'s, the grid's place): the layout handed over (null: none).
 var _layouts: Array[CanvasItem] = []
-## By place: 1 while it is not drawn. Read only (for tests: `is_hidden`).
+## By place: its drawing (SHOWN, OFF, WAY_HIDDEN). Read only (for tests: `is_hidden`).
 var _hidden: PackedByteArray = PackedByteArray()
 ## What every switch was last laid for: the dark's changes, the regions' fits, the marks' layers,
 ## the cover's rooms and the layouts handed over (-1: not yet).
@@ -94,23 +102,26 @@ func step(dark: UnseenDarkScript, grid: RoomGrid, seen: ViewBoxesScript, marks: 
 	var viewed: bool = seen != null and not seen.is_empty() and grid != null
 	var grid_places: int = grid.places() if grid != null else 0
 	for place in places:
-		var off: bool = dark.covers_whole(place)
-		if not off and viewed and place < grid_places:
-			off = not seen.intersects(grid.place_rect(place), MARGIN)
-		_wanted[place] = 1 if off else 0
+		var want: int = SHOWN
+		if dark.covers_whole(place) or (viewed and place < grid_places and not seen.intersects(grid.place_rect(place), MARGIN)):
+			want = OFF
+		elif dark.build_of(place) == UnseenDarkScript.HIDDEN:
+			want = WAY_HIDDEN
+		_wanted[place] = want
 	if _hidden.size() != places:
 		_hidden.resize(places)
 	for place in places:
 		if not all and _hidden[place] == _wanted[place]:
 			continue
 		_hidden[place] = _wanted[place]
-		_switch(place, _wanted[place] == 0, marks, regions, cover)
+		_switch(place, _wanted[place], marks, regions, cover)
 
 
-## Place `place`'s drawing on (`shown`) or off.
-func _switch(place: int, shown: bool, marks: MarksScript, regions: MoteRegionsScript, cover: CoverRoomsScript) -> void:
+## Place `place`'s drawing switched to `state` (SHOWN, OFF, or WAY_HIDDEN: all but its layout).
+func _switch(place: int, state: int, marks: MarksScript, regions: MoteRegionsScript, cover: CoverRoomsScript) -> void:
+	var shown: bool = state == SHOWN
 	if place < _layouts.size() and is_instance_valid(_layouts[place]):
-		_layouts[place].visible = shown
+		_layouts[place].visible = state != OFF
 	if marks != null:
 		marks.set_layer_shown(place, shown)
 	if regions != null:
@@ -120,6 +131,6 @@ func _switch(place: int, shown: bool, marks: MarksScript, regions: MoteRegionsSc
 		(room as CanvasItem).visible = shown
 
 
-## Whether place `place`'s drawing is switched off now (for tests).
+## Whether place `place`'s drawing is switched off now, wholly or as a hidden secret way (for tests).
 func is_hidden(place: int) -> bool:
-	return place >= 0 and place < _hidden.size() and _hidden[place] == 1
+	return place >= 0 and place < _hidden.size() and _hidden[place] != SHOWN

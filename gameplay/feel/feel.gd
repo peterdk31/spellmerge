@@ -138,7 +138,6 @@ const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
 const UnseenStandingScript := preload("res://gameplay/feel/unseen_standing.gd")
 const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
-const MistScript := preload("res://gameplay/feel/mist.gd")
 const RoomsViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const TeleportLooksScript := preload("res://gameplay/feel/teleport_looks.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
@@ -413,6 +412,10 @@ var input: InputManagerScript = null
 var _auto_actors: ActorsScript = null
 ## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
 var drive_engine: bool = true
+## A benchmark's fixed clock (tests/benchmark/fixed_steps.gd): while above 0, every drawn frame is
+## this many seconds of the view (the camera's easing, the motes, the reveals), as the Tick runs one
+## tick a frame, so what is drawn is the same every run; 0: the real clock. Never set by the game.
+var fixed_view_delta: float = 0.0
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
 ## skipped as when the pool is empty; flashes, numbers and sound stay).
 var particles_enabled: bool = true:
@@ -582,7 +585,6 @@ var _unseen_rooms: UnseenRoomsScript = UnseenRoomsScript.new()
 var _unseen_standing: UnseenStandingScript = UnseenStandingScript.new()
 var _masked_looks: Array[CanvasItem] = []
 var _masked_for: int = -1
-var _no_mists: Array[MistScript] = []
 ## The one picture's box as the party camera stands this frame, for `_unseen_rooms` (`_rooms_seen`).
 var _rooms_seen_box: RoomsViewBoxesScript = RoomsViewBoxesScript.new()
 ## Where a wizard teleported from the Y map left: a column of its light narrowing away (`teleport_looks.gd`).
@@ -1089,7 +1091,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var real_delta: float = delta
-	if drive_engine:
+	if fixed_view_delta > 0.0:
+		real_delta = fixed_view_delta
+		_last_usec = Time.get_ticks_usec()
+	elif drive_engine:
 		# Real time from the clock, so a test's or benchmark's tick rate cannot skew it.
 		var now: int = Time.get_ticks_usec()
 		real_delta = minf(float(now - _last_usec) / 1000000.0, 0.25)
@@ -1192,6 +1197,11 @@ func step(real_delta: float) -> void:
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
 	_spectacle.hand_bodies(cover().bodies(), cover().body_count())
 	_profile_mark(3)
+	# What stands where nobody has seen yet is hidden before the shadows and the lights are cast from
+	# the bodies drawn (the owner, 2026-11-21, on #899): the bodies and the rooms' mists, by the mask
+	# as the dark laid it last frame.
+	if _unseen != null:
+		_unseen_standing.step(_unseen.mask, _actor_table(), _spectacle.mist, _spectacle.room_mists)
 	_spectacle.step(_clock, _actor_table())
 	_profile_mark(4)
 	if _lanes != null:
@@ -1245,12 +1255,8 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		# What those rooms hold is not drawn under the dark, nor what lies out of every view (the
 		# owner, 2026-11-21).
 		_unseen_rooms.step(_unseen, grid, _rooms_seen(), _spectacle.marks if _spectacle != null else null, _spectacle.pool.regions if _spectacle != null and _spectacle.pool != null else null, _cover_rooms)
-		# What stands in them is hidden one by one, so no cover is drawn over them (the owner,
-		# 2026-11-21, on #899): the bodies, the rooms' mists, what lies on the floor, the rooms' light.
-		if _spectacle != null:
-			_unseen_standing.step(_unseen.mask, table, _spectacle.mist, _spectacle.room_mists)
-		else:
-			_unseen_standing.step(_unseen.mask, table, null, _no_mists)
+		# What lies there is hidden one by one, so no cover is drawn over them (the owner, 2026-11-21,
+		# on #899): what lies on the floor and the rooms' light (the bodies and mists in `step`).
 		if _spectacle != null and _spectacle.light != null:
 			_spectacle.light.hide_unseen(_unseen.mask)
 		if _unseen.mask.changes != _masked_for:

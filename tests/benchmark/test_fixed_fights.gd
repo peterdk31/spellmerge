@@ -2,9 +2,10 @@ extends SceneTree
 ## The benchmark's fights play from a fixed script (the owner, 2026-11-21: "so each run is the same
 ## and the fight rows stop jumping"): the play frames' runner (play_frames_runner.gd, on the fixed
 ## clock of fixed_steps.gd, one tick a drawn frame) plays one fight scenario twice in one process, the
-## first behind the first Play's load, and the game's state hash every HASH_EVERY measured frames must
-## be the same in both: the same frames twice. Headless and shortened (a second's warm-up, two
-## measured); the frame times are the full run's (play_frames.gd, in a window).
+## first behind the first Play's load, and the frame's hash (the game's state, the camera's place and
+## zoom) every HASH_EVERY measured frames must be the same in both: the same frames twice. Headless
+## and shortened (a second's warm-up, two measured); the frame times are the full run's
+## (play_frames.gd, in a window). The unit test runner finds it by its name, as every test_*.gd.
 
 const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
 ## A fight: one wizard and its bot among a room's foes, at the web's load.

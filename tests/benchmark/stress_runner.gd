@@ -65,8 +65,9 @@ var players: int = PLAYERS
 ## before the runner is in the tree (the biome frames' and the play frames' are). Off, the Tick runs
 ## by the real clock, as in the game.
 var fixed_frames: bool = false
-## With the fixed clock: the state hash taken every this many measured frames (0: none), kept by
-## scenario run in `frame_hashes` (a test's, to see a run played twice is the same).
+## With the fixed clock: the frame's hash (the state and the view's place, `_frame_hash`) taken every
+## this many measured frames (0: none), kept by scenario run in `frame_hashes` (a test's, to see a
+## run played twice is the same).
 var hash_every: int = 0
 var frame_hashes: Array[PackedInt64Array] = []
 var _fixed: Node = null
@@ -485,7 +486,7 @@ func _process(delta: float) -> void:
 		frame_hashes.append(PackedInt64Array())
 		_measured_frames = 0
 	if _measuring and fixed_frames and hash_every > 0 and _measured_frames > 0 and _measured_frames % hash_every == 0:
-		frame_hashes[frame_hashes.size() - 1].append(_state_hash())
+		frame_hashes[frame_hashes.size() - 1].append(_frame_hash())
 	if _elapsed >= warm_up + measure:
 		_end_scenario()
 
@@ -832,11 +833,15 @@ func _report_state_hash(label: String) -> void:
 		part_most = maxi(part_most, part_took)
 	print("BENCH: stress %s: state hash spread over %d ticks: avg %.2f ms max %.2f ms a tick" % [label, HASH_SLICES, float(part_total) / float(HASH_SLICES) / 1000.0, float(part_most) / 1000.0])
 
-
-## The game's state hash now (every area the Tick names, as the netcode would make it).
-func _state_hash() -> int:
+## The frame's hash now: the game's state (every area the Tick names, as the netcode would make it)
+## and where the view is (the camera's place and zoom: Feel's view is on the fixed clock too; its
+## shake and its motes draw from generators seeded once a process, so they repeat from run to run of
+## the benchmark, each a process of its own, but not within one).
+func _frame_hash() -> int:
 	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
-	return SimHash.whole(SimHash.areas(tick.state_areas())) if tick != null else 0
+	var state: int = SimHash.whole(SimHash.areas(tick.state_areas())) if tick != null else 0
+	var camera: Camera2D = get_viewport().get_camera_2d()
+	return hash([state, camera.position if camera != null else Vector2.ZERO, camera.zoom if camera != null else Vector2.ONE])
 
 
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.

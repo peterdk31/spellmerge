@@ -4,14 +4,14 @@ extends Node2D
 ## and far past them (GROW), so whatever no room, bridge or look covers shows the void, in every view
 ## of a split screen alike (they share the world). Its sparse drifting motes are the spectacle's
 ## (`Spectacle.void_air`). Outside a biome (a world with no places: the hub, a single room) it draws
-## nothing and the world is as before. The dark of unentered rooms is the same black
-## (`unseen_dark.gd`), and the void's motes drift over it too (`Spectacle.void_pool`, drawn over that
-## dark), so a room nobody has been in is one with the void until it is lit.
+## nothing and the world is as before. Nothing of a room nobody has entered is drawn (`unseen_dark.gd`'s
+## mask), so this black shows there and the void's motes drift over it too (`Spectacle.void_pool`):
+## the room is one with the void until it is lit.
 ##
 ## A child of Feel, top level (world space), at the lowest z there is. Drawn again only when the
 ## bounds change; nothing is allocated in a frame. View only.
 
-## Pure black: the void, and the dark over a room nobody has entered.
+## Pure black: the void, and the dark of a room's reveal and of the floors reaching into an unseen room.
 const COLOUR := Color(0.0, 0.0, 0.0, 1.0)
 ## Under everything in the world.
 const Z: int = RenderingServer.CANVAS_ITEM_Z_MIN

@@ -14,6 +14,7 @@ const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const UnseenStandingScript := preload("res://gameplay/feel/unseen_standing.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const MistScript := preload("res://gameplay/feel/mist.gd")
+const MoteRegionsScript := preload("res://gameplay/feel/mote_regions.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
 const START: int = 0
@@ -77,8 +78,11 @@ func _imp_in(place: int) -> Actor:
 	return imp
 
 
+## Feel's frame twice: the dark's mask laid (its rooms step), then what stands by it hidden (before
+## the shadows, by the mask laid last frame).
 func _step() -> void:
-	feel.call(&"_step_rooms", 0.0, 1)
+	feel.call(&"step", 0.0)
+	feel.call(&"step", 0.0)
 
 
 func test_an_unvisited_rooms_bodies_and_what_lies_there_are_hidden_until_its_reveal() -> void:
@@ -126,6 +130,22 @@ func test_an_unvisited_rooms_bodies_and_what_lies_there_are_hidden_until_its_rev
 	check(not dark.landing_rects().has(west_end), "its bridge's end is no longer under black")
 	check(dark.landing_rects().has(east_end), "the court's still is")
 
+
+## A player's own wizard is never hidden (the review's: one walking in over the bridge's end inside
+## the room's rectangle, still the bridge's place, popped out whole for the frames before the reveal).
+func test_a_wizard_on_a_bridges_end_inside_an_unvisited_room_stays_drawn() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry)
+	_start(map)
+	var bridge: int = map.rooms()
+	var end_of: Rect2 = _grid().place_rect(WEST).intersection(_grid().place_rect(bridge))
+	var wizard := flow.get_wizard(0) as Actor
+	var at: Vector2 = _grid().nearest_ground(end_of.get_center(), 4.0)
+	wizard.global_position = at
+	tick.run(DT)
+	_step()
+	check(_dark().mask.hides(wizard.global_position), "its feet are in the unvisited room's rectangle")
+	check(_grid().place_at(wizard.global_position) != WEST or not _dark().covers_whole(WEST), "on the bridge's place, the room not entered")
+	check(wizard.visible, "the wizard is drawn")
 
 func test_items_coins_and_light_spots_in_an_unvisited_room_are_left_out() -> void:
 	var map: BiomeMap = BiomeMaps.split(registry)
@@ -211,6 +231,18 @@ func test_a_secret_rooms_hidden_way_stays_hidden() -> void:
 	tick.run(DT)
 	_step()
 	check(not imp.visible, "a body in the secret room is not drawn")
+	# The way's own drawing is off but its layout (its floor under the black): its rim's motes never
+	# show over the void (the review's: a hidden bridge's pit dust gave it away).
+	var rooms: Object = feel.call(&"unseen_rooms")
+	var pool: Object = feel.call(&"spectacle").get(&"pool")
+	pool.call(&"use_places", _grid())
+	feel.call(&"step", 0.0)
+	var regions: MoteRegionsScript = pool.get(&"regions") as MoteRegionsScript
+	check(bool(rooms.call(&"is_hidden", seam)), "the way's drawing is switched off")
+	check(regions != null and regions.places > seam, "the motes are drawn by place")
+	if regions != null and regions.places > seam:
+		check(not regions.region_shown(seam + 1), "its motes are not drawn")
+		check(regions.region_shown(1), "the nave's are")
 
 
 ## The mask: a point in a hidden rectangle; written in place, empty ones left out.

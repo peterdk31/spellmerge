@@ -143,6 +143,10 @@ var _times_dirty: bool = false
 var _now: float = 0.0
 ## The stirs' `version` last handed to the batches (-1: hand them over at the next step).
 var _stirs_version: int = -1
+## While switched off: true when a `step` held its hand-over back, and the stirs it was told.
+var _held: bool = false
+var _held_stirs_version: int = -1
+var _held_hand_stirs: Callable = Callable()
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -160,6 +164,8 @@ func _init(z: int) -> void:
 
 func _ready() -> void:
 	ShaderWarmupScript.want(SHADER, ShaderWarmupScript.BATCH)
+	if not visibility_changed.is_connected(_on_visibility_changed):
+		visibility_changed.connect(_on_visibility_changed)
 	if events != null and not events.room_built.is_connected(_on_room_built):
 		events.room_built.connect(_on_room_built)
 	if events != null and not events.cover_changed.is_connected(_on_cover_changed):
@@ -377,6 +383,25 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 		_times_dirty = false
 		_times_texture.update(_times)
 	motes.give_off(now, pool, view)
+	_held_stirs_version = stirs_version
+	_held_hand_stirs = hand_stirs
+	# A view switched off (a room nobody has entered, a place out of every view: unseen_rooms.gd)
+	# draws nothing, so its batches are handed nothing a frame (the performance pass, 2026-11-21:
+	# a biome's every room was told the clock and the bodies each frame); the view grid above is
+	# kept walked, and the frame it is shown it is handed this frame's (`_on_visibility_changed`).
+	if not is_visible_in_tree():
+		_held = true
+		return
+	_hand_batches()
+
+
+## Hand the batches what changed: the clock, the stirs, the bodies found and the rows written
+## (the frame's last `step`'s).
+func _hand_batches() -> void:
+	_held = false
+	var now: float = _now
+	var stirs_version: int = _held_stirs_version
+	var hand_stirs: Callable = _held_hand_stirs
 	var stirred: bool = hand_stirs.is_valid() and stirs_version != _stirs_version
 	if stirred:
 		_stirs_version = stirs_version
@@ -404,6 +429,13 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 		if _dirty[index] != 0:
 			_dirty[index] = 0
 			batch.multimesh.buffer = _rows[index]
+
+
+## Shown again after a frame or more off: handed what the frame's `step` held back, before it is
+## drawn, so it draws as if it had been handed every frame.
+func _on_visibility_changed() -> void:
+	if _held and is_visible_in_tree():
+		_hand_batches()
 
 
 ## The bodies of `table` nearest `focus`, at most `BODIES`, into `_near_at` (in the order found: by

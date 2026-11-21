@@ -111,6 +111,28 @@ func test_the_bodies_nearest_the_camera_are_handed_to_every_batch() -> void:
 	check_equal(material.get_shader_parameter(&"trample_spring"), SPRING, "both")
 
 
+## The performance pass (2026-11-21): a view switched off (unseen_rooms.gd) hands its batches
+## nothing a frame, but keeps its cells walked, and the frame it is shown again it is handed that
+## frame's clock and bodies before it is drawn, as if it had been handed them every frame.
+func test_a_view_switched_off_hands_nothing_until_it_is_shown() -> void:
+	var cover: CoverScript = _cover()
+	var material := cover.batch_of(&"test_grass").material as ShaderMaterial
+	var table: ActorsScript = _table(PackedVector2Array([Vector2(10, 10)]))
+	cover.step(1.0, table, Vector2.ZERO)
+	check_equal(material.get_shader_parameter(&"view_time"), 1.0, "shown: handed the clock")
+	cover.visible = false
+	var body := table.node_of(0) as Node2D
+	body.global_position = Vector2(200, 200)
+	cover.step(2.0, table, Vector2.ZERO)
+	check_equal(material.get_shader_parameter(&"view_time"), 1.0, "off: not handed the clock")
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(10, 10), "nor the bodies")
+	var cell: int = cover.layout.cell_of(Vector2(200, 200))
+	check(cover.walked_at(cell) >= 2.0, "but the cell it stands in is walked, off as on")
+	cover.visible = true
+	check_equal(material.get_shader_parameter(&"view_time"), 2.0, "shown again: handed the frame's clock at once")
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(200, 200), "and its bodies")
+
+
 func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:
 	var cover: CoverScript = _cover()
 	cover.step(1.0, _table(PackedVector2Array([Vector2(10, 10), Vector2(20, 20)])))

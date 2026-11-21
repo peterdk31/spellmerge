@@ -23,6 +23,8 @@ extends "res://tests/benchmark/biome_frames_runner.gd"
 const PLAY_SEED: int = 11
 ## The foes a room's fight holds (each room the wizards stand in gets its share of these).
 const FOES_A_ROOM: int = 12
+## `--off=` names and the Feel setting each switches off.
+const PASS_SETTERS: Dictionary[String, StringName] = {"light": &"set_spell_light", "shadows": &"set_shadows", "air": &"set_ambient_particles", "fog": &"set_fog"}
 
 
 func _init() -> void:
@@ -59,8 +61,17 @@ static func _row(label: String, players: int, enemies: int, idle: bool, spread: 
 	return {"label": label, "players": players, "enemies": enemies, "shots": cap, "fill": 0, "idle": idle, "seed": PLAY_SEED, "spread": spread, "split": split, "motes": motes}
 
 
-## The scenario's mote ring (the "Particles" setting) taken before its run starts.
+## The scenario's mote ring (the "Particles" setting) taken before its run starts, and the passes
+## `--off=` names switched off by their settings (light, shadows, air, fog: Feel's `set_spell_light`,
+## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs.
 func _start_play(scenario: Dictionary) -> void:
+	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if arg.begins_with("--off=") and _feel != null:
+			for part in arg.trim_prefix("--off=").split(","):
+				var setter: StringName = PASS_SETTERS.get(part, &"")
+				if setter != &"" and _feel.has_method(setter):
+					_feel.call(setter, false)
+					print("BENCH: play frames %s: %s off" % [scenario["label"], part])
 	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		var taken: int = int(_feel.call(&"set_mote_cap", int(scenario.get("motes", MoteCap.DEFAULT_DESKTOP))))
 		print("BENCH: play frames %s: mote ring %d rows" % [scenario["label"], taken])

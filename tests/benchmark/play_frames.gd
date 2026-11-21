@@ -8,6 +8,7 @@ extends SceneTree
 ## xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --script res://tests/benchmark/play_frames.gd
 ## ... -- --only="1p near,4p apart equal"   those scenarios alone (labels, comma separated)
 ## ... -- --profile                         the tree profile too (each script's time)
+## ... -- --off=light,shadows,air,fog        those passes switched off by their settings
 
 const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
 

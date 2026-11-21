@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Shadows (docs/milestones/atmosphere.md, C): light blocked by a room's standing walls and the props
-## that block light (gameplay/feel/light_blockers.gd, handed to the spell light, `light.gdshader`'s
+## that block light (gameplay/feel/light_blockers.gd, handed to the spell light, `light_grid.gd`'s
 ## blockers, whose pick `LightBlockers.shade_between` mirrors), easing out as a pillar crumbles; and
 ## the bodies' short hard shadows cast away from the light near them (gameplay/feel/body_shadows.gd),
 ## easing as lights move, in whole pixels, taking the drawn shadows' place. Only while spell light is

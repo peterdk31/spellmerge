@@ -1,7 +1,7 @@
 extends RefCounted
 ## Light blocked (docs/milestones/atmosphere.md, C): the boxes that stop spell light, worked out from
 ## the room and the props in it and handed to the spell light (`SpellLight.set_blockers`), which
-## draws every light with them (`light.gdshader`); the spell light knows nothing of rooms or props,
+## lights every light by them (grid lighting, `light_grid.gd`, and its native mirror); the spell light knows nothing of rooms or props,
 ## and this knows nothing of how light is drawn. View only: it reads the room's layout and the
 ## bodies once a frame, and changes nothing.
 ##
@@ -13,20 +13,20 @@ extends RefCounted
 ## - **Props that block light:** a prop whose data says so (`PropBase.blocks_light`: the crypt's
 ##   pillars) blocks by the ground it stands on (its `Footprint` box) while that blocks the bodies
 ##   that walk (its state's `blocks`), and has a column drawn over it: its hurt box, the shaft, lit as
-##   the floor in front of its base (light.gdshader). Found each frame in the actor table, so a body
+##   the floor in front of its base (`lit_as`). Found each frame in the actor table, so a body
 ##   made again from a snapshot is found as any other.
 ## - **Smooth:** a prop's box comes with the room at full strength, and when it stops blocking (a
 ##   pillar crumbles into rubble) its strength eases to nothing over FADE_SECONDS and its column
 ##   shrinks down to its base with it, so the light comes back over the rubble a band at a time as
 ##   the shaft falls, never in one jump.
 ##
-## Up to MAX boxes (light.gdshader's MAX_BLOCKERS), the walls first; any past it are left out (every
-## room's are counted by a test). `lit_as` and `shade_between` are the shader's pick in GDScript (for
+## Up to MAX boxes (LightGrid's and its kernel's MAX_BLOCKERS), the walls first; any past it are left out (every
+## room's are counted by a test). `lit_as` and `shade_between` are the pick the grid lights by (for
 ## the bodies' shadows and the tests).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## The most boxes (light.gdshader's MAX_BLOCKERS: its uniform arrays' length).
+## The most boxes (the grid's kernel's too: `LG_BLOCKERS_MOST`, native/src/light_grid.cpp).
 const MAX: int = 32
 ## How long a prop's box takes to ease out once it stops blocking (s): about its crumble's strip
 ## (the crypt pillar's rubble is 9 frames at 12 a second).
@@ -240,16 +240,16 @@ func _write() -> void:
 		count += 1
 
 
-# --- The shader's pick (light.gdshader), in GDScript ---------------------------------------------
+# --- The pick the grid lights by (light_grid.gd; native/src/light_grid.cpp mirrors it) -----------
 
 ## Where `p` is lit as: just in front of the base of the first box whose column holds it, else
-## itself (light.gdshader's `lit_as`).
+## itself.
 static func lit_as(p: Vector2, box_list: PackedVector4Array, body_list: PackedVector4Array, n: int) -> Vector2:
 	var k: int = column_of(p, box_list, body_list, n)
 	return Vector2(p.x, box_list[k].w + 0.5) if k >= 0 else p
 
 
-## The first box whose column holds `p` (-1: none; light.gdshader's `column_of`).
+## The first box whose column holds `p` (-1: none).
 static func column_of(p: Vector2, box_list: PackedVector4Array, body_list: PackedVector4Array, n: int) -> int:
 	for k in mini(n, MAX):
 		var box: Vector4 = box_list[k]
@@ -260,7 +260,7 @@ static func column_of(p: Vector2, box_list: PackedVector4Array, body_list: Packe
 
 
 ## How much of a light at `l` (where it is lit from: `lit_as` its middle) is blocked on its way to the
-## pixel `p` (0 to 1; light.gdshader's `shade_between`, every box counted as near): the strongest box
+## pixel `p` (0 to 1; every box counted as near): the strongest box
 ## the way crosses that holds neither end. A pixel in a column is lit as the floor in front of its
 ## base, and its own box blocks only a light behind it (past its base's back edge); a point that is
 ## `on_floor` (a body's feet) is never in a column, whatever is drawn over it.

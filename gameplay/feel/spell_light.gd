@@ -11,7 +11,7 @@ extends Node
 ##   cell their world point lies in (`light_grid.gdshaderinc`). There is no light buffer drawn by the
 ##   GPU any more, and no SubViewport a view for it.
 ## - **Rows are never written twice:** the grid reads the rows their owners already write, as the GPU's
-##   light did (light.gdshader's row formats once, LightGrid.ROWS_*):
+##   light did (its row formats, LightGrid.ROWS_*):
 ##   - Shots, every one (the enemies' too): each projectile batch's rows drawn this frame
 ##     (`ProjectileManager.light_rows`, kept while `light_rows_wanted`), read as shots, or as runes
 ##     for a quad body's batch.
@@ -68,7 +68,7 @@ const DOWNSCALE: int = 4
 ## The apply rect reaches this far from the origin each way: past any room, so it always covers
 ## the view (the GPU only shades what is on screen).
 const REACH: float = 65536.0
-## How the rows read (LightGrid.ROWS_*, light.gdshader's once).
+## How the rows read (LightGrid.ROWS_*).
 const ROWS_SHOT: int = LightGridScript.ROWS_SHOT
 const ROWS_RUNE: int = LightGridScript.ROWS_RUNE
 const ROWS_FLASH: int = LightGridScript.ROWS_FLASH

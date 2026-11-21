@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Grid lighting (gameplay/feel/light_grid.gd; the owner's decision of 2026-11-21): the light at each
-## cell's middle with light.gdshader's falloff, colours and blocking; the views laid in one atlas on
+## cell's middle with the GPU light's falloff (light.gdshader's, before), colours and blocking; the views laid in one atlas on
 ## the world's grid; the native kernel (`MoteKernel.light_grid_*`) the same as the GDScript to the
 ## byte, over seeded rows of every kind, beams and boxes.
 

@@ -484,12 +484,12 @@ func test_the_void_is_black_with_motes_outside_the_rooms() -> void:
 
 
 ## The owner, 2026-11-21: an unvisited room is not black, it looks like the void round it, the void's
-## motes drifting over it, until it is revealed. The dark is the void's colour; the void's motes are
-## given off over the rooms it covers whole as over the void (into a pool of their own, drawn over the
-## dark, so they cross a room's edge without stopping), never over a room entered; the room's own
-## motes stay under the dark; the void's motes over a hidden room are drawn by that room's chunk of
-## the void's pool (#892), none in the room's chunks of the motes' pool; and the reveal still opens
-## a stage a frame, the void's motes given off there no more once it begins.
+## motes drifting over it, until it is revealed. Nothing is drawn over it (what it holds is hidden one
+## by one: test_unseen_hidden.gd); the void's motes are given off over the rooms the dark covers whole
+## as over the void (into a pool of their own, at the motes' z, so they cross a room's edge without
+## stopping), never over a room entered; the void's motes over a hidden room are drawn by that room's
+## chunk of the void's pool (#892), none in the room's chunks of the motes' pool; and the reveal still
+## opens a stage a frame, the void's motes given off there no more once it begins.
 func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> void:
 	var map: BiomeMap = _start(1)
 	feel.call(&"_step_rooms", 0.0, 1)
@@ -503,8 +503,6 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	var void_pool: MotesScript = spectacle.get(&"void_pool") as MotesScript
 	var pool: MotesScript = spectacle.get(&"pool") as MotesScript
 	check(void_pool != null and void_pool != pool, "the void's motes have a pool of their own")
-	check(SpectacleScript.VOID_MOTE_Z > UnseenDarkScript.Z and SpectacleScript.VOID_MOTE_Z < 22, "drawn over the dark, under the labels")
-	check(SpectacleScript.MOTE_Z < UnseenDarkScript.Z, "the room's own motes stay under the dark")
 	var air: AirMotesScript = spectacle.get(&"void_air") as AirMotesScript
 	check(void_pool.kind_index(air.look.kind) >= 0, "the void's pool has the void's kind")
 	var inside := Rect2(room.get_center() - Vector2(48.0, 48.0), Vector2(96.0, 96.0))
@@ -522,7 +520,6 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	check_equal(pool.next_row(), rows_before, "none into the motes' pool")
 	# Drawn by the room's own chunk of the void's pool (#892), none by the motes' pool's for it.
 	void_pool.use_places(_grid())
-	spectacle.call(&"_lay_void_z")
 	void_pool.step(now)
 	var in_room: int = 0
 	var newest: int = posmod(void_pool.next_row() - 1, void_pool.cap())
@@ -531,9 +528,8 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 		var chunk: int = void_pool.regions.chunk_of_row(row)
 		if void_pool.regions.region_of_chunk(chunk) == 2:
 			in_room += 1
-			check_equal(void_pool.regions.node_of(chunk).z_index, SpectacleScript.VOID_MOTE_Z, "its chunk is drawn over the dark")
+			check_equal(void_pool.regions.node_of(chunk).z_index, SpectacleScript.MOTE_Z, "its chunk is drawn at the motes' z, no layer of its own (#897's 21 is gone)")
 			break
-	check_equal(void_pool.regions.region_z(1), SpectacleScript.MOTE_Z, "the start room's chunks of the void's pool are drawn as motes")
 	check(in_room > 0, "the void's motes over the room are drawn by its chunk of the void's pool")
 	# Entered: the reveal begins, and from its first stage the room is the void no more.
 	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
@@ -542,14 +538,11 @@ func test_an_unvisited_room_is_the_void_with_its_motes_drifting_over_it() -> voi
 	dark.advance()
 	check_equal(dark.stage_of(1), UnseenDarkScript.BLOCK_SIDES.size() - 2, "a stage into the reveal")
 	feel.call(&"_step_rooms", 0.0, 1)
-	spectacle.call(&"_lay_void_z")
-	check_equal(void_pool.regions.region_z(2), SpectacleScript.MOTE_Z, "the void's motes left over it go under its opening blocks, then under its telegraphs")
-	check_equal(void_pool.regions.region_z(3), SpectacleScript.VOID_MOTE_Z, "the court's stay over its dark")
 	var under: int = 0
 	for c in void_pool.regions.chunks_made():
 		if void_pool.regions.region_of_chunk(c) == 2:
 			under += 1
-			check_equal(void_pool.regions.node_of(c).z_index, SpectacleScript.MOTE_Z, "at once")
+			check_equal(void_pool.regions.node_of(c).z_index, SpectacleScript.MOTE_Z, "under its opening blocks, then under its telegraphs")
 	check(under > 0, "its chunk is there")
 	air.given = 0
 	for i in 200:

@@ -31,6 +31,10 @@ extends "res://tests/benchmark/stress_runner.gd"
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
 ## `user://biome_frames/<label>.png` (one slow frame, outside the averages' sense).
 ##
+## Its fights play from a fixed script (the owner, 2026-11-21): on the fixed clock (fixed_steps.gd,
+## the stress runner's `fixed_frames`: one tick a drawn frame, the windows counted in ticks), so each
+## run of a scenario plays the same frames; `--real-clock` runs by the real clock, as the game does.
+##
 ## Started by `biome_frames.gd` (it needs a window: a GPU, or `xvfb-run`, where llvmpipe draws).
 
 const DrawCensusScript := preload("res://tests/benchmark/draw_census.gd")
@@ -87,8 +91,12 @@ func _init() -> void:
 	for index in rows.size():
 		scenarios.append(index)
 	result_word = "BIOME FRAMES"
-	_shots = (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--shots")
-	_census = (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--census")
+	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
+	_shots = args.has("--shots")
+	_census = args.has("--census")
+	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
+	# a scenario plays the same (stress_runner.gd's `fixed_frames`); `--real-clock` as the game runs.
+	fixed_frames = not args.has("--real-clock")
 
 
 func _enter_tree() -> void:
@@ -125,6 +133,7 @@ static func scenario_rows() -> Array[Dictionary]:
 
 func _start_play(scenario: Dictionary) -> void:
 	_frames_service = get_tree().root.get_node_or_null("Frames")
+	_spot_turn = 0
 	_replay_seed = int(scenario.get("seed", SEEDS[0]))
 	if _feel != null and _feel.has_method(&"set_split_mode"):
 		_feel.call(&"set_split_mode", int(scenario.get("split", SplitScreenSetting.DYNAMIC)))

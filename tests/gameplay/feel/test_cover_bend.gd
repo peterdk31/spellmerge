@@ -136,6 +136,37 @@ func test_a_view_switched_off_hands_nothing_until_it_is_shown() -> void:
 	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(200, 200), "and its bodies")
 
 
+## The performance pass (2026-11-21, round C): a view switched off that no body found reaches
+## (`found_box`) walks none of them and takes none (a biome's 27 views each walked the 32 bodies a
+## frame); shown again, it takes the finding view's bodies of that frame before it is drawn. One
+## that a body reaches walks it, off as on.
+func test_a_view_switched_off_out_of_reach_takes_the_bodies_only_when_shown() -> void:
+	var lead: CoverScript = _cover()
+	var other: CoverScript = _cover()
+	var material := other.batch_of(&"test_grass").material as ShaderMaterial
+	var table: ActorsScript = _table(PackedVector2Array([Vector2(3000, 3000), Vector2(3100, 2900)]))
+	lead.step(1.0, table, Vector2.ZERO)
+	check_equal(lead.found_box(), Rect2(3000, 2900, 100, 100), "the box round the bodies found")
+	other.visible = false
+	other.step_with(lead.bodies(), lead.body_count(), 1.0, null, Rect2(), -1, Callable(), lead.found_box())
+	check_equal(other.body_count(), 0, "out of reach and off: no body taken")
+	other.visible = true
+	check_equal(other.body_count(), 2, "shown: the frame's bodies taken at once")
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(3000, 3000), "and handed to its batches")
+	check_equal(material.get_shader_parameter(&"body_count"), 2, "all of them")
+	# A body in reach of the off view's cells walks them.
+	other.visible = false
+	var body := table.node_of(0) as Node2D
+	body.global_position = Vector2(200, 200)
+	lead.step(2.0, table, Vector2.ZERO)
+	other.step_with(lead.bodies(), lead.body_count(), 2.0, null, Rect2(), -1, Callable(), lead.found_box())
+	check(other.walked_at(other.layout.cell_of(Vector2(200, 200))) >= 2.0, "in reach: walked though off")
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(3000, 3000), "its batches not told while off")
+	other.visible = true
+	check_equal((material.get_shader_parameter(&"bodies") as PackedVector2Array)[0], Vector2(200, 200), "shown: told the frame's bodies")
+	check_equal((own(CoverScript.new(0)) as CoverScript).found_box(), CoverScript.NOWHERE, "a view that found none: nowhere")
+
+
 func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:
 	var cover: CoverScript = _cover()
 	cover.step(1.0, _table(PackedVector2Array([Vector2(10, 10), Vector2(20, 20)])))

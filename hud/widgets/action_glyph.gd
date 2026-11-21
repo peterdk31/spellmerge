@@ -171,11 +171,16 @@ func _draw_symbol(area: Rect2, symbol: String, color: Color) -> void:
 
 ## A trigger: a shoulder cap with its top corners cut, so LT and RT read apart from LB and RB
 ## by shape too, not only by their label.
+## The cut corners and the top line are drawn before the label, so the glyph's shapes are one
+## run and its label another (two draw calls, not three: the performance pass, 2026-11-21); none of
+## them lies under the label's pixels, so the order shows nothing.
 func _draw_trigger(area: Rect2, face: Color) -> void:
-	_draw_cap(area, face, TEXT_ON_PLAIN)
+	draw_rect(area, OUTLINE)
+	draw_rect(area.grow(-1.0), face)
 	draw_rect(Rect2(area.position, Vector2(2.0, 2.0)), OUTLINE)
 	draw_rect(Rect2(Vector2(area.end.x - 2.0, area.position.y), Vector2(2.0, 2.0)), OUTLINE)
 	draw_line(Vector2(area.position.x + 2.0, area.position.y + 2.5), Vector2(area.end.x - 2.0, area.position.y + 2.5), TEXT_ON_PLAIN.darkened(0.3), 1.0)
+	_draw_label(area, _glyph["label"], TEXT_ON_PLAIN)
 
 
 ## The d-pad: a cross with the arm of its label (`up`, `right`, `down`, `left`) lit, or every arm's

@@ -86,9 +86,12 @@ scons() { # scons <args...>: the pinned SCons on native/SConstruct
 # platform"): a desktop library with a fused multiply-add rounds once where its GDScript twin rounds
 # twice, so one built with any (a compiler, a flag or an intrinsic that slipped -ffp-contract=off)
 # is refused. objdump is binutils' (MinGW's for the DLL).
+# A call of the C library's fma fuses too, so it is refused with them.
 no_fma() { # no_fma <objdump> <library>
-  local found; found=$("$1" -d --no-show-raw-insn "$2" | grep -cE '\svf(n)?m(add|sub)' || true)
-  ((found == 0)) || { echo "$2 has $found fused multiply-add instructions; the kernels must not fuse" >&2; exit 1; }
+  local dis found
+  dis=$("$1" -d --no-show-raw-insn "$2") # an objdump that fails fails the build
+  found=$(grep -cE '\svf(n)?m(add|sub)|call.*<_*fmaf?(@plt)?>' <<<"$dis" || true)
+  ((found == 0)) || { echo "$2 has $found fused multiply-adds; the kernels must not fuse" >&2; exit 1; }
 }
 
 setup_godot_cpp

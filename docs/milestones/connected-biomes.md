@@ -925,3 +925,12 @@ The owner chose this round's HUD work on 2026-11-21: cache each seat's corner pa
 - **Pixels:** the same as main in every state shot, but for see-through pixels by at most 2 in 255 (premultiplied rounding; the owner accepted it on #905, and kept the screen-sized picture).
 - **Measured** (docs/LOG.md, "Each corner panel drawn once"): on the fixed clock, one player 63 to 40 draw calls in the start room, 86 to 63 idle in a fight room, 158 to 138 fighting; 2p apart 381 to 337; 4p Equal 786 to 702.
 - **Tests:** `tests/hud/test_cached_view.gd` (every change the panel shows draws it again the same frame, and any frame a look changed without one fails; an idle panel draws nothing; a cooldown draws the live layer only; nothing lies past the picture). Screenshots: `tests/screenshots/shot_panel_cache.gd` (the picture against the panel drawn as before, `PlayerPanel.set_drawn_live`).
+
+## The desktop's native module optimised (2026-11-22, D2)
+
+The owner decided on 2026-11-22 that the game is optimised for its Windows and Linux builds first, and asked for the native module (ShotKernel, MoteKernel, BodyKernel and LightKernel, the light grid) to be built for the desktop with stronger optimisation, bit-exact with its GDScript and the same on every machine.
+
+- **Built:** godot-cpp's release target was already `-O3`. The desktop libraries are now linked whole (LTO) and built for `x86-64-v2` (SSE4.2, which Godot 4.7 itself needs), in `native/SConstruct`. The web is unchanged. `ci/build/native.sh` refuses a desktop library holding any fused multiply-add instruction. native/README.md, "The desktop builds optimised".
+- **AVX2:** `x86-64-v3` was measured against v2 and was no faster. Godot has no CPU feature tag to pick a second library by, so it is not built.
+- **The same game:** the four biomes' state hash (1p seed 11, 2p 23, 3p 37, 4p 11), main's library and this one, is identical every tick, and the kernels' side-by-side tests pass with both v2 and v3.
+- **Measured** (docs/LOG.md, 2026-11-22): the hit pass's kernel about 13 to 16% faster, the draw writing about 12% at 100k shots; the motes and the common pass unchanged within the noise, the light grid at 8 px 5% slower in the medians (likely noise). At a run's load the play frames are no worse (1p far 36.7 → 32.0 ms, 4p apart Equal 95.3 → 87.6 on llvmpipe, within the spread).

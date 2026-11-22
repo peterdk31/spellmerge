@@ -574,7 +574,7 @@ func test_corner_walkways_bridge_rooms_too() -> void:
 
 
 ## The start room alone (`MapRules.start_only`, rooms 0 to 0: a test's pinned room,
-## tests/support/pinned_run.gd; connected biomes CB8): one room, the first template hosting the start
+## bench/pinned_run.gd; connected biomes CB8): one room, the first template hosting the start
 ## room's kind, unmirrored at the origin, filled as its kind fills; the same for every seed.
 func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
 	var rules := MapRules.new()

@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
-const BOT_PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
+const BOT_PROFILE: AIProfile = preload("res://bench/bots/bot_profile.tres")
 
 ## The bot's walk (pixels a second) as the test moves it.
 const WALK: float = 80.0

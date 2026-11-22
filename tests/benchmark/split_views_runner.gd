@@ -1,4 +1,4 @@
-extends "res://tests/benchmark/stress_runner.gd"
+extends "res://bench/stress_runner.gd"
 ## The camera spike (connected biomes CB1, docs/milestones/connected-biomes.md), kept as a stress
 ## test (the owner, 2026-11-18): the stress fight (stress_runner.gd: four bots with built spells, a
 ## crowd and the shots held at the cap, full effects) drawn as a Voronoi split screen of 2, 3 and 4

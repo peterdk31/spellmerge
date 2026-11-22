@@ -4,7 +4,7 @@ extends RefCounted
 ## hub's own run start, so what it carries in is its loadout). Bot code, never the game's: it reads
 ## what a person reads off the screen (where the rack's staffs lie, `Items.lying`; which one is in
 ## reach, `Items.near_of`, the hint; where the teleporter stone stands, the room's props by role, and
-## whether it is lit, `Flow.is_stone_lit`), and the bot (tests/bots/bot.gd) plays it through its seat's
+## whether it is lit, `Flow.is_stone_lit`), and the bot (bench/bots/bot.gd) plays it through its seat's
 ## input only: the walk, and A as the gamepad's (`take` for the item in reach, `accept` on the lit
 ## stone, which the HUD's panels turn into the commands `item_take_requested` and `run_requested`).
 ##
@@ -29,8 +29,8 @@ extends RefCounted
 
 enum Stage { RACK, BUILD, STONE, WAIT, DONE }
 
-const RouteScript := preload("res://tests/bots/bot_route.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const RouteScript := preload("res://bench/bots/bot_route.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 ## How near the rack staff a bot walks before it presses `take` (pixels; inside the pickup rule's

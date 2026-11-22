@@ -12,7 +12,7 @@ extends SceneTree
 ## ... -- --quality=low                     the effects at the low row (effects_quality.gd)
 ## ... -- --picture=1280x720                 the picture drawn at that size (the world drawn finer)
 
-const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
+const RunnerScript := preload("res://bench/play_frames_runner.gd")
 
 
 func _initialize() -> void:

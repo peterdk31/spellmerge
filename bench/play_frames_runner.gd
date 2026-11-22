@@ -1,4 +1,4 @@
-extends "res://tests/benchmark/biome_frames_runner.gd"
+extends "res://bench/biome_frames_runner.gd"
 ## The frames of a run as it is played, not stressed (the owner's report of 2026-11-21: "I'm
 ## noticing worse performance in the game now"): the biome frames' crypt biome of seed 11, its
 ## measures and its `BENCH:` lines (biome_frames_runner.gd), with the load a room walked through
@@ -8,7 +8,7 @@ extends "res://tests/benchmark/biome_frames_runner.gd"
 ## mote ring, `MoteCap.DEFAULT_WEB`, and shot cap), where the owner plays:
 ##  - **1p near**: one wizard standing in a fight room with no foe, the camera at its own zoom (the
 ##    room, the void round it and the rooms not yet entered on screen);
-##  - **1p start web**: one wizard standing where the run puts it (the start room, the rooms round it
+##  - **1p start web** and **1p start** (the desktop's): one wizard standing where the run puts it (the start room, the rooms round it
 ##    not yet entered and the void on screen);
 ##  - **1p small far web**: one wizard fighting a few foes in the smallest fight room, zoomed out
 ##    over the rooms and the void round it;
@@ -49,12 +49,18 @@ static func play_rows() -> Array[Dictionary]:
 	var small: Dictionary = _row("1p small far web", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB)
 	small["room"] = "smallest"
 	out.append(small)
+	var start_desktop: Dictionary = _row("1p start", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, cap)
+	start_desktop["room"] = "start"
+	out.append(start_desktop)
 	out.append(_row("1p near", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, cap))
 	out.append(_row("1p far", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 	for players: int in [2, 3, 4]:
 		out.append(_row("%dp together" % players, players, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart dynamic" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart equal" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.EQUAL, cap))
+	# The shipped benchmark's split rows at the web's settings (bench/benchmark.gd, `WEB_LABELS`).
+	out.append(_row("2p apart dynamic web", 2, FOES_A_ROOM * 2, false, "apart", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
+	out.append(_row("4p apart equal web", 4, FOES_A_ROOM * 4, false, "apart", SplitScreenSetting.EQUAL, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
 	return out
 
 

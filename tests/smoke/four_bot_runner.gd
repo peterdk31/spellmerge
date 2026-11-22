@@ -2,16 +2,16 @@ extends Node
 ## The 4-bot smoke test as a node: four bots join on virtual devices and play the
 ## run's first fight through the real input path. They start in the hub (the owner, 2026-11-20,
 ## after #886; `Frames.record` of `hub_requested`), as players do: each bot plays its hub errand
-## (tests/bots/bot_hub.gd): bots 1-3 draw their starting builds from the hub's dice
-## (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and bot 2's three staffs: its
+## (bench/bots/bot_hub.gd): bots 1-3 draw their starting builds from the hub's dice
+## (bench/bots/bot_builds.gd: a fighter's strong staff and a dash, and bot 2's three staffs: its
 ## mend, a dash and the rack's Firebolt taken with A as its attack), each staff set with
 ## `staff_cards_requested` from a bag stocked for it (`BuildsScript.stock`, put back when the node
 ## goes), and all four walk onto the teleporter stone, where bot 1 presses A once it is lit: the run
 ## starts from the stone and every wizard carries its loadout in. The run is the crypt's biome
 ## (connected biomes CB8), from its start room over a bridge to the nearest fight (the bots travel,
-## tests/bots/bot.gd). Bots 1-3 fight; bot 4 opens its builder with B (`back`) as the run starts and
+## bench/bots/bot.gd). Bots 1-3 fight; bot 4 opens its builder with B (`back`) as the run starts and
 ## idles in it the whole run (the full builder, fights included), and the fighters' brains (the
-## enemies' AI, tests/bots/bot.gd) play what they built.
+## enemies' AI, bench/bots/bot.gd) play what they built.
 ##
 ## It passes only if
 ##  - `room_cleared` is received for a fight room (the start room's, a shop's or a reward room's,
@@ -25,7 +25,7 @@ extends Node
 ##    the mender's rack staff on a hand, as the run starts and at the end) and no `build_refused`
 ##    arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
-##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
+##    restart failed" warning (bench/error_log.gd, which has a unit test; it
 ##    starts after the autoloads load, so errors during startup are not covered).
 ## If the run does not start within HUB_LIMIT game seconds in the hub, or is not cleared within
 ## TIME_LIMIT game seconds of its start, the test fails.
@@ -44,7 +44,7 @@ extends Node
 ##
 ## build/linux-test/Spellmerge.x86_64 --headless -- --four-bot
 ##
-## The performance probe (tests/benchmark/probe.gd) rides along and prints `BENCH:`
+## The performance probe (bench/probe.gd) rides along and prints `BENCH:`
 ## lines at the end; it gates nothing.
 ##
 ## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1. The seed
@@ -82,11 +82,11 @@ extends Node
 ## replay seed and run seed it played.
 signal finished(failures: Array[String], replay_seed: int, run_seed: int)
 
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
-const ProbeScript := preload("res://tests/benchmark/probe.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
+const ProbeScript := preload("res://bench/probe.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
 
 const PLAYERS: int = 4
 ## The index of the bot that idles in its builder (bot 4).
@@ -94,7 +94,7 @@ const IDLER: int = 3
 ## The seed of the replay the hub is recorded into, which deals the hub's seed and then the run's
 ## (see the class doc; 11: it was 8 for a while, since the crypt's longer treasure line laid seed
 ## 11's map with a corner walkway out of the start room the bots' travel could not cross; they walk
-## every walkway since 2026-11-19, tests/bots/bot_route.gd, and win it again. Since the bots start
+## every walkway since 2026-11-19, bench/bots/bot_route.gd, and win it again. Since the bots start
 ## in the hub, 2026-11-20, the run is the replay's second and seed 11 lays another map; the bots win
 ## it too, so the pin stays). Changing it, or content that changes how
 ## this run's fight goes, can make the run end otherwise: a failure then is the same on every start.

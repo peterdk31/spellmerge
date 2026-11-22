@@ -10,7 +10,7 @@ extends "res://tests/support/suite.gd"
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
 const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")
-const BOT_PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
+const BOT_PROFILE: AIProfile = preload("res://bench/bots/bot_profile.tres")
 
 const ROOM: StringName = &"ai_cover_room"
 ## The room: SIZE (a wall in its last cell fixes it; a room is never under the screen's size), the

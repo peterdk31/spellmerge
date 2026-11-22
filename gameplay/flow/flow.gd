@@ -148,7 +148,7 @@ extends Node
 ## in together (the gate: everyone, downed or far away); its boss's intro opens as it is entered. The
 ## boss's room cleared opens the portal home: every standing wizard in it wins the run, back to the hub;
 ## everyone down loses it, back to the hub too. A test plays a map of its own (`start_biome`), or a
-## room of its choosing pinned as a biome of that room alone (tests/support/pinned_run.gd).
+## room of its choosing pinned as a biome of that room alone (bench/pinned_run.gd).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 

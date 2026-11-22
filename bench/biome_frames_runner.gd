@@ -1,4 +1,4 @@
-extends "res://tests/benchmark/stress_runner.gd"
+extends "res://bench/stress_runner.gd"
 ## The performance pass's measure (the owner, 2026-11-20; targets 16.7 ms a frame on desktop and
 ## 33 ms on the web): four local players in a generated crypt biome of 16 rooms, busy fights in the
 ## rooms they stand in, drawn by the game's own split screen (Feel's `split_screen.gd`) in both of
@@ -36,7 +36,7 @@ extends "res://tests/benchmark/stress_runner.gd"
 ##
 ## Started by `biome_frames.gd` (it needs a window: a GPU, or `xvfb-run`, where llvmpipe draws).
 
-const DrawCensusScript := preload("res://tests/benchmark/draw_census.gd")
+const DrawCensusScript := preload("res://bench/draw_census.gd")
 const SEEDS: PackedInt64Array = [11, 23, 37]
 ## A map with fewer rooms than this is reported (the crypt makes 12 to 16; the pass measures 16).
 const ROOMS_WANTED: int = 16
@@ -84,6 +84,11 @@ var _shot_taken: bool = false
 var _census: bool = false
 var _census_taken: bool = false
 const SHOTS_DIR: String = "user://biome_frames"
+## A summary of each scenario measured, in the order run (`_report_more`): `label`, the frame's
+## `frame_ms`, `p95_ms` and `worst_ms`, and a frame's mean `sim_ms` (the Tick's steps), `feel_ms`
+## (Feel's step, 0 when it cannot time its parts), `gpu_ms`, `render_cpu_ms`, `draw_calls` and
+## `primitives`. The shipped benchmark's table (bench/benchmark.gd).
+var summaries: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -118,7 +123,7 @@ static func picture_asked(args: PackedStringArray) -> Vector2i:
 
 
 ## Every scenario: for each seed, the two splits apart at the desktop's and the web's load, and the
-## wizards together once at each load (the one picture both splits share).
+## wizards together once at each load: the one picture both splits share.
 static func scenario_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for seed in SEEDS:
@@ -333,10 +338,11 @@ static func _draws(viewport: Viewport) -> bool:
 
 ## The screen as last drawn, saved as `SHOTS_DIR/<label>.png` (spaces as underscores).
 func _save_shot(label: String) -> void:
-	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
+	DirAccess.make_dir_recursive_absolute("user://biome_frames")
 	var image: Image = get_viewport().get_texture().get_image()
 	var path: String = "%s/%s.png" % [SHOTS_DIR, label.replace(" ", "_")]
-	if image != null and image.save_png(path) == OK:
+	# Written out as SHOTS_DIR (the rules want a literal user:// path).
+	if image != null and image.save_png("user://biome_frames/" + label.replace(" ", "_") + ".png") == OK:
 		print("BENCH: biome frames %s: screen saved to %s" % [label, ProjectSettings.globalize_path(path)])
 
 
@@ -432,6 +438,8 @@ func _report_more(label: String) -> void:
 	for kind: String in kinds:
 		parts.append("%s %.2f (cpu %.2f)" % [kind, _gpu_by_kind[kind] / float(frames), _cpu_by_kind.get(kind, 0.0) / float(frames)])
 	print("BENCH: biome frames %s gpu (ms a frame): %s" % [label, ", ".join(parts)])
+	var summary: Dictionary = {"label": label, "frame_ms": total / float(frames), "p95_ms": sorted[int(float(frames - 1) * 0.95)], "worst_ms": sorted[frames - 1], "sim_ms": tick_total / float(frames), "feel_ms": 0.0, "gpu_ms": gpu_total / float(frames), "render_cpu_ms": cpu_total / float(frames), "draw_calls": calls_total / float(frames), "primitives": primitives_total / float(frames)}
+	summaries.append(summary)
 	var profile: PackedInt64Array = _feel.get(&"step_profile") if _feel != null and _feel.has_method(&"profile_parts") else PackedInt64Array()
 	if not profile.is_empty():
 		var names: PackedStringArray = _feel.get(&"PROFILE_PARTS")
@@ -441,6 +449,7 @@ func _report_more(label: String) -> void:
 			feel_total += profile[i]
 			feel_parts.append("%s %.3f" % [names[i], float(profile[i]) / float(frames) / 1000.0])
 		print("BENCH: biome frames %s feel parts (ms a frame, total %.3f): %s" % [label, float(feel_total) / float(frames) / 1000.0, ", ".join(feel_parts)])
+		summary["feel_ms"] = float(feel_total) / float(frames) / 1000.0
 		_feel.set(&"step_profile", PackedInt64Array())
 	var order: Array[int] = []
 	for i in frames:

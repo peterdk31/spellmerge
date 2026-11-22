@@ -11,8 +11,8 @@ extends "res://tests/support/screenshot.gd"
 ## (`sounds`, and `doubled sound`: one id started twice at one place in one frame), `one body hit
 ## twice in a frame by one caster's card`, and every error logged; `PLAYTEST downs` the downs by
 ## bot. The arguments are in tests/README.md (`bots/`). The bots start in the hub (the owner,
-## 2026-11-20, after #886), as players do: each plays its hub errand (tests/bots/bot_hub.gd), drawing
-## its build from the hub's dice (tests/bots/bot_builds.gd: a fighter's strong staff and a dash, and
+## 2026-11-20, after #886), as players do: each plays its hub errand (bench/bots/bot_hub.gd), drawing
+## its build from the hub's dice (bench/bots/bot_builds.gd: a fighter's strong staff and a dash, and
 ## with two or more P2's mend, dash and the rack's Firebolt taken as its attack), and all walk onto
 ## the teleporter stone, where P1 starts the run; `PLAYTEST heals` says what each bot's heals gave to
 ## teammates and to foes. `--plain` plays the starter staffs instead and `--build` the smoke test's
@@ -25,9 +25,9 @@ extends "res://tests/support/screenshot.gd"
 ## `--sturdy` heals the standing wizards every half second: a playtest looks for rough edges on the way
 ## to the boss, not at the balance (the seed sweep's, tests/smoke/four_bot_sweep.gd).
 
-const BotScript := preload("res://tests/bots/bot.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 const STUCK_TICKS: int = 600

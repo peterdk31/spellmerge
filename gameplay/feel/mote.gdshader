@@ -97,20 +97,19 @@ const float RISE_SPEED = 2.0;
 
 // The mote's pixel (its shape's middle), its shade and the shade hotter, its glow, its shape (the
 // atlas's square: kind's row, frame's column), the way it is turned (cos, sin; 1, 0 unturned),
-// and the world pixel drawn.
+// and the world pixel drawn. A lit-only mote: 1 (else 0), the shade its life allows now (0 white-hot
+// ... 3 shadow), and its base and shadow shades (m_hot and m_rgb are then its white-hot and light
+// ones). The small ones go together in a vector (`m_cell_turn`: the shape's square, then the turn;
+// `m_shade`: the glow, the lit-only flag, the life's shade), since the Vulkan renderer gives every
+// varying a slot of its own and a GPU has 32 (2026-11-22, D1: 33 failed to compile there).
 varying flat vec2 m_at;
 // Where a lit-only mote is in the world (as drawn): the light it reads.
 varying flat vec2 m_world;
 varying flat vec3 m_rgb;
 varying flat vec3 m_hot;
-varying flat float m_glow;
-varying flat vec2 m_cell;
-varying flat vec2 m_turn;
+varying flat vec4 m_cell_turn;
+varying flat vec3 m_shade;
 varying vec2 m_px;
-// A lit-only mote: 1 (else 0), the shade its life allows now (0 white-hot ... 3 shadow), and its
-// base and shadow shades (m_hot and m_rgb are then its white-hot and light ones).
-varying flat float m_lit;
-varying flat float m_life_shade;
 varying flat vec3 m_mid;
 varying flat vec3 m_lo;
 
@@ -175,11 +174,8 @@ void vertex() {
 	m_world = vec2(0.0);
 	m_rgb = vec3(0.0);
 	m_hot = vec3(0.0);
-	m_glow = 0.0;
-	m_cell = vec2(0.0);
-	m_turn = vec2(1.0, 0.0);
-	m_lit = 0.0;
-	m_life_shade = 3.0;
+	m_cell_turn = vec4(0.0, 0.0, 1.0, 0.0);
+	m_shade = vec3(0.0, 0.0, 3.0);
 	m_mid = vec3(0.0);
 	m_lo = vec3(0.0);
 	vec4 light_of = alive ? texelFetch(kind_table, ivec2(3, k), 0) : vec4(0.0);
@@ -231,17 +227,16 @@ void vertex() {
 		VERTEX = p;
 		m_px = p;
 		m_at = pixel;
-		m_glow = lit;
-		m_cell = vec2(frame, float(k)) * float(SHAPE_SIZE);
-		m_turn = turn;
+		m_shade.x = lit;
+		m_cell_turn = vec4(vec2(frame, float(k)) * float(SHAPE_SIZE), turn);
 		if (!lit_only) {
 			m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, shade);
 			m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, max(shade - 1, 0));
 		} else {
 			// In through its shades and out again: its first shade at the middle of its life.
 			float rise = min((1.0 - abs(2.0 * t / life - 1.0)) * RISE_SPEED, 1.0);
-			m_lit = 1.0;
-			m_life_shade = clamp(3.0 - floor(rise * (4.0 - shade_from)), shade_from, 3.0);
+			m_shade.y = 1.0;
+			m_shade.z = clamp(3.0 - floor(rise * (4.0 - shade_from)), shade_from, 3.0);
 			m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, 0);
 			m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, 1);
 			m_mid = mote_shade(source, INSTANCE_CUSTOM.rgb, s, 2);
@@ -253,13 +248,13 @@ void vertex() {
 void fragment() {
 	vec2 d = floor(m_px) - m_at;
 	// The shape's pixel this one is: turned back by its way, to the nearest pixel.
-	vec2 q = round(vec2(m_turn.x * d.x + m_turn.y * d.y, -m_turn.y * d.x + m_turn.x * d.y));
+	vec2 q = round(vec2(m_cell_turn.z * d.x + m_cell_turn.w * d.y, -m_cell_turn.w * d.x + m_cell_turn.z * d.y));
 	float half_size = float(SHAPE_SIZE / 2);
 	float mark = 0.0;
 	if (abs(q.x) <= half_size && abs(q.y) <= half_size) {
-		mark = texelFetch(shape_atlas, ivec2(m_cell + q + half_size), 0).r;
+		mark = texelFetch(shape_atlas, ivec2(m_cell_turn.xy + q + half_size), 0).r;
 	}
-	if (m_lit > 0.5) {
+	if (m_shade.y > 0.5) {
 		// Lit only: as bright as the light under it, no brighter than its life allows.
 		if (mark <= 0.25) {
 			discard;
@@ -271,7 +266,7 @@ void fragment() {
 			discard;
 		}
 		float step_of = most >= lit_steps.w ? 0.0 : (most >= lit_steps.z ? 1.0 : (most >= lit_steps.y ? 2.0 : 3.0));
-		float shade = max(step_of, m_life_shade);
+		float shade = max(step_of, m_shade.z);
 		vec3 rgb = shade < 0.5 ? m_hot : (shade < 1.5 ? m_rgb : (shade < 2.5 ? m_mid : m_lo));
 		COLOR = vec4(rgb * mix(vec3(1.0), shine / max(most, 0.0001), lit_hue), 1.0);
 	} else if (mark > 0.75) {
@@ -280,6 +275,6 @@ void fragment() {
 		COLOR = vec4(m_rgb, 1.0);
 	} else {
 		// The glow round a hot mote: light added, no alpha.
-		COLOR = vec4(m_rgb * m_glow * 0.5 * falloff(length(d), half_size + GLOW_REACH), 0.0);
+		COLOR = vec4(m_rgb * m_shade.x * 0.5 * falloff(length(d), half_size + GLOW_REACH), 0.0);
 	}
 }

@@ -98,7 +98,7 @@ jobs:
           key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
           ci/build/build.sh --quick
       - id: prepare
         env:
@@ -283,7 +283,7 @@ jobs:
           key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
           ci/build/build.sh --quick
       - id: prepare
         env:
@@ -483,7 +483,7 @@ jobs:
           key: godot-${{ hashFiles('after/ci/build/godot.env') }}
       - name: Virtual display
         if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
       - name: After (this PR)
         if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         working-directory: after

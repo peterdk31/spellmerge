@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the bots' starting builds (tests/bots/bot_builds.gd) and the mend bot (tests/bots/bot.gd,
+## Tests for the bots' starting builds (bench/bots/bot_builds.gd) and the mend bot (bench/bots/bot.gd,
 ## `build_drawn`, `foe_in_line`): every build of the table is valid by the card rules on the staffs
 ## it goes on (the starter staffs, and the mender's rack staff: no card wasted, one cast a staff, the
 ## attack hurts, the dash moves its caster, the mend heals and hurts nobody), the bag builds each,
@@ -9,8 +9,8 @@ extends "res://tests/support/suite.gd"
 ## of fire. Its rack staff is put on its LB
 ## here as the hub's rack would give it (tests/bots/test_bot_hub.gd takes it from the rack).
 
-const BotScript := preload("res://tests/bots/bot.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

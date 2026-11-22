@@ -33,7 +33,7 @@ Regular enemies: a body, its staffs and how it plays them. Enemies create the "r
 
 1. Copy the example folder and rename it.
 2. Edit the `.tres` values and the scene; replace the sprites (see `docs/STYLE.md`).
-3. Give it staffs (`staffs`) and a profile (one of `profiles/` or its own); try it in play: a run of its biome stands it (`biomes`, `cost`, `min_depth`), and a test plays it in a run of one room (`tests/support/pinned_run.gd`). (The sandbox's enemy arena and its AI view went with the sandbox, crypt rework CR-S.)
+3. Give it staffs (`staffs`) and a profile (one of `profiles/` or its own); try it in play: a run of its biome stands it (`biomes`, `cost`, `min_depth`), and a test plays it in a run of one room (`bench/pinned_run.gd`). (The sandbox's enemy arena and its AI view went with the sandbox, crypt rework CR-S.)
 4. Add each asset to `art/manifest.json`; commit the `.uid` files Godot creates.
 5. Run the checks below, then open a PR with a short GIF of the enemy in action.
 

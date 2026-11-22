@@ -1,7 +1,7 @@
 class_name AISight
 extends RefCounted
 ## What an AI sees of walls (owner, 2026-11-01: "handle walls better ... also useful for
-## enemies"): shared by the enemy AI (`ai.gd`) and the test bots (`tests/bots/bot.gd`), so every
+## enemies"): shared by the enemy AI (`ai.gd`) and the test bots (`bench/bots/bot.gd`), so every
 ## AI reads walls one way. It asks the projectile manager's wall grid, which holds the room's
 ## walls and every live solid shot (a Wall card's, whoever cast it): the same grid shots stop on,
 ## so "clear" means a shot along the line would get through. A walk also asks of the ground of the

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A boss's intro as the game's (docs/milestones/boss-intro.md, rule 2, step BI2), on the real
 ## autoloads: a test boss made here (the imp's body, with an intro), the boss of a copy of the crypt
-## arena pinned as a one-room biome (tests/support/pinned_run.gd). The game stops on the room's tick
+## arena pinned as a one-room biome (bench/pinned_run.gd). The game stops on the room's tick
 ## with the boss's id open (a biome room entered through its gate: test_gather_doors.gd), only for a
 ## boss with an intro and the
 ## run's rule on; any seat turns a page, a stale page is ignored, the last page lets the game go; it
@@ -12,7 +12,7 @@ extends "res://tests/support/suite.gd"
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")

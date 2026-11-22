@@ -16,8 +16,8 @@ extends "res://tests/support/suite.gd"
 ## A failure names the seed and the staff, so it can be replayed: change `SEED` or `STAFFS`, or
 ## build the staff by hand in the arena.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
-const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const FuzzerScript := preload("res://bench/bots/staff_fuzzer.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
 
 const SEED: int = 20261026
 ## Random staffs tried.

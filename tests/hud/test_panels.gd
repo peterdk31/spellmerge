@@ -600,7 +600,8 @@ func _panel_source() -> String:
 ## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd); the corner panel
 ## itself sends nothing. (Tested in test_quick.gd.)
 func test_the_panel_scripts_send_only_the_player_intents() -> void:
-	check(not _panel_source().contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone, an item or its altar")
+	# A staff row's own `live_changed` (its live parts over the cached picture) is no bus event.
+	check(not _panel_source().replace("live_changed.emit(", "").contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone, an item or its altar")
 
 
 func test_the_panel_scripts_read_no_input() -> void:

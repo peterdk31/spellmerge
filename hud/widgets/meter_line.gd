@@ -23,6 +23,18 @@ const TRACK_COLOR: Color = Color(0.07, 0.06, 0.1, 0.9)
 @export var fill_color: Color = HEALTH_COLOR
 @export var track_color: Color = TRACK_COLOR
 
+## Drawn by another (`draw_onto`, over a cached panel's picture: `player_panel.gd`): its own
+## `_draw` draws nothing, and a change of what it shows is told by `looks_changed`, not a redraw.
+var live: bool = false:
+	set(value):
+		if value != live:
+			live = value
+			queue_redraw()
+			looks_changed.emit()
+
+## What `draw_onto` draws changed (while `live`).
+signal looks_changed
+
 ## The share of the width the fill goes to, 0 to 1; -1 before any value.
 var _share: float = -1.0
 ## The drawn fill and the fill it goes to, in whole pixels.
@@ -45,9 +57,13 @@ func set_value(value: float, most: float) -> void:
 	var first: bool = _share < 0.0
 	_share = share
 	_target = _pixels(share)
-	if first:
+	set_process(_shown != _target)
+	if first and _shown != _target:
 		_shown = _target
-	_go()
+		set_process(false)
+		_redraw()
+	# Else only `step` changes what is drawn: a value told again (a mana regained every frame, a
+	# pixel short of the next) draws nothing, so a cached panel is not drawn again for it.
 
 
 ## Forget the value: the next `set_value` is drawn at once.
@@ -56,7 +72,7 @@ func reset() -> void:
 	_shown = 0
 	_target = 0
 	set_process(false)
-	queue_redraw()
+	_redraw()
 
 
 ## The share of the width the value is, 0 to 1 (-1 before any value; for tests).
@@ -81,7 +97,7 @@ func step() -> void:
 		return
 	var move: int = maxi(1, ceili(absi(gap) / 3.0))
 	_shown += mini(move, absi(gap)) * signi(gap)
-	queue_redraw()
+	_redraw()
 	if _shown == _target:
 		set_process(false)
 
@@ -91,13 +107,27 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	if not live:
+		draw_onto(self, Vector2.ZERO)
+
+
+## Draw the line on `target` with its top left at `at` (its own `_draw`, or a cached panel's live
+## layer while `live`).
+func draw_onto(target: CanvasItem, at: Vector2) -> void:
 	var height: float = floorf(size.y)
 	var width: float = floorf(size.x)
 	if height <= 0.0 or width <= 0.0:
 		return
-	draw_rect(Rect2(0.0, 0.0, width, height), track_color)
+	target.draw_rect(Rect2(at.x, at.y, width, height), track_color)
 	if _shown > 0:
-		draw_rect(Rect2(0.0, 0.0, float(_shown), height), fill_color)
+		target.draw_rect(Rect2(at.x, at.y, float(_shown), height), fill_color)
+
+
+func _redraw() -> void:
+	if live:
+		looks_changed.emit()
+	else:
+		queue_redraw()
 
 
 func _pixels(share: float) -> int:
@@ -119,4 +149,4 @@ func _on_resized() -> void:
 
 func _go() -> void:
 	set_process(_shown != _target)
-	queue_redraw()
+	_redraw()

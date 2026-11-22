@@ -30,11 +30,23 @@ extends PanelContainer
 ##
 ## While the player has a menu open the staff rows hide: the builder shows the staffs, and the
 ## radial builder's column takes the space under the panel.
+##
+## **Drawn once** (the owner, 2026-11-21; `hud/widgets/cached_view.gd`): everything in the panel but
+## its see-through backing is drawn into a picture of its own (`%Cache`) only on a frame something
+## on it changed (a number, a word, a staff's plan or timing, a key, a count, a cooldown's sweep,
+## a binding, a row shown or hidden, the panel laid out again), and shown as one picture
+## meanwhile: the backing and the picture are the panel's two draw calls while nothing changes.
+## The backing stays drawn live, so the see-through pixels over the world are blended as before.
+## So do the parts that move most frames of a fight: each staff row's glyph shade and rim and its
+## mana line are drawn over the picture by one live layer (`_live`, plain rects: one draw call),
+## from the rows' places, again whenever one of them changes (`StaffRow.live_changed`) or the
+## picture is (`CachedView.marked`), so a cooldown's sweep never draws the picture again.
 
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
+const CachedViewScript := preload("res://hud/widgets/cached_view.gd")
 ## The staff rows' least width: all of a 96 px panel inside its 4 px margins, as before the quick-use
 ## cross stood beside them always, so a short staff still shows whole and the panel grows by the
 ## cross instead (inside a quarter pane of the Equal split).
@@ -77,6 +89,8 @@ var _unspent: int = 0
 ## The staff rows and the quick-use cross beside them (`set_quick`).
 var _lower: HBoxContainer = null
 var _quick: QuickCrossScript = null
+## Drawn over the picture: the rows' parts that move most frames (`_draw_live`).
+var _live: Control = null
 
 @onready var _seat_row: Control = %SeatRow
 @onready var _seat: Label = %Seat
@@ -84,6 +98,7 @@ var _quick: QuickCrossScript = null
 @onready var _health_line: MeterScript = %HealthLine
 @onready var _health_value: Label = %HealthValue
 @onready var _staffs: VBoxContainer = %Staffs
+@onready var _cache: CachedViewScript = %Cache
 
 
 func _ready() -> void:
@@ -94,6 +109,7 @@ func _ready() -> void:
 		row.name = "StaffRow%d" % (staff + 1)
 		row.player = player
 		row.staff = staff
+		row.live = true
 		row.visible = false
 		_staffs.add_child(row)
 		_rows.append(row)
@@ -142,8 +158,41 @@ func _ready() -> void:
 	_held_note.add_theme_font_size_override(&"font_size", 8)
 	rows_box.add_child(_held_note)
 	rows_box.move_child(_held_note, _purse_row.get_index())
+	_live = Control.new()
+	_live.name = "Live"
+	_live.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_live.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_live.draw.connect(_draw_live)
+	_cache.add_child(_live)
+	_cache.marked.connect(_live.queue_redraw)
+	for row in _rows:
+		row.live_changed.connect(_live.queue_redraw)
 	_align_rows()
 	_refresh_status()
+
+
+## The live layer over the picture: each shown row's glyph shade and rim and its mana line, at the
+## row's place in the content (the same place in the picture and drawn live).
+func _draw_live() -> void:
+	var origin: Vector2 = _cache.content().get_global_transform().origin
+	for row in _rows:
+		if row.live and row.is_visible_in_tree():
+			row.draw_live_onto(_live, row.get_global_transform().origin - origin)
+
+
+## Draw the panel as it was drawn before it was cached (`on`): its content out of the picture
+## and each row drawing its own shade and mana line; off, back to the picture and the live layer.
+## A diagnostic: the screenshots compare the two (`tests/screenshots/shot_panel_cache.gd`).
+func set_drawn_live(on: bool) -> void:
+	for row in _rows:
+		row.live = not on
+	_cache.set_live(on)
+	_live.queue_redraw()
+
+
+## The live layer drawn over the panel's picture (for tests).
+func live_layer() -> Control:
+	return _live
 
 
 ## Show the health. A player with no health left is shown as down. Mana is not shown here: each
@@ -276,6 +325,11 @@ func set_quick_recharge(slot: int, left: float, whole: float, at_once: bool = fa
 ## The quick-use cross (for tests and screenshots).
 func quick_cross() -> QuickCrossScript:
 	return _quick
+
+
+## The picture the panel's content is drawn into (for tests and the benchmark's census).
+func cache() -> CachedViewScript:
+	return _cache
 
 
 ## Show staff `staff` (0-3) as the plan of `staff_changed` says (`Spells.staff_view`), with

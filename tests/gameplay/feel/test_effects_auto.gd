@@ -47,8 +47,8 @@ func test_slow_frames_step_down_a_row_at_a_time_and_fast_ones_back_up() -> void:
 	var heavy: Array = [24.0, 30.0, 40.0]
 	check(_play(auto, heavy, 1.8).is_empty(), "slow for under 2 s: no change yet")
 	check(_play(auto, heavy, 0.5) == [MEDIUM], "slow for 2 s: one row down")
-	check(_play(auto, heavy, 1.5).is_empty(), "the next row waits its own 2 s")
-	check(_play(auto, heavy, 1.0) == [LOW], "still slow, and the drop helped: low")
+	check(_play(auto, heavy, 3.2).is_empty(), "the drop judged (2 s), then the next row waits its own 2 s")
+	check(_play(auto, heavy, 1.5) == [LOW], "still slow, and the drop helped: low")
 	check(_play(auto, heavy, 10.0).is_empty(), "low stays low")
 	# The fight ends: fast at every row.
 	var light: Array = _flat(14.0)
@@ -118,11 +118,45 @@ func test_a_machine_at_the_edge_of_a_row_settles_on_the_lower() -> void:
 func test_held_by_the_split_budget() -> void:
 	var auto := EffectsAutoScript.new(false)
 	auto.reset(LOW as EffectsQualityScript.Level)
-	check(_play(auto, _flat(14.0), 20.0, true).is_empty(), "fast while the split's fallbacks are taken: no rise")
-	check(_play(auto, _flat(14.0), 3.5).is_empty(), "let go: the fast frames held back are not counted")
-	check(_play(auto, _flat(14.0), 2.0) == [MEDIUM], "up after 5 s of its own")
+	check(_play(auto, _flat(14.0), 19.0, true).is_empty(), "fast while the split's fallbacks are taken: no rise (their rungs given back instead)")
+	auto.rise_blocked = false
+	check(_play(auto, _flat(14.0), 5.5) == [MEDIUM], "let go: up within 5 s")
 	check(_play(auto, [12.0, 30.0, 30.0], 10.0, false, true).is_empty(), "slow while the budget can still take a rung: the budget acts, not Auto")
 	check(_play(auto, [12.0, 30.0, 30.0], 2.5) == [LOW], "the budget on its last rung: Auto drops")
+
+
+func test_while_held_a_rise_is_a_rung_given_back_and_a_retaken_rung_makes_the_next_wait() -> void:
+	var auto := EffectsAutoScript.new(false)
+	auto.reset(MEDIUM as EffectsQualityScript.Level)
+	check(_play(auto, _flat(14.0), 4.5, true).is_empty() and not auto.rise_blocked, "fast for 4.5 s while held: nothing yet")
+	_play(auto, _flat(14.0), 1.0, true)
+	check(auto.rise_blocked and int(auto.level) == MEDIUM, "5 s fast while held: a rise blocked (the budget's rung to give back), the row kept")
+	auto.rise_blocked = false
+	auto.failed_try()
+	check_equal(auto.rise_wait, EffectsAutoScript.RISE_SECONDS * 2.0, "the budget took it back soon: the next try waits twice as long")
+	var budget := SplitBudgetScript.new(false)
+	budget.rung = 2
+	budget.give_back()
+	check_equal(budget.rung, 1, "the budget gives a rung back")
+	budget.set_floor(1.0 / 50.0)
+	check(is_equal_approx(budget.target, 0.02), "and takes the display's floor too")
+
+
+func test_the_budgets_last_rung_has_its_own_time_before_auto_drops() -> void:
+	var auto := EffectsAutoScript.new(false)
+	check(_play(auto, _flat(30.0), 3.0, false, true).is_empty(), "slow while the budget climbs: Auto waits")
+	check(_play(auto, _flat(30.0), 1.8).is_empty(), "the last rung taken: 2 s of its own first")
+	check(_play(auto, [12.0, 12.0, 30.0], 0.5) == [MEDIUM], "still slow: Auto drops")
+
+
+func test_a_drop_that_did_not_help_is_tried_again_in_time() -> void:
+	var auto := EffectsAutoScript.new(false)
+	check(_play(auto, _flat(25.0), 10.0) == [MEDIUM, HIGH], "undone")
+	check(_play(auto, [12.0, 12.0, 40.0], 5.0) == [MEDIUM], "the frames much slower than then (the effects the cost now): a drop again")
+	auto.reset()
+	_play(auto, _flat(25.0), 10.0)
+	var later: Array[int] = _play(auto, [12.0, 12.0, 25.0], EffectsAutoScript.RISE_MOST + 1.0)
+	check(not later.is_empty() and later[0] == MEDIUM, "or, a minute on, tried again (%s)" % [later])
 
 
 ## The setting reaches no line of the simulation (no hash, no SessionRules, no InputFrame): its names

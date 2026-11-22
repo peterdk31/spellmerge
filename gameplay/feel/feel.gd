@@ -569,6 +569,9 @@ var effects_mode: int = EffectsSetting.HIGH
 ## `effects_mode` is AUTO. The one place the effects' row is chosen; the split screen's budget
 ## (`split_budget.gd`) only adds its own fallbacks on top while split, and holds it from rising.
 var effects_auto: EffectsAutoScript = EffectsAutoScript.new()
+## Seconds until the display's shortest frame is read again, and the split budget's rung last frame.
+var _floor_wait: float = 0.0
+var _rung_seen: int = 0
 ## The split camera's HUD corners last sent to the HUD (`hud_corners_changed`), by its count.
 var _corners_sent: int = 0
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
@@ -2860,7 +2863,7 @@ func set_effects_mode(mode: int) -> void:
 	effects_mode = EffectsSetting.snap(mode)
 	if effects_mode == EffectsSetting.AUTO:
 		effects_auto.reset()
-		effects_auto.set_floor(shortest_frame())
+		_floor_wait = 0.0
 		_spectacle.set_effects_quality(effects_auto.level)
 	else:
 		_spectacle.set_effects_quality(EffectsQualityScript.of_setting(effects_mode))
@@ -2869,16 +2872,33 @@ func set_effects_mode(mode: int) -> void:
 ## The watcher stepped by this drawn frame (`real_delta` seconds), its row drawn when it changes while
 ## the setting is Auto. One ladder while split: the split screen's budget (`split_budget.gd`, faster
 ## to act) takes its fallbacks first and Auto drops a row only once the budget is on its last rung;
-## Auto does not rise while the budget has a fallback taken. With one picture the budget's rung
-## changes nothing drawn, so it holds nothing.
+## while the budget has a fallback taken, frames fast long enough for a rise have the budget give
+## a rung back instead (a try: the budget taking it again soon makes the next wait longer). With one
+## picture the budget's rung changes nothing drawn, so it holds nothing.
 func _step_effects(real_delta: float) -> void:
+	_floor_wait -= real_delta
+	if _floor_wait <= 0.0:
+		# The display (a window moved to another screen) or the frame cap may change: read again a second.
+		_floor_wait = 1.0
+		var shortest: float = shortest_frame()
+		effects_auto.set_floor(shortest)
+		if split_screen != null:
+			split_screen.budget.set_floor(shortest)
 	if effects_mode != EffectsSetting.AUTO:
 		return
-	var split: bool = split_screen != null and split_screen.is_drawing()
-	var rung: int = split_screen.budget.rung if split else 0
+	var split: bool = split_screen != null and split_screen.views().size() > 1
+	var budget: SplitBudgetScript = split_screen.budget if split_screen != null else null
+	var rung: int = budget.rung if split else 0
+	if split and rung > _rung_seen:
+		effects_auto.failed_try()
 	var last_rung: int = SplitBudgetScript.RUNG_MOTES.size() - 1
 	if effects_auto.step(real_delta, split and rung > 0, split and rung < last_rung):
 		_spectacle.set_effects_quality(effects_auto.level)
+	if effects_auto.rise_blocked:
+		effects_auto.rise_blocked = false
+		if split:
+			budget.give_back()
+	_rung_seen = budget.rung if split else 0
 
 
 ## The shortest frame this machine draws (seconds; 0: none known): the display's refresh and the

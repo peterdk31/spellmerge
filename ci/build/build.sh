@@ -303,7 +303,7 @@ screenshots() {
       display=(xvfb-run --server-num=$((100 + ${#scripts[@]})) --server-args="-screen 0 1280x720x24")
     fi
     (XDG_DATA_HOME="$runs/$name" godot_checked "shot-$name" "${display[@]}" "$GODOT" --path . \
-      --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script "res://$script" \
+      --rendering-method gl_compatibility --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script "res://$script" \
       || touch "$runs/$name.failed") &
   done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
   wait
@@ -317,10 +317,29 @@ screenshots() {
     done
   done
   ls -l build/screenshots
+  display=()
+  ((virtual)) && display=(xvfb-run --server-num=99 --server-args="-screen 0 1280x720x24")
+  renderer_shaders "${display[@]}" || failed+=("tests/smoke/renderer_shaders.gd")
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"
     return 1
   fi
+}
+
+# Every shader compiled and drawn by both renderers (D1, 2026-11-22): the web's (Compatibility,
+# OpenGL) and the desktop builds' (Mobile, Vulkan; lavapipe on a runner, `mesa-vulkan-drivers`).
+# Without a Vulkan driver the Vulkan pass only warns. The arguments are the display to draw on.
+renderer_shaders() {
+  local status=0
+  godot_checked renderer-shaders-gl "$@" "$GODOT" --path . --rendering-method gl_compatibility \
+    --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd || status=1
+  if compgen -G "/usr/share/vulkan/icd.d/*.json" >/dev/null; then
+    godot_checked renderer-shaders-vulkan "$@" "$GODOT" --path . --rendering-method mobile \
+      --rendering-driver vulkan --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd || status=1
+  else
+    echo "::warning::no Vulkan driver (sudo apt-get install mesa-vulkan-drivers), so the shaders were not checked on Vulkan"
+  fi
+  return $status
 }
 
 # The recorder saves one folder per clip to user://clips/ (the format is in ci/smbot/clips.py);

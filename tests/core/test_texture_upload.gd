@@ -33,15 +33,18 @@ func test_a_frame_uploads_at_once_then_once_more_at_its_draw() -> void:
 	var upload := TextureUpload.new()
 	var image: Image = _image(2, 2, 0.0)
 	upload.hand(image)
-	check_equal(upload.uploads, 1, "the frame's first hand uploads at once")
+	await process_frame
+	# Making the texture is not a frame's upload; the next frame's first hand updates it at once.
+	upload.hand(image)
+	check_equal(upload.uploads, 2, "the frame's first hand uploads at once")
 	for value: int in [10, 20, 30]:
 		image.set_pixel(0, 0, Color8(value, 0, 0))
 		upload.hand(image)
-	check_equal(upload.uploads, 1, "a later hand the same frame waits for the frame's draw")
+	check_equal(upload.uploads, 2, "a later hand the same frame waits for the frame's draw")
 	RenderingServer.frame_pre_draw.emit()
-	check_equal(upload.uploads, 2, "and uploads once there")
+	check_equal(upload.uploads, 3, "and uploads once there")
 	check_equal(upload.last_handed().get_pixel(0, 0).r8, 30, "the image as it was at the draw")
-	check_equal(upload.image_count(), 2, "into a second image: the first is still the render thread's")
+	check_equal(upload.image_count(), 3, "into an image of its own: the frame's others are still the render thread's")
 
 
 func test_a_new_texture_then_a_picture_the_same_frame_uploads_the_picture_at_once() -> void:

@@ -25,6 +25,10 @@ extends "res://bench/stress_runner.gd"
 ## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer, the light a world pixel at a
 ## time (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
 ## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
+## `--thread-compare` holds the game still halfway through and draws the same frame threaded and on one
+## thread, comparing them pixel for pixel (`_compare_threads`).
+## `--one-thread` runs Feel's per-frame pieces on the main thread alone (gameplay/feel/feel_jobs.gd;
+## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
@@ -37,6 +41,7 @@ extends "res://bench/stress_runner.gd"
 ## Started by `biome_frames.gd` (it needs a window: a GPU, or `xvfb-run`, where llvmpipe draws).
 
 const DrawCensusScript := preload("res://bench/draw_census.gd")
+const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
 const SEEDS: PackedInt64Array = [11, 23, 37]
 ## A map with fewer rooms than this is reported (the crypt makes 12 to 16; the pass measures 16).
 const ROOMS_WANTED: int = 16
@@ -80,6 +85,10 @@ var _panel_draws_seen: int = 0
 ## `--shots`: whether to save a screen a scenario, and whether this scenario's is saved.
 var _shots: bool = false
 var _shot_taken: bool = false
+## `--thread-compare`: whether to draw a held frame on Feel's worker threads and on one thread and
+## compare the two pixel for pixel, and whether this scenario's is done (`_compare_threads`).
+var _thread_compare: bool = false
+var _compared: bool = false
 ## `--census`: whether to print a draw census a scenario, and whether this scenario's is printed.
 var _census: bool = false
 var _census_taken: bool = false
@@ -99,6 +108,7 @@ func _init() -> void:
 	result_word = "BIOME FRAMES"
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	_shots = args.has("--shots")
+	_thread_compare = args.has("--thread-compare")
 	_census = args.has("--census")
 	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
 	# a scenario plays the same (stress_runner.gd's `fixed_frames`); `--real-clock` as the game runs.
@@ -188,7 +198,13 @@ func _scenario_started(scenario: Dictionary) -> void:
 	_rescan_left = 0.0
 	_counting = false
 	_shot_taken = false
+	_compared = false
 	_census_taken = false
+	if _feel != null and _feel.has_method(&"set_effect_threads"):
+		# Feel's per-frame pieces on the worker threads (feel_jobs.gd) unless `--one-thread`.
+		var threaded: bool = FeelJobsScript.default_threaded() and not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--one-thread")
+		_feel.call(&"set_effect_threads", threaded)
+		print("BENCH: biome frames %s effect threads: %s, %d cores, renderer thread model %d" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), int(ProjectSettings.get_setting("rendering/driver/threads/thread_model", 1))])
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
 
@@ -291,6 +307,9 @@ func _process(delta: float) -> void:
 	if _shots and not _shot_taken and _elapsed >= warm_up + measure * 0.5:
 		_shot_taken = true
 		_save_shot(String(rows[scenarios[_current]]["label"]))
+	if _thread_compare and not _compared and _elapsed >= warm_up + measure * 0.5:
+		_compared = true
+		_compare_threads(String(rows[scenarios[_current]]["label"]))
 	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:
 		_census_taken = true
 		DrawCensusScript.report(get_tree(), String(rows[scenarios[_current]]["label"]))
@@ -344,6 +363,53 @@ func _save_shot(label: String) -> void:
 	# Written out as SHOTS_DIR (the rules want a literal user:// path).
 	if image != null and image.save_png("user://biome_frames/" + label.replace(" ", "_") + ".png") == OK:
 		print("BENCH: biome frames %s: screen saved to %s" % [label, ProjectSettings.globalize_path(path)])
+
+
+## The game held still (the tree paused, Feel not stepping) and the same frame drawn on Feel's worker
+## threads, again so, then on one thread (gameplay/feel/feel_jobs.gd): the light grid is worked out
+## anew at every drawn frame from the lights it holds, so the frames compare the threaded light (a
+## view a thread in a split) with the light on one thread. Prints `BENCH: biome frames <label> thread
+## compare: <n> px differ threaded twice, <m> px differ threaded against one thread` and saves the
+## two frames (`<label>_threads.png`, `<label>_one.png`). Its window's times are not the game's.
+func _compare_threads(label: String) -> void:
+	if _feel == null or not _feel.has_method(&"set_effect_threads"):
+		return
+	var tree: SceneTree = get_tree()
+	var was_threaded: bool = _feel.call(&"set_effect_threads", true)
+	tree.paused = true
+	_feel.set_process(false)
+	# The first held frames let go of what was handed for one frame only (flashes, beams).
+	for i in 4:
+		await RenderingServer.frame_post_draw
+	var threaded: Image = get_viewport().get_texture().get_image()
+	await RenderingServer.frame_post_draw
+	var again: Image = get_viewport().get_texture().get_image()
+	var one_threaded: bool = _feel.call(&"set_effect_threads", false)
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var one: Image = get_viewport().get_texture().get_image()
+	print("BENCH: biome frames %s thread compare: %d px differ threaded twice, %d px differ threaded (%s) against one thread (%s)" % [label, _pixels_differ(threaded, again), _pixels_differ(threaded, one), "on" if was_threaded else "off", "off" if not one_threaded else "on"])
+	DirAccess.make_dir_recursive_absolute("user://biome_frames")
+	threaded.save_png("user://biome_frames/" + label.replace(" ", "_") + "_threads.png")
+	one.save_png("user://biome_frames/" + label.replace(" ", "_") + "_one.png")
+	_feel.call(&"set_effect_threads", true)
+	_feel.set_process(true)
+	tree.paused = false
+
+
+## How many pixels of `a` and `b` differ (all of them when their sizes differ).
+static func _pixels_differ(a: Image, b: Image) -> int:
+	if a == null or b == null or a.get_size() != b.get_size():
+		return -1
+	a.convert(Image.FORMAT_RGBA8)
+	b.convert(Image.FORMAT_RGBA8)
+	var da: PackedByteArray = a.get_data()
+	var db: PackedByteArray = b.get_data()
+	var differ: int = 0
+	for i in range(0, da.size(), 4):
+		if da[i] != db[i] or da[i + 1] != db[i + 1] or da[i + 2] != db[i + 2]:
+			differ += 1
+	return differ
 
 
 ## The Tick's profiled time so far (microseconds; 0 with no profile).

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-22: The effects on threads
+
+The owner's decision of 2026-11-22: Feel's per-frame effects on worker threads on the desktop. `FeelJobs` (gameplay/feel/feel_jobs.gd) runs independent pieces as `WorkerThreadPool` group tasks: the light grid a view a piece (the light kernel's new view range), the rooms' mists a room a piece when four or more are stepped. The same frames either way (a held frame threaded and on one thread, 0 px differ; the arrays byte for byte in `test_feel_jobs.gd`); the web and `Feel.set_effect_threads(false)` keep one thread. On this 4-core container, where llvmpipe draws on the same cores, the threads do not make frames faster (2p apart Dynamic 3 to 5 ms slower threaded); the separate render thread is much faster but logs renderer errors, so it stays off (docs/milestones/connected-biomes.md, "The effects on threads").
+
 ## 2026-11-22: One pass
 
 The owner's second step after grid lighting (docs/milestones/connected-biomes.md, "One pass"). Measured first at 1280 x 720: once the light is a grid, #902's passes cost more than they save, so the light's factor passes and the mist's pass are gone and both are worked out a world pixel at a time where they are drawn; the apply rect is the one full-screen pass (light, ambient, tints, one screen read). The mist stays its own draw under the bodies: a ground mask in the screen's alpha would merge it, but Vulkan's screen copy keeps no alpha (open with the owner). A table of the effects' cost (`EffectsQuality`, LOW and HIGH: the light's cell and smoothing, the mists' billows, the air's share) for the coming quality setting, `Spectacle.set_effects_quality`.

@@ -76,7 +76,15 @@ func size() -> Vector2:
 
 ## Once a frame, `delta` s after the last: the mist parted round the first `count` of `feet` (bodies'
 ## positions, world px) and every cell eased toward it; the texture updated when a cell changed.
+## `work` then `upload`.
 func step(delta: float, feet: PackedVector2Array, count: int) -> void:
+	work(delta, feet, count)
+	upload()
+
+
+## `step`'s part on this grid's own arrays and picture, which may run on a worker thread
+## (`feel_jobs.gd`): it touches no texture, no node and nothing another grid holds.
+func work(delta: float, feet: PackedVector2Array, count: int) -> void:
 	if _image == null:
 		return
 	delta = clampf(delta, 0.0, 0.25)
@@ -103,7 +111,12 @@ func step(delta: float, feet: PackedVector2Array, count: int) -> void:
 			_image.set_pixel(at % width, at / width, Color(now, 0.0, 0.0, 1.0))
 			_dirty = true
 	_live_count = kept
-	if _dirty:
+
+
+## `step`'s part on the main thread, after `work`: the picture handed to the texture when a cell
+## changed.
+func upload() -> void:
+	if _dirty and texture != null:
 		_dirty = false
 		texture.update(_image)
 
@@ -139,6 +152,11 @@ func parted_at(point: Vector2) -> float:
 	if x < 0 or y < 0 or x >= width or y >= height:
 		return 0.0
 	return _shown[y * width + x]
+
+
+## The picture's bytes as `work` left them (for tests: the texture's own copy is the renderer's).
+func picture_data() -> PackedByteArray:
+	return _image.get_data() if _image != null else PackedByteArray()
 
 
 ## How many cells are not closed (for tests).

@@ -115,6 +115,9 @@ var tints: PackedColorArray = PackedColorArray()
 var texture: ImageTexture = null
 ## The kernel these calls run in (null: here). Read only.
 var kernel: Object = null
+## The views the GDScript's loops light this call (`_views_from`).
+var _first_lit: int = 0
+var _last_lit: int = 0
 var _image: Image = null
 
 
@@ -195,28 +198,33 @@ func clear() -> void:
 ## The light of the first `count` rows of `rows` (STRIDE floats each), read as `kind` says (ROWS_*):
 ## `reach` and `pad` a flash's (the GPU light's `flash_reach`, `flash_pad`), `now` the clock a spot's
 ## flicker steps by, and `blocked` whether the boxes stop it (SpellLight.SHOTS_BLOCKED for shots and
-## runes).
-func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad: float, now: float, blocked: bool) -> void:
+## runes); on the views `first_view` to `first_view` + `views` - 1 only (each view's cells are its
+## own columns of the atlas, so calls for different views may run on threads of their own while the
+## kernel is loaded: `can_split`; every view by default).
+func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad: float, now: float, blocked: bool, first_view: int = 0, views: int = VIEWS_MOST) -> void:
 	count = mini(count, rows.size() / STRIDE)
-	if count <= 0 or view_count == 0:
+	if count <= 0 or not lights_views(first_view, views):
 		return
 	if kernel != null:
-		kernel.call(&"light_grid_rows", self, rows, count, kind, reach, pad, now, blocked)
+		kernel.call(&"light_grid_rows", self, rows, count, kind, reach, pad, now, blocked, first_view, views)
 		return
+	_views_from(first_view, views)
 	for i in count:
 		var at: int = i * STRIDE
 		_row(rows, at, kind, reach, pad, now, blocked)
 
 
 ## A live beam's light along the first `points` points of `path` (world x, y; z unused), `beam_reach`
-## px each side, in `colour` (its glow times its strength and fade: SpellLight works it out).
-func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: Color) -> void:
+## px each side, in `colour` (its glow times its strength and fade: SpellLight works it out); on the
+## views `first_view` to `first_view` + `views` - 1 only (as `add_rows`).
+func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: Color, first_view: int = 0, views: int = VIEWS_MOST) -> void:
 	points = mini(points, path.size())
-	if points < 2 or view_count == 0 or beam_reach <= 0.0:
+	if points < 2 or not lights_views(first_view, views) or beam_reach <= 0.0:
 		return
 	if kernel != null:
-		kernel.call(&"light_grid_beam", self, path, points, beam_reach, colour)
+		kernel.call(&"light_grid_beam", self, path, points, beam_reach, colour, first_view, views)
 		return
+	_views_from(first_view, views)
 	# At least a cell each side, as every light (`_lamp`; the kernel the same).
 	beam_reach = maxf(beam_reach, cell)
 	var r: float = colour.r
@@ -241,7 +249,7 @@ func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: 
 		var low_y: float = minf(ay, ay + dy) - beam_reach
 		var high_x: float = maxf(ax, ax + dx) + beam_reach
 		var high_y: float = maxf(ay, ay + dy) + beam_reach
-		for view in view_count:
+		for view in range(_first_lit, _last_lit):
 			var c0: int = 0
 			var c1: int = 0
 			var l0: int = 0
@@ -275,6 +283,26 @@ func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: 
 					rgb[cell_at] += r * lit
 					rgb[cell_at + 1] += g * lit
 					rgb[cell_at + 2] += b * lit
+
+
+## Whether the views from `first_view`, `views` of them, cut to the grid's, are any (read only: a
+## call on a thread of its own writes nothing here but its cells).
+func lights_views(first_view: int, views: int) -> bool:
+	var first: int = clampi(first_view, 0, view_count)
+	return clampi(first_view + maxi(views, 0), first, view_count) > first
+
+
+## The GDScript's loops light the views from `first_view`, `views` of them, cut to the grid's
+## (`_first_lit` to `_last_lit` - 1; the kernel cuts them the same way).
+func _views_from(first_view: int, views: int) -> void:
+	_first_lit = clampi(first_view, 0, view_count)
+	_last_lit = clampi(first_view + maxi(views, 0), _first_lit, view_count)
+
+
+## Whether views may be lit on threads of their own (`add_rows`' `first_view`): in the kernel only,
+## which writes a call's own cells in place; the GDScript's loops keep to one thread.
+func can_split() -> bool:
+	return kernel != null
 
 
 ## The frame's light into the texture: each cell's colour cut at 1, a byte a channel.
@@ -437,7 +465,7 @@ func _lamp(cx: float, cy: float, hx: float, hy: float, wx: float, wy: float, r: 
 			if body.w > 0.0 and minf(box.x, body.x) <= lit_x1 and maxf(box.z, body.z) >= lit_x0 and minf(box.y, body.y) <= lit_y1 and box.w >= lit_y0:
 				near |= 1 << k
 	var big: float = maxf(hx, hy)
-	for view in view_count:
+	for view in range(_first_lit, _last_lit):
 		var ox: float = view_origin[view * 2]
 		var oy: float = view_origin[view * 2 + 1]
 		var c0: int = maxi(floori((cx - big - ox) / cell), 0)

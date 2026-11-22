@@ -22,6 +22,8 @@ extends "res://tests/support/screenshot.gd"
 ## with `--every=S` one every S game seconds.
 ##
 ## The bots page a boss's intro on as a player's A would (`boss_intro_next_requested`, seat 0), and
+## `--fail-on-errors` exits with 1 when an error was logged (`PLAYTEST error` lines), so a run on a
+## separate render thread (`--rendering-method mobile --render-thread separate`) checks it logs none.
 ## `--sturdy` heals the standing wizards every half second: a playtest looks for rough edges on the way
 ## to the boss, not at the balance (the seed sweep's, tests/smoke/four_bot_sweep.gd).
 
@@ -86,6 +88,9 @@ var _healed_mates: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
 var _healed_foes: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
 var _healed_world: PackedFloat64Array = PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
 var _heals: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## `--fail-on-errors`: the run fails (exit 1) when the engine logged an error on the way (the render
+## thread's check, 2026-11-22: a whole biome played on a separate render thread logs none).
+var _fail_on_errors: bool = false
 
 
 func _init() -> void:
@@ -106,6 +111,8 @@ func take() -> void:
 			_every = arg.trim_prefix("--every=").to_int() * 60
 		elif arg == "--sturdy":
 			_sturdy = true
+		elif arg == "--fail-on-errors":
+			_fail_on_errors = true
 		elif arg == "--build":
 			_build = true
 		elif arg == "--plain":
@@ -225,6 +232,9 @@ func take() -> void:
 		bot.leave()
 	if not _plain and not _build:
 		_flow.set(&"play_bag", _bag_had)
+	var errors: int = _log.call("get_lines").size()
+	if _fail_on_errors and errors > 0:
+		fail("%d engine errors logged (PLAYTEST error lines)" % errors)
 
 
 ## A report line, with the game time.

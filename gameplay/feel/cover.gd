@@ -142,6 +142,8 @@ var _sent_count: int = 0
 ## the texture the batches read it by (`cell_times`), handed over when it changed (`_times_dirty`).
 var _times: Image = null
 var _times_texture: ImageTexture = null
+## `_times`' one upload point (core/base/texture_upload.gd: safe with a separate render thread).
+var _times_upload: TextureUpload = TextureUpload.new()
 var _times_dirty: bool = false
 ## Feel's clock at the last `step`: when a change heard since began to show.
 var _now: float = 0.0
@@ -263,7 +265,7 @@ func lay(laid: CoverLayout) -> void:
 	# Shown since the room was laid: a loop then steps evenly (a time from `NEVER` would lose the
 	# shader's float precision).
 	_times.fill(Color(NEVER, _now, 0.0, 1.0))
-	_times_texture = ImageTexture.create_from_image(_times)
+	_times_texture = _times_upload.hand(_times)
 	_times_dirty = false
 	_sent_count = -1
 	_stirs_version = -1
@@ -461,7 +463,7 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 		_walk_bodies(_near_at, _near_count, now)
 	if _times_dirty:
 		_times_dirty = false
-		_times_texture.update(_times)
+		_times_texture = _times_upload.hand(_times)
 	motes.give_off(now, pool, view)
 	_held_stirs_version = stirs_version
 	_held_hand_stirs = hand_stirs
@@ -529,7 +531,7 @@ func _on_visibility_changed() -> void:
 			_take_bodies()
 		if _times_dirty:
 			_times_dirty = false
-			_times_texture.update(_times)
+			_times_texture = _times_upload.hand(_times)
 		_hand_batches()
 
 

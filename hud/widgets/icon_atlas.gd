@@ -18,6 +18,9 @@ static var _regions: Dictionary[Texture2D, Texture2D] = {}
 ## The pages, their images, and where the next icon goes on the last (a shelf: left to right,
 ## then down by the shelf's tallest).
 static var _pages: Array[ImageTexture] = []
+## Each page's one upload point (core/base/texture_upload.gd: a page written again as icons are added
+## is safe with a separate render thread).
+static var _uploads: Array[TextureUpload] = []
 static var _images: Array[Image] = []
 static var _cursor: Vector2i = Vector2i.ZERO
 static var _shelf: int = 0
@@ -66,12 +69,13 @@ static func _copy(texture: Texture2D) -> Texture2D:
 		_shelf = 0
 	if _pages.is_empty() or _cursor.y + size.y > PAGE:
 		_images.append(Image.create_empty(PAGE, PAGE, false, Image.FORMAT_RGBA8))
-		_pages.append(ImageTexture.create_from_image(_images[-1]))
+		_uploads.append(TextureUpload.new())
+		_pages.append(_uploads[-1].hand(_images[-1]))
 		_cursor = Vector2i.ZERO
 		_shelf = 0
 	var page: Image = _images[-1]
 	page.blit_rect(image, Rect2i(Vector2i.ZERO, size), _cursor)
-	_pages[-1].update(page)
+	_uploads[-1].hand(page)
 	var region := AtlasTexture.new()
 	region.atlas = _pages[-1]
 	region.region = Rect2(_cursor, size)

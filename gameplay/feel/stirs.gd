@@ -78,6 +78,8 @@ var enabled: bool = true
 ## The window's corner cell, and its image.
 var _corner: Vector2i = Vector2i.ZERO
 var _image: Image = null
+## The texture's one upload point (core/base/texture_upload.gd: safe with a separate render thread).
+var _upload: TextureUpload = TextureUpload.new()
 ## Each cell's drag and what it shows (FIELD_W * FIELD_H), the cells that are not still (`_live`,
 ## `_live_count`; `_is_live` a byte a cell), and a spare pair the window's move fills.
 var _wake: PackedVector2Array = PackedVector2Array()
@@ -140,7 +142,7 @@ func _init() -> void:
 	# Half floats: filtered on every renderer (32-bit float textures need an extension to filter on
 	# WebGL 2 and GLES 3).
 	_image = Image.create_empty(FIELD_W, FIELD_H, false, Image.FORMAT_RGH)
-	texture = ImageTexture.create_from_image(_image)
+	texture = _upload.hand(_image)
 
 
 ## A blast at `at` of `radius` px (an explosion's part; Feel's `show_flash`), at Feel's clock `now`:
@@ -227,7 +229,7 @@ func step(now: float, births: PackedFloat32Array, count: int, view: Rect2) -> vo
 			version += 1
 	if _image_dirty:
 		_image_dirty = false
-		texture.update(_image)
+		texture = _upload.hand(_image)
 
 
 ## The window's corner cell for the view `view`: the view in its middle.

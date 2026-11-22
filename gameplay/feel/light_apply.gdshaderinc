@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The spell light's factor on the world (gameplay/feel/spell_light.gd): what the apply rect multiplies
-// the picture by (light_apply.gdshader, where it is drawn; light_factor.gdshader, into a pass at the
-// light's resolution, gameplay/feel/light_passes.gd). See light_apply.gdshader for the steps, the
+// the picture by (light_apply.gdshader, where it is drawn, a pixel at a time). See light_apply.gdshader for the steps, the
 // ambient and the rooms' tints.
 
 // The room's light where no spell lights it (1.0: as it is), and the colour of its dark

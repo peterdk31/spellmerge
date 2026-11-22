@@ -72,10 +72,6 @@ func _start_play(scenario: Dictionary) -> void:
 				if setter != &"" and _feel.has_method(setter):
 					_feel.call(setter, false)
 					print("BENCH: play frames %s: %s off" % [scenario["label"], part])
-	if (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--light-at-picture") and _feel != null and _feel.call("light") != null:
-		# The light at the picture's own resolution, as before 2026-11-21 (the A/B of PictureGrid).
-		_feel.call("light").set("fixed_resolution", false)
-		print("BENCH: play frames %s: light at the picture's resolution" % scenario["label"])
 	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		var taken: int = int(_feel.call(&"set_mote_cap", int(scenario.get("motes", MoteCap.DEFAULT_DESKTOP))))
 		print("BENCH: play frames %s: mote ring %d rows" % [scenario["label"], taken])

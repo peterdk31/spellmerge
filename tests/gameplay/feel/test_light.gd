@@ -220,7 +220,6 @@ func test_the_shaders_are_warmed_and_the_rect_reads_the_grid() -> void:
 	var light: SpellLightScript = feel.light()
 	var warmed: Array[Shader] = ShaderWarmupScript.shaders()
 	check(warmed.has(SpellLightScript.APPLY_SHADER), "the apply shader is warmed")
-	check(warmed.has(SpellLightScript.FACTOR_SHADER), "and its pass's")
 	var shade: ShaderMaterial = light.apply.material as ShaderMaterial
 	light.follow()
 	check(shade.get_shader_parameter(&"light_grid") == light.grid.texture, "the rect reads the grid")

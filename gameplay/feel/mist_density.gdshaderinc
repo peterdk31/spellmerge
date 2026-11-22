@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // A room's low floor mist, how thick it is at a world pixel (gameplay/feel/mist.gd; mist.gdshader, where it
-// is drawn; mist_pass.gdshader, into a pass at the light's resolution, gameplay/feel/light_passes.gd). See
+// is drawn, a pixel at a time). See
 // mist.gdshader for where it lies, its billows and what pushes it.
 
 #include "res://gameplay/feel/stir.gdshaderinc"
@@ -24,6 +24,9 @@ uniform float spill = 0.2;
 uniform float patchy = 0.6;
 uniform float scale = 96.0;
 uniform vec2 drift = vec2(4.0, 1.0);
+// How many layers of billows are worked out (1 to 3; EffectsQuality.mist_billows): fewer is cheaper, the
+// first layer standing for the rest.
+uniform int billows = 3;
 // Mist.THICKEST_DRAWN, STIR_SHOT_PIXELS, STIR_BLAST_PIXELS, STIR_THIN, PART_PIXELS, PART_THIN.
 const float THICKEST_DRAWN = 0.6;
 const float STIR_SHOT_PIXELS = 10.0;
@@ -81,9 +84,11 @@ float mist_density(vec2 world) {
 	// pushes it aside.
 	vec2 q = p - wake * STIR_SHOT_PIXELS - push * STIR_BLAST_PIXELS + part_way * PART_PIXELS;
 	vec2 moved = drift * view_time;
-	float n = 0.55 * mist_noise((q - moved) / scale)
-		+ 0.3 * mist_noise(mat2(vec2(0.8, -0.6), vec2(0.6, 0.8)) * (q - moved * 1.6) / scale * 2.03 + vec2(17.3, 3.1))
-		+ 0.15 * mist_noise((q + moved * 0.7) / scale * 4.1 + vec2(-5.2, 11.7));
+	float n = mist_noise((q - moved) / scale);
+	if (billows > 1) {
+		n = 0.55 * n + 0.3 * mist_noise(mat2(vec2(0.8, -0.6), vec2(0.6, 0.8)) * (q - moved * 1.6) / scale * 2.03 + vec2(17.3, 3.1));
+		n += billows > 2 ? 0.15 * mist_noise((q + moved * 0.7) / scale * 4.1 + vec2(-5.2, 11.7)) : 0.15 * n / 0.85;
+	}
 	density *= mix(1.0, smoothstep(0.25, 0.75, n) * 1.6, patchy);
 	density *= (1.0 - PART_THIN * smoothstep(0.0, 1.0, part)) * (1.0 - clamp((length(push) + length(wake) * 0.5) * STIR_THIN, 0.0, 0.85));
 	density = min(density, THICKEST_DRAWN);

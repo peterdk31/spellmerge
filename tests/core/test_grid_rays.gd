@@ -56,6 +56,12 @@ func test_the_native_rays_give_the_grids_bits() -> void:
 	var cases: int = 0
 	var long_rays: int = 0
 	var hits: int = 0
+	# The long rays' kinds met, counted on the GDScript side: seen through a mouth, a walk stopped by a
+	# hole or the props' ground, a pillar's ground on the way, a run cut short.
+	var past_mouths: int = 0
+	var walks_stopped: int = 0
+	var grounds_met: int = 0
+	var runs_cut: int = 0
 	for room in 40:
 		var origin := Vector2(rng.randf_range(-50.0, 50.0), rng.randf_range(-50.0, 50.0))
 		var grid: RoomGrid = _room(rng, room % 4, origin)
@@ -73,6 +79,14 @@ func test_the_native_rays_give_the_grids_bits() -> void:
 			var twin: PackedByteArray = _asks(grid, from, to)
 			if grid.wall_hit(from, to) >= 0.0:
 				hits += 1
+			if grid.sight_clear(from, to) and not grid.line_clear(from, to):
+				past_mouths += 1
+			if not grid.walk_clear(from, to):
+				walks_stopped += 1
+			if not grid.ground_clear(from, to):
+				grounds_met += 1
+			if from != to and grid.clear_run(from, to - from, from.distance_to(to)) < from.distance_to(to):
+				runs_cut += 1
 			WallSlide.use_native(true)
 			if native:
 				var walked: PackedByteArray = _asks(grid, from, to)
@@ -86,3 +100,4 @@ func test_the_native_rays_give_the_grids_bits() -> void:
 				long_rays += 1
 	check(cases == 8000, "every case compared: %d" % cases)
 	check(long_rays > 2000 and hits > 300, "long rays handed to the kernel (%d) and walls met (%d)" % [long_rays, hits])
+	check(past_mouths > 20 and walks_stopped > 100 and grounds_met > 20 and runs_cut > 100, "seen past a mouth (%d), walks stopped (%d), ground met (%d), runs cut short (%d)" % [past_mouths, walks_stopped, grounds_met, runs_cut])

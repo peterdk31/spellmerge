@@ -62,6 +62,9 @@ var _stale: bool = false
 ## The stirs' version last handed over (-1: hand them at the next step), and Feel's clock then.
 var _stirs_version: int = -1
 var _now: float = -1.0
+## The time `begin_step` handed the parting to step by, and whether it is due (shown this frame).
+var _part_delta: float = 0.0
+var _parting_due: bool = false
 ## Whether its room is one nobody has seen yet (`set_unseen`): not drawn, the void shows there.
 var _unseen: bool = false
 
@@ -177,14 +180,37 @@ static func _moved(rects: Array[Rect2], by: Vector2) -> Array[Rect2]:
 ## Once a frame, at Feel's clock `now`: the clock handed over, the mist parted round the first `count`
 ## of `feet` (the bodies' positions, world px), and the world's stirs handed over by `hand_stirs`
 ## (taking a ShaderMaterial: `Stirs.hand_to`) whenever `stirs_version` is not the one handed last.
+## `begin_step`, `part_step` and `end_step` in turn (Spectacle parts its rooms' mists on threads:
+## the first and last on the main thread, the middle one on a worker's).
 func step(now: float, feet: PackedVector2Array, count: int, stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
-	var delta: float = now - _now if _now >= 0.0 else 0.0
+	begin_step(now, stirs_version, hand_stirs)
+	part_step(feet, count)
+	end_step()
+
+
+## `step`'s first part, on the main thread: the clock and the stirs handed to the shader.
+func begin_step(now: float, stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+	_part_delta = now - _now if _now >= 0.0 else 0.0
 	_now = now
-	if not visible:
+	_parting_due = visible
+	if not _parting_due:
 		return
 	var shading := material as ShaderMaterial
 	_param(&"view_time", now)
-	parting.step(delta, feet, count)
 	if hand_stirs.is_valid() and stirs_version != _stirs_version:
 		_stirs_version = stirs_version
 		hand_stirs.call(shading)
+
+
+## `step`'s middle part, on any thread: the mist parted round the first `count` of `feet` on this
+## mist's own grid (`MistParting.work`).
+func part_step(feet: PackedVector2Array, count: int) -> void:
+	if _parting_due:
+		parting.work(_part_delta, feet, count)
+
+
+## `step`'s last part, on the main thread: the parting's picture handed to its texture.
+func end_step() -> void:
+	if _parting_due:
+		_parting_due = false
+		parting.upload()

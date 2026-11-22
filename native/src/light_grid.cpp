@@ -9,6 +9,13 @@
 // and the blocking's points, Vector2s, are there); a packed float32 array's element is read as a
 // float and written back rounded. What only draws keeps std:: maths (native/README.md): the spots'
 // flicker's `sin` is the C library's, as GDScript's is.
+//
+// Feel lights each view on a worker thread of its own on the desktop (gameplay/feel/feel_jobs.gd):
+// a call lights only the views it is handed (`first_view`, `views`), whose cells are their own
+// columns of the atlas, so calls for different views never write the same float and each cell's
+// sums run in the same order as on one thread. A call reads the grid's members and writes its views'
+// cells in place; it starts no thread. The name table (`gn`) is made by `check_light_grid`, on the
+// main thread, before any call.
 
 #include "light_kernel.h"
 
@@ -41,6 +48,8 @@ constexpr double LG_SPECK_REACH = 14.0, LG_RUNE_REACH = 1.5, LG_FLASH_FROM = 0.0
 constexpr double LG_SPOT_RATE = 7.0, LG_HF_LIVE = 1.0;
 constexpr int64_t LG_MATERIALS = 7, LG_ENEMY_PLAYER = 4, LG_KIND_COUNT = 22, LG_ENEMY_RAMP = 23, LG_EXACT = 24;
 constexpr int64_t LG_PALETTE_MOST = 4, LG_BLOCKERS_MOST = 32;
+// The most views a grid has (LightGrid.VIEWS_MOST): a call's views by default.
+constexpr int64_t LG_VIEWS_MOST = 4;
 constexpr double LG_INFUSION_MARK = 128.0 / 255.0;
 const double LG_P_BASE[15] = {0.231, 0.451, 0.788, 0.851, 0.278, 0.478, 0.247, 0.561, 0.310, 0.541, 0.310, 0.769, 0.651, 0.541, 0.165};
 const double LG_P_LIGHT[15] = {0.498, 0.753, 0.941, 0.961, 0.604, 0.722, 0.561, 0.831, 0.416, 0.788, 0.604, 0.941, 0.890, 0.812, 0.420};
@@ -101,6 +110,9 @@ struct Grid {
 	Arr<PackedVector4Array> boxes, bodies;
 	int64_t blockers = 0;
 	Arr<PackedColorArray> tints;
+	// The views this call lights: `first` to `last` - 1 (LightGrid's `first_view` and `views`).
+	int64_t first = 0;
+	int64_t last = 0;
 
 	bool load(Object *g) {
 		const GridNames &k = gn();
@@ -117,7 +129,15 @@ struct Grid {
 		blockers = g->get(k.blocker_count);
 		tints.load(g, k.tints);
 		blockers = clampi(blockers, 0, mini(LG_BLOCKERS_MOST, mini(boxes.n, bodies.n)));
+		first = 0;
+		last = views;
 		return views >= 0 && origin.n >= views * 2 && size.n >= views * 2 && at.n >= views * 2 && rgb.n >= width * height * 3 && cell > 0.0;
+	}
+
+	// Only the views `first_view` to `first_view` + `views` - 1 lit (LightGrid's `_views_from`).
+	void only(int64_t first_view, int64_t count) {
+		first = clampi(first_view, 0, views);
+		last = clampi(first_view + maxi(count, 0), first, views);
 	}
 
 	// GDScript's `rgb[c] += v`: the element read as a float, added in doubles, rounded back.
@@ -332,7 +352,7 @@ void lamp(Grid &gr, double cx, double cy, double hx, double hy, double wx, doubl
 	}
 	const Vector2 lamp_at((real_t)lx, (real_t)ly);
 	const double big = maxf(hx, hy);
-	for (int64_t view = 0; view < gr.views; view++) {
+	for (int64_t view = gr.first; view < gr.last; view++) {
 		const double ox = gr.origin[view * 2];
 		const double oy = gr.origin[view * 2 + 1];
 		const int64_t c0 = maxi(floori((cx - big - ox) / gr.cell), 0);
@@ -459,7 +479,8 @@ PackedStringArray LightKernel::check_light_grid(Object *object) const {
 			(int64_t)object->get("MATERIALS") == LG_MATERIALS && (int64_t)object->get("ENEMY_PLAYER") == LG_ENEMY_PLAYER &&
 			(int64_t)object->get("KIND_COUNT") == LG_KIND_COUNT && (int64_t)object->get("ENEMY_RAMP") == LG_ENEMY_RAMP &&
 			(int64_t)object->get("EXACT") == LG_EXACT && (int64_t)object->get("PALETTE_MOST") == LG_PALETTE_MOST &&
-			(double)object->get("INFUSION_MARK") == LG_INFUSION_MARK && (int64_t)object->get("BLOCKERS_MOST") == LG_BLOCKERS_MOST;
+			(double)object->get("INFUSION_MARK") == LG_INFUSION_MARK && (int64_t)object->get("BLOCKERS_MOST") == LG_BLOCKERS_MOST &&
+			(int64_t)object->get("VIEWS_MOST") == LG_VIEWS_MOST;
 	const PackedFloat64Array shades = object->get("SHADES");
 	const PackedFloat64Array base = object->get("P_BASE");
 	const PackedFloat64Array light = object->get("P_LIGHT");
@@ -477,12 +498,13 @@ PackedStringArray LightKernel::check_light_grid(Object *object) const {
 }
 
 void LightKernel::light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now,
-		bool blocked) {
+		bool blocked, int64_t first_view, int64_t views) {
 	ERR_FAIL_NULL(grid);
 	Grid gr;
 	ERR_FAIL_COND(!gr.load(grid));
+	gr.only(first_view, views);
 	count = mini(count, rows.size() / LG_STRIDE);
-	if (count <= 0 || gr.views == 0) {
+	if (count <= 0 || gr.first >= gr.last) {
 		return;
 	}
 	const float *p = rows.ptr();
@@ -491,12 +513,14 @@ void LightKernel::light_grid_rows(Object *grid, const PackedFloat32Array &rows, 
 	}
 }
 
-void LightKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour) {
+void LightKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour, int64_t first_view,
+		int64_t views) {
 	ERR_FAIL_NULL(grid);
 	Grid gr;
 	ERR_FAIL_COND(!gr.load(grid));
+	gr.only(first_view, views);
 	points = mini(points, path.size());
-	if (points < 2 || gr.views == 0 || beam_reach <= 0.0) {
+	if (points < 2 || gr.first >= gr.last || beam_reach <= 0.0) {
 		return;
 	}
 	// At least a cell each side, as every light.
@@ -523,7 +547,7 @@ void LightKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, 
 		const double low_y = minf(ay, ay + dy) - beam_reach;
 		const double high_x = maxf(ax, ax + dx) + beam_reach;
 		const double high_y = maxf(ay, ay + dy) + beam_reach;
-		for (int64_t view = 0; view < gr.views; view++) {
+		for (int64_t view = gr.first; view < gr.last; view++) {
 			const double ox = gr.origin[view * 2];
 			const double oy = gr.origin[view * 2 + 1];
 			const int64_t c0 = maxi(floori((low_x - ox) / gr.cell), 0);
@@ -587,7 +611,9 @@ void LightKernel::free_names() {
 
 void LightKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check_light_grid", "grid"), &LightKernel::check_light_grid);
-	ClassDB::bind_method(D_METHOD("light_grid_rows", "grid", "rows", "count", "kind", "reach", "pad", "now", "blocked"), &LightKernel::light_grid_rows);
-	ClassDB::bind_method(D_METHOD("light_grid_beam", "grid", "path", "points", "beam_reach", "colour"), &LightKernel::light_grid_beam);
+	ClassDB::bind_method(D_METHOD("light_grid_rows", "grid", "rows", "count", "kind", "reach", "pad", "now", "blocked", "first_view", "views"), &LightKernel::light_grid_rows, DEFVAL(0),
+			DEFVAL(LG_VIEWS_MOST));
+	ClassDB::bind_method(D_METHOD("light_grid_beam", "grid", "path", "points", "beam_reach", "colour", "first_view", "views"), &LightKernel::light_grid_beam, DEFVAL(0),
+			DEFVAL(LG_VIEWS_MOST));
 	ClassDB::bind_method(D_METHOD("light_grid_bake", "grid"), &LightKernel::light_grid_bake);
 }

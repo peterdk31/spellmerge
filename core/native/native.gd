@@ -2,7 +2,7 @@ extends RefCounted
 ## The native module (native/README.md): Spellmerge's own C++, built from source for each platform
 ## and loaded as a GDExtension (`native/spellmerge.gdextension`, written by `ci/build/native.sh`).
 ## It holds only faster versions of GDScript the game already has (the projectile manager's hot
-## loops, `ShotKernel`; the motes' trail births, `MoteKernel`; the deterministic maths, `DMathKernel`; a body's move against the walls, `BodyKernel`; a room's ground drawn at layout, `GroundKernel`), so the game runs
+## loops, `ShotKernel`; the motes' trail births, `MoteKernel`; the deterministic maths, `DMathKernel`; a body's move against the walls, `BodyKernel`; a room's ground drawn at layout, `GroundKernel`; grid lighting, `LightKernel`), so the game runs
 ## the same without it: a checkout where it was never built (slower). This file is the one place
 ## that asks whether it is there.
 ##
@@ -46,6 +46,14 @@ static func mote_kernel() -> Object:
 	if not _loaded_or_tell():
 		return null
 	return ClassDB.instantiate(&"MoteKernel")
+
+
+## A new `LightKernel` (grid lighting: `LightGrid` in gameplay/feel/light_grid.gd), or null when the
+## module is not loaded.
+static func light_kernel() -> Object:
+	if not _loaded_or_tell():
+		return null
+	return ClassDB.instantiate(&"LightKernel")
 
 
 ## A new `GroundKernel` (a room's ground drawn at layout, connected biomes CB4: `GroundDrawing` in

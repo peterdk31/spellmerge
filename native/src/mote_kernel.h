@@ -22,8 +22,6 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
-#include <godot_cpp/variant/packed_vector3_array.hpp>
-#include <godot_cpp/variant/color.hpp>
 
 namespace godot {
 
@@ -49,16 +47,8 @@ public:
 	// `MoteRegions._hand(motes, from, count, now)`: the ring's rows from `from` handed to their
 	// rooms' chunks (gameplay/feel/mote_regions.gd). Returns how many rows were handed out.
 	int64_t region_rows(Object *regions, Object *motes, int64_t from, int64_t count, double now);
-	// Grid lighting (light_grid.cpp; gameplay/feel/light_grid.gd): one line for each member or number
-	// of `grid` (a LightGrid) that is not the kernel's; then LightGrid's `add_rows`, `add_beam` and
-	// `bake` on its arrays in place.
-	PackedStringArray check_light_grid(Object *grid) const;
-	void light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now, bool blocked);
-	void light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour);
-	void light_grid_bake(Object *grid);
 	// At the module's end (register_types.cpp).
 	static void free_names();
-	static void free_grid_names();
 
 protected:
 	static void _bind_methods();

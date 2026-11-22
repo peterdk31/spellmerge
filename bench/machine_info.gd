@@ -10,10 +10,9 @@ static func facts(tree: SceneTree) -> Array[PackedStringArray]:
 	var version: Dictionary = Engine.get_version_info()
 	out.append(PackedStringArray(["Build", "%s (Godot %s)" % [BuildInfo.describe(), String(version.get("string", ""))]]))
 	out.append(PackedStringArray(["Renderer", "%s, %s %s" % [RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name(), RenderingServer.get_video_adapter_api_version()]]))
-	out.append(PackedStringArray(["GPU", "%s (%s)" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()]]))
-	out.append(PackedStringArray(["GPU driver", " ".join(OS.get_video_adapter_driver_info())]))
-	out.append(PackedStringArray(["OS", "%s %s" % [OS.get_name(), OS.get_version()]]))
-	out.append(PackedStringArray(["CPU", "%s, %d cores" % [OS.get_processor_name(), OS.get_processor_count()]]))
+	var driver: String = " ".join(OS.get_video_adapter_driver_info()).strip_edges()
+	out.append(PackedStringArray(["GPU", "%s (%s)%s" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor(), (", driver " + driver) if not driver.is_empty() else ""]]))
+	out.append(PackedStringArray(["OS and CPU", "%s %s; %s, %d cores" % [OS.get_name(), OS.get_version(), OS.get_processor_name(), OS.get_processor_count()]]))
 	var window: Vector2i = DisplayServer.window_get_size()
 	var picture: Vector2i = tree.root.content_scale_size
 	out.append(PackedStringArray(["Window", "%dx%d, picture %dx%d" % [window.x, window.y, picture.x, picture.y]]))

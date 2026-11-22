@@ -33,10 +33,18 @@ func _init(facts: PackedStringArray, header: PackedStringArray, rows: Array[Pack
 
 func _ready() -> void:
 	var panel := PanelContainer.new()
+	panel.name = "Panel"
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, MARGIN)
 	add_child(panel)
+	# A long table (many notes, a small window) scrolls rather than leaving the screen.
+	var scroll := ScrollContainer.new()
+	scroll.name = "Scroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
 	var box := VBoxContainer.new()
-	panel.add_child(box)
+	box.name = "Box"
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
 	box.add_child(_label("Spellmerge benchmark"))
 	for line in _facts:
 		box.add_child(_label(line))

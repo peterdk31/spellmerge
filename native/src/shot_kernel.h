@@ -61,6 +61,10 @@ public:
 	double threat_scan(Object *manager, const Vector2 &point, double radius, int64_t team, int64_t own, double horizon);
 	int64_t threat_fill(Object *manager, double horizon);
 	double threat_query(Object *manager, const Vector2 &point, double radius, int64_t team, int64_t own, double horizon);
+	// `nearest_target`'s search (sim-native SN3): the row of the nearest target on `layers` whose hit
+	// shape overlaps the circle, by distance to its centre, skipping rows `skip` and `skip_also`, the
+	// world's and, with a `team`, that team's; -1 for none. The grid must be ready (`_query_ready`).
+	int64_t nearest_target(Object *manager, const Vector2 &point, double radius, int64_t layers, int64_t skip, int64_t skip_also, int64_t team);
 	// `shot_places`: which places hold a shot, from the room grid's whole squares (asks handed back).
 	int64_t shot_places(Object *manager, int64_t from);
 	// The draw regions' hand-out (`DrawRegions`: `_count`, `_write`): each region's rows counted, and

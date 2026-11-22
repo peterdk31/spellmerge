@@ -62,7 +62,9 @@ static func use_native(on: bool) -> void:
 
 static func _native_kernel() -> Object:
 	var kernel: Object = NativeScript.body_kernel()
-	if kernel == null or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE}):
+	# Its methods all there (a library built before one was added runs the GDScript), and the room
+	# grid's place marks the kernel writes the same as the GDScript's.
+	if kernel == null or not kernel.has_method(&"walk") or not kernel.has_method(&"places") or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE, "NO_PLACE": RoomGrid.NO_PLACE, "ASK_GDSCRIPT": RoomGrid.ASK_GDSCRIPT}):
 		return null
 	return kernel
 
@@ -81,6 +83,12 @@ static func slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: in
 ## (`RoomGrid.gd_walk_body`).
 static func walk(walls: PackedByteArray, walk_cells: PackedByteArray, ground: PackedByteArray, holes: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, flags: int, mask: int, from: Vector2, motion: Vector2, crossed: Vector2, radius: float, reach: float) -> Vector3:
 	return _kernel.call(&"walk", walls, walk_cells, ground, holes, w, h, cell, origin, flags, mask, from, motion, crossed, radius, reach)
+
+
+## The native module's `BodyKernel.places` (sim-native SN2): every open body's place made current,
+## `RoomGrid.find_places`', which calls it only while `native_on()`.
+static func places(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, projectiles: Object, rects: Array[Rect2], cells: PackedByteArray, over: PackedByteArray, mixed: PackedByteArray, touched: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, out: PackedInt32Array) -> bool:
+	return _kernel.call(&"places", nodes, ids, count, projectiles, rects, cells, over, mixed, touched, w, h, cell, origin, out)
 
 
 ## `slide` in GDScript: the reference the native kernel mirrors, and the fallback without it.

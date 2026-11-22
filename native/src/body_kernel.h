@@ -14,14 +14,25 @@
 // one call: `Actor.move`'s grid work, the twin of `RoomGrid.gd_walk_body` (core/projectiles/room_grid.gd),
 // which calls `RoomGrid.slide_body`, `is_hole` and `touches_hole` in the order this mirrors.
 // tests/core/test_body_walk.gd compares the two to the bit.
+//
+// `places` (sim-native SN2) is Flow's room life's first pass in one call: every open body's place
+// worked out from where its node stands (`RoomGrid.place_at`, mirrored) and set as its `room`, the
+// twin of `RoomLife.gd_find_places` (gameplay/flow/room_life.gd); tests/gameplay/flow/test_room_life.gd
+// compares the two.
 
 #pragma once
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+
+#include <vector>
 
 namespace godot {
 
@@ -45,6 +56,18 @@ public:
 			int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
 			const Vector2 &crossed, double radius, double reach) const;
 
+	// `RoomLife.gd_find_places` on the bodies: for each of the first `count` actor ids in `ids`, the body
+	// whose instance id `nodes` keeps there; one in the tree that keeps `projectiles` (the manager whose
+	// grid this is) has its `room` set to the place it stands in (`RoomGrid.place_at` on
+	// the places: `rects`, the PLACE_CELL squares' `cells`, `over`, `mixed`, `touched`, `w` by `h` from
+	// `origin`), and `places[n]` is its `room` after; a missing body's is NO_PLACE (-1), and one of another manager is
+	// left to GDScript (-2, `RoomLife.ASK_GDSCRIPT`). `places` is the
+	// caller's array, sized, written in place.
+	// False, with nothing written, when the arrays do not fit: the caller runs the GDScript.
+	bool places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
+			const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
+			int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const;
+
 protected:
 	static void _bind_methods();
 
@@ -52,6 +75,8 @@ private:
 	bool _ready = false;
 	int64_t _iterations = 0;
 	double _min_stride = 0.0;
+	// `places`' copy of the places' rectangles, kept so a tick allocates nothing (numbers only).
+	mutable std::vector<Rect2> _boxes;
 };
 
 } // namespace godot

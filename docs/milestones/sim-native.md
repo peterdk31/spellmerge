@@ -1,6 +1,6 @@
 # The simulation's hot paths in C++, built for threads
 
-**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 on are each a PR of their own, in the order below, the next opened once the last is merged.
+**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 (the foes' nearest-foe search) built ("Built (SN3)"); SN4 on are each a PR of their own, in the order below, the next opened once the last is merged.
 
 **The owner's decisions (2026-11-22):**
 
@@ -46,7 +46,7 @@ Measured headless with the native module, `tick_hash.gd --profile-steps` (bots p
 
 What this says:
 
-- **A wizard's body is about 0.1 ms a tick, a foe's about a third of it.** The foes are cheap because most sleep with their rooms (connected biomes CB3): about two are stepped a tick in these runs. A crowd of awake foes (an arena, a wave) is where the AI's think grows, and its share should be measured again there (SN4).
+- **A wizard's body is about 0.1 ms a tick, a foe's about a third of it.** The foes are cheap because most sleep with their rooms (connected biomes CB3): about two are stepped a tick in these runs. A crowd of awake foes (an arena, a wave) is where the AI's think grows, and its share should be measured again there (SN3: "Built (SN3)").
 - **The move is the largest path, and the one that is pure arithmetic on arrays:** its slides, hole tests and room lookup read the room grid's packed arrays and nothing else. The rest of the move (the dash held up, the fall, the touches) sends events or calls gameplay.
 - **The caster's casts are Spells' runtime,** not a loop: hundreds of lines of GDScript making launches and shots, with events. They stay GDScript in this series; only `_push_place`'s wall clip (`clip_to_walls`, the room grid's) is arithmetic.
 - **Much of a body's cost is calls, not work:** each component step, each service asked by its node, each signal. A kernel saves the call only where many small calls become one; one call a body that does what three or four did is the shape of SN1.
@@ -58,13 +58,13 @@ Each step moves a path whose work is a pure function of arrays, keeps the order 
 | PR | What moves to C++ | Where it runs | Why in this order |
 |---|---|---|---|
 | **SN1** | **A body's walk:** `Actor.move`'s grid work in one call (`BodyKernel.walk`: the slides over holes or the plain slide, the hole under the body's end and whether its circle reaches a hole) | each body's move, in id order as now | the largest pure path (above); one native call a body where there were up to five (three slides and two hole tests); the room it ends in (`find_room`) joins in SN2 |
-| SN2 | **The body table:** a body's position, velocity, radius, walk mask and flags as columns of the actor table (structure of arrays by actor id, below), written by the body as it moves; the touches (`Actors.touching`) and `_push_place`'s clip read it | no change of order | the layout every later kernel reads; no gain of its own but the touches' |
-| SN3 | **The foes' perception** (`AIBrain._perceive`'s queries: the nearest foe in rings, the line of fire, the threat, the harm exit's cell search) as one kernel call per think over the body table and the room grid | each foe's think, in id order | the AI's arithmetic, grows with awake foes |
-| SN4 | **The bodies' step in two phases** (accepted by the owner, 2026-11-22: a new `tick_hash` baseline): every awake foe's perception worked out for the tick first, from the state as the bodies' step found it, then each body's step and move in id order as now, reading its own answer | phase 1 on the threads, phase 2 in id order | the first step with independent parts; changes the game once |
-| SN5 | **Flow's waking and Cover's cells** (`RoomLife.wake`: each body's place; Cover's harming cells) on the body table | their steps | Flow is the second largest step; its per-body loop is lookups |
+| **SN2** | **Flow's waking** (`RoomLife.wake`'s first pass: every open body's place found where its node stands and set as its `room`, in one `BodyKernel.places` call), and a native-on/native-off compare in the regular suite | Flow's step, once a tick | moved up from SN5 by SN2's profile: the waking was 0.17 ms a tick at 4p, the largest single path left (below) |
+| **SN3** | **The foes' look for their nearest foe** (`ProjectileManager.nearest_target`, which `AIBrain._find_target` asks ring by ring: `ShotKernel.nearest_target`) | each foe's think, in id order, as now | SN3's profile in a crowd (below): the target's search was the brain's largest part, not the perception |
+| SN4 | **The body table and the foes' perception in two phases** (accepted by the owner): a body's position, radius, team and flags as columns of the actor table, filled in one native pass from the nodes at the bodies' step start; every awake foe's perception (`AIBrain._perceive`'s queries) worked out from it on the threads, read in each foe's think in id order | before the bodies' steps | the one step that changes the game: a new `tick_hash` baseline |
+| SN5 | **The touches and the cover's cells** on the body table, then **whatever the profile names next** (the teleports' tell, 0.056 ms; `_push_place`'s clip) | their steps | once the table is there |
 | SN6 | **The threads' proof:** 1, 2, 4 and 8 threads, the hash every tick the same (a test and the four biomes) | | once two or more steps run as kernels with parallel parts (SN4) |
 
-SN1 to SN3 and SN5 keep the game exactly as it is. SN4 is the one step whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN4 records a new baseline.
+SN1, SN2, SN3 and SN5 keep the game exactly as it is. SN4 is the one step whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN4 records a new baseline.
 
 ## The data layout
 
@@ -81,7 +81,7 @@ The state that kernels read lives in **structure-of-arrays tables keyed by actor
 |---|---|---|---|---|
 | Projectiles' common and behaviour passes | one shot | its slot | its slot | already (`jobs::for_spans`, shot scale H5) |
 | SN4's perception | one awake foe | the body table and the room grid as the bodies' step found them, the threat grid | its row of the perception table | nothing to merge: each foe reads its own row in its step, in id order |
-| SN5's waking | one body | its position, the places | its place in a column | the rooms' wake masks combined after, in id order, by bitwise or (order-free, and exact) |
+| SN2's waking | one body | its node's place, the places | its `room` and its row of `_places` | the places awake worked out after, in id order, in GDScript (`keeps_awake` reads the bodies) |
 
 Rules for every split: a part never reads what another part of the same pass writes; anything shared (counts, sums, events) is combined on the calling thread in id or slot order; a roll is `sim.chance` with the part's own key and counter; floats are never summed across parts in a thread-dependent order. The events a step sends stay GDScript, sent in id order from the merged results.
 
@@ -111,9 +111,25 @@ Rules for every split: a part never reads what another part of the same pass wri
 - **Measured** (headless, native, `tick_hash.gd --profile-steps`, main → this, ms a tick, one run each; the other steps move by a few per cent between runs): the bodies 1p 0.293 → 0.259, 2p 0.375 → 0.357, 3p 0.468 → 0.440, 4p 0.606 → 0.551; the whole tick 1.162 → 1.052, 1.273 → 1.250, 1.407 → 1.369, 1.740 → 1.640.
 - **Found on the way, on main:** with the native module off, main's own run of the four biomes parts from its run with the module on (1p at tick 820, 2p 1464, 3p 1033, 4p 889): some kernel or its fallback is not the same to the bit as its GDScript in play, though each side-by-side test passes. This branch changes neither side. A machine without the module never plays online today (every build has it), but a desync between the two is a mirror broken somewhere; to be found with the desync report (`Desync.compare` of the two runs at that tick) before SN2.
 
+## Built (SN2): Flow's waking
+
+- **Profiled first** (4p, seed 11, timers round each part of Flow's step, a patch kept out of the tree, ms a tick): the waking (`RoomLife.wake`) 0.171, of which its first pass 0.132 over about 46 open bodies a tick (2.9 us a body: `place_at` 1.4, the rest the lookups and `keeps_awake`); the teleports' tell 0.056, the locks 0.030, `forget_gone` 0.028, the doors 0.021, the runes 0.010. So the waking moved up from SN5.
+- **One call a tick.** `RoomLife.wake`'s first pass is `RoomGrid.find_places`: the native module's `BodyKernel.places` reads each open body's node by the actor table's instance ids (in the tree, where it stands, its `room` and its manager), works out its place (the twin of `place_at`) and sets its `room` where it changed; else its twin `RoomLife.gd_find_places`, main's loop. `keeps_awake` is asked after, in id order, only of the bodies in places not yet awake (it reads only the body's own: dying, who drives it, still, its team, so asking it after every place is found gives what main gave). A body of another manager is handed back (`RoomGrid.ASK_GDSCRIPT`); a kernel that refuses its arrays, or a library built before the method, runs the twin (`find_places` false; `WallSlide` asks for `walk` and `places` and checks `NO_PLACE` and `ASK_GDSCRIPT` at `configure`). No member added or moved.
+- **The same game.** The four biomes' state hash every tick identical to main's (3cd6147) with the module on and with it off.
+- **Native on and off in the suite** (the orchestrator's ask after #916): `tests/core/test_determinism.gd` plays the fight and the storm with the kernels they reach on and with them off, every area every tick (it fails, at the storm's tick 12, with the manager's `_one` made state again); `tests/gameplay/flow/test_room_life.gd` compares the native places with the twin's over a biome's bodies scattered on rooms, bridges and the void (a third on whole 16 px cells), and plays `wake` itself with the module on and off (the places awake, the bodies asleep, every room). A mutant of the C++ (an overlapping place's `over` dropped) fails it.
+- **Measured** (headless, native, `tick_hash.gd --profile-steps`, main → this, ms a tick): Flow 1p 0.325 → 0.266, 2p 0.324 → 0.291, 3p 0.314 → 0.309 and again 0.315 → 0.289, 4p 0.366 → 0.311; the whole tick moves with the other steps' noise (1p 1.112 → 1.004, 4p 1.641 → 1.553).
+
+## Built (SN3): the foes' look for their nearest foe
+
+- **Profiled in a crowd** (`tests/benchmark/ai_step.gd`: 200 awake staffed foes round four wizards, timers round the brain's parts, a patch kept out of the tree, ms a pass): one pass of their steps 15.6, their think 7.4, of which the target's tracking (`_track_target`: `_find_target`, `nearest_foe`) 3.4, the perception 0.94, the decision 0.47, the chase 0.41, the harm's steering 0.23. The look for the nearest foe is `ProjectileManager.nearest_target` asked ring by ring (160, 480, then the whole room), which walks every target in the cells it covers and passes over the foe's own crowd one by one. So SN3 is that search, and the body table with the two-phase perception moves to SN4.
+- **One call a ring.** `nearest_target` searches in C++ when the module is loaded (`ShotKernel.nearest_target`, a new method of the class: `_query_cells`, `_query_match` and the team's rules on the manager's arrays, read through `MANAGER_FIELDS`), else `_gd_nearest_row`, main's loop. A library built before the method runs the GDScript (`_kernel_nearest`).
+- **The same game.** The four biomes' state hash every tick identical to main's with the module on and with it off.
+- **Tests:** `tests/core/test_native_kernel.gd` asks both managers the nearest targets between steps (small circles and the whole room, by a team or none, on one layer or both, again past the first found and past both: the skips change the answer) and from inside the hit pass (a chain's jump, the grid stale, rows taken away or grown since), and the native manager's kernel against its own GDScript on the same grid; a mutant (`skip_also` dropped) fails it.
+- **Measured:** the crowd (`ai_step.gd`, median ms a pass) main 16.0, this with the kernels off (`--no-native`) 15.6, on 12.7. The biomes, headless (`tick_hash.gd --profile-steps`, main 74beba1 → this, ms a tick): 1p 1.067 → 1.057, 4p 1.586 → 1.535 (the bodies 0.544 → 0.529): about two foes are awake a tick there, so the search was little of it.
+
 ## Answered by the owner (2026-11-22)
 
-1. **SN4 is accepted:** a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
+1. **The two-phase step (now SN4, after SN2's and SN3's reordering) is accepted:** a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
 2. **Threads: the best solution**, as recommended: the module's own pool (`jobs::for_spans`) inside a kernel's passes, `WorkerThreadPool` only where GDScript has several independent kernel calls to make at once ("The threading model").
 
 ## Open questions for the owner

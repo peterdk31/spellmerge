@@ -176,6 +176,15 @@ func _manager(side: int, threads: int, cap: int, table: ActorSeats.ActorsScript)
 # A kernel built against other constants or members is refused, and the manager runs its GDScript:
 # the kernel names every constant and member that does not match.
 
+## What the side-by-side compare skips may differ between the two sides, so none of it may be state:
+## the hash and a snapshot would part a game with the module from one without (`_one` was state, and
+## the four biomes' hash parted there, the native hit pass catching a homing shot up itself).
+func test_every_member_left_out_of_the_compare_is_outside_the_state() -> void:
+	var state: PackedStringArray = StateWalk.members(ManagerScript)
+	for member in NOT_COMPARED + OWN_BUFFERS:
+		check(not state.has(String(member)), "%s is left out of the compare, so it must be DERIVED or VIEW, never state" % member)
+
+
 func test_the_module_makes_a_shot_kernel() -> void:
 	if not _native_loaded():
 		return

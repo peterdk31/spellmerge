@@ -60,6 +60,15 @@ const SOLID_MOST: int = 63
 ## The bits a wizard's walk and sight see as walls: all but the mouth's.
 const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
 
+## `walk_body`'s handing of the grid to the native kernel (sim-native SN1): what the grid has laid.
+const WALK_WALLS: int = 1
+const WALK_FOOTPRINTS: int = 2
+const WALK_HOLES: int = 4
+## `walk_body`'s answer (its z): the body's end is over a hole (`is_hole`), or, not over one, its
+## circle of `reach` there touches a hole (`touches_hole`).
+const WALKED_OVER_HOLE: int = 1
+const WALKED_NEAR_HOLE: int = 2
+
 ## Not state: the room's layers (its bounds, walls, mouths and holes), laid from the room or the biome
 ## map by whoever lays them, and the grids worked out from the state (the footprints' counts, the
 ## walking grid), set up again in `rebuild_derived` (see the class doc).
@@ -764,13 +773,73 @@ func nearest_ground(point: Vector2, radius: float) -> Vector2:
 ## room's holes, whose lip a walk stops at; and, unless it goes `through_mouths` (a body a wizard
 ## drives: connected biomes CB2, `Actor.passes_mouths`), the mouths. The kernel is handed the walls,
 ## the bits of them it minds, and one other grid: the ground and the holes merged for a walk
-## (`_walk_cells`), the ground alone for a crossing.
+## (`_walk_cells`), the ground alone for a crossing. Mirrored in `walk_body`'s flags and mask and in
+## `BodyKernel.walk`'s `slide_on` (native/src/body_kernel.cpp): change them together.
 func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false, through_mouths: bool = false) -> Vector2:
 	var holes: bool = _has_holes and not crossing
 	if not _has_walls and _footprints_laid == 0 and not holes:
 		return from + motion
 	var minded: int = PAST_MOUTHS if through_mouths and _has_mouths else 255
 	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius, minded)
+
+
+## A body's whole walk over the grid (sim-native SN1, docs/milestones/sim-native.md): `Actor.move`'s
+## grid work in one call. A circle of `radius` at `from` moves by `motion`, of which `crossed` crosses
+## holes (the Mover's `crossing` for this move); in a room with holes what crosses is slid first, then
+## the walk (`slide_body`; the rules are `gd_walk_body`'s comment), and the end is looked at for holes: the
+## answer's x and y are where it ends, its z `WALKED_OVER_HOLE` when that is over a hole, else
+## `WALKED_NEAR_HOLE` when a circle of `reach` there touches one, else 0 (always 0 with no holes).
+## Runs the native module's `BodyKernel.walk` when it is loaded (`WallSlide.native_on`), else
+## `gd_walk_body`, the reference it mirrors (tests/core/test_body_walk.gd compares them to the bit).
+func walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector3:
+	if not _has_walls and _footprints_laid == 0 and not _has_holes:
+		# Nothing laid: the whole way, as `slide_body` goes, with no call made.
+		var whole: Vector2 = from + motion
+		return Vector3(whole.x, whole.y, 0.0)
+	if WallSlide.native_on():
+		var flags: int = (WALK_WALLS if _has_walls else 0) | (WALK_FOOTPRINTS if _footprints_laid != 0 else 0) | (WALK_HOLES if _has_holes else 0)
+		var minded: int = PAST_MOUTHS if through_mouths and _has_mouths else 255
+		return WallSlide.walk(_wall_cells, _walk_cells, _ground_cells, _hole_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, flags, minded, from, motion, crossed, radius, reach)
+	return gd_walk_body(from, motion, crossed, radius, through_mouths, reach)
+
+
+## `walk_body` in GDScript: the reference `BodyKernel.walk` mirrors line by line, and the fallback.
+func gd_walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector3:
+	if not _has_holes:
+		var slid: Vector2 = slide_body(from, motion, radius, false, through_mouths)
+		return Vector3(slid.x, slid.y, 0.0)
+	# In a room with holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes" 2 and 3) the move
+	# is slid in two parts: first what crosses holes (the Mover's `crossing`: its dashes and what is
+	# done to it), then its own walk, which stops at a hole's lip. One slide of the sum could not tell
+	# the parts apart. The walk:
+	# - from over a hole crosses: it is not pushed back out, so a jump onto a hole (a teleport, a
+	#   swap, a portal's exit) or a push into one keeps the body there (falling is HR-H2's);
+	# - while something crosses and the circle already reaches over a lip, is slid against the ground
+	#   alone, so it never pushes the body back out against the push, and is dropped if it would set
+	#   the centre over a hole: it never steps in;
+	# - while something crosses and the body does not walk, is not slid (a still walk would push it
+	#   back off the lip it is carried over);
+	# - otherwise stops at the lip, as at a wall.
+	var at: Vector2 = from
+	if crossed != Vector2.ZERO:
+		at = slide_body(from, crossed, radius, true, through_mouths)
+	var walk: Vector2 = motion - crossed
+	var to: Vector2 = at
+	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
+		to = at
+	elif is_hole(at):
+		to = slide_body(at, walk, radius, true, through_mouths)
+	elif crossed != Vector2.ZERO and touches_hole(at, radius):
+		var walked: Vector2 = slide_body(at, walk, radius, true, through_mouths)
+		to = at if is_hole(walked) else walked
+	else:
+		to = slide_body(at, walk, radius, false, through_mouths)
+	var found: int = 0
+	if is_hole(to):
+		found = WALKED_OVER_HOLE
+	elif touches_hole(to, reach):
+		found = WALKED_NEAR_HOLE
+	return Vector3(to.x, to.y, float(found))
 
 
 ## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its

@@ -9,6 +9,11 @@
 // tests/core/test_wall_slide.gd compares the two to the bit. The grid is handed in with each call
 // and kept by nothing: a pure function of its arguments. The constants live in the GDScript and are
 // handed over once (`configure`).
+//
+// `walk` (sim-native SN1, docs/milestones/sim-native.md) is a body's whole walk over the room grid in
+// one call: `Actor.move`'s grid work, the twin of `RoomGrid.gd_walk_body` (core/projectiles/room_grid.gd),
+// which calls `RoomGrid.slide_body`, `is_hole` and `touches_hole` in the order this mirrors.
+// tests/core/test_body_walk.gd compares the two to the bit.
 
 #pragma once
 
@@ -16,6 +21,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 namespace godot {
 
@@ -30,6 +36,14 @@ public:
 	// all but a mouth's), or it is not 0 in `ground`.
 	Vector2 slide(const PackedByteArray &cells, const PackedByteArray &ground, int64_t w, int64_t h, double cell, const Vector2 &origin,
 			const Vector2 &from, const Vector2 &motion, double radius, int64_t mask) const;
+	// `RoomGrid.gd_walk_body(from, motion, crossed, radius, through_mouths, reach)` on the grid's arrays:
+	// `walls`, `walk` (holes and ground), `ground` and `holes`, each `w` by `h` cells of `cell` pixels from
+	// `origin`; `flags` the grid's (`RoomGrid.WALK_*`: walls laid, footprints laid, holes), `mask` the
+	// wall bits the body minds. Where it ends as x and y; z the hole flags at its end
+	// (`RoomGrid.WALKED_OVER_HOLE`, `WALKED_NEAR_HOLE`: a circle of `reach` there touches a hole).
+	Vector3 walk(const PackedByteArray &walls, const PackedByteArray &walk, const PackedByteArray &ground, const PackedByteArray &holes, int64_t w,
+			int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
+			const Vector2 &crossed, double radius, double reach) const;
 
 protected:
 	static void _bind_methods();

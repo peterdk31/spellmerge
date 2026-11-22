@@ -19,16 +19,59 @@ const PATIENCE_MS: int = 15000
 const CARD: StringName = &"bolt"
 const TICKS: int = 240
 
+## Where a code points when it must reach nobody (`_unreachable`): an address on this machine at
+## which nothing listens.
+const UNREACHABLE: String = "candidate:1 1 UDP 2114977791 127.0.0.1 9 typ host"
+
 var _pair: NetPair
+## Every WebRTC handshake this test made (`_rtc`), for the guard in `after_each`.
+var _made: Array[NetRtc] = []
 
 
 func before_each() -> void:
 	_pair = null
+	_made.clear()
 
 
 func after_each() -> void:
 	if _pair != null:
 		_pair.free_all()
+	# The guard (the owner, 2026-11-22): a peer the test never links holds no real address of
+	# another. A machine answers a connectivity check before it has the other's code (RFC 8445
+	# 7.3), so one that took a real code begins a DTLS handshake nobody finishes, and its close
+	# cuts that short; on a busy machine WebRTC's thread can log that as an engine error, which
+	# fails the run with every check passing (the flake of 2026-11-22). Such a code goes through
+	# `_unreachable`.
+	for made: NetRtc in _made:
+		if made.link() == null and made.their_code() != null:
+			var held: PackedStringArray = _real_addresses(made.their_code())
+			check(held.is_empty(), "a peer never linked holds no real address of another (it took %d: hide them with _unreachable; or a link waited for never came, said above)" % held.size())
+	_made.clear()
+
+
+## A WebRTC handshake for this test, seen by the guard. Every one the test makes comes from here.
+func _rtc(stun_servers: PackedStringArray = PackedStringArray(), relay: NetRelay = null) -> NetRtc:
+	var made := NetRtc.new(stun_servers, relay)
+	_made.append(made)
+	return made
+
+
+## The addresses (with their ports) in `code` that are not UNREACHABLE's: where it could reach a
+## machine. A candidate line in its description counts too (WebRTC would take it), and so does a
+## candidate the guard cannot read. Never shown in a message (a check says how many).
+static func _real_addresses(code: NetCode) -> PackedStringArray:
+	var found: PackedStringArray = PackedStringArray()
+	var nowhere: PackedStringArray = UNREACHABLE.split(" ", false)
+	for name: String in code.names:
+		var fields: PackedStringArray = name.substr(name.find("candidate:") + 10).split(" ", false)
+		if fields.size() < 6:
+			found.append(name)
+		elif fields[4] != nowhere[4] or fields[5] != nowhere[5]:
+			found.append("%s %s" % [fields[4], fields[5]])
+	for line: String in code.sdp.split("\n", false):
+		if line.strip_edges().begins_with("a=candidate"):
+			found.append(line.strip_edges())
+	return found
 
 
 func _has_webrtc() -> bool:
@@ -51,8 +94,8 @@ func _wait(sides: Array[NetRtc], done: Callable) -> bool:
 
 ## Two machines that swapped their codes: the host's and the client's ends of the link.
 func _linked() -> Array[NetLink]:
-	var host := NetRtc.new(PackedStringArray())
-	var client := NetRtc.new(PackedStringArray())
+	var host := _rtc()
+	var client := _rtc()
 	var sides: Array[NetRtc] = [host, client]
 	check_equal(_t(host.offer()), "", "the host begins")
 	check(_wait(sides, func() -> bool: return host.code() != ""), "the host's code is made (%s)" % _t(host.problem()))
@@ -93,7 +136,7 @@ func _message(size: int, salt: int) -> PackedByteArray:
 func test_a_build_without_webrtc_says_so_and_makes_no_peer() -> void:
 	if NetWebRTC.available():
 		return
-	var host := NetRtc.new(PackedStringArray())
+	var host := _rtc()
 	check(_t(host.offer()) != "" and _t(host.problem()) != "", "Host is refused, in words (%s)" % _t(host.problem()))
 	check(host.link() == null and host.code() == "", "nothing is made")
 
@@ -109,11 +152,11 @@ func test_a_stun_server_and_a_relay_given_are_taken_and_two_machines_still_link(
 	# Every kind of address a relay service hands out (UDP, TCP, TLS): one the extension refused
 	# would stop WebRTC from starting at all.
 	var relay := NetRelay.new(PackedStringArray(["turn:127.0.0.1:9?transport=udp", "turn:127.0.0.1:9?transport=tcp", "turns:127.0.0.1:9?transport=tcp"]), "u", "p")
-	var alone := NetRtc.new(stun)
+	var alone := _rtc(stun)
 	check_equal(_t(alone.offer()), "", "a STUN server given as NetRtc.STUN is (a PackedStringArray) starts WebRTC")
 	alone.close()
-	var host := NetRtc.new(stun, relay)
-	var client := NetRtc.new(stun, relay)
+	var host := _rtc(stun, relay)
+	var client := _rtc(stun, relay)
 	var sides: Array[NetRtc] = [host, client]
 	check_equal(_t(host.offer()), "", "with a relay too")
 	check(_wait(sides, func() -> bool: return host.code() != "" or _t(host.problem()) != ""), "the host's code is made")
@@ -214,9 +257,9 @@ func test_packets_out_of_form_close_the_link() -> void:
 func test_a_code_of_the_wrong_side_or_no_code_is_refused_and_another_may_be_given() -> void:
 	if not _has_webrtc():
 		return
-	var host := NetRtc.new(PackedStringArray())
-	var client := NetRtc.new(PackedStringArray())
-	var other_host := NetRtc.new(PackedStringArray())
+	var host := _rtc()
+	var client := _rtc()
+	var other_host := _rtc()
 	var sides: Array[NetRtc] = [host, client, other_host]
 	check_equal(client.take("hello").name, OnlineWhy.BAD_CODE, "what is no code is refused, by name")
 	check_equal(_t(client.problem()), "", "and the client may still be given one")
@@ -229,9 +272,13 @@ func test_a_code_of_the_wrong_side_or_no_code_is_refused_and_another_may_be_give
 	check_equal(_t(client.take(host.code())), "", "the client takes the host's code after its refusals")
 	check(_t(client.take(host.code())) != "", "but only one")
 	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made")
-	var other_client := NetRtc.new(PackedStringArray())
+	var other_client := _rtc()
 	check_equal([other_client.take(client.code()).name, other_client.problem()], [OnlineWhy.JOINERS_CODE, null], "a joining machine refuses a joining machine's code")
-	check_equal(_t(other_client.take(other_host.code())), "", "and takes a host's after")
+	# A host's code with its addresses hidden (`_unreachable`): the other host answers a check
+	# before it has any answer (RFC 8445 7.3), so with its real address this machine would begin a
+	# DTLS handshake that its close below cuts short, and on a busy machine the handshake's thread
+	# can log that as an engine error (2026-11-22).
+	check_equal(_t(other_client.take(_unreachable(other_host.code()))), "", "and takes a host's after")
 	sides.append(other_client)
 	check_equal(_t(host.take(client.code())), "", "the host takes the client's code after its refusals")
 	check(_t(host.take(client.code())) != "", "but only one")
@@ -280,6 +327,27 @@ func test_no_link_says_why_as_far_as_the_codes_tell() -> void:
 			check(fact is int or fact is bool or fact is StringName, "a fact is a number, yes or no, or a name: never text")
 
 
+## The guard's own check: a code's real addresses are found, the one nobody answers at is not.
+func test_the_guard_finds_the_real_addresses_a_code_holds() -> void:
+	var own: String = "candidate:1 1 UDP 2114977791 192.168.1.20 59921 typ host"
+	var named: String = "candidate:1 1 UDP 2114977791 0123abcd-4567-89ab-cdef-0123456789ab.local 59921 typ host"
+	var outside: String = "candidate:2 1 UDP 1677729535 203.0.113.7 61000 typ srflx raddr 0.0.0.0 rport 0"
+	var on_port: String = "candidate:1 1 UDP 2114977791 127.0.0.1 59921 typ host"
+	check_equal(_real_addresses(_code_with([own, named, outside, on_port])).size(), 4, "every address another machine could be reached at, a .local name and this machine at another port too")
+	check_equal(_real_addresses(_code_with([UNREACHABLE])).size(), 0, "not the one nobody answers at")
+	check_equal(_real_addresses(_code_with([UNREACHABLE, outside])).size(), 1, "and one real address beside it is found")
+	var described: NetCode = _code_with([UNREACHABLE])
+	described.sdp = "v=0\r\na=candidate:1 1 UDP 2114977791 192.168.1.20 59921 typ host\r\n"
+	check_equal(_real_addresses(described).size(), 1, "and one in the description itself")
+
+
+## And every handshake the file makes is one the guard sees.
+func test_every_handshake_this_file_makes_is_seen_by_the_guard() -> void:
+	var source: String = FileAccess.get_file_as_string("res://tests/net/test_net_rtc.gd")
+	check(source != "", "the file is read")
+	check_equal(source.count("NetRtc" + ".new("), 1, "a NetRtc is made in _rtc alone")
+
+
 ## The joining machine waits as long as its player does (its code travels to the host by hand);
 ## the host, once given that code, gives up when the other machine is not found in time.
 func test_only_the_host_given_the_answer_runs_out_of_time() -> void:
@@ -287,8 +355,8 @@ func test_only_the_host_given_the_answer_runs_out_of_time() -> void:
 		return
 	var now: Array[int] = [0]
 	var clock: Callable = func() -> int: return now[0]
-	var host := NetRtc.new(PackedStringArray())
-	var client := NetRtc.new(PackedStringArray())
+	var host := _rtc()
+	var client := _rtc()
 	host.clock = clock
 	client.clock = clock
 	var sides: Array[NetRtc] = [host, client]
@@ -324,8 +392,8 @@ func test_a_code_made_before_the_address_from_outside_came_says_so_when_no_link_
 	# The STUN server asked is one that never answers: the gathering is not done in the code's time.
 	var now: Array[int] = [1000]
 	var clock: Callable = func() -> int: return now[0]
-	var host := NetRtc.new(PackedStringArray(["stun:127.0.0.1:9"]))
-	var client := NetRtc.new(PackedStringArray())
+	var host := _rtc(PackedStringArray(["stun:127.0.0.1:9"]))
+	var client := _rtc()
 	host.clock = clock
 	client.clock = clock
 	check_equal(_t(host.offer()), "", "the host begins")
@@ -413,7 +481,12 @@ func _unreachable(text: String) -> String:
 	code.mids.clear()
 	code.indexes.clear()
 	code.names.clear()
-	check(code.add_candidate(mid, index, "candidate:1 1 UDP 2114977791 127.0.0.1 9 typ host"), "an address nobody answers at")
+	var kept: PackedStringArray = PackedStringArray()
+	for line: String in code.sdp.split("\n", false):
+		if not line.strip_edges().begins_with("a=candidate"):
+			kept.append(line.strip_edges())
+	code.sdp = "\r\n".join(kept) + "\r\n"
+	check(code.add_candidate(mid, index, UNREACHABLE), "an address nobody answers at")
 	return code.to_text()
 
 

@@ -15,10 +15,10 @@ extends RefCounted
 ##   `on_render_thread` (Godot's `RenderingServer.call_on_render_thread`: at once on the web's and
 ##   CI's one thread, queued in order with the frame's other calls on the desktop's separate one), so
 ##   what an effect dispatches reads the buffers handed before it and is drawn by the frame after it.
-## - **The shaders** are GLSL sources held as text constants in a script of their own
-##   (`light_grid_compute.gd`), compiled by `compile`: GLSL has no file type of its own in the project
-##   (AGENTS.md, hard rule 2: no `.glsl`; an open question with the owner) and `RDShaderSource` is no
-##   resource a `.tres` can hold. They are compiled only behind `available()`, never on the web.
+## - **The shaders** are `.glsl` files (imported by Godot as `RDShaderFile`; AGENTS.md, hard rule 2,
+##   the owner's decision of 2026-11-22: in `core/` or `gameplay/feel/`, drawing only), each loaded
+##   with a literal `load()` only behind `available()` (so never on the web or the OpenGL fallback;
+##   never preloaded) and made by `compile`.
 ##
 ## View only: nothing here touches the simulation.
 
@@ -46,13 +46,16 @@ static func device() -> RenderingDevice:
 	return RenderingServer.get_rendering_device()
 
 
-## A compute shader made from the GLSL `glsl` on `rd` (on the render thread): its RID, or an invalid
-## RID with the compiler's error pushed.
-static func compile(rd: RenderingDevice, glsl: String, name: String) -> RID:
-	var source := RDShaderSource.new()
-	source.language = RenderingDevice.SHADER_LANGUAGE_GLSL
-	source.source_compute = glsl
-	var spirv: RDShaderSPIRV = rd.shader_compile_spirv_from_source(source)
+## A compute shader made on `rd` (on the render thread) from `file`, a `.glsl` file Godot imported:
+## its RID, or an invalid RID with the compiler's error pushed.
+static func compile(rd: RenderingDevice, file: RDShaderFile, name: String) -> RID:
+	if file == null:
+		push_error("GpuCompute: %s did not load" % name)
+		return RID()
+	if file.base_error != "":
+		push_error("GpuCompute: %s does not import: %s" % [name, file.base_error])
+		return RID()
+	var spirv: RDShaderSPIRV = file.get_spirv()
 	if spirv == null or spirv.compile_error_compute != "":
 		push_error("GpuCompute: %s does not compile: %s" % [name, spirv.compile_error_compute if spirv != null else "no SPIR-V"])
 		return RID()

@@ -3,7 +3,7 @@ extends RefCounted
 ## heaviest per-frame effects on the GPU, the desktop builds only; gameplay/feel/README.md, "The light
 ## grid on the GPU"). LightGrid's other way to work its cells out: while `LightGrid.use_gpu` holds one
 ## of these, `add_rows`, `add_beam` and `bake` hand their rows here and the shader
-## (`light_grid_compute.gd`) lights every cell and writes the atlas the readers sample
+## (`light_grid.glsl`) lights every cell and writes the atlas the readers sample
 ## (`texture`, a Texture2DRD), so the CPU neither lights a cell nor reads one back. LightGrid's own
 ## loops (and LightKernel) stay the reference and the fallback (the web, the OpenGL fallback, a GPU
 ## with no compute: `GpuCompute.available`).
@@ -96,9 +96,9 @@ var _too_many_said: bool = false
 ## The jobs the render thread runs (made once: no Callable a frame).
 var _dispatch_job: Callable = Callable()
 var _make_job: Callable = Callable()
-## The shader's GLSL (light_grid_compute.gd's SOURCE), loaded only here, on a renderer with compute:
-## the web never loads it (its export leaves the file out).
-var _glsl: String = ""
+## The shader (light_grid.glsl), loaded only here, on a renderer with a RenderingDevice: never on the
+## web or the OpenGL fallback (the web's exports leave the file out too).
+var _shader_file: RDShaderFile = null
 
 
 ## What one frame hands the render thread, written by the main thread only while the render thread
@@ -209,8 +209,7 @@ func _init() -> void:
 	_make_job = _make
 	if not GpuCompute.available():
 		return
-	var compute: GDScript = load("res://gameplay/feel/light_grid_compute.gd") as GDScript
-	_glsl = compute.get_script_constant_map().get("SOURCE", "") if compute != null else ""
+	_shader_file = load("res://gameplay/feel/light_grid.glsl") as RDShaderFile
 	GpuCompute.on_render_thread(_make_job)
 	# The atlas's RID is the render thread's: wait for it once, here, before the readers bind it.
 	RenderingServer.force_sync()
@@ -370,7 +369,7 @@ func _make() -> void:
 	_rd = GpuCompute.device()
 	if _rd == null:
 		return
-	_shader = GpuCompute.compile(_rd, _glsl, "light_grid_compute")
+	_shader = GpuCompute.compile(_rd, _shader_file, "light_grid.glsl")
 	if not _shader.is_valid():
 		return
 	_pipeline = _rd.compute_pipeline_create(_shader)

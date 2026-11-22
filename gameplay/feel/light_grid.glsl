@@ -1,14 +1,5 @@
-extends RefCounted
-## The light grid's compute shader (gameplay/feel/light_grid_gpu.gd), its GLSL source as text:
-## compiled by `GpuCompute.compile` on the render thread, on the desktop's Mobile renderer only (the
-## web never makes a LightGridGpu, so this is never compiled there). GLSL has no file type of its own
-## in the project (AGENTS.md, hard rule 2: no `.glsl`), and Godot's `RDShaderSource` is not a resource
-## a `.tres` can hold, so it is a constant here (an open question with the owner: a `.glsl` file,
-## imported by Godot as an `RDShaderFile`, would take its place).
-##
-## The shader is LightGrid's `_row`, `_lamp`, `add_beam` and `bake`, in two modes (see its head).
-
-const SOURCE: String = """#version 450
+#[compute]
+#version 450
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The light grid worked out on the GPU (gameplay/feel/light_grid_gpu.gd; the owner's decision of
 // 2026-11-22): the GDScript's and LightKernel's light grid (gameplay/feel/light_grid.gd,
@@ -481,4 +472,3 @@ void main() {
 		light_cells();
 	}
 }
-"""

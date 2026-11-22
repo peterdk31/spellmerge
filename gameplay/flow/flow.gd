@@ -923,8 +923,7 @@ func _on_loaded(next: Callable) -> void:
 ## True when nobody is playing: a test script is the main loop, or the game was started with user
 ## arguments (the automated runs).
 func _is_automated() -> bool:
-	var tree: MainLoop = Engine.get_main_loop()
-	return (tree != null and tree.get_script() != null) or not OS.get_cmdline_user_args().is_empty()
+	return CommandLine.automated()
 
 
 ## A run will start soon that cannot wait at its start (`play_load_requested`: one two machines

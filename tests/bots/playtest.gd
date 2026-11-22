@@ -22,10 +22,11 @@ extends "res://tests/support/screenshot.gd"
 ## with `--every=S` one every S game seconds.
 ##
 ## The bots page a boss's intro on as a player's A would (`boss_intro_next_requested`, seat 0), and
-## `--fail-on-errors` exits with 1 when an error was logged (`PLAYTEST error` lines), so a run on a
-## separate render thread (`--rendering-method mobile --render-thread separate`) checks it logs none.
 ## `--sturdy` heals the standing wizards every half second: a playtest looks for rough edges on the way
 ## to the boss, not at the balance (the seed sweep's, tests/smoke/four_bot_sweep.gd).
+##
+## `--fail-on-errors` exits with 1 when an error was logged (`PLAYTEST error` lines), so a run on a
+## separate render thread (`--rendering-method mobile --render-thread separate`) checks it logs none.
 
 const BotScript := preload("res://bench/bots/bot.gd")
 const ErrorLogScript := preload("res://bench/error_log.gd")

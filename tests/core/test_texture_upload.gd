@@ -44,6 +44,18 @@ func test_a_frame_uploads_at_once_then_once_more_at_its_draw() -> void:
 	check_equal(upload.image_count(), 2, "into a second image: the first is still the render thread's")
 
 
+func test_a_new_texture_then_a_picture_the_same_frame_uploads_the_picture_at_once() -> void:
+	# The light grid at a frame's draw: grown (a cleared atlas, a new texture), then baked.
+	var upload := TextureUpload.new()
+	upload.hand(_image(2, 2, 0.0))
+	await process_frame
+	upload.hand(_image(4, 4, 0.0))
+	var baked: Image = _image(4, 4, 0.0)
+	baked.set_pixel(1, 1, Color8(200, 0, 0))
+	upload.hand(baked)
+	check_equal(upload.last_handed().get_pixel(1, 1).r8, 200, "the baked picture is handed the same frame, not a frame late")
+
+
 func test_an_image_handed_is_not_written_for_two_frames() -> void:
 	var upload := TextureUpload.new()
 	var image: Image = _image(2, 2, 0.1)
@@ -85,7 +97,7 @@ func test_no_game_script_updates_a_texture_another_way() -> void:
 		_scripts(folder, found)
 	check(found.size() > 100, "the scripts are found: %d" % found.size())
 	# A texture's `update(...)` or `set_image(...)` (split, so this file does not name them).
-	var pattern := RegEx.create_from_string("(?i)\\b(\\w*_)?(tex\\w*|pages?\\[[^\\]]*\\])\\s*\\.\\s*(up" + "date|set_im" + "age)\\(")
+	var pattern := RegEx.create_from_string("(?i)(\\b(\\w*_)?(tex\\w*|pages?\\[[^\\]]*\\])\\s*\\.\\s*(up" + "date|set_im" + "age)\\(|texture_2d_up" + "date\\()")
 	for path in found:
 		if path == UPLOAD:
 			continue

@@ -31,7 +31,7 @@ extends "res://bench/stress_runner.gd"
 ## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
-## `--held-shot` holds the game still halfway through (as `--thread-compare` does) and saves the held
+## `--held-shot` (not with `--thread-compare`) holds the game still halfway through and saves the held
 ## frame, `user://biome_frames/<label>_held_<render thread>.png` (`_save_held`), with the tick and the
 ## frame's hash (the game's state and the camera), to compare two runs (the render thread on and off:
 ## `--render-thread separate` and `safe`). The state repeats from run to run; the view does not yet,
@@ -324,7 +324,7 @@ func _process(delta: float) -> void:
 	if _thread_compare and not _compared and _elapsed >= warm_up + measure * 0.5:
 		_compared = true
 		_compare_threads(String(rows[scenarios[_current]]["label"]))
-	if _held_shot and not _held_taken and _elapsed >= warm_up + measure * 0.5:
+	elif _held_shot and not _thread_compare and not _held_taken and _elapsed >= warm_up + measure * 0.5:
 		_held_taken = true
 		_save_held(String(rows[scenarios[_current]]["label"]))
 	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:

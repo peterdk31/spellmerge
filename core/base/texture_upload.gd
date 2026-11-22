@@ -18,13 +18,16 @@ extends RefCounted
 ## **Once a frame:** the first `hand` of a frame uploads at once (a test reads it straight after);
 ## a later one that frame waits for the frame's draw (`RenderingServer.frame_pre_draw`, after every
 ## step and join of Feel's workers) and uploads the image as it is then, once: a frame that adds a
-## dozen icons to a page or a few rows to the ramp table hands the GPU two pictures, not a dozen. So
+## dozen icons to a page or a few rows to the ramp table hands the GPU two pictures, not a dozen. (A
+## second hand from inside `frame_pre_draw` itself waits for the next frame's: a frame late, or
+## overtaken by that frame's first hand; making the texture anew does not count as a hand.) So
 ## two images take turns, and at most IMAGES_MOST are held; none is made a frame once they are
 ## (`blit_rect` writes in place). On the main thread only, as every RenderingServer call; on one
 ## render thread (the web's) it is the same pictures, a copy dearer.
 
-## The frames an image handed waits before it is written again (one is enough: the frame's `sync`
-## has run every call queued before it; two for a margin).
+## The frames an image handed waits before it is written again: two, no fewer. An image handed at
+## frame N's draw (`frame_pre_draw`) is queued after N's `sync`, and the render thread may run that
+## call while frame N + 1's game code runs; only N + 1's `sync` has surely run it.
 const FRAMES_HELD: int = 2
 ## The most images an upload holds: two uploads a frame (the first, and the frame's draw) over
 ## FRAMES_HELD frames.
@@ -79,11 +82,13 @@ func _upload(image: Image, now: int) -> void:
 	own.blit_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
 	_handed[at] = now
 	_last = own
-	_uploaded_frame = now
 	uploads += 1
 	if texture != null and texture.get_width() == own.get_width() and texture.get_height() == own.get_height() and texture.get_format() == own.get_format():
 		texture.update(own)
+		_uploaded_frame = now
 	else:
+		# A new texture is not the frame's upload: the picture written into it next (the light grid
+		# grown, then baked, both at one frame's draw) uploads at once, not a frame late.
 		texture = ImageTexture.create_from_image(own)
 
 

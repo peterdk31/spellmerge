@@ -58,6 +58,8 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns", &"merged_opens",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
+## How many nearest-target asks found one (both sides alike).
+var _nearest_found: int = 0
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
 var _mgrs: Array[ManagerScript] = []
 var _targets: Array = [[], []]
@@ -434,6 +436,24 @@ func _step_the_scene_alike(threads: int) -> void:
 			if not (var_to_bytes(a) == var_to_bytes(b) and _mgrs[0].threat_slot == _mgrs[1].threat_slot
 					and var_to_bytes(_mgrs[0].threat_away) == var_to_bytes(_mgrs[1].threat_away)):
 				_differ("step %d ask %d: the same threat (%s %d %s / %s %d %s)" % [step, n, a, _mgrs[0].threat_slot, _mgrs[0].threat_away, b, _mgrs[1].threat_slot, _mgrs[1].threat_away])
+			# The nearest target (sim-native SN3, `nearest_target`: an AI's look for its nearest foe),
+			# by a team or none, past one body and another, on one layer or every one; small circles
+			# and the whole room.
+			var reach: float = [radius, radius * 6.0, 2000.0][n % 3]
+			var layers: int = [ManagerScript.LAYER_ENEMY, ManagerScript.LAYER_PLAYER, ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER][(n + step) % 3]
+			var skips: int = (n + step) % 4
+			var found: Array[String] = []
+			var near: Array[Vector2] = []
+			for side in 2:
+				var others: Array = _targets[side] as Array
+				var skip: Node2D = others[(step * 7 + n) % others.size()] if skips >= 1 else null
+				var skip_also: Node2D = others[(step * 3 + n * 5) % others.size()] if skips >= 2 else null
+				var node: Node2D = _mgrs[side].nearest_target(point, reach, layers, skip, skip_also, team)
+				found.append(String(node.name) if node != null else "")
+				near.append(_mgrs[side].nearest_point)
+			_nearest_found += 1 if found[0] != "" else 0
+			if found[0] != found[1] or var_to_bytes(near[0]) != var_to_bytes(near[1]):
+				_differ("step %d ask %d: the same nearest target (%s at %s / %s at %s)" % [step, n, found[0], near[0], found[1], near[1]])
 		_compare_arrays(step)
 		if _differences > 8:
 			return
@@ -444,6 +464,7 @@ func _step_the_scene_alike(threads: int) -> void:
 	check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 	check(_turned_back, "a circling shot bounced and went round backwards")
+	check(_nearest_found > 100, "the nearest-target asks found targets (%d)" % _nearest_found)
 	check(_circled_quad, "a still body circled, drawn as its quad")
 	var boxes_hit: int = _box_hits.filter(func(n: String) -> bool: return n.begins_with("prop")).size()
 	check(boxes_hit > 0 and _box_hits.size() > boxes_hit, "shots hit the boxes, props (%d) and enemies (%d)" % [boxes_hit, _box_hits.size() - boxes_hit])

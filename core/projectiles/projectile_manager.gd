@@ -6617,10 +6617,26 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	if not point.is_finite() or not is_finite(radius):
 		return null
 	var best: int = -1
-	var best_sq: float = INF
 	_query_ready()
 	var skip: int = _target_row(exclude)
 	var skip_also: int = _target_row(exclude_also)
+	# The search in C++ when the module is loaded (sim-native SN3: an AI's look for its nearest foe
+	# goes over the whole crowd), else here; -2 only when the kernel refused the grid.
+	if _kernel != null:
+		best = _kernel.call(&"nearest_target", self, point, radius, layers, skip, skip_also, team)
+	if best == -2 or _kernel == null:
+		best = _gd_nearest_row(point, radius, layers, skip, skip_also, team)
+	if best < 0:
+		return null
+	nearest_point = _target_pos[best]
+	return _targets[best]
+
+
+## `nearest_target`'s search in GDScript: the reference `ShotKernel.nearest_target` mirrors, and the
+## fallback. The row of the nearest target (by distance to its centre) or -1.
+func _gd_nearest_row(point: Vector2, radius: float, layers: int, skip: int, skip_also: int, team: int) -> int:
+	var best: int = -1
+	var best_sq: float = INF
 	var cells: Vector4i = _query_cells(point, radius)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
@@ -6632,10 +6648,7 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 						best_sq = d
 						best = t
 				t = _target_next[t]
-	if best < 0:
-		return null
-	nearest_point = _target_pos[best]
-	return _targets[best]
+	return best
 
 
 ## Fill `out` with the targets on `layers` that are foes of `team` (`Actors.is_foe`: not of `team`,

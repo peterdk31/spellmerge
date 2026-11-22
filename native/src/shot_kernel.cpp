@@ -2670,6 +2670,59 @@ double ShotKernel::threat_query(Object *m, const Vector2 &point, double radius, 
 	return t.slot >= 0 ? best : -1.0;
 }
 
+int64_t ShotKernel::nearest_target(Object *m, const Vector2 &point, double radius, int64_t layers, int64_t skip, int64_t skip_also, int64_t team) {
+	const Names &k = *names;
+	Arr<PackedVector2Array> target_pos, target_half;
+	Arr<PackedFloat32Array> target_radius;
+	Arr<PackedInt32Array> target_layer, target_team, target_next, cell_head;
+	Arr<PackedInt64Array> target_id;
+	target_pos.load(m, k.target_pos);
+	target_half.load(m, k.target_half);
+	target_radius.load(m, k.target_radius);
+	target_layer.load(m, k.target_layer);
+	target_team.load(m, k.target_team);
+	target_next.load(m, k.target_next);
+	cell_head.load(m, k.cell_head);
+	target_id.load(m, k.target_id);
+	const int64_t grid_w = m->get(k.grid_w);
+	const int64_t grid_h = m->get(k.grid_h);
+	const Rect2 bounds = m->get(k.bounds);
+	const double max_target_reach = m->get(k.max_target_reach);
+	ERR_FAIL_COND_V(grid_w <= 0 || grid_h <= 0 || cell_head.n < grid_w * grid_h, -2);
+	// `_query_cells`.
+	const Vector2 pad = vmul(Vector2(1, 1), MAX(radius, 0.0) + max_target_reach);
+	const Vector2 low = point - pad;
+	const Vector2 high = point + pad;
+	const int64_t x0 = clampi(floori(((double)low.x - (double)bounds.position.x) / GRID_CELL), 0, grid_w - 1);
+	const int64_t y0 = clampi(floori(((double)low.y - (double)bounds.position.y) / GRID_CELL), 0, grid_h - 1);
+	const int64_t x1 = clampi(floori(((double)high.x - (double)bounds.position.x) / GRID_CELL), 0, grid_w - 1);
+	const int64_t y1 = clampi(floori(((double)high.y - (double)bounds.position.y) / GRID_CELL), 0, grid_h - 1);
+	int64_t best = -1;
+	double best_sq = INFINITY;
+	for (int64_t y = y0; y <= y1; y++) {
+		for (int64_t x = x0; x <= x1; x++) {
+			int64_t t = cell_head[y * grid_w + x];
+			while (t >= 0) {
+				// `_query_match`, then the team's rules.
+				if ((target_layer[t] & layers) != 0 && t != skip &&
+						::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr) {
+					const double reach = MAX(radius, 0.0) + (double)target_radius[t];
+					if (gap_sq(point - target_pos[t], target_half[t]) <= reach * reach && t != skip_also && target_team[t] != TEAM_WORLD &&
+							(team == TEAM_NONE || target_team[t] != team)) {
+						const double d = (double)target_pos[t].distance_squared_to(point);
+						if (d < best_sq) {
+							best_sq = d;
+							best = t;
+						}
+					}
+				}
+				t = target_next[t];
+			}
+		}
+	}
+	return best;
+}
+
 // `shot_places`' loop from slot `from`: each live shot in a square of the room grid's
 // `_place_whole` that names a place marks it in `_places_found`, a square of none is passed by. Returns
 // the first slot GDScript must ask `place_at` about (a square of PLACE_ASK, or a shot outside the
@@ -2809,6 +2862,7 @@ void ShotKernel::region_rows(Object *regions, const PackedFloat32Array &rows, in
 }
 
 void ShotKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("nearest_target", "manager", "point", "radius", "layers", "skip", "skip_also", "team"), &ShotKernel::nearest_target);
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
 	ClassDB::bind_method(D_METHOD("set_threads", "threads"), &ShotKernel::set_threads);
 	ClassDB::bind_method(D_METHOD("get_threads"), &ShotKernel::get_threads);

@@ -46,7 +46,7 @@ Measured headless with the native module, `tick_hash.gd --profile-steps` (bots p
 
 What this says:
 
-- **A wizard's body is about 0.1 ms a tick, a foe's about a third of it.** The foes are cheap because most sleep with their rooms (connected biomes CB3): about two are stepped a tick in these runs. A crowd of awake foes (an arena, a wave) is where the AI's think grows, and its share should be measured again there (SN3).
+- **A wizard's body is about 0.1 ms a tick, a foe's about a third of it.** The foes are cheap because most sleep with their rooms (connected biomes CB3): about two are stepped a tick in these runs. A crowd of awake foes (an arena, a wave) is where the AI's think grows, and its share should be measured again there (SN3: "Built (SN3)").
 - **The move is the largest path, and the one that is pure arithmetic on arrays:** its slides, hole tests and room lookup read the room grid's packed arrays and nothing else. The rest of the move (the dash held up, the fall, the touches) sends events or calls gameplay.
 - **The caster's casts are Spells' runtime,** not a loop: hundreds of lines of GDScript making launches and shots, with events. They stay GDScript in this series; only `_push_place`'s wall clip (`clip_to_walls`, the room grid's) is arithmetic.
 - **Much of a body's cost is calls, not work:** each component step, each service asked by its node, each signal. A kernel saves the call only where many small calls become one; one call a body that does what three or four did is the shape of SN1.
@@ -59,12 +59,12 @@ Each step moves a path whose work is a pure function of arrays, keeps the order 
 |---|---|---|---|
 | **SN1** | **A body's walk:** `Actor.move`'s grid work in one call (`BodyKernel.walk`: the slides over holes or the plain slide, the hole under the body's end and whether its circle reaches a hole) | each body's move, in id order as now | the largest pure path (above); one native call a body where there were up to five (three slides and two hole tests); the room it ends in (`find_room`) joins in SN2 |
 | **SN2** | **Flow's waking** (`RoomLife.wake`'s first pass: every open body's place found where its node stands and set as its `room`, in one `BodyKernel.places` call), and a native-on/native-off compare in the regular suite | Flow's step, once a tick | moved up from SN5 by SN2's profile: the waking was 0.17 ms a tick at 4p, the largest single path left (below) |
-| SN3 | **The body table:** a body's position, radius, team and flags as columns of the actor table (structure of arrays by actor id), filled in one native pass from the nodes at the bodies' step start, and **the foes' perception** (`AIBrain._perceive`'s queries: the nearest foe in rings, the line of fire, the threat, the harm exit's cell search) worked out from it for every awake foe, on the threads (two phases, accepted by the owner) | before the bodies' steps, then each foe's think in id order reads its row | the table's first reader is the perception: a table with no reader would only cost |
-| SN4 | **The touches and the cover's cells** on the body table (`Actors.touching`, Cover's harmed bodies) | their steps | once the table is there |
-| SN5 | **Whatever the profile names next** (measured again after SN4, the tick then profiled per step again: the wizards' caster place, `_push_place`'s clip, the teleports' tell, 0.056 ms) | | |
-| SN6 | **The threads' proof:** 1, 2, 4 and 8 threads, the hash every tick the same (a test and the four biomes) | | once two or more steps run as kernels with parallel parts (SN3) |
+| **SN3** | **The foes' look for their nearest foe** (`ProjectileManager.nearest_target`, which `AIBrain._find_target` asks ring by ring: `ShotKernel.nearest_target`) | each foe's think, in id order, as now | SN3's profile in a crowd (below): the target's search was the brain's largest part, not the perception |
+| SN4 | **The body table and the foes' perception in two phases** (accepted by the owner): a body's position, radius, team and flags as columns of the actor table, filled in one native pass from the nodes at the bodies' step start; every awake foe's perception (`AIBrain._perceive`'s queries) worked out from it on the threads, read in each foe's think in id order | before the bodies' steps | the one step that changes the game: a new `tick_hash` baseline |
+| SN5 | **The touches and the cover's cells** on the body table, then **whatever the profile names next** (the teleports' tell, 0.056 ms; `_push_place`'s clip) | their steps | once the table is there |
+| SN6 | **The threads' proof:** 1, 2, 4 and 8 threads, the hash every tick the same (a test and the four biomes) | | once two or more steps run as kernels with parallel parts (SN4) |
 
-SN1, SN2, SN4 and SN5 keep the game exactly as it is. SN3 is the one step whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN3 records a new baseline.
+SN1, SN2, SN3 and SN5 keep the game exactly as it is. SN4 is the one step whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN4 records a new baseline.
 
 ## The data layout
 
@@ -72,7 +72,7 @@ The state that kernels read lives in **structure-of-arrays tables keyed by actor
 
 - **The room grid** (`RoomGrid`, the manager's): walls, walk cells, the bodies' ground, holes, mouths, places. Already packed arrays; SN1 hands them to the kernel per call, as `slide_body` does.
 - **The body table** (SN2, columns of `Actors`, sized `ACTORS`): `position: PackedVector2Array`, `velocity: PackedVector2Array`, `radius: PackedFloat32Array`, `walk_mask: PackedByteArray` (mouths passed), `team: PackedByteArray`, flags (`down`, `dying`, `spawning` as bits of one `PackedByteArray`). **One owner per datum:** a column is either the state (the node's member becomes a getter over it, DERIVED as a computed property, core/sim/README.md "Steps") or follows the node (DERIVED, written where the node changes and set up again in `rebuild_derived`), never both. SN2 starts with follow-the-node columns, so a snapshot and the hash stay exactly as they are; the columns become the state one by one as the tick-on-a-thread work needs it (the owner's later goal: then nothing a kernel reads lives on a node).
-- **Results tables:** what a parallel part writes (SN3: a foe's perception) is a row of a results table of its own, by actor id, DERIVED (scratch refilled each tick before it is read, core/sim/README.md "Steps"), read by the body's own step. A part writes only its own row; nothing in a row is a sum over others.
+- **Results tables:** what a parallel part writes (SN4: a foe's perception) is a row of a results table of its own, by actor id, DERIVED (scratch refilled each tick before it is read, core/sim/README.md "Steps"), read by the body's own step. A part writes only its own row; nothing in a row is a sum over others.
 - **The kernel reads with `get`, writes in place, keeps nothing** (native/README.md, "The object's arrays, in place"): the table sizes every array before a call; no copy of a column is kept by anyone.
 
 ## The parallel split and the merge order
@@ -80,7 +80,7 @@ The state that kernels read lives in **structure-of-arrays tables keyed by actor
 | Step | Independent part | Reads | Writes | Merged |
 |---|---|---|---|---|
 | Projectiles' common and behaviour passes | one shot | its slot | its slot | already (`jobs::for_spans`, shot scale H5) |
-| SN3's perception | one awake foe | the body table and the room grid as the bodies' step found them, the threat grid | its row of the perception table | nothing to merge: each foe reads its own row in its step, in id order |
+| SN4's perception | one awake foe | the body table and the room grid as the bodies' step found them, the threat grid | its row of the perception table | nothing to merge: each foe reads its own row in its step, in id order |
 | SN2's waking | one body | its node's place, the places | its `room` and its row of `_places` | the places awake worked out after, in id order, in GDScript (`keeps_awake` reads the bodies) |
 
 Rules for every split: a part never reads what another part of the same pass writes; anything shared (counts, sums, events) is combined on the calling thread in id or slot order; a roll is `sim.chance` with the part's own key and counter; floats are never summed across parts in a thread-dependent order. The events a step sends stay GDScript, sent in id order from the merged results.
@@ -121,7 +121,7 @@ Rules for every split: a part never reads what another part of the same pass wri
 
 ## Answered by the owner (2026-11-22)
 
-1. **SN4 (now SN3, by SN2's reordering) is accepted:** a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
+1. **The two-phase step (now SN4, after SN2's and SN3's reordering) is accepted:** a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
 2. **Threads: the best solution**, as recommended: the module's own pool (`jobs::for_spans`) inside a kernel's passes, `WorkerThreadPool` only where GDScript has several independent kernel calls to make at once ("The threading model").
 
 ## Open questions for the owner

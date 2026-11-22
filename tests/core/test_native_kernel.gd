@@ -176,6 +176,36 @@ func _manager(side: int, threads: int, cap: int, table: ActorSeats.ActorsScript)
 # A kernel built against other constants or members is refused, and the manager runs its GDScript:
 # the kernel names every constant and member that does not match.
 
+## What the side-by-side compare skips may differ between the two sides, so none of it may be state:
+## the hash and a snapshot would part a game with the module from one without (`_one` was state, and
+## the four biomes' hash parted there, the native hit pass catching a homing shot up itself).
+## The compare also passes over every member of a type it does not read (`_compare_arrays`): the
+## manager's state among them is this list, each looked at (none written by a kernel, or set round
+## an event and put back after it); a new one fails until it is compared or added here.
+const STATE_NOT_READ_BY_TYPE: Array[StringName] = [&"impact_carrier_card", &"impact_carrier", &"impact_core", &"_bounds",
+		&"_carrier_card_ids", &"_stuck_to", &"_catching_up", &"expired_on_wall", &"_grid_stale", &"_solids", &"_any_solid",
+		&"_room_grid", &"_stepping", &"ray_gates"]
+
+
+func test_every_member_left_out_of_the_compare_is_outside_the_state() -> void:
+	var state: PackedStringArray = StateWalk.members(ManagerScript)
+	var declared: PackedStringArray = StateWalk.declared(ManagerScript)
+	check(state.has("_pos"), "the manager's state is walked (its shots' places among it)")
+	for member in NOT_COMPARED + OWN_BUFFERS:
+		check(declared.has(String(member)), "%s, left out of the compare, is a member of the manager" % member)
+		check(not state.has(String(member)), "%s is left out of the compare, so it must be DERIVED or VIEW, never state" % member)
+	var mgr := own(ManagerScript.new()) as ManagerScript
+	for prop: Dictionary in mgr.get_property_list():
+		var member: StringName = prop["name"]
+		var type: int = prop["type"]
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or not state.has(String(member)):
+			continue
+		if type < TYPE_PACKED_BYTE_ARRAY and type != TYPE_INT and type != TYPE_FLOAT and type != TYPE_VECTOR2:
+			check(member in STATE_NOT_READ_BY_TYPE, "%s is state the compare passes over by its type: compare it, or look at it and add it to STATE_NOT_READ_BY_TYPE" % member)
+	for member in STATE_NOT_READ_BY_TYPE:
+		check(state.has(String(member)), "%s, listed as state the compare passes over, is state" % member)
+
+
 func test_the_module_makes_a_shot_kernel() -> void:
 	if not _native_loaded():
 		return

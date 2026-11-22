@@ -128,6 +128,7 @@ const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_dra
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
 const EffectsAutoScript := preload("res://gameplay/feel/effects_auto.gd")
+const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
@@ -2859,19 +2860,37 @@ func set_effects_mode(mode: int) -> void:
 	effects_mode = EffectsSetting.snap(mode)
 	if effects_mode == EffectsSetting.AUTO:
 		effects_auto.reset()
+		effects_auto.set_floor(shortest_frame())
 		_spectacle.set_effects_quality(effects_auto.level)
 	else:
 		_spectacle.set_effects_quality(EffectsQualityScript.of_setting(effects_mode))
 
 
 ## The watcher stepped by this drawn frame (`real_delta` seconds), its row drawn when it changes while
-## the setting is Auto. Held from rising while the split screen's budget has a fallback taken.
+## the setting is Auto. One ladder while split: the split screen's budget (`split_budget.gd`, faster
+## to act) takes its fallbacks first and Auto drops a row only once the budget is on its last rung;
+## Auto does not rise while the budget has a fallback taken. With one picture the budget's rung
+## changes nothing drawn, so it holds nothing.
 func _step_effects(real_delta: float) -> void:
 	if effects_mode != EffectsSetting.AUTO:
 		return
-	var held: bool = split_screen != null and split_screen.budget.rung > 0
-	if effects_auto.step(real_delta, held):
+	var split: bool = split_screen != null and split_screen.is_drawing()
+	var rung: int = split_screen.budget.rung if split else 0
+	var last_rung: int = SplitBudgetScript.RUNG_MOTES.size() - 1
+	if effects_auto.step(real_delta, split and rung > 0, split and rung < last_rung):
 		_spectacle.set_effects_quality(effects_auto.level)
+
+
+## The shortest frame this machine draws (seconds; 0: none known): the display's refresh and the
+## frame cap (`Engine.max_fps`), so Auto never counts a 50 Hz display's frames as slow. View only.
+static func shortest_frame() -> float:
+	var shortest: float = 0.0
+	var refresh: float = DisplayServer.screen_get_refresh_rate()
+	if refresh > 1.0:
+		shortest = 1.0 / refresh
+	if Engine.max_fps > 0:
+		shortest = maxf(shortest, 1.0 / float(Engine.max_fps))
+	return shortest
 
 
 ## Tell the HUD where each seat's corner panel and menus sit now (`hud_corners_changed`), once a

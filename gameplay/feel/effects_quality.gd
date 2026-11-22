@@ -1,6 +1,6 @@
 extends RefCounted
 ## How much the screen's effects cost (the owner's one pass, 2026-11-22; docs/milestones/connected-biomes.md,
-## "One pass"): one row of numbers a level, so a quality setting (Auto, Low, High: the coming one)
+## "One pass"): one row of numbers a level, so the quality setting ("Effects")
 ## turns every effect down by choosing a row, and nothing else knows how ("Effects", `EffectsSetting` in
 ## core/settings: Low, Medium and High a row each, Auto a row chosen by the frames' times,
 ## `effects_auto.gd`; the owner's choice of 2026-11-21). The spectacle reads it

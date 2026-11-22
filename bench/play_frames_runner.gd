@@ -32,6 +32,11 @@ const PASS_SETTERS: Dictionary[String, StringName] = {"light": &"set_spell_light
 const QUALITY_MODES: Dictionary[String, int] = {"low": EffectsSetting.LOW, "medium": EffectsSetting.MEDIUM, "high": EffectsSetting.HIGH}
 
 
+## The row each scenario's effects were drawn at, by label ("Low", "Medium", "High"; the shipped
+## benchmark's table shows it).
+var effects_drawn: Dictionary[String, String] = {}
+
+
 func _init() -> void:
 	super()
 	rows = with_quality(play_rows(), quality_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args()))
@@ -109,6 +114,7 @@ func _start_play(scenario: Dictionary) -> void:
 	if _feel != null and _feel.has_method(&"set_effects_mode"):
 		_feel.call(&"set_effects_mode", QUALITY_MODES.get(quality, EffectsSetting.HIGH))
 		var drawn: int = int(((_feel.call(&"spectacle") as Object).get(&"quality") as Object).get(&"level"))
+		effects_drawn[String(scenario["label"])] = String(EffectsQualityScript.Level.keys()[drawn]).capitalize()
 		print("BENCH: play frames %s: effects at %s" % [scenario["label"], String(EffectsQualityScript.Level.keys()[drawn]).to_lower()])
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
 		if arg.begins_with("--off=") and _feel != null:

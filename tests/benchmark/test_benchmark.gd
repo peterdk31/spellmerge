@@ -38,12 +38,27 @@ func test_the_web_scenarios_are_at_the_webs_settings() -> void:
 
 
 func test_a_row_has_a_cell_a_column() -> void:
-	var summary: Dictionary = {"label": "1p near", "frame_ms": 12.345, "p95_ms": 15.0, "worst_ms": 20.0, "sim_ms": 1.0, "feel_ms": 2.0, "gpu_ms": 3.0, "render_cpu_ms": 0.5, "draw_calls": 40.4, "primitives": 5000.0}
+	var summary: Dictionary = {"label": "1p near", "effects": "High", "frame_ms": 12.345, "p95_ms": 15.0, "worst_ms": 20.0, "sim_ms": 1.0, "feel_ms": 2.0, "gpu_ms": 3.0, "render_cpu_ms": 0.5, "draw_calls": 40.4, "primitives": 5000.0}
 	var cells: PackedStringArray = BenchmarkScript.row_cells(summary)
 	check_equal(cells.size(), BenchmarkScript.ROW_COLUMNS.size(), "a cell a column")
 	check_equal(cells[0], "1p near", "the label first")
-	check_equal(cells[1], "12.35", "ms to two places")
-	check_equal(cells[8], "40", "draw calls whole")
+	check_equal(cells[1], "High", "the effects' row it ran at")
+	check_equal(cells[2], "12.35", "ms to two places")
+	check_equal(cells[9], "40", "draw calls whole")
+
+
+## Every scenario at each row (`--quality=each`): the default labels named as the rows name them.
+func test_each_row_names_the_default_labels_with_their_row() -> void:
+	check(BenchmarkScript.labels_at(BenchmarkScript.DEFAULT_LABELS, PackedStringArray(["high"])) == BenchmarkScript.DEFAULT_LABELS, "one row: the labels as they are")
+	var each: PackedStringArray = BenchmarkScript.labels_at(PackedStringArray(["1p near"]), BenchmarkScript.quality_asked(PackedStringArray(["--quality=each"])))
+	check(each == PackedStringArray(["1p near low", "1p near medium", "1p near high"]), "each row: %s" % [each])
+	var rows: Array[Dictionary] = BenchmarkScript.with_quality(BenchmarkScript.play_rows(), PackedStringArray(["low", "high"]))
+	var labels: PackedStringArray = []
+	for row in rows:
+		labels.append(String(row["label"]))
+	for label in BenchmarkScript.labels_at(BenchmarkScript.DEFAULT_LABELS, PackedStringArray(["low", "high"])):
+		check(labels.has(label), "%s is a row" % label)
+	check(BenchmarkScript.quality_asked(PackedStringArray()) == PackedStringArray(["high"]), "high unless told")
 
 
 func test_the_table_text_is_the_facts_a_header_the_rows_and_the_notes() -> void:

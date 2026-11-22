@@ -254,6 +254,11 @@ func _ready() -> void:
 		_projectiles.set(&"native", false)
 		WallSlide.use_native(false)
 	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
+	# The effects at a fixed row (the high one; play_frames_runner.gd's `--quality=` another): never
+	# "Effects: Auto", whose row would follow how slow this run's frames are (the HUD's menu tells
+	# Feel the saved setting when it binds at boot).
+	if _feel != null and _feel.has_method(&"set_effects_mode"):
+		_feel.call(&"set_effects_mode", EffectsSetting.HIGH)
 	if fixed_frames:
 		_fixed = FixedStepsScript.new()
 		add_child(_fixed)

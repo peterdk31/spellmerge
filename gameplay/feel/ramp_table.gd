@@ -17,6 +17,8 @@ const TABLE_SOURCE: int = 16
 
 var _image: Image = null
 var _texture: ImageTexture = null
+## The texture's one upload point (core/base/texture_upload.gd: safe with a separate render thread).
+var _upload: TextureUpload = TextureUpload.new()
 var _rows: Dictionary = {}
 ## Rows written, all told: a holder of sources that sees it change asks for them again (`source`),
 ## since a row may have been given to new colours (the oldest goes when all ROWS are taken).
@@ -26,7 +28,7 @@ var _next: int = 0
 
 func _init() -> void:
 	_image = Image.create_empty(SHADES, ROWS, false, Image.FORMAT_RGBA8)
-	_texture = ImageTexture.create_from_image(_image)
+	_texture = _upload.hand(_image)
 
 
 ## The texture the shaders read (SHADES across, ROWS down).
@@ -51,7 +53,7 @@ func source(colours: PackedColorArray) -> int:
 	writes += 1
 	for shade in SHADES:
 		_image.set_pixel(shade, row, shades[mini(shade, shades.size() - 1)])
-	_texture.update(_image)
+	_texture = _upload.hand(_image)
 	return TABLE_SOURCE + row
 
 

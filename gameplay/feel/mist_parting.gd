@@ -36,6 +36,9 @@ var width: int = 0
 var height: int = 0
 
 var _image: Image = null
+## The texture's one upload point: `_image` is only ever this grid's to write (on a worker thread
+## too), and the upload hands a copy (core/base/texture_upload.gd).
+var _upload: TextureUpload = TextureUpload.new()
 ## How far each cell should be parted this frame, how far it is, and the cells not closed (`_live`,
 ## `_live_count`, `_is_live` a byte a cell).
 var _wanted: PackedFloat32Array = PackedFloat32Array()
@@ -62,10 +65,7 @@ func lay(size: Vector2, at: Vector2 = Vector2.ZERO) -> void:
 	_is_live.fill(0)
 	_live_count = 0
 	_image = Image.create_empty(width, height, false, Image.FORMAT_R8)
-	if texture != null and texture.get_width() == width and texture.get_height() == height:
-		texture.update(_image)
-	else:
-		texture = ImageTexture.create_from_image(_image)
+	texture = _upload.hand(_image)
 	_dirty = false
 
 
@@ -118,7 +118,7 @@ func work(delta: float, feet: PackedVector2Array, count: int) -> void:
 func upload() -> void:
 	if _dirty and texture != null:
 		_dirty = false
-		texture.update(_image)
+		texture = _upload.hand(_image)
 
 
 ## Every cell within REACH of `foot` (the grid's px) wants to be parted as much as it is near.
@@ -173,4 +173,4 @@ func clear() -> void:
 	_is_live.fill(0)
 	_live_count = 0
 	_image.fill(Color(0.0, 0.0, 0.0, 1.0))
-	texture.update(_image)
+	texture = _upload.hand(_image)

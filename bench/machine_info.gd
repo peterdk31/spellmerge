@@ -16,7 +16,17 @@ static func facts(tree: SceneTree) -> Array[PackedStringArray]:
 	var window: Vector2i = DisplayServer.window_get_size()
 	var picture: Vector2i = tree.root.content_scale_size
 	out.append(PackedStringArray(["Window", "%dx%d, picture %dx%d" % [window.x, window.y, picture.x, picture.y]]))
+	out.append(PackedStringArray(["Render thread", "separate" if render_thread_separate() else "the main thread's"]))
 	return out
+
+
+## Whether the renderer runs on a thread of its own (Godot's separate thread model: the desktop
+## builds', core/README.md, "The render thread"; `--render-thread` on the command line): asked from
+## the main thread, which is the render thread on the other models. A benchmark then reads no
+## viewport's render time, since each read waits for the render thread (a sync a frame) and would
+## time it as if on one.
+static func render_thread_separate() -> bool:
+	return OS.get_thread_caller_id() == OS.get_main_thread_id() and not RenderingServer.is_on_render_thread()
 
 
 ## The facts as "Name: value" lines.

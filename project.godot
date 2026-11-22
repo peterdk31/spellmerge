@@ -250,6 +250,7 @@ infusion_tints={
 renderer/rendering_method="mobile"
 renderer/rendering_method.mobile="gl_compatibility"
 renderer/rendering_method.web="gl_compatibility"
+driver/threads/thread_model.render_thread=2
 rendering_device/fallback_to_opengl3=true
 environment/defaults/default_clear_color=Color(0.105882, 0.0941176, 0.188235, 1)
 textures/canvas_textures/default_texture_filter=0

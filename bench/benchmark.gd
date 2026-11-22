@@ -16,7 +16,6 @@ extends "res://bench/play_frames_runner.gd"
 ## its numbers (fewer foes or shots than asked, a bot that never cast) is noted under the table, not
 ## failed: the times are what is wanted here.
 
-const MachineInfoScript := preload("res://bench/machine_info.gd")
 const ResultsScreenScript := preload("res://bench/results_screen.gd")
 const InputScript := preload("res://core/input/input_manager.gd")
 

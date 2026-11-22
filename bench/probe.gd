@@ -21,6 +21,7 @@ extends Node
 ## queue with its deferred calls and frees, the renderer) is the frame less the two.
 
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const MachineInfoScript := preload("res://bench/machine_info.gd")
 
 ## Frames kept. Further frames still count towards the average and the peaks, but not
 ## the percentile.
@@ -60,6 +61,8 @@ var _physics_max_ms: float = 0.0
 var _process_sum_ms: float = 0.0
 var _process_max_ms: float = 0.0
 var _render_sum_ms: float = 0.0
+## Whether the renderer's CPU time is read (not with a separate render thread: `_ready`).
+var _render_timed: bool = true
 var _render_max_ms: float = 0.0
 var _peak_draw_calls: int = 0
 var _parts_frames: int = 0
@@ -100,7 +103,10 @@ func _ready() -> void:
 	add_child(first)
 	_projectiles = get_node_or_null("/root/Projectiles")
 	_feel = get_node_or_null("/root/Feel")
-	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+	# With a separate render thread a read of the render time waits for it every frame (a sync):
+	# the frame would be timed as if on one thread, so the renderer's CPU is not read (0).
+	_render_timed = not MachineInfoScript.render_thread_separate()
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), _render_timed)
 
 
 func _exit_tree() -> void:
@@ -152,7 +158,7 @@ func _sample_parts() -> void:
 		_steps_max = maxi(_steps_max, steps)
 		var physics_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
 		var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
-		var render_ms: float = RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid())
+		var render_ms: float = RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid()) if _render_timed else 0.0
 		_physics_sum_ms += physics_ms
 		_physics_max_ms = maxf(_physics_max_ms, physics_ms)
 		_process_sum_ms += process_ms

@@ -928,7 +928,7 @@ The owner chose this round's HUD work on 2026-11-21: cache each seat's corner pa
 
 ## The desktop's native module optimised (2026-11-22, D2)
 
-The owner decided on 2026-11-22 that the game is optimised for its Windows and Linux builds first, and asked for the native module (ShotKernel, MoteKernel and its light grid, BodyKernel) to be built for the desktop with stronger optimisation, bit-exact with its GDScript and the same on every machine.
+The owner decided on 2026-11-22 that the game is optimised for its Windows and Linux builds first, and asked for the native module (ShotKernel, MoteKernel, BodyKernel and LightKernel, the light grid) to be built for the desktop with stronger optimisation, bit-exact with its GDScript and the same on every machine.
 
 - **Built:** godot-cpp's release target was already `-O3`. The desktop libraries are now linked whole (LTO) and built for `x86-64-v2` (SSE4.2, which Godot 4.7 itself needs), in `native/SConstruct`. The web is unchanged. `ci/build/native.sh` refuses a desktop library holding any fused multiply-add instruction. native/README.md, "The desktop builds optimised".
 - **AVX2:** `x86-64-v3` was measured against v2 and was no faster. Godot has no CPU feature tag to pick a second library by, so it is not built.

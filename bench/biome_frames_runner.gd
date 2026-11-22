@@ -32,9 +32,10 @@ extends "res://bench/stress_runner.gd"
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
 ## `--held-shot` holds the game still halfway through (as `--thread-compare` does) and saves the held
-## frame, `user://biome_frames/<label>_held_<render thread>.png` (`_save_held`): the same on every run of the
-## same code, so two runs (the render thread on and off: `--render-thread separate` and `safe`) are
-## compared pixel for pixel.
+## frame, `user://biome_frames/<label>_held_<render thread>.png` (`_save_held`), with the tick and the
+## frame's hash (the game's state and the camera), to compare two runs (the render thread on and off:
+## `--render-thread separate` and `safe`). The state repeats from run to run; the view does not yet,
+## quite (the motes' births differ by a few between processes: the render thread, 2026-11-22).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
 ## `user://biome_frames/<label>.png` (one slow frame, outside the averages' sense).
 ##
@@ -213,8 +214,6 @@ func _scenario_started(scenario: Dictionary) -> void:
 	_compared = false
 	_held_taken = false
 	_census_taken = false
-	if _held_shot:
-		_reseed_view()
 	if _feel != null and _feel.has_method(&"set_effect_threads"):
 		# Feel's per-frame pieces on the worker threads (feel_jobs.gd) unless `--one-thread`.
 		var threaded: bool = FeelJobsScript.default_threaded() and not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--one-thread")
@@ -431,55 +430,10 @@ func _save_held(label: String) -> void:
 	var name: String = label.replace(" ", "_") + "_held_" + ("separate" if MachineInfoScript.render_thread_separate() else "main") + ".png"
 	if image != null and image.save_png("user://biome_frames/" + name) == OK:
 		var tick: TickScript = tree.root.get_node_or_null("Tick") as TickScript
-		var pool: Object = (_feel.call(&"spectacle") as Object).get(&"pool") if _feel != null else null
-		if pool != null:
-			print("DEBUG held: births %d next %d now %f serial %d writes %d clock %f" % [pool.get(&"births"), pool.get(&"_next"), pool.get(&"_now"), pool.get(&"_serial"), pool.get(&"written"), _feel.get(&"_clock")])
 		print("BENCH: biome frames %s held frame at tick %d (frame hash %d): saved to %s" % [label, tick.count if tick != null else -1, _frame_hash(), ProjectSettings.globalize_path("user://biome_frames/" + name)])
 	if _feel != null:
 		_feel.set_process(true)
 	tree.paused = false
-
-
-## `--held-shot`: every view generator (a RandomNumberGenerator member) of Feel and the projectile
-## manager, and of what they hold, seeded anew as a scenario starts, each from its place, so the
-## held frame is the same from process to process: they are seeded once a process, then drawn from
-## every frame, and how many frames a process draws before a scenario (its loads) is not fixed.
-## View only: the simulation's chance is its own (`sim.chance`), and its frames repeat already.
-func _reseed_view() -> void:
-	var seen: Dictionary[int, bool] = {}
-	var reseeded: int = 0
-	for root_name: String in ["Feel", "Projectiles"]:
-		var node: Node = get_tree().root.get_node_or_null(root_name)
-		if node != null:
-			reseeded += _reseed_in(node, root_name, seen, 0)
-	print("BENCH: biome frames view generators seeded anew: %d" % reseeded)
-
-
-func _reseed_in(object: Object, path: String, seen: Dictionary[int, bool], depth: int) -> int:
-	if object == null or seen.has(object.get_instance_id()) or depth > 4:
-		return 0
-	seen[object.get_instance_id()] = true
-	var reseeded: int = 0
-	for property: Dictionary in object.get_property_list():
-		if not (int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE):
-			continue
-		var value: Variant = object.get(property["name"])
-		var place: String = path + "/" + String(property["name"])
-		if value is RandomNumberGenerator:
-			(value as RandomNumberGenerator).seed = hash(place)
-			reseeded += 1
-		elif value is Object and not value is Node:
-			reseeded += _reseed_in(value as Object, place, seen, depth + 1)
-		elif value is Array:
-			for i in (value as Array).size():
-				var item: Variant = (value as Array)[i]
-				if item is Object and not item is Node:
-					reseeded += _reseed_in(item as Object, "%s[%d]" % [place, i], seen, depth + 1)
-	var node := object as Node
-	if node != null:
-		for child: Node in node.get_children():
-			reseeded += _reseed_in(child, path + "/" + String(child.name), seen, depth + 1)
-	return reseeded
 
 
 ## How many pixels of `a` and `b` differ (all of them when their sizes differ).

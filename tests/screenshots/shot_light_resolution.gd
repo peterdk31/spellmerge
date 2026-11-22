@@ -10,7 +10,7 @@ extends "res://tests/support/screenshot.gd"
 ## to compare them pixel by pixel. The HUD is hidden.
 
 const RegistryScript := preload("res://core/registry/registry.gd")
-const BiomeFramesScript := preload("res://tests/benchmark/biome_frames_runner.gd")
+const BiomeFramesScript := preload("res://bench/biome_frames_runner.gd")
 
 const ROOM: StringName = &"arena_02"
 const HALL: StringName = &"boss_broom"

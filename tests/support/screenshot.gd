@@ -20,7 +20,7 @@ extends SceneTree
 ## A script that shows the load itself sets `warm_first = false` in its `_init()`.
 ##
 ## A run a shot starts plays the crypt's first arena alone (`PINNED_ROOM`, a pinned run:
-## tests/support/pinned_run.gd), so a shot staged by its places shows the same room every time; the
+## bench/pinned_run.gd), so a shot staged by its places shows the same room every time; the
 ## crypt run's own first room is any of its fight rooms, by the run's seed (run generation RG3b). A
 ## script that shows the generated run sets `pin_room = false` in its `_init()`.
 
@@ -29,7 +29,7 @@ const SHOTS_DIR := "user://screenshots"
 ## The game's screen, which every sheet is laid out on.
 const SCREEN := Vector2(640.0, 360.0)
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 ## The room a shot's run plays while `pin_room` is on.
 const PINNED_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
@@ -52,6 +52,11 @@ func _initialize() -> void:
 	var registry: Node = root.get_node_or_null("Registry")
 	if pin_room and flow != null and registry != null:
 		flow.set("run_id_to_play", PinnedRun.pin(registry, PINNED_ROOM))
+	# The effects at the high row, never "Effects: Auto" (the HUD's menu tells Feel the saved setting
+	# when it binds at boot): a shot must not change with how busy the machine drawing it is.
+	var feel: Node = root.get_node_or_null("Feel")
+	if feel != null and feel.has_method("set_effects_mode"):
+		feel.call("set_effects_mode", EffectsSetting.HIGH)
 	await take()
 	if not _failed:
 		quit(0)

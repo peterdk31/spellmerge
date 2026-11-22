@@ -1,4 +1,4 @@
-extends "res://tests/benchmark/biome_frames_runner.gd"
+extends "res://bench/biome_frames_runner.gd"
 ## The frames of a run as it is played, not stressed (the owner's report of 2026-11-21: "I'm
 ## noticing worse performance in the game now"): the biome frames' crypt biome of seed 11, its
 ## measures and its `BENCH:` lines (biome_frames_runner.gd), with the load a room walked through
@@ -8,7 +8,7 @@ extends "res://tests/benchmark/biome_frames_runner.gd"
 ## mote ring, `MoteCap.DEFAULT_WEB`, and shot cap), where the owner plays:
 ##  - **1p near**: one wizard standing in a fight room with no foe, the camera at its own zoom (the
 ##    room, the void round it and the rooms not yet entered on screen);
-##  - **1p start web**: one wizard standing where the run puts it (the start room, the rooms round it
+##  - **1p start web** and **1p start** (the desktop's): one wizard standing where the run puts it (the start room, the rooms round it
 ##    not yet entered and the void on screen);
 ##  - **1p small far web**: one wizard fighting a few foes in the smallest fight room, zoomed out
 ##    over the rooms and the void round it;
@@ -28,9 +28,18 @@ const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 const PASS_SETTERS: Dictionary[String, StringName] = {"light": &"set_spell_light", "shadows": &"set_shadows", "air": &"set_ambient_particles", "fog": &"set_fog"}
 
 
+## The rows' words for `--quality=` and each one's fixed "Effects" mode (`EffectsSetting`).
+const QUALITY_MODES: Dictionary[String, int] = {"low": EffectsSetting.LOW, "medium": EffectsSetting.MEDIUM, "high": EffectsSetting.HIGH}
+
+
+## The row each scenario's effects were drawn at, by label ("Low", "Medium", "High"; the shipped
+## benchmark's table shows it).
+var effects_drawn: Dictionary[String, String] = {}
+
+
 func _init() -> void:
 	super()
-	rows = play_rows()
+	rows = with_quality(play_rows(), quality_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args()))
 	scenarios = []
 	for index in rows.size():
 		scenarios.append(index)
@@ -49,12 +58,18 @@ static func play_rows() -> Array[Dictionary]:
 	var small: Dictionary = _row("1p small far web", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB)
 	small["room"] = "smallest"
 	out.append(small)
+	var start_desktop: Dictionary = _row("1p start", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, cap)
+	start_desktop["room"] = "start"
+	out.append(start_desktop)
 	out.append(_row("1p near", 1, 0, true, "together", SplitScreenSetting.DYNAMIC, cap))
 	out.append(_row("1p far", 1, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 	for players: int in [2, 3, 4]:
 		out.append(_row("%dp together" % players, players, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart dynamic" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart equal" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.EQUAL, cap))
+	# The shipped benchmark's split rows at the web's settings (bench/benchmark.gd, `WEB_LABELS`).
+	out.append(_row("2p apart dynamic web", 2, FOES_A_ROOM * 2, false, "apart", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
+	out.append(_row("4p apart equal web", 4, FOES_A_ROOM * 4, false, "apart", SplitScreenSetting.EQUAL, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
 	return out
 
 
@@ -62,16 +77,46 @@ static func _row(label: String, players: int, enemies: int, idle: bool, spread: 
 	return {"label": label, "players": players, "enemies": enemies, "shots": cap, "fill": 0, "idle": idle, "seed": PLAY_SEED, "spread": spread, "split": split, "motes": motes}
 
 
+## The effects' rows `--quality=` asks for in `args`: low, medium or high alone, or each of them
+## (`--quality=each`); high when it names none.
+static func quality_asked(args: PackedStringArray) -> PackedStringArray:
+	for arg in args:
+		if arg.begins_with("--quality="):
+			var asked: String = arg.trim_prefix("--quality=")
+			if asked == "each":
+				return PackedStringArray(QUALITY_MODES.keys())
+			if QUALITY_MODES.has(asked):
+				return PackedStringArray([asked])
+	return PackedStringArray(["high"])
+
+
+## `scenarios` at each row of `qualities` (its "quality"); with more than one, each label says its row
+## ("1p near low"), so `--only=` names them so.
+static func with_quality(scenarios: Array[Dictionary], qualities: PackedStringArray) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for scenario: Dictionary in scenarios:
+		for quality: String in qualities:
+			var row: Dictionary = scenario.duplicate()
+			row["quality"] = quality
+			if qualities.size() > 1:
+				row["label"] = "%s %s" % [scenario["label"], quality]
+			out.append(row)
+	return out
+
+
 ## The scenario's mote ring (the "Particles" setting) taken before its run starts, and the passes
 ## `--off=` names switched off by their settings (light, shadows, air, fog: Feel's `set_spell_light`,
-## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs; `--quality=low` or
-## `high` draws the effects at that row (gameplay/feel/effects_quality.gd).
+## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs; the effects drawn
+## at the scenario's fixed row (its "quality", `--quality=`: Feel's `set_effects_mode`,
+## gameplay/feel/effects_quality.gd; never Auto, whose row follows the machine), told in a `BENCH:` line.
 func _start_play(scenario: Dictionary) -> void:
+	var quality: String = String(scenario.get("quality", "high"))
+	if _feel != null and _feel.has_method(&"set_effects_mode"):
+		_feel.call(&"set_effects_mode", QUALITY_MODES.get(quality, EffectsSetting.HIGH))
+		var drawn: int = int(((_feel.call(&"spectacle") as Object).get(&"quality") as Object).get(&"level"))
+		effects_drawn[String(scenario["label"])] = String(EffectsQualityScript.Level.keys()[drawn]).capitalize()
+		print("BENCH: play frames %s: effects at %s" % [scenario["label"], String(EffectsQualityScript.Level.keys()[drawn]).to_lower()])
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
-		if arg.begins_with("--quality=") and _feel != null:
-			var level: int = EffectsQualityScript.Level.LOW if arg.trim_prefix("--quality=") == "low" else EffectsQualityScript.Level.HIGH
-			(_feel.call(&"spectacle") as Object).call(&"set_effects_quality", level)
-			print("BENCH: play frames %s: effects at %s" % [scenario["label"], arg.trim_prefix("--quality=")])
 		if arg.begins_with("--off=") and _feel != null:
 			for part in arg.trim_prefix("--off=").split(","):
 				var setter: StringName = PASS_SETTERS.get(part, &"")

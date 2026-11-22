@@ -7,7 +7,7 @@ extends RefCounted
 ## engine pacing that spreads load over steps and never drops anything (the per-step fire pacing,
 ## the zap and magnet turns; the projectile pool lives in `core/projectiles`), room made at
 ## start that grows when needed, and tuning. If the stress benchmark
-## (tests/benchmark/stress_runner.gd) or the emergent combo report shows a staff that freezes
+## (bench/stress_runner.gd) or the emergent combo report shows a staff that freezes
 ## the game, a limit, a mana cost or a cheaper effect is decided then (owner, 2026-10-26).
 
 const ActorsScript := preload("res://core/actors/actors.gd")

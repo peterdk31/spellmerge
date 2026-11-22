@@ -3,7 +3,7 @@ extends RefCounted
 ## collision rectangles out of the instantiated scene, and find the rooms a run's map can pick.
 
 const RegistryScript := preload("res://core/registry/registry.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 ## A crypt room's light where nothing lights it, and the colour of its dark: cool, so the candles'
 ## warm light reads against it (crypt rework rule 6, darker since docs/milestones/atmosphere.md, A).
 const CRYPT_AMBIENT: float = 0.65
@@ -12,7 +12,7 @@ const CRYPT_SHADE: Color = Color(0.82, 0.88, 1.0, 1.0)
 
 ## Every room template a run's map can pick (a room that hosts a kind, content/rooms/README.md), by
 ## id, found by folder: a new template is checked the day it lands. `registry` has been scanned. A
-## test's pinned copy of a room (tests/support/pinned_run.gd) is not one.
+## test's pinned copy of a room (bench/pinned_run.gd) is not one.
 static func templates(registry: RegistryScript) -> Array[RoomBase]:
 	var found: Array[RoomBase] = []
 	for room: RoomBase in registry.run_content().rooms:

@@ -19,7 +19,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 ## The room every run here plays (its spawns are named below): the crypt run picks among several.
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 

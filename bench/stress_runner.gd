@@ -42,17 +42,17 @@ extends Node
 ## the run varies only with frame timing, like the 4-bot test, unless the run is on the fixed clock
 ## (`fixed_frames`, fixed_steps.gd: one tick a drawn frame), where it plays the same every run.
 
-const HashLabel := preload("res://tests/benchmark/hash_label.gd")
-const BotScript := preload("res://tests/bots/bot.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
-const ProbeScript := preload("res://tests/benchmark/probe.gd")
+const HashLabel := preload("res://bench/hash_label.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
+const ProbeScript := preload("res://bench/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
+const TreeProfileScript := preload("res://bench/tree_profile.gd")
 const TickScript := preload("res://core/sim/tick.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
-const FixedStepsScript := preload("res://tests/benchmark/fixed_steps.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
+const FixedStepsScript := preload("res://bench/fixed_steps.gd")
 ## The room the fight is played in: the antechamber, pinned as a one-room biome at the world's origin
-## (tests/support/pinned_run.gd; since connected biomes CB8 a crypt run starts on its start room).
+## (bench/pinned_run.gd; since connected biomes CB8 a crypt run starts on its start room).
 const STRESS_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const PLAYERS: int = 4
@@ -254,11 +254,16 @@ func _ready() -> void:
 		_projectiles.set(&"native", false)
 		WallSlide.use_native(false)
 	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
+	# The effects at a fixed row (the high one; play_frames_runner.gd's `--quality=` another): never
+	# "Effects: Auto", whose row would follow how slow this run's frames are (the HUD's menu tells
+	# Feel the saved setting when it binds at boot).
+	if _feel != null and _feel.has_method(&"set_effects_mode"):
+		_feel.call(&"set_effects_mode", EffectsSetting.HIGH)
 	if fixed_frames:
 		_fixed = FixedStepsScript.new()
 		add_child(_fixed)
 		_fixed.connect(&"stepped", _on_fixed_tick)
-		print("BENCH: fixed clock: one tick a drawn frame, the windows in ticks (tests/benchmark/fixed_steps.gd)")
+		print("BENCH: fixed clock: one tick a drawn frame, the windows in ticks (bench/fixed_steps.gd)")
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
@@ -777,8 +782,8 @@ func _report_tick_parts(label: String) -> void:
 	_projectiles.set(&"step_profile", PackedInt64Array())
 
 
-## The state hash's cost at the scenario's full load (online-ready N3c; core/sim/README.md, "The
-## hash"): HASH_PASSES hashes of every area the Tick names (`state_areas`), as the netcode would
+## The state hash's cost at the scenario's full load, online-ready N3c; core/sim/README.md, "The
+## hash": HASH_PASSES hashes of every area the Tick names (`state_areas`), as the netcode would
 ## make them (no paths), after the measured window so they stay out of its frames; with the areas
 ## that cost most (the bodies together), and spread over a second, one part a tick
 ## (`SimHash.slice`), as a netcode checking once a second would.
@@ -888,6 +893,13 @@ func _finish(failed: Array[String]) -> void:
 	if _projectiles != null and _default_cap > 0:
 		SessionRules.machine().shot_cap = _default_cap
 		_projectiles.call("set_cap", _default_cap)
+	_finished(failed)
+
+
+## The run's end once everything is put back: `OK` or `FAILED` printed and the game quit with 0 or 1.
+## A runner that ends otherwise (the shipped benchmark's results screen, bench/benchmark.gd)
+## overrides it.
+func _finished(failed: Array[String]) -> void:
 	if failed.is_empty():
 		print("%s OK: %d scenarios, players with built spells, enemies and shots at the targets, no errors logged" % [result_word, scenarios.size()])
 		get_tree().quit(0)

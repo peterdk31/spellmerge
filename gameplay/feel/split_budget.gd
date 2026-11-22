@@ -36,11 +36,13 @@ var average: float = 0.0
 var switched_off: bool = false
 
 var _over: float = 0.0
+var _base_target: float = DESKTOP_TARGET
 var _under: float = 0.0
 
 
 func _init(web: bool = OS.has_feature("web")) -> void:
-	target = WEB_TARGET if web else DESKTOP_TARGET
+	_base_target = WEB_TARGET if web else DESKTOP_TARGET
+	target = _base_target
 
 
 ## A drawn frame that took `delta` real seconds, with `views` views on the screen.
@@ -69,6 +71,20 @@ func step(delta: float, views: int) -> void:
 	else:
 		_over = 0.0
 		_under = 0.0
+
+
+## A rung given back (the "Effects: Auto" watcher's frames fast for long enough, gameplay/feel/
+## effects_auto.gd: one ladder, Feel's `_step_effects`), nothing counted.
+func give_back() -> void:
+	rung = maxi(rung - 1, 0)
+	_over = 0.0
+	_under = 0.0
+
+
+## The shortest frame the display or a frame cap allows (seconds; 0: none known): the target is never
+## under it.
+func set_floor(seconds: float) -> void:
+	target = maxf(_base_target, seconds)
 
 
 ## The light's downscale on this rung (past SpellLight.DOWNSCALE: coarser light cells).

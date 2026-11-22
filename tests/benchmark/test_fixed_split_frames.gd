@@ -8,12 +8,12 @@ extends SceneTree
 ## left out, which is seeded once a process), must be the same in both runs of each. Headless and
 ## shortened, as test_fixed_fights.gd is. The unit test runner finds it by its name.
 
-const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
+const RunnerScript := preload("res://bench/play_frames_runner.gd")
 const SPLIT_ROWS: Array[String] = ["2p apart dynamic", "2p apart equal"]
 const HASH_EVERY: int = 10
 
 
-class Runner extends "res://tests/benchmark/play_frames_runner.gd":
+class Runner extends "res://bench/play_frames_runner.gd":
 	## Frames hashed while split, by run.
 	var split_frames: PackedInt32Array = PackedInt32Array()
 

@@ -20,9 +20,9 @@ extends Node
 ## Started by `prop_cost.gd`. Prints `PROP COST OK` and quits 0, or `PROP COST FAILED` and 1 (the
 ## hub did not start, a snapshot named problems, or the log has an error).
 
-const HashLabel := preload("res://tests/benchmark/hash_label.gd")
-const BotScript := preload("res://tests/bots/bot.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const HashLabel := preload("res://bench/hash_label.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const StandIn: EnemyBase = preload("res://tests/benchmark/prop_stand_in.tres")
 

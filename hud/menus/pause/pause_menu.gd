@@ -29,7 +29,12 @@ extends PanelContainer
 ##   switch flips and the tab changes. Every saved
 ##   setting below is read when the menu is bound and sent again only when it is not its default
 ##   (each default lives in core/settings, which feel reads too, so neither reads the other).
-## - **Graphics** tab: "Fullscreen: Off" (or On), "Dynamic lighting: On", "Shadows: On", "Fog: On",
+## - **Graphics** tab: "Fullscreen: Off" (or On), "Effects: Auto" (or Low, Medium, High; the owner,
+##   2026-11-21: `EffectsSetting`, `accept` steps to the next mode, saved as `effects` and sent as
+##   `effects_changed` whenever the menu is bound, since feel draws the high row until told: Auto lets
+##   feel's frame-time watcher choose how much the effects cost, shown with the row it draws now,
+##   "Auto (Medium)", as feel says it, `effects_row_changed`; the others fix the row; this machine's
+##   view only), "Dynamic lighting: On", "Shadows: On", "Fog: On",
 ##   "Ambient particles: On", "Environment interaction: On", "Floor marks: On".
 ##   "Fullscreen" asks `Display` (core) to fill the screen or not and stays on the tab; its word
 ##   follows the window itself, read each time the tab is shown, so leaving fullscreen with the
@@ -154,6 +159,7 @@ const SHAKE_TEXT: String = "Screen shake: %s"
 ## The saved setting that holds the choice.
 const SHAKE_SETTING: StringName = &"screen_shake"
 const SPLIT_TEXT: String = "Split screen: %s"
+const EFFECTS_TEXT: String = "Effects: %s"
 const NUMBERS_TEXT: String = "Damage numbers: %s"
 const NUMBERS_SETTING: StringName = &"damage_numbers"
 const SHOT_CAP_TEXT: String = "Max shots: %d"
@@ -227,6 +233,11 @@ var effect_slots: int = EffectSlots.DEFAULT
 var screen_shake: bool = true
 ## The "Split screen" setting (see the top): `SplitScreenSetting.DEFAULT` (Dynamic) by default.
 var split_screen: int = SplitScreenSetting.DEFAULT
+## The "Effects" setting (see the top): `EffectsSetting.DEFAULT` (Auto) by default.
+var effects: int = EffectsSetting.DEFAULT
+## The row feel draws now (`effects_row_changed`: `EffectsSetting.LOW`, MEDIUM or HIGH; -1 before it
+## says), shown after Auto: "Effects: Auto (Medium)".
+var effects_row: int = -1
 ## The "Damage numbers" setting (see the top): on by default.
 var damage_numbers: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
@@ -268,6 +279,7 @@ var display: Node = null
 @onready var _body: Control = _add_body()
 @onready var _tab_box: VBoxContainer = _add_tab_box()
 @onready var _fullscreen: Button = _add_setting(Tab.GRAPHICS, "Fullscreen", FULLSCREEN_TEXT % "Off")
+@onready var _effects_row: Button = _add_setting(Tab.GRAPHICS, "Effects", EFFECTS_TEXT % EffectsSetting.word_of(effects))
 @onready var _light: Button = _add_setting(Tab.GRAPHICS, "SpellLight", LIGHT_TEXT % _word(spell_light))
 @onready var _shadows: Button = _add_setting(Tab.GRAPHICS, "Shadows", SHADOWS_TEXT % _word(shadows))
 @onready var _fog: Button = _add_setting(Tab.GRAPHICS, "Fog", FOG_TEXT % _word(fog))
@@ -325,6 +337,7 @@ func _fit_widths() -> void:
 	needs[_put_style] = maxf(needs[_put_style], _width_of(_put_style, _worded(PUT_TEXT, ["Push right", "Replace"])))
 	needs[_reload_style] = maxf(needs[_reload_style], _width_of(_reload_style, _worded(RELOAD_TEXT, ["Button", "Next cast"])))
 	needs[_split] = maxf(needs[_split], _width_of(_split, _worded(SPLIT_TEXT, SplitScreenSetting.WORDS)))
+	needs[_effects_row] = maxf(needs[_effects_row], _width_of(_effects_row, _worded(EFFECTS_TEXT, EffectsSetting.every_word())))
 	for on_page: int in _pages:
 		var widest: float = 0.0
 		if on_page == Page.SETTINGS:
@@ -388,6 +401,9 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScri
 		save = SaveFile.new()
 	_load_shake()
 	_load_split()
+	if _events != null:
+		_events.effects_row_changed.connect(_on_effects_row_changed)
+	_load_effects()
 	_load_numbers()
 	_load_shot_cap()
 	_load_mote_cap()
@@ -836,6 +852,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_shake(not screen_shake)
 	elif control == _split:
 		_set_split((split_screen + 1) % SplitScreenSetting.WORDS.size())
+	elif control == _effects_row:
+		_set_effects((effects + 1) % EffectsSetting.WORDS.size())
 	elif control == _numbers:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
@@ -871,6 +889,35 @@ func _load_split() -> void:
 	_mark_focus()
 	if split_screen != SplitScreenSetting.DEFAULT and _events != null:
 		_events.split_screen_changed.emit(split_screen)
+
+
+## Read the saved "Effects" mode and show it; feel is told always (it draws the high row until told,
+## while the menu's default is Auto).
+func _load_effects() -> void:
+	effects = EffectsSetting.snap(int(save.get_setting(EffectsSetting.KEY, EffectsSetting.DEFAULT)))
+	_show_effects()
+	if _events != null:
+		_events.effects_changed.emit(effects)
+
+
+## The "Effects" mode set to `mode`: shown, saved and sent.
+func _set_effects(mode: int) -> void:
+	effects = EffectsSetting.snap(mode)
+	_show_effects()
+	save.set_setting(EffectsSetting.KEY, effects)
+	if _events != null:
+		_events.effects_changed.emit(effects)
+
+
+## The row feel draws now: shown after Auto ("Auto (Medium)"), as it changes.
+func _on_effects_row_changed(row: int) -> void:
+	effects_row = row
+	_show_effects()
+
+
+func _show_effects() -> void:
+	_effects_row.set_meta(BASE_TEXT_META, EFFECTS_TEXT % EffectsSetting.word_of(effects, effects_row))
+	_mark_focus()
 
 
 ## The "Split screen" mode set to `mode`: shown, saved and sent.

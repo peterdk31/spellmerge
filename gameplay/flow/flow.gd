@@ -69,8 +69,9 @@ extends Node
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
 ## skippable by any of them; when it ends or is skipped the save is marked and the run starts.
-## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
-## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
+## It plays only for people: off (`intro_enabled` false) when the run is automated
+## (`CommandLine.automated()`: a test script is the main loop, or the game was started with its own
+## arguments, the web page's `args` included: the 4-bot test, the stress run, the replay runs).
 ##
 ## Loading (owner, 2026-10-29): Play and the hub first do the work that must be ready before a
 ## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
@@ -148,7 +149,7 @@ extends Node
 ## in together (the gate: everyone, downed or far away); its boss's intro opens as it is entered. The
 ## boss's room cleared opens the portal home: every standing wizard in it wins the run, back to the hub;
 ## everyone down loses it, back to the hub too. A test plays a map of its own (`start_biome`), or a
-## room of its choosing pinned as a biome of that room alone (tests/support/pinned_run.gd).
+## room of its choosing pinned as a biome of that room alone (bench/pinned_run.gd).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -366,8 +367,7 @@ func _ready() -> void:
 		# Nobody is there to press A: the runs this machine starts have no boss intros (a rule, so
 		# a replay of such a run plays back the same anywhere).
 		SessionRules.machine().boss_intros = 0
-	var tree: MainLoop = Engine.get_main_loop()
-	if tree != null and tree.get_script() != null:
+	if CommandLine.scripted():
 		loading_enabled = false
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
@@ -920,11 +920,9 @@ func _on_loaded(next: Callable) -> void:
 	next.call()
 
 
-## True when nobody is playing: a test script is the main loop, or the game was started with user
-## arguments (the automated runs).
+## True when nobody is playing (core/base/command_line.gd).
 func _is_automated() -> bool:
-	var tree: MainLoop = Engine.get_main_loop()
-	return (tree != null and tree.get_script() != null) or not OS.get_cmdline_user_args().is_empty()
+	return CommandLine.automated()
 
 
 ## A run will start soon that cannot wait at its start (`play_load_requested`: one two machines

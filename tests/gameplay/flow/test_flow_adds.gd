@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ## crumble when the boss dies (nobody's kill) and the room is cleared after the last; its health
 ## follows the wizards joining and leaving, keeping its share. 1, 2 and 4 players.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const Spawning := preload("res://tests/support/spawning.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const BOSS_ID: StringName = &"test_adds_boss"

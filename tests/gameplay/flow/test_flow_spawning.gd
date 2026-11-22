@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A room's enemies come in groups as the room gets quiet (enemy spawning EA5,
 ## docs/milestones/enemy-spawning.md, "Pacing"), on the real autoloads: the arena pinned as a one-room
-## biome with a pace of its own (its start room's fight) (tests/support/pinned_run.gd). The first group starts in the room's
+## biome with a pace of its own (its start room's fight) (bench/pinned_run.gd). The first group starts in the room's
 ## setup and ripples in; the next comes only once the room is quiet, never while it is busy; a group
 ## stands at the spawns farthest from the wizards; the room is cleared only when the queue is empty and
 ## nothing stands or spawns in; an id that cannot stand is dropped, so the room is never stuck; the
@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const Spawning := preload("res://tests/support/spawning.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const STEP: float = 1.0 / 60.0

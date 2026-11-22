@@ -14,7 +14,7 @@ extends Resource
 ##
 ## **The start room alone** (`rooms_max` 0, `start_only`): the map is its start room and nothing
 ## else, filled as its kind fills: a test's one room pinned as a biome of its own
-## (tests/support/pinned_run.gd). No way, no boss, no walkway is asked of it.
+## (bench/pinned_run.gd). No way, no boss, no walkway is asked of it.
 
 ## The most rooms a biome's map may hold (the editor's range; a rule change may not pass it either).
 const MOST_ROOMS: int = 32

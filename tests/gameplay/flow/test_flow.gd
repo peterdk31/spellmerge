@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## gameplay/flow on the real autoloads (the real wiring is the point): Play starts the room in the
 ## same call with 1, 2 and 4 players, the enemies the run's map puts in it stand (no waves: boss
-## OB2a; run generation RG3; the arena pinned as a one-room biome, tests/support/pinned_run.gd, so
+## OB2a; run generation RG3; the arena pinned as a one-room biome, bench/pinned_run.gd, so
 ## its spawns are known), `room_entered` and `room_cleared` are sent once, a cleared room stays
 ## cleared and the run goes on, every wizard holds the two start spells, the cooldowns are reset on
 ## a new run, the run ends back in the hub in under 3 seconds when every player is down (connected
@@ -14,7 +14,7 @@ extends "res://tests/support/suite.gd"
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const Spawning := preload("res://tests/support/spawning.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")

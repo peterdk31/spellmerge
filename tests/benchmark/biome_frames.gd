@@ -10,7 +10,7 @@ extends SceneTree
 ## ... -- --profile                                 the tree profile too (each script's time)
 ## ... -- --no-native                               the GDScript kernels in place of the module
 
-const RunnerScript := preload("res://tests/benchmark/biome_frames_runner.gd")
+const RunnerScript := preload("res://bench/biome_frames_runner.gd")
 
 
 func _initialize() -> void:

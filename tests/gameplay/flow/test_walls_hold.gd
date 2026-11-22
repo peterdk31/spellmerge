@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ## is the point. It also checks that every wizard really walked away from its spawn, so the test
 ## is not passed by wizards that never moved.
 
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The room is 640x384; a wizard's centre must stay inside it and off its walls (a floating room's

@@ -292,7 +292,7 @@ jobs:
           path: ~/.cache/spellmerge-native
           key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
       - name: Record every clip
         run: ci/build/build.sh --quick --clips
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

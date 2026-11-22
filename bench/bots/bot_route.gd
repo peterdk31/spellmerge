@@ -1,5 +1,5 @@
 extends RefCounted
-## A travelling bot's way over the walls (tests/bots/bot.gd, "Travel"): the shortest walk from where
+## A travelling bot's way over the walls (bench/bots/bot.gd, "Travel"): the shortest walk from where
 ## it stands to a goal, over the wall grid's cells (`RoomGrid.WALL_CELL`), so it follows a walkway
 ## round its corner, comes to a mouth along the walkway's band and never cuts across the void (a
 ## wall) or snags on a lip. Bot code, never the game's: it only reads the grid a person's eyes read

@@ -77,6 +77,8 @@ const WALKED_NEAR_HOLE: int = 2
 const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells", &"_place_over", &"_place_mixed", &"_place_touched", &"_place_whole", &"_whole_due"]
 ## What `place_at` answers outside every place (and everywhere in a world with none).
 const NO_PLACE: int = -1
+## `find_places`' mark for a body the native pass leaves to GDScript (one of another manager).
+const ASK_GDSCRIPT: int = -2
 ## The side of a cell of the places' lookup (`place_at`), in pixels: a biome's pieces stand on the
 ## 32 px grid (`PieceShape.GRID`), so nearly every cell lies in one place.
 const PLACE_CELL: float = 32.0
@@ -575,6 +577,18 @@ func _work_out_whole() -> void:
 			var end: Vector2 = rect.end
 			if rect.position.x <= left and rect.position.y <= top and left + PLACE_CELL <= end.x and top + PLACE_CELL <= end.y:
 				_place_whole[at] = guess + 1
+
+
+## Every open body's place made current in one native call (sim-native SN2, Flow's room life: the
+## twin is `RoomLife.gd_find_places`): for each of the first `count` actor ids in `ids`, the body whose
+## instance id `nodes` keeps there (the actor table's `nodes()`), its `room` set where it stands
+## (`place_at`) when it keeps the manager `projectiles`, and `places[n]` its `room` after (NO_PLACE for
+## no body; ASK_GDSCRIPT for one of another manager). False when nothing was done (no native module,
+## or arrays the kernel refused): the caller runs its twin.
+func find_places(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, projectiles: Object, places: PackedInt32Array) -> bool:
+	if not WallSlide.native_on():
+		return false
+	return WallSlide.places(nodes, ids, count, projectiles, _place_rects, _place_cells, _place_over, _place_mixed, _place_touched, _place_w, _place_h, PLACE_CELL, _bounds.position, places)
 
 
 ## The place `point` is in (the first whose rectangle holds it), or NO_PLACE.

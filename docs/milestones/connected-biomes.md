@@ -868,6 +868,14 @@ The owner chose **grid lighting + one pass** in place of the per-pixel light pas
 
   The light buffers drew in about 0.6 to 1.2 ms a view on llvmpipe; the grid costs less on the CPU than that (the frames are shorter everywhere, most in the splits, where a buffer a view was drawn). What a 1280 x 720 picture still doubles is the root's own fill (the picture, the screen copy the apply rect multiplies, the mist): the one pass's to take on next.
 
+
+### Answered by the owner (2026-11-21, on #907)
+
+1. **The default look is smoothed, 8 px cells** (`light_grid_smooth` on: the four nearest cells' middles weighed, the bands still hard, as the light looked before); whole cells stay an option (`SpellLight.set_grid_smooth`).
+2. **Every light reaches at least a cell each way**, so none falls between the cells' middles and blinks (`LightGrid._lamp`, a beam's reach too; the kernel the same; `test_a_light_smaller_than_a_cell_still_lights_the_cells_round_it`).
+3. **The split's cheaper light is coarser cells:** while split and the frame-time budget takes its light rung (`SplitBudget`, a downscale past `SpellLight.DOWNSCALE`), every view's grid is drawn in `SPLIT_CHEAP_CELL` (16 px) cells; the cell set again when frames are fast or the screen is one picture (`test_the_splits_cheaper_light_is_coarser_cells`).
+4. **A `LightKernel` class of its own:** allowed by the owner for this PR (the one `NATIVE_CLASSES` line in `ci/smbot/rules.py`), but this session's permission check refused the `ci/` edit when the allowance came relayed through another session, so the methods stay on `MoteKernel` for now; moving them is a one-line `rules.py` edit plus a header, for the owner to apply or allow directly.
+5. GPU and web numbers: none yet.
 ## The tick cheaper, the game the same (2026-11-21)
 
 The owner's choice after #900 for this round's CPU work, part C: hidden rooms' cover views idle more, and the simulation's tick cheaper, the state hash unchanged. As built (docs/LOG.md, 2026-11-21, "The tick and hidden cover views a little cheaper"):

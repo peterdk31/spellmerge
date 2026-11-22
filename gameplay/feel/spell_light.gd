@@ -62,9 +62,11 @@ const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
 const LightPassesScript := preload("res://gameplay/feel/light_passes.gd")
 ## The grid's cell by default (world px each way; LightGrid.CELLS the choices).
 const GRID_CELL: float = LightGridScript.CELL
-## How much smaller than its view the split's cheaper light made a buffer once (SplitBudget's rungs
-## still name it); the grid's cost is the CPU's, a view's share of it small, so it changes nothing now.
+## The split's cheaper light (SplitBudget's rungs name a light this many times smaller than its view
+## once, and more past the first view when frames run slow): past it, the grid's cell is SPLIT_CHEAP_CELL
+## (the owner, 2026-11-21: coarser cells as the split's cheaper-light rung).
 const DOWNSCALE: int = 4
+const SPLIT_CHEAP_CELL: float = 16.0
 ## The apply rect reaches this far from the origin each way: past any room, so it always covers
 ## the view (the GPU only shades what is on screen).
 const REACH: float = 65536.0
@@ -165,9 +167,9 @@ var fixed_resolution: bool = true
 var factor_passes: LightPassesScript = null
 var under_passes: LightPassesScript = null
 var factor_rects: Array[ColorRect] = []
-## Whether the grid is read smoothed between the cells' middles (`set_grid_smooth`), and how many times
-## it was worked out (for tests). Read only.
-var grid_smooth: bool = false
+## Whether the grid is read smoothed between the cells' middles (`set_grid_smooth`; the owner's default,
+## 2026-11-21: smoothed, its bands still hard), and how many times it was worked out (for tests). Read only.
+var grid_smooth: bool = true
 var grids_baked: int = 0
 ## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
 var spots_written: int = 0
@@ -209,6 +211,9 @@ var _view_boxes: PackedVector4Array = PackedVector4Array()
 var _grid_view_keys: PackedVector4Array = PackedVector4Array()
 var _grid_size_keys: PackedVector4Array = PackedVector4Array()
 var _tints_version: int = -1
+## The cell set (`set_grid_cell`), and whether the split's cheaper light asks for SPLIT_CHEAP_CELL now.
+var _base_cell: float = GRID_CELL
+var _cheap_split: bool = false
 ## The grid's texture as last handed to the readers (made again when its atlas grows).
 var _bound_texture: Texture2D = null
 ## Whether the equal split's void quarter is drawn as one view more (`use_views`).
@@ -454,7 +459,17 @@ func _each_reader(uniform: StringName, value: Variant) -> void:
 ## The grid's cell from now on (world px each way; LightGrid.CELLS the choices: a coarser grid is
 ## cheaper and blockier).
 func set_grid_cell(size: float) -> void:
-	grid.set_cell(size)
+	_base_cell = size
+	_use_cell()
+
+
+## The grid's cell now: SPLIT_CHEAP_CELL while the split's cheaper light asks (`use_views`), else the
+## cell set; handed to the readers when it changes.
+func _use_cell() -> void:
+	var wanted: float = maxf(SPLIT_CHEAP_CELL, _base_cell) if _cheap_split else _base_cell
+	if wanted == grid.cell:
+		return
+	grid.set_cell(wanted)
 	_each_reader(GRID_CELL_UNIFORM, grid.cell)
 
 
@@ -479,11 +494,13 @@ func _fit_passes(k: int, view: Viewport) -> void:
 
 ## The views the light follows from now on, a grid each (`views`, in the order the split screen lays
 ## them out, at most VIEWS_MOST; empty: the one picture, this node's viewport). The split's cheaper
-## light once (its downscale) changes nothing now (DOWNSCALE). `void_view`: the equal split's void
-## quarter is drawn too, one view more than `views` (no grid: no light), with its own copy of each
-## reader (`readers`, `ViewReaders.use`).
-func use_views(views: Array[Viewport], _extra_downscale: int = DOWNSCALE, void_view: bool = false) -> void:
+## light (`extra_downscale` past DOWNSCALE, the budget's rung while frames run slow) draws every view's
+## grid in SPLIT_CHEAP_CELL cells. `void_view`: the equal split's void quarter is drawn too, one view
+## more than `views` (no grid: no light), with its own copy of each reader (`readers`, `ViewReaders.use`).
+func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, void_view: bool = false) -> void:
 	_void_view = void_view
+	_cheap_split = views.size() > 1 and extra_downscale > DOWNSCALE
+	_use_cell()
 	if views.size() == _views.size():
 		var same: bool = true
 		for k in views.size():

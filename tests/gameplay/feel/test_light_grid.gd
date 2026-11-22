@@ -215,3 +215,34 @@ func test_a_rows_glow_is_its_looks() -> void:
 	var fire_ice: Vector3 = grid.look_glow(0.878, 0.349, 0.184, 0, 1 << 1, 0, 0, false)
 	check(fire_ice.is_equal_approx(Vector3(0.310 + (0.769 - 0.310) * 0.35, 0.839 + (0.965 - 0.839) * 0.35, 0.863 + (0.949 - 0.863) * 0.35)), "a second infusion's material glows")
 	check(grid.look_glow(0.878, 0.349, 0.184, 0, 1 << 1, 0, 0, true).is_equal_approx(Vector3(0.878 + (1.0 - 0.878) * 0.35, 0.349 + (0.635 - 0.349) * 0.35, 0.184 + (0.235 - 0.184) * 0.35)), "a beam's own infusions: the first material alone")
+
+
+## Every light reaches at least a cell each way (the owner, 2026-11-21): a light smaller than a cell,
+## standing on a corner between four cells' middles, still lights them, and the kernel agrees.
+func test_a_light_smaller_than_a_cell_still_lights_the_cells_round_it() -> void:
+	for native: bool in [false, true]:
+		if native and not NativeScript.loaded():
+			continue
+		var grid := LightGridScript.new()
+		grid.use_native(native)
+		grid.fit(PackedVector4Array([Vector4(0.0, 0.0, 320.0, 180.0)]), 1)
+		var rows := PackedFloat32Array()
+		rows.resize(LightGridScript.STRIDE)
+		# A spot of reach 2 px on the corner of four cells (their middles 4 px off each way, 5.7 px away).
+		rows[0] = 2.0
+		rows[3] = 96.0
+		rows[7] = 96.0
+		rows[8] = 1.0
+		rows[9] = 1.0
+		rows[10] = 1.0
+		rows[11] = 1.0
+		grid.clear()
+		grid.add_rows(rows, 1, LightGridScript.ROWS_SPOT, 1.0, 0.0, 0.0, false)
+		for at: Vector2 in [Vector2(92.0, 92.0), Vector2(100.0, 92.0), Vector2(92.0, 100.0), Vector2(100.0, 100.0)]:
+			check(grid.light_at(0, at).r > 0.0, "the cell at %s is lit (native %s)" % [at, native])
+		check_equal(grid.light_at(0, Vector2(116.0, 96.0)), Color.BLACK, "but not past a cell's reach (native %s)" % native)
+		# A beam narrower than a cell too.
+		grid.clear()
+		# On a cells' edge, between two rows' middles (4 px off each side).
+		grid.add_beam(PackedVector3Array([Vector3(40.0, 48.0, 0.0), Vector3(200.0, 48.0, 0.0)]), 2, 1.0, Color.WHITE)
+		check(grid.light_at(0, Vector2(120.0, 52.0)).r > 0.0 and grid.light_at(0, Vector2(120.0, 44.0)).r > 0.0, "a beam of reach 1 px lights the cells either side of it (native %s)" % native)

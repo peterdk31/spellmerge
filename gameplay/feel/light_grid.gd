@@ -16,6 +16,7 @@ extends RefCounted
 ## - **A frame:** `clear`, then `add_rows` for each batch of rows and `add_beam` for each beam, then
 ##   `bake` writes the bytes and hands them to the texture. Each light adds its colour times
 ##   (1 - its distance from its middle as a share of its reach)² at every cell whose middle it reaches
+##   (its reach at least a cell each way, so no light falls between the cells' middles)
 ##   (the GPU light's falloff, its ellipse along its way), blocked as the shader blocks it
 ##   (`LightBlockers.shade_between`, the boxes near it only); the cells add up and are cut at 1.
 ## - **Native:** while the module is loaded, `add_rows`, `add_beam` and `bake` run in `MoteKernel`
@@ -211,6 +212,8 @@ func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: 
 	points = mini(points, path.size())
 	if points < 2 or view_count == 0 or beam_reach <= 0.0:
 		return
+	# At least a cell each side, as every light (`_lamp`).
+	beam_reach = maxf(beam_reach, cell)
 	if kernel != null:
 		kernel.call(&"light_grid_beam", self, path, points, beam_reach, colour)
 		return
@@ -406,6 +409,10 @@ func _row(rows: PackedFloat32Array, at: int, kind: int, reach: float, pad: float
 ## One light: its middle (cx, cy), half sizes along its way and across, its way, its colour, where a
 ## spot stands from its middle (gx, gy) and whether the boxes stop it.
 func _lamp(cx: float, cy: float, hx: float, hy: float, wx: float, wy: float, r: float, g: float, b: float, gx: float, gy: float, spot: bool, blocked: bool) -> void:
+	# Every light reaches at least a cell each way (the owner, 2026-11-21): one smaller than that could
+	# fall between the cells' middles and blink as it moves.
+	hx = maxf(hx, cell)
+	hy = maxf(hy, cell)
 	var near: int = 0
 	var lx: float = cx
 	var ly: float = cy

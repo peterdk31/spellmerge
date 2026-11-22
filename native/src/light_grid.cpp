@@ -300,6 +300,9 @@ double length2(double x, double y) {
 // LightGrid._lamp.
 void lamp(Grid &gr, double cx, double cy, double hx, double hy, double wx, double wy, double r, double g, double b, double gx, double gy,
 		bool spot, bool blocked) {
+	// Every light reaches at least a cell each way (LightGrid._lamp).
+	hx = maxf(hx, gr.cell);
+	hy = maxf(hy, gr.cell);
 	int64_t near = 0;
 	double lx = cx;
 	double ly = cy;
@@ -494,6 +497,8 @@ void MoteKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, i
 	if (points < 2 || gr.views == 0 || beam_reach <= 0.0) {
 		return;
 	}
+	// At least a cell each side, as every light.
+	beam_reach = maxf(beam_reach, gr.cell);
 	const double r = colour.r;
 	const double g = colour.g;
 	const double b = colour.b;

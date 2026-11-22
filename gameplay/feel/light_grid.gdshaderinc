@@ -11,7 +11,7 @@
 // split's void quarter). One uniform each, not arrays, so a frame hands over numbers, not arrays.
 
 uniform sampler2D light_grid : hint_default_black, filter_nearest, repeat_disable;
-uniform bool light_grid_smooth = false;
+uniform bool light_grid_smooth = true;
 uniform float light_grid_cell = 8.0;
 uniform vec4 light_grid_view_0 = vec4(0.0);
 uniform vec4 light_grid_view_1 = vec4(0.0);

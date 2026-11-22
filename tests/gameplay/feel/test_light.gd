@@ -225,6 +225,8 @@ func test_the_shaders_are_warmed_and_the_rect_reads_the_grid() -> void:
 	light.follow()
 	check(shade.get_shader_parameter(&"light_grid") == light.grid.texture, "the rect reads the grid")
 	check(is_equal_approx(float(shade.get_shader_parameter(&"light_grid_cell")), light.grid.cell), "by its cell")
+	check(light.grid_smooth and bool(shade.get_shader_parameter(&"light_grid_smooth")), "smoothed by default (the owner's pick, 2026-11-21)")
+	check_equal(light.grid.cell, SpellLightScript.GRID_CELL, "at 8 px cells")
 	var ambient: Variant = shade.get_shader_parameter(&"ambient")
 	check(ambient == null or is_equal_approx(float(ambient), 1.0), "the ambient is 1.0 with no room: the room as it is")
 
@@ -636,3 +638,25 @@ func test_a_beams_light_follows_its_cards_light() -> void:
 	var card: Color = light.beam_colour(1)
 	check(is_equal_approx(card.r, plain.r * 0.5) and is_equal_approx(card.g, plain.g * 0.5), "half as bright")
 	check(is_equal_approx(light.beam_reach(1), SpellLightScript.BEAM_REACH * 2.0), "twice as wide")
+
+
+## The split's cheaper light (SplitBudget's rung while frames run slow) is coarser cells (the owner,
+## 2026-11-21): every view's grid in SPLIT_CHEAP_CELL cells while split and asked, the cell set again
+## when it is not, and the one picture never.
+func test_the_splits_cheaper_light_is_coarser_cells() -> void:
+	var light := own(SpellLightScript.new(null, 0)) as SpellLightScript
+	root.add_child(light)
+	var first := own(SubViewport.new()) as SubViewport
+	var second := own(SubViewport.new()) as SubViewport
+	for view: SubViewport in [first, second]:
+		view.size = Vector2i(320, 360)
+		root.add_child(view)
+	var apply := light.apply.material as ShaderMaterial
+	light.use_views([first, second] as Array[Viewport], SpellLightScript.DOWNSCALE * 2)
+	check_equal(light.grid.cell, SpellLightScript.SPLIT_CHEAP_CELL, "split and asked: coarser cells")
+	check(is_equal_approx(float(apply.get_shader_parameter(&"light_grid_cell")), SpellLightScript.SPLIT_CHEAP_CELL), "handed to the readers")
+	light.use_views([first, second] as Array[Viewport], SpellLightScript.DOWNSCALE)
+	check_equal(light.grid.cell, SpellLightScript.GRID_CELL, "frames fast again: the cell set")
+	light.use_views([] as Array[Viewport], SpellLightScript.DOWNSCALE * 2)
+	check_equal(light.grid.cell, SpellLightScript.GRID_CELL, "one picture: never coarser")
+	light.release()

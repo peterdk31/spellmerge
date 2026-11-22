@@ -58,8 +58,10 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns", &"merged_opens",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
-## How many nearest-target asks found one (both sides alike).
+## How many nearest-target asks found one, found none, and found another past the first.
 var _nearest_found: int = 0
+var _nearest_none: int = 0
+var _nearest_skipped: int = 0
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
 var _mgrs: Array[ManagerScript] = []
 var _targets: Array = [[], []]
@@ -442,18 +444,25 @@ func _step_the_scene_alike(threads: int) -> void:
 			var reach: float = [radius, radius * 6.0, 2000.0][n % 3]
 			var layers: int = [ManagerScript.LAYER_ENEMY, ManagerScript.LAYER_PLAYER, ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER][(n + step) % 3]
 			var skips: int = (n + step) % 4
+			# Asked again past what it found, then past both found (so the skips change the answer).
 			var found: Array[String] = []
 			var near: Array[Vector2] = []
 			for side in 2:
-				var others: Array = _targets[side] as Array
-				var skip: Node2D = others[(step * 7 + n) % others.size()] if skips >= 1 else null
-				var skip_also: Node2D = others[(step * 3 + n * 5) % others.size()] if skips >= 2 else null
-				var node: Node2D = _mgrs[side].nearest_target(point, reach, layers, skip, skip_also, team)
-				found.append(String(node.name) if node != null else "")
+				var first: Node2D = _mgrs[side].nearest_target(point, reach, layers, null, null, team)
+				var second: Node2D = _mgrs[side].nearest_target(point, reach, layers, first, null, team) if skips >= 1 else null
+				var third: Node2D = _mgrs[side].nearest_target(point, reach, layers, first, second, team) if skips >= 2 else null
+				for node: Node2D in [first, second, third]:
+					found.append(String(node.name) if node != null else "")
 				near.append(_mgrs[side].nearest_point)
 			_nearest_found += 1 if found[0] != "" else 0
-			if found[0] != found[1] or var_to_bytes(near[0]) != var_to_bytes(near[1]):
-				_differ("step %d ask %d: the same nearest target (%s at %s / %s at %s)" % [step, n, found[0], near[0], found[1], near[1]])
+			_nearest_none += 1 if found[0] == "" else 0
+			_nearest_skipped += 1 if found[1] != "" and found[1] != found[0] else 0
+			if found.slice(0, 3) != found.slice(3, 6) or var_to_bytes(near[0]) != var_to_bytes(near[1]):
+				_differ("step %d ask %d: the same nearest targets (%s at %s / %s at %s)" % [step, n, found.slice(0, 3), near[0], found.slice(3, 6), near[1]])
+			# And on the native manager itself: its kernel and its GDScript on the same grid, never refused.
+			var row: int = _mgrs[1]._kernel.call(&"nearest_target", _mgrs[1], point, reach, layers, -1, -1, team)
+			if row == -2 or row != _mgrs[1]._gd_nearest_row(point, reach, layers, -1, -1, team):
+				_differ("step %d ask %d: the native manager's kernel %d, its GDScript %d" % [step, n, row, _mgrs[1]._gd_nearest_row(point, reach, layers, -1, -1, team)])
 		_compare_arrays(step)
 		if _differences > 8:
 			return
@@ -464,7 +473,7 @@ func _step_the_scene_alike(threads: int) -> void:
 	check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 	check(_turned_back, "a circling shot bounced and went round backwards")
-	check(_nearest_found > 100, "the nearest-target asks found targets (%d)" % _nearest_found)
+	check(_nearest_found > 100 and _nearest_none > 10 and _nearest_skipped > 50, "the nearest-target asks found targets (%d), none (%d), and others past the ones found (%d)" % [_nearest_found, _nearest_none, _nearest_skipped])
 	check(_circled_quad, "a still body circled, drawn as its quad")
 	var boxes_hit: int = _box_hits.filter(func(n: String) -> bool: return n.begins_with("prop")).size()
 	check(boxes_hit > 0 and _box_hits.size() > boxes_hit, "shots hit the boxes, props (%d) and enemies (%d)" % [boxes_hit, _box_hits.size() - boxes_hit])
@@ -712,6 +721,10 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 		for k in 2:
 			var child: int = m.spawn(caster, position, Vector2.from_angle(float(shot + k) * 2.1) * 200.0, 0.4, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
 			m.exclude(child, target)
+	# A chain's jump asks for the nearest target from inside the pass (sim-native SN3): the grid is
+	# stale there, with rows taken away or grown since it was filled; both sides alike.
+	var jump: Node2D = m.nearest_target(position, 120.0, ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER, target as Node2D, null, -1)
+	_events[side].append("jump %s %s" % [String(jump.name) if jump != null else "-", var_to_str(m.nearest_point)])
 	if shot % 97 == 13 and target.name.begins_with("enemy"):
 		# Now and then a hit takes its target away (it died).
 		m.remove_target(target as Node2D)

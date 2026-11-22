@@ -1,6 +1,6 @@
 # The simulation's hot paths in C++, built for threads
 
-**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 on are each a PR of their own, in the order below, the next opened once the last is merged.
+**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 (the foes' nearest-foe search) built ("Built (SN3)"); SN4 on are each a PR of their own, in the order below, the next opened once the last is merged.
 
 **The owner's decisions (2026-11-22):**
 
@@ -118,6 +118,14 @@ Rules for every split: a part never reads what another part of the same pass wri
 - **The same game.** The four biomes' state hash every tick identical to main's (3cd6147) with the module on and with it off.
 - **Native on and off in the suite** (the orchestrator's ask after #916): `tests/core/test_determinism.gd` plays the fight and the storm with the kernels they reach on and with them off, every area every tick (it fails, at the storm's tick 12, with the manager's `_one` made state again); `tests/gameplay/flow/test_room_life.gd` compares the native places with the twin's over a biome's bodies scattered on rooms, bridges and the void (a third on whole 16 px cells), and plays `wake` itself with the module on and off (the places awake, the bodies asleep, every room). A mutant of the C++ (an overlapping place's `over` dropped) fails it.
 - **Measured** (headless, native, `tick_hash.gd --profile-steps`, main → this, ms a tick): Flow 1p 0.325 → 0.266, 2p 0.324 → 0.291, 3p 0.314 → 0.309 and again 0.315 → 0.289, 4p 0.366 → 0.311; the whole tick moves with the other steps' noise (1p 1.112 → 1.004, 4p 1.641 → 1.553).
+
+## Built (SN3): the foes' look for their nearest foe
+
+- **Profiled in a crowd** (`tests/benchmark/ai_step.gd`: 200 awake staffed foes round four wizards, timers round the brain's parts, a patch kept out of the tree, ms a pass): one pass of their steps 15.6, their think 7.4, of which the target's tracking (`_track_target`: `_find_target`, `nearest_foe`) 3.4, the perception 0.94, the decision 0.47, the chase 0.41, the harm's steering 0.23. The look for the nearest foe is `ProjectileManager.nearest_target` asked ring by ring (160, 480, then the whole room), which walks every target in the cells it covers and passes over the foe's own crowd one by one. So SN3 is that search, and the body table with the two-phase perception moves to SN4.
+- **One call a ring.** `nearest_target` searches in C++ when the module is loaded (`ShotKernel.nearest_target`, a new method of the class: `_query_cells`, `_query_match` and the team's rules on the manager's arrays, read through `MANAGER_FIELDS`), else `_gd_nearest_row`, main's loop. A library built before the method runs the GDScript (`_kernel_nearest`).
+- **The same game.** The four biomes' state hash every tick identical to main's with the module on and with it off.
+- **Tests:** `tests/core/test_native_kernel.gd` asks both managers the nearest targets between steps (small circles and the whole room, by a team or none, on one layer or both, again past the first found and past both: the skips change the answer) and from inside the hit pass (a chain's jump, the grid stale, rows taken away or grown since), and the native manager's kernel against its own GDScript on the same grid; a mutant (`skip_also` dropped) fails it.
+- **Measured:** the crowd (`ai_step.gd`, median ms a pass) main 16.0, this with the kernels off (`--no-native`) 15.6, on 12.7. The biomes, headless (`tick_hash.gd --profile-steps`, main 74beba1 → this, ms a tick): 1p 1.067 → 1.057, 4p 1.586 → 1.535 (the bodies 0.544 → 0.529): about two foes are awake a tick there, so the search was little of it.
 
 ## Answered by the owner (2026-11-22)
 

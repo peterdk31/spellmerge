@@ -676,7 +676,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -1287,6 +1287,8 @@ var _threat_stamp: int = 0
 var native: bool = true:
 	set = set_native
 var _kernel: Object = null
+## Whether `_kernel` has `nearest_target` (a library built before it has not).
+var _kernel_nearest: bool = false
 ## `shot_places`' scratch for the native kernel: 1 for each place it found a shot in.
 var _places_found: PackedByteArray = PackedByteArray()
 ## The threads the native kernel's loops run on: 0 for its own choice (the machine's cores less
@@ -1349,6 +1351,8 @@ func set_native(on: bool) -> void:
 		push_error("Projectiles: the native ShotKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		return
 	_kernel = kernel
+	# A library built before the nearest-target search runs its GDScript (sim-native SN3).
+	_kernel_nearest = kernel.has_method(&"nearest_target")
 	set_native_threads(native_threads)
 
 
@@ -6622,9 +6626,10 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	var skip_also: int = _target_row(exclude_also)
 	# The search in C++ when the module is loaded (sim-native SN3: an AI's look for its nearest foe
 	# goes over the whole crowd), else here; -2 only when the kernel refused the grid.
-	if _kernel != null:
+	var native_search: bool = _kernel != null and _kernel_nearest
+	if native_search:
 		best = _kernel.call(&"nearest_target", self, point, radius, layers, skip, skip_also, team)
-	if best == -2 or _kernel == null:
+	if best == -2 or not native_search:
 		best = _gd_nearest_row(point, radius, layers, skip, skip_also, team)
 	if best < 0:
 		return null

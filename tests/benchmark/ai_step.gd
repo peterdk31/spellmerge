@@ -6,7 +6,7 @@ extends SceneTree
 ## pass of `Actor.step` over the whole crowd per physics step. The wizards walk in circles and cast a bolt at the crowd every few steps, so the enemies' dodging and leading have
 ## shots and moving targets to read. Nothing is random but the AI's own seeded numbers.
 ##
-## godot --headless --path . --script res://tests/benchmark/ai_step.gd [-- --enemies=N --steps=N --no-native]
+## godot --headless --path . --script res://tests/benchmark/ai_step.gd [-- --enemies=N --steps=N --no-native: the manager's and the walls' kernels off]
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 

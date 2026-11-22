@@ -11,20 +11,25 @@ extends RefCounted
 ## run drew that was not warmed (the 4-bot smoke test and the playtest's `--fail-on-errors` fail on
 ## it, headless too), so a new size or character cannot be forgotten.
 
-## The characters warmed: printable ASCII, and the few others the game writes.
+## The characters warmed: printable ASCII, and the few others the game writes (characters the
+## font lacks, arrows or a tick, are drawn by a system font of the engine's, which no warm-up
+## reaches: the game writes none).
 const FIRST: int = 32
 const LAST: int = 126
-const EXTRA: String = "×·•–—…←→↑↓✓∞°"
+const EXTRA: String = "×·•–—…∞°"
 ## Letters the font draws as one glyph of no character of its own (its ligatures: "fi" is one).
 const LIGATURES: String = "fi fl ff ffi ffl ft fj"
-## The default font's sizes the game draws (font size, outline size): the labels (8 to 16 px, the
-## theme's outline 2, the panels' and banners' 3 and 4) and the damage numbers (8 px with an outline
-## of 3, 16 px for a big hit). Measured on a whole biome's play (seed 11, two players); a size drawn
-## and not listed is named by `drawn_since_warm`. About 13 ms a pair.
+## The default font's sizes the game draws (font size, outline size): the labels (8 to 16 px and
+## the theme's outline 2; the panels' 3 and 4), the damage numbers (8 px, outline 3), the frame
+## rate's readout (10 px, outline 3), the altar's code (16 px, outline 4) and the main menu's title
+## (40 px). Measured on a whole biome's play (seed 11, two players) and the menus; a size drawn
+## and not listed is named by `drawn_since_warm` (`tests/core/test_glyph_warmup.gd` shows the
+## menu and the HUD's widgets). About 10 ms a pair.
 const GAME_SIZES: Array[Vector2i] = [
 	Vector2i(8, 0), Vector2i(10, 0), Vector2i(12, 0), Vector2i(14, 0), Vector2i(16, 0),
 	Vector2i(8, 2), Vector2i(10, 2), Vector2i(12, 2), Vector2i(14, 2), Vector2i(16, 2),
-	Vector2i(8, 3), Vector2i(8, 4), Vector2i(16, 4),
+	Vector2i(8, 3), Vector2i(10, 3), Vector2i(8, 4), Vector2i(16, 4),
+	Vector2i(40, 0), Vector2i(40, 2),
 ]
 
 ## The glyphs of each font's caches when warmed, by font and "size/outline".
@@ -33,11 +38,13 @@ static var _warmed: Dictionary = {}
 static var game_ms: float = 0.0
 
 
-## The default font (the theme's and the damage numbers') warmed at each of GAME_SIZES, once: the HUD and Feel each call it as they start. Returns the milliseconds
+## The default font (the theme's and the damage numbers') warmed at each of GAME_SIZES, once, where
+## the renderer may have a thread of its own: never on the web, which has none (its boot is slower,
+## and nothing there races): the HUD and Feel each call it as they start. Returns the milliseconds
 ## it took (0 when warmed already).
 static func warm_game() -> float:
 	var font := ThemeDB.fallback_font as FontFile
-	if font == null or _warmed.has(font):
+	if font == null or _warmed.has(font) or OS.has_feature("web"):
 		return 0.0
 	var began: int = Time.get_ticks_usec()
 	warm(font, GAME_SIZES)

@@ -1,9 +1,12 @@
 extends "res://tests/support/suite.gd"
+# unit-test-alone
 ## Every glyph the game draws, rasterized before play (core/base/glyph_warmup.gd): a glyph drawn in
 ## play writes the font's atlas image as a separate render thread reads it (the render thread,
 ## 2026-11-22: `p_image->is_empty()` entering the boss's room). The warm-up draws each size and
 ## outline the game uses, at every quarter-pixel offset, with the ligatures; text drawn after it at
-## those sizes draws no glyph of its own, and one at a size not warmed is named.
+## those sizes draws no glyph of its own, the main menu and the HUD's widgets draw none either, and
+## one at a size not warmed is named. Alone in its process: it checks the default font as the
+## autoloads warmed it, which another test file's text would change.
 
 
 func test_the_game_font_is_warmed_as_the_game_starts() -> void:
@@ -28,6 +31,19 @@ func test_text_drawn_at_warmed_sizes_draws_no_glyph() -> void:
 		else:
 			font.draw_string(item, Vector2(3.37, 11.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size.x)
 	RenderingServer.free_rid(item)
+	check_equal(GlyphWarmup.drawn_since_warm(), PackedStringArray(), "nothing drawn that was not warmed")
+
+
+func test_the_main_menu_and_the_frame_rate_draw_no_glyph() -> void:
+	GlyphWarmup.warm_game()
+	var menu: Node = own(load("res://hud/menus/main_menu/main_menu.tscn").instantiate())
+	root.add_child(menu)
+	var fps: Label = own(load("res://hud/widgets/fps_counter.gd").new()) as Label
+	root.add_child(fps)
+	fps.visible = true
+	fps.text = "60 FPS"
+	await process_frame
+	await process_frame
 	check_equal(GlyphWarmup.drawn_since_warm(), PackedStringArray(), "nothing drawn that was not warmed")
 
 

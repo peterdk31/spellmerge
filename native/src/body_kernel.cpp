@@ -7,6 +7,7 @@
 // and nothing here calls the C library's other maths.
 
 #include "body_kernel.h"
+#include "grid_ray.h"
 #include "packed.h"
 
 #include <cmath>
@@ -380,7 +381,22 @@ bool BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &i
 	return true;
 }
 
+double BodyKernel::wall_hit(const PackedByteArray &cells, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &from,
+		const Vector2 &to) const {
+	ERR_FAIL_COND_V_MSG(w <= 0 || h <= 0 || cells.size() < w * h, -2.0, "BodyKernel.wall_hit: the grid is smaller than w * h");
+	return grid_ray::wall_hit(cells.ptr(), w, h, cell, origin, from, to);
+}
+
+double BodyKernel::way_hit(const PackedByteArray &walls, const PackedByteArray &ground, int64_t w, int64_t h, double cell, const Vector2 &origin,
+		const Vector2 &from, const Vector2 &to, int64_t wall_mask, bool with_walls, bool with_ground) const {
+	ERR_FAIL_COND_V_MSG(w <= 0 || h <= 0 || walls.size() < w * h || ground.size() < w * h, -2.0, "BodyKernel.way_hit: the grids are smaller than w * h");
+	return grid_ray::way_hit(walls.ptr(), ground.ptr(), w, h, cell, origin, from, to, wall_mask, with_walls, with_ground);
+}
+
 void BodyKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("wall_hit", "cells", "w", "h", "cell", "origin", "from", "to"), &BodyKernel::wall_hit);
+	ClassDB::bind_method(D_METHOD("way_hit", "walls", "ground", "w", "h", "cell", "origin", "from", "to", "wall_mask", "with_walls", "with_ground"),
+			&BodyKernel::way_hit);
 	ClassDB::bind_method(D_METHOD("configure", "config"), &BodyKernel::configure);
 	ClassDB::bind_method(D_METHOD("slide", "cells", "ground", "w", "h", "cell", "origin", "from", "motion", "radius", "mask"),
 			&BodyKernel::slide);

@@ -63,6 +63,13 @@ public:
 	// `origin`), and `places[n]` is its `room` after; a missing body's is NO_PLACE (-1), and one of another manager is
 	// left to GDScript (-2, `RoomLife.ASK_GDSCRIPT`). `places` is the
 	// caller's array, sized, written in place.
+	// `RoomGrid.wall_hit` on `cells` (the grid has walls; sim-native SN4: the long rays of an AI's sight
+	// and line of fire, `RoomGrid` hands over only paths past its fast ones), t in [0, 1] or -1.
+	double wall_hit(const PackedByteArray &cells, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &from, const Vector2 &to) const;
+	// `RoomGrid._way_hit` past its checks (an AI's walk: `ground_clear`, `walk_clear`, `clear_run`, sight
+	// past a mouth): `ground` the walking or the ground grid, `walls` minded by `wall_mask`.
+	double way_hit(const PackedByteArray &walls, const PackedByteArray &ground, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &from,
+			const Vector2 &to, int64_t wall_mask, bool with_walls, bool with_ground) const;
 	// False, with nothing written, when the arrays do not fit: the caller runs the GDScript.
 	bool places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
 			const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,

@@ -64,7 +64,7 @@ static func _native_kernel() -> Object:
 	var kernel: Object = NativeScript.body_kernel()
 	# Its methods all there (a library built before one was added runs the GDScript), and the room
 	# grid's place marks the kernel writes the same as the GDScript's.
-	if kernel == null or not kernel.has_method(&"walk") or not kernel.has_method(&"places") or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE, "NO_PLACE": RoomGrid.NO_PLACE, "ASK_GDSCRIPT": RoomGrid.ASK_GDSCRIPT}):
+	if kernel == null or not kernel.has_method(&"walk") or not kernel.has_method(&"places") or not kernel.has_method(&"way_hit") or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE, "NO_PLACE": RoomGrid.NO_PLACE, "ASK_GDSCRIPT": RoomGrid.ASK_GDSCRIPT}):
 		return null
 	return kernel
 
@@ -83,6 +83,16 @@ static func slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: in
 ## (`RoomGrid.gd_walk_body`).
 static func walk(walls: PackedByteArray, walk_cells: PackedByteArray, ground: PackedByteArray, holes: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, flags: int, mask: int, from: Vector2, motion: Vector2, crossed: Vector2, radius: float, reach: float) -> Vector3:
 	return _kernel.call(&"walk", walls, walk_cells, ground, holes, w, h, cell, origin, flags, mask, from, motion, crossed, radius, reach)
+
+
+## The native module's `BodyKernel.wall_hit` and `way_hit` (sim-native SN4): `RoomGrid.wall_hit`'s and
+## `_way_hit`'s long rays, which they hand over only while `native_on()`; their loops are the twins.
+static func wall_hit(cells: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, to: Vector2) -> float:
+	return _kernel.call(&"wall_hit", cells, w, h, cell, origin, from, to)
+
+
+static func way_hit(walls: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, to: Vector2, wall_mask: int, with_walls: bool, with_ground: bool) -> float:
+	return _kernel.call(&"way_hit", walls, ground, w, h, cell, origin, from, to, wall_mask, with_walls, with_ground)
 
 
 ## The native module's `BodyKernel.places` (sim-native SN2): every open body's place made current,

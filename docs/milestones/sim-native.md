@@ -1,6 +1,6 @@
 # The simulation's hot paths in C++, built for threads
 
-**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 (the foes' nearest-foe search) built ("Built (SN3)"); SN4 on are each a PR of their own, in the order below, the next opened once the last is merged.
+**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 (the foes' nearest-foe search) built ("Built (SN3)"); SN4 (the long rays) built ("Built (SN4)"); SN5 on are each a PR of their own, in the order below, the next opened once the last is merged.
 
 **The owner's decisions (2026-11-22):**
 
@@ -60,11 +60,11 @@ Each step moves a path whose work is a pure function of arrays, keeps the order 
 | **SN1** | **A body's walk:** `Actor.move`'s grid work in one call (`BodyKernel.walk`: the slides over holes or the plain slide, the hole under the body's end and whether its circle reaches a hole) | each body's move, in id order as now | the largest pure path (above); one native call a body where there were up to five (three slides and two hole tests); the room it ends in (`find_room`) joins in SN2 |
 | **SN2** | **Flow's waking** (`RoomLife.wake`'s first pass: every open body's place found where its node stands and set as its `room`, in one `BodyKernel.places` call), and a native-on/native-off compare in the regular suite | Flow's step, once a tick | moved up from SN5 by SN2's profile: the waking was 0.17 ms a tick at 4p, the largest single path left (below) |
 | **SN3** | **The foes' look for their nearest foe** (`ProjectileManager.nearest_target`, which `AIBrain._find_target` asks ring by ring: `ShotKernel.nearest_target`) | each foe's think, in id order, as now | SN3's profile in a crowd (below): the target's search was the brain's largest part, not the perception |
-| SN4 | **The body table and the foes' perception in two phases** (accepted by the owner): a body's position, radius, team and flags as columns of the actor table, filled in one native pass from the nodes at the bodies' step start; every awake foe's perception (`AIBrain._perceive`'s queries) worked out from it on the threads, read in each foe's think in id order | before the bodies' steps | the one step that changes the game: a new `tick_hash` baseline |
-| SN5 | **The touches and the cover's cells** on the body table, then **whatever the profile names next** (the teleports' tell, 0.056 ms; `_push_place`'s clip) | their steps | once the table is there |
-| SN6 | **The threads' proof:** 1, 2, 4 and 8 threads, the hash every tick the same (a test and the four biomes) | | once two or more steps run as kernels with parallel parts (SN4) |
+| **SN4** | **The room grid's long rays** (`RoomGrid.wall_hit` and `_way_hit` past `NATIVE_RAY_CELLS`: an AI's line of fire, sight, walk and ground checks, `clear_run`, the harm exit's search; `BodyKernel.wall_hit`, `way_hit`, on `grid_ray.h`, which the shots' hit pass shares) | where they are asked, as now | the owner's decision of 2026-11-22 (below): the next pure kernels by profile, the game the same |
+| SN5 | **Whatever the profile names next**, measured again after SN4 | | |
+| later | **The body table, the foes' perception in two phases and the simulation's threads**, with the state off the nodes (the tick on its own thread): waiting for that step, by the owner's decision of 2026-11-22 | | |
 
-SN1, SN2, SN3 and SN5 keep the game exactly as it is. SN4 is the one step whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN4 records a new baseline.
+Every step keeps the game exactly as it is. The two-phase step (later) is the one whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): SN4 records a new baseline.
 
 ## The data layout
 
@@ -127,11 +127,20 @@ Rules for every split: a part never reads what another part of the same pass wri
 - **Tests:** `tests/core/test_native_kernel.gd` asks both managers the nearest targets between steps (small circles and the whole room, by a team or none, on one layer or both, again past the first found and past both: the skips change the answer) and from inside the hit pass (a chain's jump, the grid stale, rows taken away or grown since), and the native manager's kernel against its own GDScript on the same grid; a mutant (`skip_also` dropped) fails it.
 - **Measured:** the crowd (`ai_step.gd`, median ms a pass) main 16.0, this with the kernels off (`--no-native`) 15.6, on 12.7. The biomes, headless (`tick_hash.gd --profile-steps`, main 74beba1 → this, ms a tick): 1p 1.067 → 1.057, 4p 1.586 → 1.535 (the bodies 0.544 → 0.529): about two foes are awake a tick there, so the search was little of it.
 
+## Built (SN4): the room grid's long rays
+
+- **Measured first** (after SN3, `ai_step.gd`, 200 awake foes, timers patched in, ms a pass): the step 14.2; the brain's think 5.0, of which the perception 0.98, the target's tracking (native since SN3) 0.85, the decision 0.50, the chase 0.44; the caster 1.7, the Mover 1.2, the rest mostly the looks (stepped each tick by the bench, left to the drawing by the game). So the two-phase perception would save at most about 0.7 ms on four threads in such a crowd and next to nothing in a biome, for a large refactor of the brain and a game changed: the owner chose (2026-11-22) to leave it, and the simulation's threads, for when the state is off the nodes, and to take the next pure kernels instead.
+- **Built:** a ray that crosses more than `RoomGrid.NATIVE_RAY_CELLS` (4) cells is walked in C++ when the module is loaded (`BodyKernel.wall_hit`, `way_hit`): `wall_hit` past its fast paths and `_way_hit` past its checks, so `line_clear`, `clip_to_walls`, `sight_clear`, `ground_clear`, `walk_clear` and `clear_run` (an AI's line of fire, sight, walk and ground checks, the harm exit's search) take it. The walk is `native/src/grid_ray.h`, shared with the shots' hit pass (`HitPass::wall_hit` now calls it), mirrored from the grid's loops line by line. A shorter ray stays in GDScript, which costs less than the call. A refused grid (-2) walks in GDScript.
+- **One ray, timed** (`line_clear` across an open room, us a ray, GDScript → native): 3 cells 1.69 → 1.77, 6 cells 2.68 → 1.47, 20 cells 6.2 → 1.4, 80 cells 16.9 → 1.6, 140 cells 24.2 → 1.3.
+- **Left as they were, by the profile:** the touches (`Actors.touching`, 0.018 ms a tick at 4p for every body together: a native call a body costs as much) and the wizards' wall clip (`_push_place`'s `clip_to_walls` is a staff's length, one or two cells, already `wall_hit`'s fast path; its 0.043 ms is the calls round it).
+- **Tests:** `tests/core/test_grid_rays.gd` (8,000 seeded rays, short and long, a third on whole cells, every query, native against GDScript to the bit; a mutant in `way_hit` fails it); `tests/core/test_native_kernel.gd` holds the hit pass to its GDScript through the shared walk.
+
 ## Answered by the owner (2026-11-22)
 
-1. **The two-phase step (now SN4, after SN2's and SN3's reordering) is accepted:** a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
+1. **The two-phase step was accepted** (later set aside by answer 3): a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
 2. **Threads: the best solution**, as recommended: the module's own pool (`jobs::for_spans`) inside a kernel's passes, `WorkerThreadPool` only where GDScript has several independent kernel calls to make at once ("The threading model").
+3. **SN4 by the profile (2026-11-22):** the two-phase perception skipped for now; the two-phase step and the simulation's threads wait for the state-off-the-nodes step; SN4 is the next pure, order-preserving kernels by profile.
 
 ## Open questions for the owner
 
-1. **Found on main, not caused by SN1:** with the native module off, main's own run of the four biomes parts from its run with it on ("Built (SN1)"). Find it with the desync report before SN2?
+None. (The parting found on main with the module off was the manager's `_one`, fixed in #916; the regular suite now plays native against GDScript, SN2.)

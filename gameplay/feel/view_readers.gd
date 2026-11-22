@@ -73,10 +73,6 @@ var _copies: Array[Array] = []
 var _keys: PackedVector4Array = PackedVector4Array()
 var _sizes: PackedVector2Array = PackedVector2Array()
 var _shared_on: bool = false
-## By material: the uniforms a copy's material holds for its own view (`set_view_uniform`: one dictionary a
-## view from SHARED, uniform to value), never copied over from the item's.
-var _view_values: Dictionary = {}
-
 
 func _init() -> void:
 	_keys.resize(SHARED)
@@ -135,42 +131,10 @@ func watch(material: Material, tree: SceneTree) -> void:
 			var named: String = String(uniform.get("name", ""))
 			if int(uniform.get("type", TYPE_NIL)) != TYPE_NIL and named != "" and not own.has(named):
 				names.append(named)
-	_uniforms[shading] = _without_view_uniforms(shading, names)
+	_uniforms[shading] = names
 	_hand_keys(shading)
 	if tree != null and tree.root != null:
 		_scan(tree.root, shading)
-
-
-## View `view`'s copies of the items drawn with `material` hold `value` in `uniform`, their own (a texture
-## of their view's, say), never the item's (the item's material, drawn in the first SHARED views, keeps
-## its own value; nothing is set for a view under SHARED). Kept while the material is read.
-func set_view_uniform(material: ShaderMaterial, view: int, uniform: StringName, value: Variant) -> void:
-	if material == null or view < SHARED or view >= VIEWS_MOST:
-		return
-	if not _view_values.has(material):
-		var by_view: Array[Dictionary] = []
-		for k in VIEWS_MOST - SHARED:
-			by_view.append({})
-		_view_values[material] = by_view
-	(_view_values[material][view - SHARED] as Dictionary)[uniform] = value
-	if _uniforms.has(material):
-		_uniforms[material] = _without_view_uniforms(material, _uniforms[material])
-	if _materials.has(material) and _materials[material][view - SHARED] != null:
-		(_materials[material][view - SHARED] as ShaderMaterial).set_shader_parameter(uniform, value)
-
-
-## `names` less the uniforms `material`'s copies hold for their own views.
-func _without_view_uniforms(material: ShaderMaterial, names: PackedStringArray) -> PackedStringArray:
-	if not _view_values.has(material):
-		return names
-	var out := PackedStringArray()
-	for named in names:
-		var own: bool = false
-		for values: Dictionary in _view_values[material]:
-			own = own or values.has(StringName(named))
-		if not own:
-			out.append(named)
-	return out
 
 
 ## The items drawn with `material` read the light no more: they are drawn as any of the world's
@@ -185,7 +149,6 @@ func forget(material: Material) -> void:
 	(material as ShaderMaterial).set_shader_parameter(SHARED_ON, false)
 	_materials.erase(material)
 	_uniforms.erase(material)
-	_view_values.erase(material)
 
 
 ## `node`, just come into the tree: a reader when it is drawn with a watched material.
@@ -329,10 +292,6 @@ func _material_of(material: ShaderMaterial, view: int) -> ShaderMaterial:
 		var own := material.duplicate() as ShaderMaterial
 		own.set_shader_parameter(VIEW_ID, view)
 		own.set_shader_parameter(SHARED_ON, false)
-		if _view_values.has(material):
-			var values: Dictionary = _view_values[material][view - SHARED]
-			for uniform: StringName in values:
-				own.set_shader_parameter(uniform, values[uniform])
 		by_view[view - SHARED] = own
 	return by_view[view - SHARED]
 

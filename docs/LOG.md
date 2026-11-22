@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-22: One pass
+
+The owner's second step after grid lighting (docs/milestones/connected-biomes.md, "One pass"). Measured first at 1280 x 720: once the light is a grid, #902's passes cost more than they save, so the light's factor passes and the mist's pass are gone and both are worked out a world pixel at a time where they are drawn; the apply rect is the one full-screen pass (light, ambient, tints, one screen read). The mist stays its own draw under the bodies: a ground mask in the screen's alpha would merge it, but Vulkan's screen copy keeps no alpha (open with the owner). A table of the effects' cost (`EffectsQuality`, LOW and HIGH: the light's cell and smoothing, the mists' billows, the air's share) for the coming quality setting, `Spectacle.set_effects_quality`.
+
 ## 2026-11-22: The desktop's native module optimised (D2)
 
 The owner's decision of 2026-11-22: the game is optimised for its Windows and Linux builds first, so build the native module for the desktop with stronger optimisation, bit-exact with its GDScript and the same on every machine. godot-cpp's release target was already `-O3`. What changed (`native/SConstruct`): the desktop libraries are linked whole (LTO, `lto=full`, with the float flags passed to the link too) and built for `x86-64-v2` (SSE4.2; Godot 4.7 will not start without it) in place of plain x86-64. The web is built as before. `ci/build/native.sh` now refuses a Linux or Windows library that holds a fused multiply-add instruction or calls the C library's `fma` (`no_fma`), so a flag, compiler or intrinsic that slips past `-ffp-contract=off` fails the build. `x86-64-v3` (AVX2) was built and measured too. It was no faster than v2 and often slower, and Godot has no CPU feature tag to pick a second library by, so there is no AVX2 library.

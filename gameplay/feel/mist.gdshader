@@ -10,15 +10,11 @@ shader_type canvas_item;
 // - **Where it lies:** `mask` (MistMask: how far each place is from a wall and from a pit, and how
 //   deep in a wall it is) thickens it toward the walls within `edge_reach` and the pits within
 //   `pit_reach`, thin over the middle (`middle`), spilling `spill` over a wall's edge.
-// - **Its billows:** three layers of value noise in world px, each drifting its own way at Feel's
+// - **Its billows:** up to three layers of value noise in world px (`billows`, EffectsQuality's row), each drifting its own way at Feel's
 //   clock (`view_time`), so the sheet slowly turns over as it drifts; `patchy` opens floor between.
 // - **Pushed:** the shots' wake drags it along and a blast's wave pushes it out and thins it
 //   (stir.gdshaderinc, the world's stirs); `parted` (MistParting) parts it round the bodies' feet and
 //   pushes it aside round them.
-// - **At the light's resolution:** while the picture is bigger than PictureGrid.SIZE (gameplay/feel/
-//   picture_grid.gd) how thick it is (mist_density.gdshaderinc) is worked out in a view's pass
-//   (mist_pass.gdshader, gameplay/feel/light_passes.gd) and taken whole for each block of the picture
-//   (light_passes.gdshaderinc); at PictureGrid.SIZE, and in a view with no pass, it is worked out here.
 // - **Lit:** the spell light's grid under each world pixel (`view_light`, as the apply rect reads it)
 //   brings it out and tints it the light's colour, so it glows warm in a candle's pool, in a wizard's
 //   hat colour round their staff, and flares as a fireball passes.
@@ -26,7 +22,6 @@ shader_type canvas_item;
 #include "res://gameplay/feel/mist_density.gdshaderinc"
 
 #include "res://gameplay/feel/light_views.gdshaderinc"
-#include "res://gameplay/feel/light_passes.gdshaderinc"
 uniform float in_dark = 0.5;
 uniform float lit = 1.0;
 // The floor's bright step (SpellLight.BRIGHT_FROM): a light this bright brings the mist out fully.
@@ -40,9 +35,7 @@ void vertex() {
 }
 
 void fragment() {
-	// At the light's resolution its thickness and its light are its block's (light_passes.gdshaderinc).
-	bool by_block = light_pass_here();
-	float density = by_block ? light_unpack_unit(light_pass_at(SCREEN_UV, SCREEN_PIXEL_SIZE)) * THICKEST_DRAWN : mist_density(world);
+	float density = mist_density(world);
 	if (density < 0.004) {
 		discard;
 	}

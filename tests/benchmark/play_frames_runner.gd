@@ -24,6 +24,7 @@ const PLAY_SEED: int = 11
 ## The foes a room's fight holds (each room the wizards stand in gets its share of these).
 const FOES_A_ROOM: int = 12
 ## `--off=` names and the Feel setting each switches off.
+const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 const PASS_SETTERS: Dictionary[String, StringName] = {"light": &"set_spell_light", "shadows": &"set_shadows", "air": &"set_ambient_particles", "fog": &"set_fog"}
 
 
@@ -63,19 +64,20 @@ static func _row(label: String, players: int, enemies: int, idle: bool, spread: 
 
 ## The scenario's mote ring (the "Particles" setting) taken before its run starts, and the passes
 ## `--off=` names switched off by their settings (light, shadows, air, fog: Feel's `set_spell_light`,
-## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs.
+## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs; `--quality=low` or
+## `high` draws the effects at that row (gameplay/feel/effects_quality.gd).
 func _start_play(scenario: Dictionary) -> void:
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if arg.begins_with("--quality=") and _feel != null:
+			var level: int = EffectsQualityScript.Level.LOW if arg.trim_prefix("--quality=") == "low" else EffectsQualityScript.Level.HIGH
+			(_feel.call(&"spectacle") as Object).call(&"set_effects_quality", level)
+			print("BENCH: play frames %s: effects at %s" % [scenario["label"], arg.trim_prefix("--quality=")])
 		if arg.begins_with("--off=") and _feel != null:
 			for part in arg.trim_prefix("--off=").split(","):
 				var setter: StringName = PASS_SETTERS.get(part, &"")
 				if setter != &"" and _feel.has_method(setter):
 					_feel.call(setter, false)
 					print("BENCH: play frames %s: %s off" % [scenario["label"], part])
-	if (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--light-at-picture") and _feel != null and _feel.call("light") != null:
-		# The light at the picture's own resolution, as before 2026-11-21 (the A/B of PictureGrid).
-		_feel.call("light").set("fixed_resolution", false)
-		print("BENCH: play frames %s: light at the picture's resolution" % scenario["label"])
 	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		var taken: int = int(_feel.call(&"set_mote_cap", int(scenario.get("motes", MoteCap.DEFAULT_DESKTOP))))
 		print("BENCH: play frames %s: mote ring %d rows" % [scenario["label"], taken])

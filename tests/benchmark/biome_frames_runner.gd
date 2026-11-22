@@ -16,15 +16,14 @@ extends "res://tests/benchmark/stress_runner.gd"
 ## On top of the stress run's lines, each prints (`_report_more`):
 ##  - `BENCH: biome frames <label> map`: the seed, the map's rooms and the rooms the wizards stand in;
 ##  - `... frame`: the frame's average, p95 and worst, and the views drawn a frame;
-##  - `... gpu`: each kind of viewport's render time a frame (the split's views, the light buffers,
-##    the light's passes, the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
+##  - `... gpu`: each kind of viewport's render time a frame (the split's views, the floor marks, the root, the rest), GPU and the renderer's CPU, from `RenderingServer`'s
 ##    viewport timing (no GPU timer queries on the web: there only the frame is a measure);
 ##  - `... feel parts`: Feel's step by part (`Feel.profile_parts`), milliseconds a drawn frame;
 ##  - `... worst frames`: the slowest WORST frames, each with its ticks, the tick's time and the GPU's.
 ## With `--profile` the tree profile rides along (each script's process time: the HUD's among them).
 ## `--picture=WxH` draws the game's picture at that size (the root's `content_scale_size`; the shipped
-## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer and the light keeps its
-## resolution (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
+## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer, the light a world pixel at a
+## time (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
 ## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
@@ -382,9 +381,6 @@ static func _kind_of(viewport: Viewport, root: Viewport) -> String:
 		return "views"
 	if named == "VoidView":
 		return "void view"
-	if parent == "LightFactor" or parent == "LightUnder":
-		# The passes at the light's resolution (a picture bigger than PictureGrid.SIZE: SpellLight's).
-		return "light passes"
 	if path.contains("Light") or parent.contains("Light") or named.contains("Light") or named.contains("light"):
 		return "light buffers"
 	if path.contains("Mark") or named.contains("Mark"):

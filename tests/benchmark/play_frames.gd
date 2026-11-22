@@ -9,8 +9,8 @@ extends SceneTree
 ## ... -- --only="1p near,4p apart equal"   those scenarios alone (labels, comma separated)
 ## ... -- --profile                         the tree profile too (each script's time)
 ## ... -- --off=light,shadows,air,fog        those passes switched off by their settings
-## ... -- --picture=1280x720                 the picture drawn at that size (the light at its own)
-## ... -- --light-at-picture                 the light drawn at the picture's resolution (the A/B)
+## ... -- --quality=low                     the effects at the low row (effects_quality.gd)
+## ... -- --picture=1280x720                 the picture drawn at that size (the world drawn finer)
 
 const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
 

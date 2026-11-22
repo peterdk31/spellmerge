@@ -112,6 +112,9 @@ static func _light(grid: LightGridScript) -> void:
 	# A piece of no length (a beam's two points the same), and a beam lit by fewer points than its path.
 	var still := PackedVector3Array([Vector3(400.0, 200.0, 0.0), Vector3(400.0, 200.0, 0.0), Vector3(450.0, 260.0, 0.0), Vector3(9999.0, 9999.0, 0.0)])
 	grid.add_beam(still, 3, 20.0, Color(0.5, 1.0, 0.4))
+	# A beam narrower than a cell (its reach raised to a cell, on each side alike).
+	var thin := PackedVector3Array([Vector3(60.0, 330.0, 0.0), Vector3(500.0, 290.0, 0.0)])
+	grid.add_beam(thin, thin.size(), 1.5, Color(1.0, 0.8, 0.6))
 	grid.bake()
 
 
@@ -169,6 +172,14 @@ func test_the_native_kernel_agrees_at_a_coarser_cell_and_overlapping_views() -> 
 		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
 		return
 	_check_native(12.0, true)
+
+
+## At the split's cheaper 16 px cell (SpellLight.SPLIT_CHEAP_CELL), the same.
+func test_the_native_kernel_agrees_at_the_splits_coarser_cell() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
+		return
+	_check_native(16.0, false)
 
 
 func _check_native(cell: float, overlap: bool) -> void:
@@ -240,9 +251,13 @@ func test_a_light_smaller_than_a_cell_still_lights_the_cells_round_it() -> void:
 		grid.add_rows(rows, 1, LightGridScript.ROWS_SPOT, 1.0, 0.0, 0.0, false)
 		for at: Vector2 in [Vector2(92.0, 92.0), Vector2(100.0, 92.0), Vector2(92.0, 100.0), Vector2(100.0, 100.0)]:
 			check(grid.light_at(0, at).r > 0.0, "the cell at %s is lit (native %s)" % [at, native])
-		check_equal(grid.light_at(0, Vector2(116.0, 96.0)), Color.BLACK, "but not past a cell's reach (native %s)" % native)
+		# The next cells' middles are 12.6 px away: past one cell's reach.
+		for at: Vector2 in [Vector2(108.0, 92.0), Vector2(84.0, 92.0), Vector2(92.0, 108.0)]:
+			check_equal(grid.light_at(0, at), Color.BLACK, "but the cell at %s, past a cell's reach, is not (native %s)" % [at, native])
 		# A beam narrower than a cell too.
 		grid.clear()
 		# On a cells' edge, between two rows' middles (4 px off each side).
 		grid.add_beam(PackedVector3Array([Vector3(40.0, 48.0, 0.0), Vector3(200.0, 48.0, 0.0)]), 2, 1.0, Color.WHITE)
 		check(grid.light_at(0, Vector2(120.0, 52.0)).r > 0.0 and grid.light_at(0, Vector2(120.0, 44.0)).r > 0.0, "a beam of reach 1 px lights the cells either side of it (native %s)" % native)
+		check_equal(grid.light_at(0, Vector2(120.0, 60.0)), Color.BLACK, "but not the rows past those (native %s)" % native)
+		check_equal(grid.light_at(0, Vector2(120.0, 36.0)), Color.BLACK, "nor above (native %s)" % native)

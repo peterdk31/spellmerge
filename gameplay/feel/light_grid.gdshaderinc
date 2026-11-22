@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Grid lighting (gameplay/feel/light_grid.gd, spell_light.gd; the owner's decision of 2026-11-21): the
 // spell light worked out on the CPU on a grid of world cells, `light_grid_cell` px each way, a grid a
-// view laid side by side in one small texture (`light_grid`). A reader of the light takes the cell its
-// world point lies in (`grid_light`): whole cells, never blurred; with `light_grid_smooth` the four
-// nearest cells' middles weighed by where the point lies between them (the bands the readers cut it
-// into then follow the world's pixels, still in hard steps). Outside its view's grid there is no light.
+// view laid side by side in one small texture (`light_grid`). A reader of the light takes it where its
+// world point lies (`grid_light`): by default (`light_grid_smooth`) the four nearest cells' middles
+// weighed by where the point lies between them (the bands the readers cut it into then follow the
+// world's pixels, still in hard steps); with it off, the whole cell, never blurred. Outside its view's grid there is no light.
 //
 // View k's grid: `light_grid_view_k` its first cell's corner (world x, y) and where its cells start in
 // the texture (x, y), `light_grid_size_k` its columns and rows (none: no light in that view, the equal

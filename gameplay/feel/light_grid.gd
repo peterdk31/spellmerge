@@ -16,8 +16,8 @@ extends RefCounted
 ## - **A frame:** `clear`, then `add_rows` for each batch of rows and `add_beam` for each beam, then
 ##   `bake` writes the bytes and hands them to the texture. Each light adds its colour times
 ##   (1 - its distance from its middle as a share of its reach)² at every cell whose middle it reaches
-##   (its reach at least a cell each way, so no light falls between the cells' middles)
-##   (the GPU light's falloff, its ellipse along its way), blocked as the shader blocks it
+##   (the GPU light's falloff, its ellipse along its way; its reach at least a cell each way, so no
+##   light falls between the cells' middles), blocked as the shader blocks it
 ##   (`LightBlockers.shade_between`, the boxes near it only); the cells add up and are cut at 1.
 ## - **Native:** while the module is loaded, `add_rows`, `add_beam` and `bake` run in `MoteKernel`
 ##   (`light_grid_rows`, `light_grid_beam`, `light_grid_bake`), on this object's arrays in place, to
@@ -38,6 +38,8 @@ const NativeScript := preload("res://core/native/native.gd")
 const CELL: float = 8.0
 ## The cell sizes a quality setting may pick from (no finer than 4).
 const CELLS: PackedFloat32Array = [8.0, 12.0, 16.0]
+## The finest cell `set_cell` takes.
+const CELL_LEAST: float = 4.0
 ## The most views a grid each (ScreenViews.VIEWS_MOST).
 const VIEWS_MOST: int = 4
 ## The most cells a view's grid may have each way (a view zoomed out past this is cut at its right and
@@ -139,7 +141,7 @@ func use_native(on: bool) -> bool:
 
 ## The cell (world px each way; at least 4).
 func set_cell(size: float) -> void:
-	cell = maxf(size, 4.0)
+	cell = maxf(size, CELL_LEAST)
 
 
 ## The infusion table (InfusionTable.of_registry or `published`: a tint a look layer, alpha above 0
@@ -212,11 +214,11 @@ func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: 
 	points = mini(points, path.size())
 	if points < 2 or view_count == 0 or beam_reach <= 0.0:
 		return
-	# At least a cell each side, as every light (`_lamp`).
-	beam_reach = maxf(beam_reach, cell)
 	if kernel != null:
 		kernel.call(&"light_grid_beam", self, path, points, beam_reach, colour)
 		return
+	# At least a cell each side, as every light (`_lamp`; the kernel the same).
+	beam_reach = maxf(beam_reach, cell)
 	var r: float = colour.r
 	var g: float = colour.g
 	var b: float = colour.b

@@ -459,7 +459,7 @@ func _each_reader(uniform: StringName, value: Variant) -> void:
 ## The grid's cell from now on (world px each way; LightGrid.CELLS the choices: a coarser grid is
 ## cheaper and blockier).
 func set_grid_cell(size: float) -> void:
-	_base_cell = size
+	_base_cell = maxf(size, LightGridScript.CELL_LEAST)
 	_use_cell()
 
 

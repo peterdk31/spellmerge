@@ -659,4 +659,17 @@ func test_the_splits_cheaper_light_is_coarser_cells() -> void:
 	check_equal(light.grid.cell, SpellLightScript.GRID_CELL, "frames fast again: the cell set")
 	light.use_views([] as Array[Viewport], SpellLightScript.DOWNSCALE * 2)
 	check_equal(light.grid.cell, SpellLightScript.GRID_CELL, "one picture: never coarser")
+	# A cell set while split comes back when the split's cheaper light ends.
+	light.set_grid_cell(12.0)
+	light.use_views([first, second] as Array[Viewport], SpellLightScript.DOWNSCALE * 2)
+	check_equal(light.grid.cell, SpellLightScript.SPLIT_CHEAP_CELL, "split and asked, a 12 px cell set: 16 px")
+	light.set_grid_cell(8.0)
+	check_equal(light.grid.cell, SpellLightScript.SPLIT_CHEAP_CELL, "set while split: still 16 px")
+	light.set_grid_cell(12.0)
+	light.follow()
+	var size := apply.get_shader_parameter(&"light_grid_size_0") as Vector4
+	check_equal(Vector2(size.x, size.y), Vector2(light.grid.view_size[0], light.grid.view_size[1]), "the readers' grid refitted to the coarser cells")
+	check(size.x > 0.0 and size.x <= ceilf(320.0 / SpellLightScript.SPLIT_CHEAP_CELL) + 2.0, "a view's columns in 16 px cells")
+	light.use_views([first, second] as Array[Viewport], SpellLightScript.DOWNSCALE)
+	check_equal(light.grid.cell, 12.0, "the split's cheaper light over: the cell set while split")
 	light.release()

@@ -2803,6 +2803,14 @@ func set_floor_marks(on: bool) -> void:
 	_spectacle.set_floor_marks(on)
 
 
+## Whether the per-frame effects' independent pieces run on the worker threads (`feel_jobs.gd`: on by
+## default where the engine has threads, never on the web). This machine's, never a run's: what is
+## drawn is the same either way. Returns the setting.
+func set_effect_threads(on: bool) -> bool:
+	_spectacle.jobs.threaded = on
+	return on
+
+
 ## The "Dynamic lighting" setting (once "Spell light"; `Spectacle.set_spell_light`). Returns the
 ## setting.
 func set_spell_light(on: bool) -> bool:

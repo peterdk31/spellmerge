@@ -25,6 +25,8 @@ extends "res://bench/stress_runner.gd"
 ## picture is PictureGrid.SIZE, 640 x 360): the cameras draw the same world finer, the light a world pixel at a
 ## time (gameplay/feel/picture_grid.gd; the owner's decision of 2026-11-21: 1280x720 measured before
 ## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
+## `--one-thread` runs Feel's per-frame pieces on the main thread alone (gameplay/feel/feel_jobs.gd;
+## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
@@ -37,6 +39,7 @@ extends "res://bench/stress_runner.gd"
 ## Started by `biome_frames.gd` (it needs a window: a GPU, or `xvfb-run`, where llvmpipe draws).
 
 const DrawCensusScript := preload("res://bench/draw_census.gd")
+const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
 const SEEDS: PackedInt64Array = [11, 23, 37]
 ## A map with fewer rooms than this is reported (the crypt makes 12 to 16; the pass measures 16).
 const ROOMS_WANTED: int = 16
@@ -189,6 +192,11 @@ func _scenario_started(scenario: Dictionary) -> void:
 	_counting = false
 	_shot_taken = false
 	_census_taken = false
+	if _feel != null and _feel.has_method(&"set_effect_threads"):
+		# Feel's per-frame pieces on the worker threads (feel_jobs.gd) unless `--one-thread`.
+		var threaded: bool = FeelJobsScript.default_threaded() and not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--one-thread")
+		_feel.call(&"set_effect_threads", threaded)
+		print("BENCH: biome frames %s effect threads: %s, %d cores, renderer thread model %d" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), int(ProjectSettings.get_setting("rendering/driver/threads/thread_model", 1))])
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
 

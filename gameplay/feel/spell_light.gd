@@ -55,6 +55,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
+const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
 const InfusionTableScript := preload("res://core/spells/infusion_table.gd")
 const APPLY_SHADER: Shader = preload("res://gameplay/feel/light_apply.gdshader")
 ## The grid's cell by default (world px each way; LightGrid.CELLS the choices).
@@ -173,6 +174,17 @@ var _beam_reach: PackedFloat32Array = PackedFloat32Array()
 var _beam_colour: PackedColorArray = PackedColorArray()
 var _beams_lit: int = 0
 var _no_rows: PackedFloat32Array = PackedFloat32Array()
+## The shots' batches lit this frame (`_light_grid` reads them once, for every view's piece): each
+## one's rows, count and kind (ROWS_SHOT or ROWS_RUNE), and how many; and the spots' rows lit.
+var _batch_rows: Array[PackedFloat32Array] = []
+var _batch_counts: PackedInt32Array = PackedInt32Array()
+var _batch_kinds: PackedInt32Array = PackedInt32Array()
+var _batches_lit: int = 0
+var _spots_lit: PackedFloat32Array = PackedFloat32Array()
+## Where each view's piece of the grid runs (Spectacle's; null: every view on this thread).
+var jobs: FeelJobsScript = null
+## View `view`'s piece (`_fill_view`), made once.
+var _fill_view: Callable = Callable()
 var _no_path: PackedVector3Array = PackedVector3Array()
 ## The views the grid covers while the screen is split (`use_views`; empty: the one picture), the
 ## materials that read the light by the screen besides the apply rect (`read_by`, by name), and each
@@ -213,6 +225,7 @@ var _now: float = 0.0
 ## Light for `projectiles`' shots (null: the flashes', cues', spots' and beams' only), applied at `z`.
 func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	_projectiles = projectiles
+	_fill_view = _fill_view_of
 	if _projectiles != null:
 		_projectiles.light_rows_wanted = true
 	grid.set_cell(GRID_CELL)
@@ -367,35 +380,68 @@ func _light_grid(count: int) -> void:
 		_bound_texture = grid.texture
 		_each_reader(GRID_TEXTURE, grid.texture)
 	grid.clear()
+	# The shots' batches read once, here on the main thread: a view's piece reads only arrays.
+	_batches_lit = 0
 	if _projectiles != null:
 		for batch in _projectiles.batch_count():
-			var rows: PackedFloat32Array = _projectiles.light_rows(batch)
 			var drawn: int = _projectiles.light_count(batch)
-			if drawn > 0:
-				var kind: int = ROWS_RUNE if _projectiles.batch_mesh(batch) == ProjectileManagerScript.MESH_QUAD else ROWS_SHOT
-				grid.add_rows(rows, drawn, kind, 1.0, 0.0, _now, SHOTS_BLOCKED)
+			if drawn <= 0:
+				continue
+			if _batches_lit == _batch_rows.size():
+				_batch_rows.resize(_batches_lit * 2 + 8)
+				_batch_counts.resize(_batch_rows.size())
+				_batch_kinds.resize(_batch_rows.size())
+			_batch_rows[_batches_lit] = _projectiles.light_rows(batch)
+			_batch_counts[_batches_lit] = drawn
+			_batch_kinds[_batches_lit] = ROWS_RUNE if _projectiles.batch_mesh(batch) == ProjectileManagerScript.MESH_QUAD else ROWS_SHOT
+			_batches_lit += 1
+	_spots_lit = _spot_shown if _spot_shown.size() == _spot_count * STRIDE else _spot_buffer
+	# Each view lit on a thread of its own on the desktop (its cells are its own: `LightGrid.can_split`),
+	# every light in the same order in each, so each cell sums as on one thread.
+	if jobs != null and grid.can_split() and grid.view_count > 1:
+		jobs.run(_fill_view, grid.view_count)
+	else:
+		_fill_views(0, LightGridScript.VIEWS_MOST)
+	# The rows handed over let go, once every view has read them.
+	for b in _batches_lit:
+		_batch_rows[b] = _no_rows
 	for kind in FLASH_REACHES.size():
-		if _flash_count[kind] > 0:
-			grid.add_rows(_flash_rows[kind], _flash_count[kind], ROWS_FLASH, FLASH_REACHES[kind], FLASH_PAD, _now, true)
 		_flash_rows[kind] = _no_rows
 		_flash_count[kind] = 0
-	if _cue_live > 0:
-		grid.add_rows(_cue_buffer, _cue_live, ROWS_CUE, 1.0, 0.0, _now, true)
-	if _spot_count > 0:
-		var spots: PackedFloat32Array = _spot_shown if _spot_shown.size() == _spot_count * STRIDE else _spot_buffer
-		grid.add_rows(spots, _spot_count, ROWS_SPOT, 1.0, 0.0, _now, true)
 	_spot_shown = _no_rows
-	if _carried_count > 0:
-		grid.add_rows(_carried_rows, _carried_count, ROWS_SPOT, 1.0, 0.0, _now, true)
+	_spots_lit = _no_rows
 	_carried_rows = _no_rows
 	_carried_count = 0
 	for i in _beams_lit:
-		grid.add_beam(_beam_paths[i], _beam_points[i], _beam_reach[i], _beam_colour[i])
 		_beam_paths[i] = _no_path
 	_beams_lit = 0
 	grid.bake()
 	grids_baked += 1
 	_hand_grid_views()
+
+
+## View `view`'s piece of the grid (`FeelJobs.run`): every light of this frame on its cells.
+func _fill_view_of(view: int) -> void:
+	_fill_views(view, 1)
+
+
+## Every light of this frame on the views `first` to `first` + `views` - 1: the shots' and runes'
+## batches, the flashes, the cues, the spots, the carried lights and the beams, in that order. Reads
+## only what `_light_grid` gathered; writes only those views' cells.
+func _fill_views(first: int, views: int) -> void:
+	for b in _batches_lit:
+		grid.add_rows(_batch_rows[b], _batch_counts[b], _batch_kinds[b], 1.0, 0.0, _now, SHOTS_BLOCKED, first, views)
+	for kind in FLASH_REACHES.size():
+		if _flash_count[kind] > 0:
+			grid.add_rows(_flash_rows[kind], _flash_count[kind], ROWS_FLASH, FLASH_REACHES[kind], FLASH_PAD, _now, true, first, views)
+	if _cue_live > 0:
+		grid.add_rows(_cue_buffer, _cue_live, ROWS_CUE, 1.0, 0.0, _now, true, first, views)
+	if _spot_count > 0:
+		grid.add_rows(_spots_lit, _spot_count, ROWS_SPOT, 1.0, 0.0, _now, true, first, views)
+	if _carried_count > 0:
+		grid.add_rows(_carried_rows, _carried_count, ROWS_SPOT, 1.0, 0.0, _now, true, first, views)
+	for i in _beams_lit:
+		grid.add_beam(_beam_paths[i], _beam_points[i], _beam_reach[i], _beam_colour[i], first, views)
 
 
 ## Each view's grid handed to every reader where it changed.

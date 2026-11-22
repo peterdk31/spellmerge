@@ -28,8 +28,9 @@ public:
 	// One line for each member or number of `grid` (a LightGrid) that is not the kernel's.
 	PackedStringArray check_light_grid(Object *grid) const;
 	// LightGrid's `add_rows`, `add_beam` and `bake` on its arrays in place.
-	void light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now, bool blocked);
-	void light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour);
+	void light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now, bool blocked, int64_t first_view,
+			int64_t views);
+	void light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour, int64_t first_view, int64_t views);
 	void light_grid_bake(Object *grid);
 	// At the module's end (register_types.cpp).
 	static void free_names();

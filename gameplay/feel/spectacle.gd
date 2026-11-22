@@ -21,6 +21,7 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MoteRegionsScript := preload("res://gameplay/feel/mote_regions.gd")
@@ -219,6 +220,13 @@ var _room_at: Vector2 = Vector2.ZERO
 ## mirroring): each one's node (made and freed with the first room's `mist`, by the same settings),
 ## and what it was laid with, by the same index. View only.
 var room_mists: Array[MistScript] = []
+## Where the per-frame effects' independent pieces run (the rooms' mists, the light's views): on the
+## worker threads on the desktop, on this thread on the web (`feel_jobs.gd`; `set_threaded`).
+var jobs: FeelJobsScript = FeelJobsScript.new()
+## The mists stepped this frame (`_step_mists`; the first `_mists_stepped`), and their piece, made once.
+var _stepping: Array[MistScript] = []
+var _mists_stepped: int = 0
+var _part_mist: Callable = Callable()
 var _later_data: Array[RoomMist] = []
 var _later_size: PackedVector2Array = PackedVector2Array()
 var _later_walls: Array[Array] = []
@@ -287,6 +295,10 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## write of the hits' class inside it follows that one roll, so a hit sprays whole or not at all.
 var _hit_held: bool = false
 var _hit_on: bool = false
+
+
+func _init() -> void:
+	_part_mist = _part_mist_of
 
 
 func _ready() -> void:
@@ -429,12 +441,38 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
 		shadows.step_in(table, now, seen, blockers)
+	_step_mists(now, seen)
+	_free_faded()
+
+
+## The mists near a view (`_mist_seen`) stepped at Feel's clock `now`: each one's clock and stirs
+## handed over here, then each room's parting worked out on a thread of its own (`jobs`; a mist's
+## grid is its own), then the pictures handed to their textures here, in the rooms' order.
+func _step_mists(now: float, seen: ViewBoxesScript) -> void:
+	_mists_stepped = 0
 	if mist != null and _mist_seen(mist, seen):
-		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+		_add_stepped(mist)
 	for later: MistScript in room_mists:
 		if _mist_seen(later, seen):
-			later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
-	_free_faded()
+			_add_stepped(later)
+	for k in _mists_stepped:
+		_stepping[k].begin_step(now, stirs.version, stirs.hand_to)
+	jobs.run(_part_mist, _mists_stepped)
+	for k in _mists_stepped:
+		_stepping[k].end_step()
+		_stepping[k] = null
+
+
+func _add_stepped(drawn: MistScript) -> void:
+	if _mists_stepped == _stepping.size():
+		_stepping.resize(_mists_stepped * 2 + 4)
+	_stepping[_mists_stepped] = drawn
+	_mists_stepped += 1
+
+
+## The mist `k` stepped this frame parted round the bodies' feet (`FeelJobs.run`'s piece).
+func _part_mist_of(k: int) -> void:
+	_stepping[k].part_step(_feet, _feet_count)
 
 
 ## Whether `drawn`'s room is near a view (within MIST_STEP_REACH of `seen`'s boxes; none known: yes): a
@@ -1159,6 +1197,7 @@ func _make_light(on: bool) -> void:
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
+		light.jobs = jobs
 		light.set_ambient(ambient, shade)
 		add_child(light)
 		_quality_on_light()

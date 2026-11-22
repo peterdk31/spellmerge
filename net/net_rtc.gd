@@ -136,6 +136,12 @@ func gathered() -> int:
 	return _mine.mids.size()
 
 
+## The other machine's code, once taken (null: not yet). Read, never changed, by a test's guard
+## that a peer it never links holds no real address (tests/net/test_net_rtc.gd).
+func their_code() -> NetCode:
+	return _theirs
+
+
 func poll() -> void:
 	if _peer == null or _problem != null or _link != null:
 		return

@@ -102,7 +102,7 @@ var _frames_begun: int = 0
 var _dispatch_job: Callable = Callable()
 var _make_job: Callable = Callable()
 ## The shader (light_grid.glsl), loaded only here, on a renderer with a RenderingDevice: never on the
-## web or the OpenGL fallback (the web's exports leave the file out too).
+## web or the OpenGL fallback.
 var _shader_file: RDShaderFile = null
 
 

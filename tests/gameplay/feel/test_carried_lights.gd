@@ -190,7 +190,11 @@ func test_the_spell_light_draws_what_it_is_handed() -> void:
 	_settle()
 	light.light_carried(_lights.rows, _lights.count)
 	check_equal(light.carried_count(), 2, "two lit")
-	check_equal(int((light.carried.material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_SPOT, "read as spots")
+	light.follow()
+	var lit: float = 0.0
+	for v in light.grid.rgb:
+		lit += v
+	check(lit > 0.0, "read as spots: the grid is lit round them")
 	for i in 30:
 		_lights.step(null, _clock)
 		_clock += FRAME

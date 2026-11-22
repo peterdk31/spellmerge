@@ -44,8 +44,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // gameplay/feel/mote_regions.gd): a view culls the rooms it does not show, so nothing is culled here.
 //
 // A lit-only kind (docs/milestones/atmosphere.md, B: a room's dust in the air) reads the spell
-// light's light buffer (`light_buffer`, the same view smaller, as light_apply.gdshader reads it)
-// under each of its pixels: below the first of `lit_steps` it is not drawn (the dark), above each
+// light's grid (light_grid.gdshaderinc, the grid of the view it is drawn in, as light_apply.gdshader
+// reads it) at where it is: below the first of `lit_steps` it is not drawn (the dark), above each
 // step it is a shade brighter (shadow, base, light, white-hot), in the light's hue. Its life does
 // not cool it: it comes in through its shades and goes out through them (its brightest at the
 // middle of its life, `shade_from`), the dimmer of the two winning, so it changes a shade at a time
@@ -103,6 +103,8 @@ const float RISE_SPEED = 2.0;
 // `m_shade`: the glow, the lit-only flag, the life's shade), since the Vulkan renderer gives every
 // varying a slot of its own and a GPU has 32 (2026-11-22, D1: 33 failed to compile there).
 varying flat vec2 m_at;
+// Where a lit-only mote is in the world (as drawn): the light it reads.
+varying flat vec2 m_world;
 varying flat vec3 m_rgb;
 varying flat vec3 m_hot;
 varying flat vec4 m_cell_turn;
@@ -169,6 +171,7 @@ void vertex() {
 	VERTEX = vec2(0.0);
 	m_px = vec2(0.0);
 	m_at = vec2(0.0);
+	m_world = vec2(0.0);
 	m_rgb = vec3(0.0);
 	m_hot = vec3(0.0);
 	m_cell_turn = vec4(0.0, 0.0, 1.0, 0.0);
@@ -192,6 +195,7 @@ void vertex() {
 			at.xy += (stir_wake(at.xy) * STIR_SHOT_PIXELS + stir_blasts_at(at.xy, sim_time) * STIR_BLAST_PIXELS) * light_of.y;
 		}
 		vec2 seen = at.xy - vec2(0.0, at.z);
+		m_world = seen;
 		vec2 pixel = floor(seen);
 		// Cooling: evenly from its first shade down to shadow over its life.
 		float shade_from = sway.z;
@@ -255,7 +259,7 @@ void fragment() {
 		if (mark <= 0.25) {
 			discard;
 		}
-		vec3 shine = view_light(SCREEN_UV);
+		vec3 shine = view_light(m_world);
 		float most = max(shine.r, max(shine.g, shine.b));
 		// In the dark (below the first step) it is not drawn; a highlight is drawn as its body.
 		if (most < lit_steps.x) {

@@ -201,7 +201,7 @@ func test_fog_off_eases_out_then_frees_the_mist_and_on_eases_it_in_with_the_room
 		check(spectacle.mist != null and spectacle.mist.mist == room.mist and spectacle.mist.room_size == room.places().size, "on again: with the room's mist and room")
 		check(is_zero_approx(float((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"thickness"))), "from nothing")
 		check(spectacle.get_children().back() == spectacle.mist, "and last at its z, over the shadows and the marks")
-		check((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"light_buffer") == spectacle.light.buffer(), "lit by the light's buffer")
+		check((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"light_grid") == spectacle.light.buffer(), "lit by the light's grid")
 		_frames(feel, 30)
 		check(is_equal_approx(float((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"thickness")), room.mist.thickness), "eased in to the room's thickness")
 

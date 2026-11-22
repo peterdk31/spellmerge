@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Shadows (docs/milestones/atmosphere.md, C): light blocked by a room's standing walls and the props
-## that block light (gameplay/feel/light_blockers.gd, handed to the spell light, `light.gdshader`'s
+## that block light (gameplay/feel/light_blockers.gd, handed to the spell light, `light_grid.gd`'s
 ## blockers, whose pick `LightBlockers.shade_between` mirrors), easing out as a pillar crumbles; and
 ## the bodies' short hard shadows cast away from the light near them (gameplay/feel/body_shadows.gd),
 ## easing as lights move, in whole pixels, taking the drawn shadows' place. Only while spell light is
@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
@@ -168,21 +169,22 @@ func test_the_pick_blocks_only_what_stands_between() -> void:
 	check_equal(shade.call(Vector2(60.0, 94.0), Vector2(140.0, 94.0), boxes, bodies, 1), 0.25, "a fading box blocks by its strength")
 
 
-func test_the_shader_has_the_picks_numbers() -> void:
-	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	check(code.contains("const int MAX_BLOCKERS = %d;" % LightBlockersScript.MAX), "the shader's MAX_BLOCKERS is the blockers' MAX")
-	check(code.contains("uniform vec4 blocker_box[%d];" % LightBlockersScript.MAX), "and its arrays that long")
+func test_the_grid_blocks_by_the_picks_rules() -> void:
 	check_equal(SpellLightScript.MAX_BLOCKERS, LightBlockersScript.MAX, "the spell light hands over as many")
-	# The pick's tests, by their text (headless runs draw nothing): each line the GDScript mirrors.
-	for line: String in [
-			"if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {",
-			"return k >= 0 ? vec2(p.x, blocker_box[k].w + 0.5) : p;",
-			"at = vec2(p.x, blocker_box[own].w + 0.5);",
-			"if (l.y < blocker_box[own].y) {",
-			"if (strength <= shade || holds(box, at) || holds(box, l)) {",
-			"if (crosses(at, l, box)) {",
-			"COLOR = vec4(lamp * f * f * open, 1.0);"]:
-		check(code.contains(line), "the shader's pick has `%s`, as light_blockers.gd's" % line)
+	# Grid lighting (gameplay/feel/light_grid.gd) blocks by light_blockers.gd's pick itself: a spot west
+	# of a wall lights its own side and not the far side; with no box, both.
+	var grid := LightGridScript.new()
+	grid.use_native(false)
+	grid.fit(PackedVector4Array([Vector4(0.0, 0.0, 320.0, 180.0)]), 1)
+	var rows := PackedFloat32Array()
+	rows.resize(SpellLightScript.STRIDE)
+	SpellLightScript.write_spot_row(rows, 0, Vector2(100.0, 100.0), 80.0, Color.WHITE, 1.0, 0.0, 0.0)
+	for blocked: bool in [true, false]:
+		grid.set_blockers(PackedVector4Array([Vector4(130.0, 60.0, 140.0, 140.0)]), PackedVector4Array([Vector4(130.0, 60.0, 140.0, 1.0)]), 1 if blocked else 0)
+		grid.clear()
+		grid.add_rows(rows, 1, SpellLightScript.ROWS_SPOT, 1.0, 0.0, 0.0, true)
+		check(grid.light_at(0, Vector2(116.0, 100.0)).r > 0.0, "its own side is lit (box %s)" % blocked)
+		check((grid.light_at(0, Vector2(156.0, 100.0)).r == 0.0) == blocked, "the far side is dark only behind the box (box %s)" % blocked)
 
 
 func test_the_spell_light_hands_its_lights_the_boxes_but_not_its_shots() -> void:
@@ -192,13 +194,8 @@ func test_the_spell_light_hands_its_lights_the_boxes_but_not_its_shots() -> void
 	var bodies := PackedVector4Array([Vector4(0.0, 0.0, 10.0, 1.0), Vector4(20.0, -20.0, 30.0, 0.5)])
 	light.set_blockers(boxes, bodies, 2)
 	check_equal(light.blocker_count(), 2, "two boxes")
-	for node: MultiMeshInstance2D in [light.spots, light.carried, light.cue_lights, light.flashes[0]]:
-		var material := node.material as ShaderMaterial
-		check_equal(material.get_shader_parameter(&"blocker_count"), 2, "%s draws with them" % node.name)
-		check_equal(material.get_shader_parameter(&"blocker_body"), bodies, "and their columns")
-	for node: MultiMeshInstance2D in light.batches:
-		var shot_count: Variant = (node.material as ShaderMaterial).get_shader_parameter(&"blocker_count")
-		check(SpellLightScript.SHOTS_BLOCKED or shot_count == null or shot_count == 0, "a shot's light is not blocked (SHOTS_BLOCKED)")
+	check(light.grid.blocker_count == 2 and light.grid.blocker_bodies == bodies, "the grid lights with them, and their columns")
+	check(not SpellLightScript.SHOTS_BLOCKED, "a shot's light is not blocked (SHOTS_BLOCKED)")
 	light.set_blockers(boxes, bodies, 99)
 	check_equal(light.blocker_count(), 2, "never more than it was handed")
 
@@ -484,8 +481,18 @@ func test_a_wizard_behind_a_pillar_lights_round_itself() -> void:
 	var tip := Vector2(rows[SpellLightScript.ROW_X], rows[SpellLightScript.ROW_Y])
 	var ground := Vector2(rows[SpellLightScript.SPOT_ROW_GROUND], rows[SpellLightScript.SPOT_ROW_GROUND + 1])
 	check_equal(tip + ground, wizard.global_position, "a carried light stands on its body's feet")
-	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	check(code.contains("lamp_at = rows == ROWS_SPOT ? centre + ground : lit_as(centre);"), "the shader lights a spot row from where it stands, only a flash or a cue moved off a shaft")
+	# The grid lights a spot row from where it stands (light_grid.gd's `_lamp`): a light over the far side
+	# of a wall, standing south of it, does not light past the wall.
+	var grid := LightGridScript.new()
+	grid.use_native(false)
+	grid.fit(PackedVector4Array([Vector4(0.0, 0.0, 320.0, 180.0)]), 1)
+	grid.set_blockers(PackedVector4Array([Vector4(40.0, 60.0, 200.0, 80.0)]), PackedVector4Array([Vector4(40.0, 60.0, 200.0, 1.0)]), 1)
+	var row := PackedFloat32Array()
+	row.resize(SpellLightScript.STRIDE)
+	SpellLightScript.write_spot_row(row, 0, Vector2(100.0, 70.0), 60.0, Color.WHITE, 1.0, 0.0, 0.0, Vector2(0.0, 20.0))
+	grid.clear()
+	grid.add_rows(row, 1, SpellLightScript.ROWS_SPOT, 1.0, 0.0, 0.0, true)
+	check(grid.light_at(0, Vector2(100.0, 100.0)).r > 0.0 and grid.light_at(0, Vector2(100.0, 44.0)).r == 0.0, "lit from where it stands: its side of the wall, not past it")
 
 
 func test_a_staff_tip_over_a_wall_does_not_open_it() -> void:

@@ -147,15 +147,15 @@ func test_a_lit_only_kind_tells_the_shader_and_reads_the_light_it_is_handed() ->
 	var light: SpellLightScript = own(SpellLightScript.new(null, 0)) as SpellLightScript
 	root.add_child(light)
 	motes.set_light(light.buffer(), SpellLightScript.lit_steps())
-	check(motes.light() == light.buffer() and motes.shader_parameter(&"light_buffer") == light.buffer(), "the spell light's buffer, handed to the shader")
+	check(motes.light() == light.buffer() and motes.shader_parameter(&"light_grid") == light.buffer(), "the spell light's grid, handed to the shader")
 	check(motes.shader_parameter(&"lit_steps") == SpellLightScript.lit_steps(), "with the light's steps")
 	check(motes.shader_parameter(&"light_on") == true, "and lit-only motes drawn by it")
-	check(light.buffer() == light.viewport.get_texture(), "the buffer is the light viewport's own texture")
+	check(light.buffer() == light.grid.texture, "the buffer is the light grid's texture")
 	motes.set_light(null)
 	check(motes.shader_parameter(&"light_on") != true, "none again: not drawn")
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
 	var views: String = FileAccess.get_file_as_string("res://gameplay/feel/light_views.gdshaderinc")
-	check(code.contains("#include \"res://gameplay/feel/light_views.gdshaderinc\"") and code.contains("view_light(SCREEN_UV)") and views.contains("uniform sampler2D light_buffer") and views.contains("textureLod(light_buffer, uv, 0.0)"), "the shader reads the light under each lit-only pixel (its view's buffer, light_views.gdshaderinc)")
+	check(code.contains("#include \"res://gameplay/feel/light_views.gdshaderinc\"") and code.contains("view_light(m_world)") and views.contains("grid_light(light_view, world)"), "the shader reads the light where each lit-only mote is (its view's grid, light_views.gdshaderinc)")
 	check(code.contains("texelFetch(kind_table, ivec2(3, k), 0)"), "and knows a lit-only kind by its row's light texel")
 
 

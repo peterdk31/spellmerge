@@ -185,7 +185,7 @@ func test_items_coins_and_light_spots_in_an_unvisited_room_are_left_out() -> voi
 	root.add_child(own(spot))
 	light.hide_unseen(null)
 	light.draw_spots()
-	var all: int = light.spots.multimesh.instance_count
+	var all: int = light.spot_count()
 	var hidden: int = 0
 	for node: Node in root.get_tree().get_nodes_in_group(LightSpot.GROUP):
 		if node is Node2D and node.is_inside_tree() and mask.hides((node as Node2D).global_position):
@@ -193,7 +193,7 @@ func test_items_coins_and_light_spots_in_an_unvisited_room_are_left_out() -> voi
 	check(hidden >= 1, "a spot in the antechamber")
 	light.hide_unseen(mask)
 	light.draw_spots()
-	check_equal(light.spots.multimesh.instance_count, all - hidden, "the spots in the unvisited rooms give no light")
+	check_equal(light.spot_count(), all - hidden, "the spots in the unvisited rooms give no light")
 	_step()
 	check(light.unseen == mask, "Feel hands the light the mask each frame")
 	if not was_lit:

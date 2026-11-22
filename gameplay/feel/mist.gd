@@ -132,9 +132,9 @@ func set_share(next: float) -> void:
 		_param(&"thickness", mist.thickness * share)
 
 
-## The spell light's buffer it glows by (SpellLight.buffer).
+## The spell light's grid it glows by (SpellLight.buffer: the grid's texture; its views come by `read_by`).
 func use_light(buffer: Texture2D) -> void:
-	(material as ShaderMaterial).set_shader_parameter(&"light_buffer", buffer)
+	(material as ShaderMaterial).set_shader_parameter(&"light_grid", buffer)
 
 
 ## Its twin drawn under `holder` from now on (the spell light's pass under it, `SpellLight.under_holder`:

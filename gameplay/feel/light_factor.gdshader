@@ -7,10 +7,12 @@ render_mode blend_disabled;
 // resolution"): one rect over the world in a view's factor pass, a pass `PictureGrid.scale_of` times
 // smaller than the view, that writes what the apply rect multiplies each block of the picture by
 // (light_apply.gdshaderinc's `light_factor`, packed: light_pack.gdshaderinc). It reads its view's
-// light buffer at its own pixel, as the apply rect read it a pixel of the picture at PictureGrid.SIZE.
+// grid at its pixel's world point (light_grid.gdshaderinc), as the apply rect reads it.
 // Written as it is (`blend_disabled`): the pass holds numbers, not a picture.
 
-uniform sampler2D light_buffer : hint_default_black, filter_linear, repeat_disable;
+#include "res://gameplay/feel/light_grid.gdshaderinc"
+// The view whose grid this rect's pass reads (its pass is that view's alone).
+uniform int light_grid_view_id = 0;
 #include "res://gameplay/feel/light_apply.gdshaderinc"
 
 // Where the pixel is in the world (the rect's own place through its transform: the world's).
@@ -24,6 +26,6 @@ void vertex() {
 
 void fragment() {
 	bool unchanged;
-	vec3 factor = light_factor(textureLod(light_buffer, SCREEN_UV, 0.0).rgb, world_at, unchanged);
+	vec3 factor = light_factor(grid_light(light_grid_view_id, world_at), world_at, unchanged);
 	COLOR = light_pack_factor(unchanged ? vec3(1.0) : factor);
 }

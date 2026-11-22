@@ -348,7 +348,7 @@ const RAY_PATH_START: int = 80
 const DRAW_STRIDE: int = 16
 ## The floats of a shot's row (its transform's free ones, `MODEL_MATRIX[2].x` and `.y` to a shader)
 ## that carry how far and how bright it lights the room (`_look_light_reach`,
-## `_look_light_intensity`; Feel's `light.gdshader`). No shot shader reads them.
+## `_look_light_intensity`; Feel's grid lighting, `light_grid.gd`). No shot shader reads them.
 const LIGHT_REACH_FLOAT: int = 2
 const LIGHT_INTENSITY_FLOAT: int = 6
 ## The bounds of a shot's light multipliers (`set_light`; a card's `look_light_intensity` and
@@ -682,7 +682,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"_draw_regions", &"_no_rows"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"_draw_regions", &"_no_rows", &"light_rows_wanted", &"_light_rows", &"_light_counts"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -809,7 +809,7 @@ var _body: PackedByteArray = PackedByteArray()
 ## How bright and how far each shot lights the room, times the shot light's own (its card's
 ## `look_light_intensity` and `look_light_reach`, `set_looks`, `set_light`; 1 for a plain shot):
 ## written into its row's free floats (`MODEL_MATRIX[2].y` and `.x`, LIGHT_INTENSITY_FLOAT and
-## LIGHT_REACH_FLOAT), which Feel's spell light reads (`light.gdshader`). Drawn only (VIEW).
+## LIGHT_REACH_FLOAT), which Feel's grid lighting reads (`light_grid.gd`). Drawn only (VIEW).
 var _look_light_intensity: PackedFloat32Array = PackedFloat32Array()
 var _look_light_reach: PackedFloat32Array = PackedFloat32Array()
 var _carrier_card_ids: Array[StringName] = []
@@ -1044,6 +1044,12 @@ var _buffers: Array[PackedFloat32Array] = []
 ## mesh of its own (`mirror_batch`: Feel's spell light). Each frame it is handed the very buffer
 ## the batch uploads, so no row is written twice.
 var _mirrors: Array[MultiMesh] = []
+## Whether each batch's rows drawn this frame are kept for the light to read (`light_rows`: Feel's grid
+## lighting, which reads them on the CPU instead of a mirror), and those rows and how many, by batch
+## (let go at the next draw's start, so the buffers are written in place).
+var light_rows_wanted: bool = false
+var _light_rows: Array[PackedFloat32Array] = []
+var _light_counts: PackedInt32Array = PackedInt32Array()
 ## The view of each watched batch's still shots (`watch_body`, `still_shots_drawn`), by batch: null
 ## for one not watched.
 var _still_views: Array[StillShotView] = []
@@ -1673,6 +1679,16 @@ func watch_body(body: int, on: bool) -> void:
 func body_watched(body: int) -> bool:
 	var batch: int = body_batch(body, false)
 	return body >= 1 and batch < _still_views.size() and _still_views[batch] != null
+
+
+## Batch `batch`'s rows drawn this frame and how many (while `light_rows_wanted`; none before the
+## first draw or once let go): read, never written.
+func light_rows(batch: int) -> PackedFloat32Array:
+	return _light_rows[batch] if batch < _light_rows.size() else _no_rows
+
+
+func light_count(batch: int) -> int:
+	return _light_counts[batch] if batch < _light_counts.size() else 0
 
 
 ## The MultiMesh mirroring batch `batch` (`mirror_batch`), or null.
@@ -5443,6 +5459,10 @@ func _ray_keep(nodes: Array, alongs: Array, points: Array, heads: Array, found: 
 
 func update_draw(fraction: float = -1.0) -> void:
 	spark_birth_count = 0
+	# Last frame's rows let go before this frame's are written (no copy of a buffer still held).
+	for batch in _light_rows.size():
+		_light_rows[batch] = _no_rows
+		_light_counts[batch] = 0
 	if _draw_node == null:
 		drawn = 0
 		_end_count = 0
@@ -5509,6 +5529,12 @@ func update_draw(fraction: float = -1.0) -> void:
 		multimesh.visible_instance_count = 0 if by_room else out
 		if mirror != null:
 			mirror.visible_instance_count = out
+		if light_rows_wanted:
+			if _light_rows.size() < _batch_total:
+				_light_rows.resize(_batch_total)
+				_light_counts.resize(_batch_total)
+			_light_rows[batch] = rows
+			_light_counts[batch] = out
 	var shots_out: int = _draw_out[DRAW_SHOTS]
 	drawn_enemy = _draw_out[DRAW_ENEMY]
 	drawn = shots_out

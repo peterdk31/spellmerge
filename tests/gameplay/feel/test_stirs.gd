@@ -264,7 +264,7 @@ func _light(at: Vector2) -> SpellLightScript:
 
 
 func _drawn_row(light: SpellLightScript, float_at: int) -> float:
-	return light.spots.multimesh.buffer[float_at]
+	return light.spot_rows_shown()[float_at]
 
 
 func test_a_candle_ducks_and_leans_away_from_a_shot_passing_and_eases_back() -> void:
@@ -303,7 +303,7 @@ func test_a_candle_ducks_and_leans_away_from_a_shot_passing_and_eases_back() -> 
 		last = spots.leans[0]
 		frames += 1
 	check(frames >= 10 and frames < 600, "back at rest after a while (%d frames)" % frames)
-	check_equal(light.spots.multimesh.buffer, placed, "at rest: the rows as placed are drawn again")
+	check_equal(light.spot_rows_shown(), placed, "at rest: the rows as placed are drawn again")
 
 
 func test_a_candle_leans_out_from_a_blast_and_nothing_far_away_stirs_it() -> void:

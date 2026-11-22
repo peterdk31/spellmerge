@@ -34,8 +34,6 @@ const CLEARED: int = 8
 
 ## Not state: scratch reused each tick (the open ids, the places shots are in).
 const DERIVED: Array[StringName] = [&"_ids", &"_shot_places", &"_places"]
-## `_places`' mark for a body `BodyKernel.places` leaves to GDScript (another manager's).
-const ASK_GDSCRIPT: int = -2
 
 ## Each room's flags, by its number.
 var flags: PackedByteArray = PackedByteArray()
@@ -136,17 +134,18 @@ func wake(table: ActorsScript, projectiles: ProjectileManagerScript) -> void:
 		_places.resize(count)
 	# Every body's place made current and kept for the second pass, in one native call when the
 	# module is loaded (sim-native SN2, `RoomGrid.find_places`), else `gd_find_places`.
-	if projectiles == null or not projectiles.grid().find_places(table.nodes(), _ids, count, projectiles.get_instance_id(), _places):
+	if projectiles == null or not projectiles.grid().find_places(table.nodes(), _ids, count, projectiles, _places):
 		gd_find_places(table, count)
 	# Each place awake while a body that acts is in it, asked of the bodies in id order; a place
 	# already awake is not asked again (`keeps_awake` changes nothing). Asked after every body's
 	# place is found, as before between them: what it reads is the body's own, never a place.
 	for n in count:
 		var place: int = _places[n]
-		if place == ASK_GDSCRIPT:
+		if place == RoomGrid.ASK_GDSCRIPT:
 			var asked := table.node_of(_ids[n]) as Actor
-			asked.find_room()
-			place = asked.room
+			if asked != null:
+				asked.find_room()
+			place = asked.room if asked != null else RoomGrid.NO_PLACE
 			_places[n] = place
 		if place >= 0 and place < awake.size() and awake[place] == 0:
 			var body := table.node_of(_ids[n]) as Actor

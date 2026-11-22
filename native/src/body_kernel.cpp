@@ -116,7 +116,8 @@ bool touches_hole(const uint8_t *holes, const uint8_t *walls, int64_t w, int64_t
 	return false;
 }
 
-// `RoomGrid.NO_PLACE`, and `RoomLife.ASK_GDSCRIPT` (a body `places` leaves to GDScript).
+// `RoomGrid.NO_PLACE` and `RoomGrid.ASK_GDSCRIPT` (a body `places` leaves to GDScript), checked by
+// `configure` against the GDScript's.
 constexpr int64_t NO_PLACE = -1, ASK_GDSCRIPT = -2;
 
 // `RoomGrid.place_at`, the places' rectangles handed over as `Rect2`s (single precision, as theirs).
@@ -161,7 +162,9 @@ int64_t place_at(const std::vector<Rect2> &rects, const uint8_t *cells, const ui
 } // namespace
 
 bool BodyKernel::configure(const Dictionary &config) {
-	_ready = config.has("ITERATIONS") && config.has("MIN_STRIDE");
+	_ready = config.has("ITERATIONS") && config.has("MIN_STRIDE") && config.get("NO_PLACE", 0) == Variant(NO_PLACE) &&
+			config.get("ASK_GDSCRIPT", 0) == Variant(ASK_GDSCRIPT);
+	ERR_FAIL_COND_V_MSG(!_ready, false, "BodyKernel: WallSlide's numbers are missing, or RoomGrid's NO_PLACE or ASK_GDSCRIPT is not the kernel's");
 	if (_ready) {
 		_iterations = config["ITERATIONS"];
 		_min_stride = config["MIN_STRIDE"];
@@ -326,17 +329,20 @@ Vector3 BodyKernel::walk(const PackedByteArray &walls, const PackedByteArray &wa
 	return Vector3(to.x, to.y, (real_t)found);
 }
 
-void BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, int64_t projectiles, const Array &rects,
+bool BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
 		const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
 		int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const {
-	ERR_FAIL_COND_MSG(count > ids.size() || count > places.size(), "BodyKernel.places: the ids or the places are fewer than count");
+	ERR_FAIL_COND_V_MSG(!_ready, false, "BodyKernel: configure it first");
+	ERR_FAIL_COND_V_MSG(count > ids.size() || count > places.size(), false, "BodyKernel.places: the ids or the places are fewer than count");
 	const int64_t n_rects = rects.size();
-	ERR_FAIL_COND_MSG(n_rects > 0 && (over.size() < n_rects || cells.size() < w * h || mixed.size() < w * h || touched.size() < w * h),
+	ERR_FAIL_COND_V_MSG(n_rects > 0 && (over.size() < n_rects || cells.size() < w * h || mixed.size() < w * h || touched.size() < w * h), false,
 			"BodyKernel.places: the places' grids are smaller than they say");
-	std::vector<Rect2> boxes((size_t)n_rects);
+	std::vector<Rect2> &boxes = _boxes;
+	boxes.resize((size_t)n_rects);
 	for (int64_t i = 0; i < n_rects; i++) {
 		boxes[(size_t)i] = rects[i];
 	}
+	const Variant manager(projectiles);
 	static const StringName ROOM("room");
 	static const StringName PROJECTILES("projectiles");
 	// The caller's array, written through its buffer (native/README.md, "The object's arrays").
@@ -357,18 +363,21 @@ void BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &i
 			continue;
 		}
 		// `Actor.find_room`: the place it stands in, by its own manager's grid (none without one).
-		const Object *own = body->get(PROJECTILES);
-		if (own != nullptr && (int64_t)own->get_instance_id() != projectiles) {
+		// Its manager compared as a Variant, never followed (a freed one is no pointer to read).
+		const Variant own = body->get(PROJECTILES);
+		const bool none = own.get_type() == Variant::NIL;
+		if (!none && own != manager) {
 			// Another manager's body (a test's world beside the game's): GDScript finds its place.
 			out[n] = (int32_t)ASK_GDSCRIPT;
 			continue;
 		}
-		const int64_t place = (own != nullptr && n_rects > 0) ? place_at(boxes, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), w, h, cell, origin, body->get_global_position()) : NO_PLACE;
+		const int64_t place = (!none && n_rects > 0) ? place_at(boxes, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), w, h, cell, origin, body->get_global_position()) : NO_PLACE;
 		if (place != (int64_t)room) {
 			body->set(ROOM, place);
 		}
 		out[n] = (int32_t)place;
 	}
+	return true;
 }
 
 void BodyKernel::_bind_methods() {

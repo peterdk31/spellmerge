@@ -467,7 +467,7 @@ func test_the_native_places_are_the_gdscripts() -> void:
 				# On whole cells: the places' squares and rectangles' edges met exactly.
 				point = (point / 16.0).round() * 16.0
 			bodies[at].global_position = point
-		check(grid.find_places(actors.nodes(), ids, count, projectiles.get_instance_id(), native), "the native pass runs")
+		check(grid.find_places(actors.nodes(), ids, count, projectiles, native), "the native pass runs")
 		var rooms: Array[int] = []
 		for body in bodies:
 			rooms.append(body.room)
@@ -489,8 +489,29 @@ func test_the_native_places_are_the_gdscripts() -> void:
 	var kept: Node = bodies[0].projectiles
 	bodies[0].projectiles = other
 	bodies[0].room = 77
-	check(grid.find_places(actors.nodes(), ids, count, projectiles.get_instance_id(), native), "the native pass runs")
-	check_equal(native[ids.find(bodies[0].id)], RoomLife.ASK_GDSCRIPT, "another manager's body is left to GDScript")
+	check(grid.find_places(actors.nodes(), ids, count, projectiles, native), "the native pass runs")
+	check_equal(native[ids.find(bodies[0].id)], RoomGrid.ASK_GDSCRIPT, "another manager's body is left to GDScript")
 	check_equal(bodies[0].room, 77, "and its room is untouched")
+	# Played through `wake` with the module on and off: the same places awake, the same bodies asleep,
+	# the same rooms, the other manager's body found by GDScript on both sides.
+	for round in 20:
+		for at in bodies.size():
+			bodies[at].global_position = Vector2(rng.randf_range(bounds.position.x, bounds.end.x), rng.randf_range(bounds.position.y, bounds.end.y))
+		var seen: Array = []
+		for on in [true, false]:
+			WallSlide.use_native(on)
+			for body in bodies:
+				body.room = 55
+			life.wake(actors, projectiles)
+			var rooms: Array[int] = []
+			var asleep: Array[int] = []
+			for body in bodies:
+				rooms.append(body.room)
+				asleep.append(actors.asleep[body.id])
+			seen.append([life.awake.duplicate(), rooms, asleep])
+		WallSlide.use_native(true)
+		if seen[0] != seen[1]:
+			check(false, "round %d: wake native %s, GDScript %s" % [round, seen[0], seen[1]])
+			break
 	bodies[0].projectiles = kept
 	_ticks(1)

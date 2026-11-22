@@ -43,11 +43,12 @@ func test_the_view_stepped_thrice_plays_the_same() -> void:
 
 
 ## The native module and its GDScript play the same game (native/README.md, "Same results"): each
-## scene played with every simulation kernel on (the projectile manager's `ShotKernel`, the walls'
-## `BodyKernel`, `DMath`'s) and with all of them off agrees in every area at every tick, so a member a
+## scene played with the simulation kernels it reaches on (the projectile manager's `ShotKernel`, the
+## walls' `BodyKernel` slides and walks, `DMath`'s) and with all of them off agrees in every area at every tick, so a member a
 ## kernel leaves as it was where the GDScript writes it is found here, not only in the four biomes'
 ## run (the manager's `_one`, 2026-11-22). The storm's homing bolt waits for its turn in the hit pass,
-## which the native pass takes itself.
+## which the native pass takes itself. (The bodies' places, `BodyKernel.places`, are Flow's: played
+## on and off by tests/gameplay/flow/test_room_life.gd.)
 func test_the_native_module_and_its_gdscript_play_the_same() -> void:
 	if not DMath.native_on() or not WallSlide.native_on():
 		if OS.get_environment("SPELLMERGE_NATIVE") == "required":
@@ -109,20 +110,23 @@ func _check_twice(scene: StringName) -> void:
 ## functions run that many times after each tick; with `native` off, the simulation's kernels are
 ## (the scene's projectile manager, `WallSlide`, `DMath`), and back on after.
 func _record(scene: StringName, into: Desync, view_runs: int = 0, native: bool = true) -> void:
-	WallSlide.use_native(native)
-	DMath.use_native(native)
+	var walls_were: bool = WallSlide.native_on()
+	var maths_were: bool = DMath.native_on()
+	WallSlide.use_native(native and walls_were)
+	DMath.use_native(native and maths_were)
 	var played := SimScenes.new(root, scene)
 	var projectiles: Object = played.areas().get("projectiles")
-	if projectiles != null:
-		projectiles.set(&"native", native)
+	if projectiles != null and not native:
+		projectiles.set(&"native", false)
+		check(projectiles.get(&"native") == false, "%s: the projectile manager runs its GDScript" % scene)
 	for i in TICKS:
 		played.step()
 		for run in view_runs:
 			_run_views(played.areas())
 		into.capture(played.areas())
 	played.free_all()
-	WallSlide.use_native(true)
-	DMath.use_native(true)
+	WallSlide.use_native(walls_were)
+	DMath.use_native(maths_were)
 
 
 ## Every view function (`VIEW`) of the areas and of everything under the area nodes, called with

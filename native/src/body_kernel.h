@@ -29,7 +29,10 @@
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+
+#include <vector>
 
 namespace godot {
 
@@ -54,13 +57,14 @@ public:
 			const Vector2 &crossed, double radius, double reach) const;
 
 	// `RoomLife.gd_find_places` on the bodies: for each of the first `count` actor ids in `ids`, the body
-	// whose instance id `nodes` keeps there; one in the tree that keeps `projectiles` (an instance id: the
-	// manager whose grid this is) has its `room` set to the place it stands in (`RoomGrid.place_at` on
+	// whose instance id `nodes` keeps there; one in the tree that keeps `projectiles` (the manager whose
+	// grid this is) has its `room` set to the place it stands in (`RoomGrid.place_at` on
 	// the places: `rects`, the PLACE_CELL squares' `cells`, `over`, `mixed`, `touched`, `w` by `h` from
 	// `origin`), and `places[n]` is its `room` after; a missing body's is NO_PLACE (-1), and one of another manager is
 	// left to GDScript (-2, `RoomLife.ASK_GDSCRIPT`). `places` is the
 	// caller's array, sized, written in place.
-	void places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, int64_t projectiles, const Array &rects,
+	// False, with nothing written, when the arrays do not fit: the caller runs the GDScript.
+	bool places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
 			const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
 			int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const;
 
@@ -71,6 +75,8 @@ private:
 	bool _ready = false;
 	int64_t _iterations = 0;
 	double _min_stride = 0.0;
+	// `places`' copy of the places' rectangles, kept so a tick allocates nothing (numbers only).
+	mutable std::vector<Rect2> _boxes;
 };
 
 } // namespace godot

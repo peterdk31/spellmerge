@@ -342,6 +342,7 @@ func _save_shot(label: String) -> void:
 	DirAccess.make_dir_recursive_absolute("user://biome_frames")
 	var image: Image = get_viewport().get_texture().get_image()
 	var path: String = "%s/%s.png" % [SHOTS_DIR, label.replace(" ", "_")]
+	# Written out as SHOTS_DIR (the rules want a literal user:// path).
 	if image != null and image.save_png("user://biome_frames/" + label.replace(" ", "_") + ".png") == OK:
 		print("BENCH: biome frames %s: screen saved to %s" % [label, ProjectSettings.globalize_path(path)])
 

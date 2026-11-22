@@ -57,6 +57,9 @@ static func play_rows() -> Array[Dictionary]:
 		out.append(_row("%dp together" % players, players, FOES_A_ROOM, false, "together", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart dynamic" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.DYNAMIC, cap))
 		out.append(_row("%dp apart equal" % players, players, FOES_A_ROOM * players, false, "apart", SplitScreenSetting.EQUAL, cap))
+	# The shipped benchmark's split rows at the web's settings (bench/benchmark.gd, `WEB_LABELS`).
+	out.append(_row("2p apart dynamic web", 2, FOES_A_ROOM * 2, false, "apart", SplitScreenSetting.DYNAMIC, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
+	out.append(_row("4p apart equal web", 4, FOES_A_ROOM * 4, false, "apart", SplitScreenSetting.EQUAL, ProjectileManagerScript.DEFAULT_CAP_WEB, MoteCap.DEFAULT_WEB))
 	return out
 
 

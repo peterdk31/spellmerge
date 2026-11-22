@@ -18,16 +18,31 @@ extends "res://bench/play_frames_runner.gd"
 
 const MachineInfoScript := preload("res://bench/machine_info.gd")
 const ResultsScreenScript := preload("res://bench/results_screen.gd")
+const InputScript := preload("res://core/input/input_manager.gd")
 
 ## The scenarios run when `--only=` names none: one wizard at the start, near and far, then the
 ## split screen at its busiest in each mode (play_frames_runner.gd's labels).
 const DEFAULT_LABELS: PackedStringArray = ["1p start", "1p near", "1p far", "2p apart dynamic", "4p apart equal"]
-## The same in the web build: the one wizard's rows at the web's settings (the split rows have none).
-const WEB_LABELS: PackedStringArray = ["1p start web", "1p near web", "1p far web", "2p apart dynamic", "4p apart equal"]
+## The same in the web build, at the web's settings (its mote ring and shot cap).
+const WEB_LABELS: PackedStringArray = ["1p start web", "1p near web", "1p far web", "2p apart dynamic web", "4p apart equal web"]
 ## Where the table is written (and its name shown on the results screen).
 const RESULTS_FILE: String = "user://benchmark.txt"
 ## The table's columns, in the order of `row_cells`.
 const ROW_COLUMNS: PackedStringArray = ["Scenario", "Frame ms", "p95", "Worst", "Sim", "Feel", "GPU", "Render CPU", "Calls", "Primitives"]
+
+
+## What the run changes in the game, kept at its start and put back at its end (`_put_back`): the
+## benchmark returns to the main menu, not out of the game. The seats the real devices held (they
+## leave so the bots can take seats 0 to 3, and input is not heard until the end, so a press cannot
+## join a seat into the run), the picture's size (`--picture=`), Feel's split mode and mote ring
+## (each scenario sets its own), and the native module (`--no-native`). `--off=` and
+## `--light-at-picture` are a developer's switches and stay as they were set.
+var _kept_scale: Vector2i = Vector2i.ZERO
+var _kept_split: int = SplitScreenSetting.DEFAULT
+var _kept_motes: int = 0
+var _kept_native: bool = true
+var _kept_wall_native: bool = true
+var _put_back_done: bool = false
 
 
 func _init() -> void:
@@ -39,6 +54,65 @@ func _init() -> void:
 	if not only_asked:
 		scenarios = scenarios_named(scenarios, WEB_LABELS if OS.has_feature("web") else DEFAULT_LABELS, rows)
 	result_word = "BENCHMARK"
+
+
+func _enter_tree() -> void:
+	_kept_scale = get_tree().root.content_scale_size
+	super()
+
+
+func _ready() -> void:
+	var root: Node = get_tree().root
+	var input: Node = root.get_node_or_null("PlayerInput")
+	if input != null:
+		free_seats(input)
+	var feel: Node = root.get_node_or_null("Feel")
+	if feel != null and feel.has_method(&"mote_cap"):
+		_kept_split = int(feel.get(&"split_mode"))
+		_kept_motes = int(feel.call(&"mote_cap"))
+	var projectiles: Node = root.get_node_or_null("Projectiles")
+	if projectiles != null:
+		_kept_native = bool(projectiles.get(&"native"))
+	_kept_wall_native = WallSlide.native_on()
+	super()
+
+
+## Every seat a real device holds left, and `input` (the PlayerInput autoload) deaf to devices until
+## `hear_seats`: the bots play seats 0 to 3 (`add_virtual_device` takes a free seat only), and a
+## press during the run would join a seat into it. A device joins again as it always does once heard.
+static func free_seats(input: Node) -> void:
+	for player in InputScript.MAX_PLAYERS:
+		var device: int = int(input.call(&"device_of", player))
+		if device != InputScript.NO_DEVICE and not InputScript.is_virtual(device):
+			input.call(&"leave", player)
+	input.set_process_input(false)
+
+
+static func hear_seats(input: Node) -> void:
+	input.set_process_input(true)
+
+
+## The game as it was before the run (see `_kept_scale`); once.
+func _put_back() -> void:
+	if _put_back_done:
+		return
+	_put_back_done = true
+	var root: Window = get_tree().root
+	root.content_scale_size = _kept_scale
+	var input: Node = root.get_node_or_null("PlayerInput")
+	if input != null:
+		hear_seats(input)
+	if _feel != null and _feel.has_method(&"mote_cap"):
+		_feel.call(&"set_split_mode", _kept_split)
+		_feel.call(&"set_mote_cap", _kept_motes)
+	if _projectiles != null:
+		_projectiles.set(&"native", _kept_native)
+	WallSlide.use_native(_kept_wall_native)
+
+
+func _exit_tree() -> void:
+	_put_back()
+	super()
 
 
 ## One summary's cells, in `ROW_COLUMNS`' order.
@@ -72,16 +146,18 @@ static func table_text(facts: PackedStringArray, summaries: Array[Dictionary], n
 ## The run's end: the table printed, written to `RESULTS_FILE` (where the platform has files) and
 ## shown; the game stays on it until its Back.
 func _finished(failed: Array[String]) -> void:
+	_put_back()
 	var facts: PackedStringArray = MachineInfoScript.lines(get_tree())
 	var notes := PackedStringArray()
 	for reason in failed:
 		notes.append("Note: " + reason)
 	var text: String = table_text(facts, summaries, notes)
+	# The literal is RESULTS_FILE (the rules want a written-out user:// path; test_benchmark.gd).
 	var file := FileAccess.open("user://benchmark.txt", FileAccess.WRITE)
 	if file != null:
 		file.store_string(text)
 		file.close()
-		notes.append("Written to %s" % ProjectSettings.globalize_path(RESULTS_FILE))
+		notes.append("Written to %s" % ("the browser's storage (%s)" % RESULTS_FILE if OS.has_feature("web") else ProjectSettings.globalize_path(RESULTS_FILE)))
 	else:
 		notes.append("Could not write %s" % RESULTS_FILE)
 	print(text)

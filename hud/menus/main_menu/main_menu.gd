@@ -177,8 +177,7 @@ func _ready() -> void:
 	_start_runner(args, SPLIT_VIEWS_ARGUMENT, SPLIT_VIEWS_NODE)
 	_start_replay_hashes(args)
 	_start_runner(args, ONLINE_ARGUMENT, ONLINE_NODE)
-	if not _benchmark_argument_used and _start_runner(args, BENCHMARK_ARGUMENT, BENCHMARK_NODE):
-		_benchmark_argument_used = true
+	_start_benchmark(args)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -208,6 +207,20 @@ func _start_timing_test(args: PackedStringArray) -> bool:
 ## The same for the hub storm (`--storm`).
 func _start_storm(args: PackedStringArray) -> bool:
 	return _start_runner(args, STORM_ARGUMENT, STORM_NODE)
+
+
+## The same for the benchmark (`--benchmark`), but once a process: its results screen brings this
+## menu back, which must not start it again.
+func _start_benchmark(args: PackedStringArray) -> bool:
+	if _benchmark_argument_used or not _start_runner(args, BENCHMARK_ARGUMENT, BENCHMARK_NODE):
+		return false
+	_benchmark_argument_used = true
+	return true
+
+
+## Only tests call this: `--benchmark` may start its run again.
+static func forget_benchmark_argument() -> void:
+	_benchmark_argument_used = false
 
 
 ## The same for the replay hashes (`--replay-hashes`).

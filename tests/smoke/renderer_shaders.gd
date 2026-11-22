@@ -8,8 +8,8 @@ extends SceneTree
 ## not compile among them (the mote shader's 33 varyings did not on Vulkan, which has 32); else
 ## `RENDERER SHADERS OK`. Needs a display (a headless run compiles nothing):
 ##
-##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method mobile --script res://tests/smoke/renderer_shaders.gd
-##   ... --rendering-method gl_compatibility ...   the web's renderer
+##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method mobile --script res://tests/smoke/renderer_shaders.gd -- --expect=mobile
+##   ... --rendering-method gl_compatibility ... -- --expect=gl_compatibility   the web's renderer
 
 const WarmUp := preload("res://tests/support/warm_up.gd")
 const ErrorLogScript := preload("res://bench/error_log.gd")
@@ -25,7 +25,13 @@ func _initialize() -> void:
 	var error_log: Logger = ErrorLogScript.new()
 	OS.add_logger(error_log)
 	var failed: Array[String] = []
-	print("RENDERER SHADERS: %s, %s" % [RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name()])
+	var method: String = RenderingServer.get_current_rendering_method()
+	print("RENDERER SHADERS: %s, %s" % [method, RenderingServer.get_current_rendering_driver_name()])
+	# `-- --expect=mobile`: the renderer it must be drawing with (a GPU with no Vulkan falls back to
+	# OpenGL with only a warning, which would check the other renderer twice).
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--expect=") and arg.trim_prefix("--expect=") != method:
+			failed.append("drawing with %s, not %s (no driver for it?)" % [method, arg.trim_prefix("--expect=")])
 	if not await WarmUp.run(root):
 		failed.append("the warm-up did not finish")
 	var flow: Node = root.get_node_or_null("Flow")
@@ -39,7 +45,8 @@ func _initialize() -> void:
 		flow.call("stop_run")
 	else:
 		failed.append("the Flow and PlayerInput autoloads must exist")
-	await process_frame
+	for i in 5:
+		await process_frame
 	OS.remove_logger(error_log)
 	for line: String in error_log.call(&"get_lines"):
 		failed.append("logged: " + line)

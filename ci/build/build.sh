@@ -318,7 +318,7 @@ screenshots() {
   done
   ls -l build/screenshots
   display=()
-  ((virtual)) && display=(xvfb-run --server-num=99 --server-args="-screen 0 1280x720x24")
+  ((virtual)) && display=(xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24")
   renderer_shaders "${display[@]}" || failed+=("tests/smoke/renderer_shaders.gd")
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"
@@ -330,12 +330,15 @@ screenshots() {
 # OpenGL) and the desktop builds' (Mobile, Vulkan; lavapipe on a runner, `mesa-vulkan-drivers`).
 # Without a Vulkan driver the Vulkan pass only warns. The arguments are the display to draw on.
 renderer_shaders() {
-  local status=0
-  godot_checked renderer-shaders-gl "$@" "$GODOT" --path . --rendering-method gl_compatibility \
-    --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd || status=1
+  local status=0 data="$PWD/build/renderer-shaders"
+  rm -rf "$data" && mkdir -p "$data"
+  XDG_DATA_HOME="$data" godot_checked renderer-shaders-gl "$@" "$GODOT" --path . --rendering-method gl_compatibility \
+    --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd \
+    -- --expect=gl_compatibility || status=1
   if compgen -G "/usr/share/vulkan/icd.d/*.json" >/dev/null; then
-    godot_checked renderer-shaders-vulkan "$@" "$GODOT" --path . --rendering-method mobile \
-      --rendering-driver vulkan --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd || status=1
+    XDG_DATA_HOME="$data" godot_checked renderer-shaders-vulkan "$@" "$GODOT" --path . --rendering-method mobile \
+      --rendering-driver vulkan --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd \
+      -- --expect=mobile || status=1
   else
     echo "::warning::no Vulkan driver (sudo apt-get install mesa-vulkan-drivers), so the shaders were not checked on Vulkan"
   fi
@@ -367,7 +370,7 @@ clips() {
   fi
   rm -rf "$saved"
   godot_checked clips timeout 1500 xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
-    "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/clips/record.gd \
+    "$GODOT" --path . --rendering-method gl_compatibility --rendering-driver opengl3 --audio-driver Dummy --script res://tests/clips/record.gd \
     -- "${ids[@]}" \
     || echo "::warning::the clip recorder failed (build/logs/clips.log); the clips it saved are kept"
   if [[ -d "$saved" ]]; then

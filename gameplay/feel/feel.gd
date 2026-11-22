@@ -2793,6 +2793,12 @@ func set_mote_cap(cap: int) -> int:
 	return _spectacle.set_mote_cap(cap)
 
 
+## The mote ring's rows now (the "Particles" setting's, or a benchmark's: bench/benchmark.gd reads
+## it to put it back).
+func mote_cap() -> int:
+	return _spectacle.mote_cap
+
+
 ## The "Particle amount" setting (`Spectacle.set_mote_density`). Returns the share taken.
 func set_mote_density(density: float) -> float:
 	return _spectacle.set_mote_density(density)

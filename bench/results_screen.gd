@@ -73,9 +73,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_back()
 
 
+## Once: Esc and a click in one frame call `back` a single time.
 func _go_back() -> void:
-	if _back.is_valid():
-		_back.call()
+	var back: Callable = _back
+	_back = Callable()
+	if back.is_valid():
+		back.call()
 	queue_free()
 
 

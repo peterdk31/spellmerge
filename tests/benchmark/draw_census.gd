@@ -29,7 +29,11 @@ static func report(tree: SceneTree, label: String) -> void:
 		var primitives: int = RenderingServer.viewport_get_render_info(rid, RenderingServer.VIEWPORT_RENDER_INFO_TYPE_CANVAS, RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME)
 		if calls == 0 and items == 0:
 			continue
-		parts.append("%s: %d items, %d calls, %d prims" % [_short_path(viewport), items, calls, primitives])
+		# A SubViewport drawn only when asked (a cached HUD panel, `cached_view.gd`) keeps the counts of
+		# the frame it was last drawn: said so, not to be added to this frame's.
+		var sub := viewport as SubViewport
+		var when: String = " (when last drawn)" if sub != null and sub.render_target_update_mode != SubViewport.UPDATE_ALWAYS else ""
+		parts.append("%s%s: %d items, %d calls, %d prims" % [_short_path(viewport), when, items, calls, primitives])
 	print("BENCH: census %s viewports: %s" % [label, "; ".join(parts)])
 	var total: int = 0
 	var processing: int = 0

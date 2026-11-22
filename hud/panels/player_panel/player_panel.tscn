@@ -1,26 +1,39 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://hud/panels/player_panel/player_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://hud/widgets/meter_line.gd" id="2_meter"]
+[ext_resource type="Script" path="res://hud/widgets/cached_view.gd" id="3_cache"]
 
 [node name="PlayerPanel" type="PanelContainer"]
 custom_minimum_size = Vector2(96, 0)
 mouse_filter = 2
 script = ExtResource("1_panel")
 
-[node name="Rows" type="VBoxContainer" parent="."]
+[node name="Cache" type="Control" parent="."]
+unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3_cache")
+
+[node name="View" type="SubViewport" parent="Cache"]
+disable_3d = true
+transparent_bg = true
+gui_disable_input = true
+size = Vector2i(8, 8)
+render_target_update_mode = 0
+
+[node name="Rows" type="VBoxContainer" parent="Cache/View"]
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="SeatRow" type="Control" parent="Rows"]
+[node name="SeatRow" type="Control" parent="Cache/View/Rows"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 7)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Seat" type="Label" parent="Rows/SeatRow"]
+[node name="Seat" type="Label" parent="Cache/View/Rows/SeatRow"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -35,13 +48,13 @@ text = "ONLINE"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Health" type="HBoxContainer" parent="Rows"]
+[node name="Health" type="HBoxContainer" parent="Cache/View/Rows"]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 2
 
-[node name="HealthLine" type="Control" parent="Rows/Health"]
+[node name="HealthLine" type="Control" parent="Cache/View/Rows/Health"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 3)
 layout_mode = 2
@@ -50,13 +63,13 @@ size_flags_vertical = 4
 mouse_filter = 2
 script = ExtResource("2_meter")
 
-[node name="Word" type="Control" parent="Rows/Health"]
+[node name="Word" type="Control" parent="Cache/View/Rows/Health"]
 custom_minimum_size = Vector2(24, 8)
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="HealthValue" type="Label" parent="Rows/Health/Word"]
+[node name="HealthValue" type="Label" parent="Cache/View/Rows/Health/Word"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -69,7 +82,7 @@ text = "100"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="Status" type="Label" parent="Rows/Health/Word"]
+[node name="Status" type="Label" parent="Cache/View/Rows/Health/Word"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -84,7 +97,7 @@ theme_override_font_sizes/font_size = 8
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="Staffs" type="VBoxContainer" parent="Rows"]
+[node name="Staffs" type="VBoxContainer" parent="Cache/View/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2

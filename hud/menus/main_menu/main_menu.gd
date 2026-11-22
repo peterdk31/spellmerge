@@ -66,6 +66,13 @@ const ONLINE_ARGUMENT: String = "--online"
 const ONLINE_RUNNER: String = "res://tests/net/online_runner.gd"
 const ONLINE_NODE: String = "OnlineRunner"
 
+## The benchmark of the shipped builds (`--benchmark`, bench/benchmark.gd; D1, 2026-11-22): the
+## play frames' scenarios on the fixed clock, then a results screen and `user://benchmark.txt`. It is
+## in every build (bench/ is exported), so the owner can measure on their own PC.
+const BENCHMARK_ARGUMENT: String = "--benchmark"
+const BENCHMARK_RUNNER: String = "res://bench/benchmark.gd"
+const BENCHMARK_NODE: String = "Benchmark"
+
 ## The most characters of a pasted code passed on (the box's limit; net/ has its own).
 const CODE_MAX_CHARS: int = 16384
 ## In a browser: how often the clipboard is read again after a paste, and the seconds between.
@@ -165,6 +172,7 @@ func _ready() -> void:
 	_start_runner(args, SPLIT_VIEWS_ARGUMENT, SPLIT_VIEWS_NODE)
 	_start_replay_hashes(args)
 	_start_runner(args, ONLINE_ARGUMENT, ONLINE_NODE)
+	_start_runner(args, BENCHMARK_ARGUMENT, BENCHMARK_NODE)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -249,6 +257,9 @@ func _runner_script(node_name: String) -> GDScript:
 		ONLINE_NODE:
 			if ResourceLoader.exists(ONLINE_RUNNER):
 				return load("res://tests/net/online_runner.gd") as GDScript
+		BENCHMARK_NODE:
+			if ResourceLoader.exists(BENCHMARK_RUNNER):
+				return load("res://bench/benchmark.gd") as GDScript
 	return null
 
 

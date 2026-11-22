@@ -134,26 +134,33 @@ bool crosses(vec2 a, vec2 b, vec4 box) {
 	return true;
 }
 
-// The box whose column holds `p` (-1: none).
-int column_of(vec2 p) {
+// The box whose column holds `p` (-1: none), and that box's base and back edges and its strength
+// (`column`: x its back edge, y its base, z its strength). The loop runs to its end and keeps the
+// first box found: a `return` from inside it, in the fragment stage, crashed the Vulkan renderer on
+// lavapipe (2026-11-22, D1; tests/core/test_shader_rd_rules.gd).
+int column_of(vec2 p, out vec3 column) {
+	column = vec3(0.0);
+	int found = -1;
 	for (int k = 0; k < MAX_BLOCKERS; k++) {
 		if (k >= blocker_count) {
 			break;
 		}
 		vec4 box = blocker_box[k];
 		vec4 body = blocker_body[k];
-		if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {
-			return k;
+		if (found < 0 && body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {
+			column = vec3(box.y, box.w, body.w);
+			found = k;
 		}
 	}
-	return -1;
+	return found;
 }
 
 // Where `p` is lit as: in front of the base of a box whose column it is in, else itself
 // (light_blockers.gd's `lit_as`).
 vec2 lit_as(vec2 p) {
-	int k = column_of(p);
-	return k >= 0 ? vec2(p.x, blocker_box[k].w + 0.5) : p;
+	vec3 column;
+	int k = column_of(p, column);
+	return k >= 0 ? vec2(p.x, column.y + 0.5) : p;
 }
 
 // How much of the light at `l` (where it is lit from) is blocked on its way to the pixel `p` (0 to
@@ -163,12 +170,13 @@ vec2 lit_as(vec2 p) {
 // from before and beside it, not from behind.
 float shade_between(vec2 p, vec2 l, uint near_bits) {
 	float shade = 0.0;
-	int own = column_of(p);
+	vec3 column;
+	int own = column_of(p, column);
 	vec2 at = p;
 	if (own >= 0) {
-		at = vec2(p.x, blocker_box[own].w + 0.5);
-		if (l.y < blocker_box[own].y) {
-			shade = blocker_body[own].w;
+		at = vec2(p.x, column.y + 0.5);
+		if (l.y < column.x) {
+			shade = column.z;
 		}
 	}
 	for (int k = 0; k < MAX_BLOCKERS; k++) {

@@ -413,7 +413,7 @@ var input: InputManagerScript = null
 var _auto_actors: ActorsScript = null
 ## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
 var drive_engine: bool = true
-## A benchmark's fixed clock (bench/fixed_steps.gd): while above 0, every drawn frame is
+## A benchmark's fixed clock (tests/benchmark/fixed_steps.gd): while above 0, every drawn frame is
 ## this many seconds of the view (the camera's easing, the motes, the reveals), as the Tick runs one
 ## tick a frame, so what is drawn is the same every run; 0: the real clock. Never set by the game.
 var fixed_view_delta: float = 0.0
@@ -2791,12 +2791,6 @@ func use_motes(pool: MotesScript) -> void:
 ## The "Particles" setting (`Spectacle.set_mote_cap`). Returns the number taken.
 func set_mote_cap(cap: int) -> int:
 	return _spectacle.set_mote_cap(cap)
-
-
-## The mote ring's rows now (the "Particles" setting's, or a benchmark's: bench/benchmark.gd reads
-## it to put it back).
-func mote_cap() -> int:
-	return _spectacle.mote_cap
 
 
 ## The "Particle amount" setting (`Spectacle.set_mote_density`). Returns the share taken.

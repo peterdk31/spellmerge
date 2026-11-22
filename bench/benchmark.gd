@@ -67,9 +67,9 @@ func _ready() -> void:
 	if input != null:
 		free_seats(input)
 	var feel: Node = root.get_node_or_null("Feel")
-	if feel != null and feel.has_method(&"mote_cap"):
+	if feel != null and feel.has_method(&"set_mote_cap"):
 		_kept_split = int(feel.get(&"split_mode"))
-		_kept_motes = int(feel.call(&"mote_cap"))
+		_kept_motes = int(feel.get(&"mote_cap"))
 	var projectiles: Node = root.get_node_or_null("Projectiles")
 	if projectiles != null:
 		_kept_native = bool(projectiles.get(&"native"))
@@ -102,7 +102,7 @@ func _put_back() -> void:
 	var input: Node = root.get_node_or_null("PlayerInput")
 	if input != null:
 		hear_seats(input)
-	if _feel != null and _feel.has_method(&"mote_cap"):
+	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		_feel.call(&"set_split_mode", _kept_split)
 		_feel.call(&"set_mote_cap", _kept_motes)
 	if _projectiles != null:

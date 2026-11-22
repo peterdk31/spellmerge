@@ -577,6 +577,19 @@ func _work_out_whole() -> void:
 				_place_whole[at] = guess + 1
 
 
+## Every open body's place made current in one native call (sim-native SN2, Flow's room life: the
+## twin is `RoomLife.gd_find_places`): for each of the first `count` actor ids in `ids`, the body whose
+## instance id `nodes` keeps there (the actor table's `nodes()`), its `room` set where it stands
+## (`place_at`) when it keeps the manager `projectiles` names (an instance id), and `places[n]` its
+## `room` after (NO_PLACE for no body; -2, `RoomLife.ASK_GDSCRIPT`, for one of another manager). False,
+## and nothing done, without the native module: the caller runs its twin.
+func find_places(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, projectiles: int, places: PackedInt32Array) -> bool:
+	if not WallSlide.native_on():
+		return false
+	WallSlide.places(nodes, ids, count, projectiles, _place_rects, _place_cells, _place_over, _place_mixed, _place_touched, _place_w, _place_h, PLACE_CELL, _bounds.position, places)
+	return true
+
+
 ## The place `point` is in (the first whose rectangle holds it), or NO_PLACE.
 func place_at(point: Vector2) -> int:
 	if _place_rects.is_empty():

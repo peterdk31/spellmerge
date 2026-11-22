@@ -42,6 +42,32 @@ func test_the_view_stepped_thrice_plays_the_same() -> void:
 		check(false, "%s: a view function writes state: %s" % [scene, Desync.compare(a2, b2)])
 
 
+## The native module and its GDScript play the same game (native/README.md, "Same results"): each
+## scene played with every simulation kernel on (the projectile manager's `ShotKernel`, the walls'
+## `BodyKernel`, `DMath`'s) and with all of them off agrees in every area at every tick, so a member a
+## kernel leaves as it was where the GDScript writes it is found here, not only in the four biomes'
+## run (the manager's `_one`, 2026-11-22). The storm's homing bolt waits for its turn in the hit pass,
+## which the native pass takes itself.
+func test_the_native_module_and_its_gdscript_play_the_same() -> void:
+	if not DMath.native_on() or not WallSlide.native_on():
+		if OS.get_environment("SPELLMERGE_NATIVE") == "required":
+			check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded")
+		return
+	for scene: StringName in [&"fight", &"storm"]:
+		var a := Desync.new()
+		var b := Desync.new()
+		_record(scene, a)
+		_record(scene, b, 0, false)
+		var tick: int = Desync.first_parting(a, b)
+		if tick < 0:
+			continue
+		var a2 := Desync.new(tick)
+		var b2 := Desync.new(tick)
+		_record(scene, a2)
+		_record(scene, b2, 0, false)
+		check(false, "%s: the native module and its GDScript part: %s" % [scene, Desync.compare(a2, b2)])
+
+
 func test_the_hash_tells_two_different_runs_apart() -> void:
 	var a := Desync.new()
 	var b := Desync.new()
@@ -80,15 +106,23 @@ func _check_twice(scene: StringName) -> void:
 
 
 ## Play `scene` for TICKS ticks into `into`; with `view_runs`, every simulation script's view
-## functions run that many times after each tick.
-func _record(scene: StringName, into: Desync, view_runs: int = 0) -> void:
+## functions run that many times after each tick; with `native` off, the simulation's kernels are
+## (the scene's projectile manager, `WallSlide`, `DMath`), and back on after.
+func _record(scene: StringName, into: Desync, view_runs: int = 0, native: bool = true) -> void:
+	WallSlide.use_native(native)
+	DMath.use_native(native)
 	var played := SimScenes.new(root, scene)
+	var projectiles: Object = played.areas().get("projectiles")
+	if projectiles != null:
+		projectiles.set(&"native", native)
 	for i in TICKS:
 		played.step()
 		for run in view_runs:
 			_run_views(played.areas())
 		into.capture(played.areas())
 	played.free_all()
+	WallSlide.use_native(true)
+	DMath.use_native(true)
 
 
 ## Every view function (`VIEW`) of the areas and of everything under the area nodes, called with

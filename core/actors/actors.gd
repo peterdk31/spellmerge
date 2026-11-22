@@ -327,6 +327,12 @@ func set_node(id: int, node: Node) -> void:
 
 
 ## The actor's node, or null: none set, the actor closed, or the node freed.
+## The instance id of each actor's node by actor id (0 for none), for a kernel that reads the bodies
+## (`RoomGrid.find_places`): the table's own array, read only.
+func nodes() -> PackedInt64Array:
+	return _node
+
+
 func node_of(id: int) -> Node:
 	if not is_open(id) or _node[id] == 0:
 		return null

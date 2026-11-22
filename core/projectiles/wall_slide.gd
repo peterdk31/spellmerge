@@ -83,6 +83,12 @@ static func walk(walls: PackedByteArray, walk_cells: PackedByteArray, ground: Pa
 	return _kernel.call(&"walk", walls, walk_cells, ground, holes, w, h, cell, origin, flags, mask, from, motion, crossed, radius, reach)
 
 
+## The native module's `BodyKernel.places` (sim-native SN2): every open body's place made current,
+## `RoomGrid.find_places`', which calls it only while `native_on()`.
+static func places(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, projectiles: int, rects: Array[Rect2], cells: PackedByteArray, over: PackedByteArray, mixed: PackedByteArray, touched: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, out: PackedInt32Array) -> void:
+	_kernel.call(&"places", nodes, ids, count, projectiles, rects, cells, over, mixed, touched, w, h, cell, origin, out)
+
+
 ## `slide` in GDScript: the reference the native kernel mirrors, and the fallback without it.
 static func gd_slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float, mask: int = 255) -> Vector2:
 	var px: float = from.x

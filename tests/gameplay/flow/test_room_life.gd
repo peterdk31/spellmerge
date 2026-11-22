@@ -431,3 +431,66 @@ func test_the_rooms_with_a_flag_are_a_mask() -> void:
 	life.set_flag(5, RoomLife.ENTERED, true)
 	check_equal(life.rooms_with(RoomLife.CLEARED), (1 << 0) | (1 << 3) | (1 << 62), "the cleared rooms below 63")
 	check_equal(life.rooms_with(RoomLife.ENTERED), 1 << 5, "another flag its own")
+
+
+## Every open body's place made current in one native call (sim-native SN2, `RoomGrid.find_places`,
+## `BodyKernel.places`) gives the rooms and the places of its twin (`RoomLife.gd_find_places`, each
+## body's `find_room`): the biome's bodies scattered over its rooms, bridges and the void, a third
+## of them on whole cells and the places' edges, every body's `room` and the pass's places alike. A
+## body of another manager is left to GDScript, its `room` untouched.
+func test_the_native_places_are_the_gdscripts() -> void:
+	if not WallSlide.native_on():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded")
+		return
+	_start(2, [IMP, IMP], [IMP])
+	_ticks(30)
+	var life: RoomLife = flow.life
+	var grid: RoomGrid = _grid()
+	var bounds: Rect2 = projectiles.call(&"bounds")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261122
+	var ids := PackedInt32Array()
+	var count: int = actors.open_ids(ids)
+	var bodies: Array[Actor] = []
+	for n in count:
+		var body := actors.node_of(ids[n]) as Actor
+		if body != null:
+			bodies.append(body)
+	check(bodies.size() >= 6 and grid.places() >= 3, "wizards and enemies in a biome of places (%d bodies, %d places)" % [bodies.size(), grid.places()])
+	var native := PackedInt32Array()
+	native.resize(count)
+	var placed: Dictionary = {}
+	for round in 60:
+		for at in bodies.size():
+			var point := Vector2(rng.randf_range(bounds.position.x, bounds.end.x), rng.randf_range(bounds.position.y, bounds.end.y))
+			if (round + at) % 3 == 0:
+				# On whole cells: the places' squares and rectangles' edges met exactly.
+				point = (point / 16.0).round() * 16.0
+			bodies[at].global_position = point
+		check(grid.find_places(actors.nodes(), ids, count, projectiles.get_instance_id(), native), "the native pass runs")
+		var rooms: Array[int] = []
+		for body in bodies:
+			rooms.append(body.room)
+			body.room = 99
+		life.gd_find_places(actors, count)
+		var twin: PackedInt32Array = life.get(&"_places")
+		for n in count:
+			if native[n] != twin[n]:
+				check(false, "round %d: body %d's place native %d, GDScript %d" % [round, n, native[n], twin[n]])
+				return
+		for at in bodies.size():
+			if rooms[at] != bodies[at].room:
+				check(false, "round %d: %s's room native %d, GDScript %d" % [round, bodies[at].name, rooms[at], bodies[at].room])
+				return
+			placed[bodies[at].room] = true
+	check(placed.size() >= 4 and placed.has(RoomGrid.NO_PLACE), "bodies landed in rooms, on bridges and outside every place: %s" % [placed.keys()])
+	# Another manager's body: left to GDScript.
+	var other := own(preload("res://core/projectiles/projectile_manager.gd").new()) as Node
+	var kept: Node = bodies[0].projectiles
+	bodies[0].projectiles = other
+	bodies[0].room = 77
+	check(grid.find_places(actors.nodes(), ids, count, projectiles.get_instance_id(), native), "the native pass runs")
+	check_equal(native[ids.find(bodies[0].id)], RoomLife.ASK_GDSCRIPT, "another manager's body is left to GDScript")
+	check_equal(bodies[0].room, 77, "and its room is untouched")
+	bodies[0].projectiles = kept
+	_ticks(1)

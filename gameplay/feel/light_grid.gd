@@ -119,6 +119,8 @@ var kernel: Object = null
 var _first_lit: int = 0
 var _last_lit: int = 0
 var _image: Image = null
+## The texture's one upload point (core/base/texture_upload.gd).
+var _upload: TextureUpload = TextureUpload.new()
 
 
 func _init() -> void:
@@ -316,7 +318,8 @@ func bake() -> void:
 			bytes[c * 4 + 1] = int(minf(rgb[c * 3 + 1], 1.0) * 255.0 + 0.5)
 			bytes[c * 4 + 2] = int(minf(rgb[c * 3 + 2], 1.0) * 255.0 + 0.5)
 	_image.set_data(atlas_width, atlas_height, false, Image.FORMAT_RGBA8, bytes)
-	texture.update(_image)
+	# Copied into an image of the upload's own (safe with a separate render thread).
+	texture = _upload.hand(_image)
 	# The picture holds this frame's bytes now (and lets go of last frame's): the next frame writes
 	# the other buffer.
 	var held: PackedByteArray = bytes
@@ -356,7 +359,7 @@ func _grow(width: int, height: int) -> void:
 		bytes[c * 4 + 2] = 0
 	_bytes_other = bytes.duplicate()
 	_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, _bytes_other)
-	texture = ImageTexture.create_from_image(_image)
+	texture = _upload.hand(_image)
 
 
 # --- One row (the GPU light's vertex stage, then its fragment stage at each cell) ------------------

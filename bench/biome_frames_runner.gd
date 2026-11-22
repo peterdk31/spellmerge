@@ -31,6 +31,11 @@ extends "res://bench/stress_runner.gd"
 ## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
 ## `--census-calls` then hides each part of the tree in turn to tell its draw calls (times off).
+## `--held-shot` (not with `--thread-compare`) holds the game still halfway through and saves the held
+## frame, `user://biome_frames/<label>_held_<render thread>.png` (`_save_held`), with the tick and the
+## frame's hash (the game's state and the camera), to compare two runs (the render thread on and off:
+## `--render-thread separate` and `safe`). The state repeats from run to run; the view does not yet,
+## quite (the motes' births differ by a few between processes: the render thread, 2026-11-22).
 ## `--shots` saves the screen once a scenario, halfway through its measured window, to
 ## `user://biome_frames/<label>.png` (one slow frame, outside the averages' sense).
 ##
@@ -42,6 +47,7 @@ extends "res://bench/stress_runner.gd"
 
 const DrawCensusScript := preload("res://bench/draw_census.gd")
 const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
+const MachineInfoScript := preload("res://bench/machine_info.gd")
 const SEEDS: PackedInt64Array = [11, 23, 37]
 ## A map with fewer rooms than this is reported (the crypt makes 12 to 16; the pass measures 16).
 const ROOMS_WANTED: int = 16
@@ -54,6 +60,9 @@ const CLEAR_RADIUS: float = 10.0
 const SPOT_TRIES: int = 24
 const FIGHT_KIND: StringName = &"fight"
 
+## Whether the viewports' render times are read: not with a separate render thread, where each
+## read waits for it (`MachineInfo.render_thread_separate`); the `gpu` line then reads 0.
+var _gpu_timed: bool = not MachineInfoScript.render_thread_separate()
 var _frames_service: Node = null
 var _replay_seed: int = 0
 ## The rooms the wizards stand in this scenario (map indexes) and their world rects.
@@ -89,6 +98,9 @@ var _shot_taken: bool = false
 ## compare the two pixel for pixel, and whether this scenario's is done (`_compare_threads`).
 var _thread_compare: bool = false
 var _compared: bool = false
+## `--held-shot`: whether to save the held frame a scenario (`_save_held`), and whether it is saved.
+var _held_shot: bool = false
+var _held_taken: bool = false
 ## `--census`: whether to print a draw census a scenario, and whether this scenario's is printed.
 var _census: bool = false
 var _census_taken: bool = false
@@ -109,6 +121,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	_shots = args.has("--shots")
 	_thread_compare = args.has("--thread-compare")
+	_held_shot = args.has("--held-shot")
 	_census = args.has("--census")
 	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
 	# a scenario plays the same (stress_runner.gd's `fixed_frames`); `--real-clock` as the game runs.
@@ -199,12 +212,13 @@ func _scenario_started(scenario: Dictionary) -> void:
 	_counting = false
 	_shot_taken = false
 	_compared = false
+	_held_taken = false
 	_census_taken = false
 	if _feel != null and _feel.has_method(&"set_effect_threads"):
 		# Feel's per-frame pieces on the worker threads (feel_jobs.gd) unless `--one-thread`.
 		var threaded: bool = FeelJobsScript.default_threaded() and not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--one-thread")
 		_feel.call(&"set_effect_threads", threaded)
-		print("BENCH: biome frames %s effect threads: %s, %d cores, renderer thread model %d" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), int(ProjectSettings.get_setting("rendering/driver/threads/thread_model", 1))])
+		print("BENCH: biome frames %s effect threads: %s, %d cores, render thread %s" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), "separate (no viewport timed)" if not _gpu_timed else "the main thread's"])
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
 
@@ -299,7 +313,7 @@ func _process(delta: float) -> void:
 	if not _active:
 		return
 	_rescan_left -= delta
-	if _rescan_left <= 0.0:
+	if _gpu_timed and _rescan_left <= 0.0:
 		_rescan_left = RESCAN
 		_scan_viewports()
 	if not _counting:
@@ -310,6 +324,9 @@ func _process(delta: float) -> void:
 	if _thread_compare and not _compared and _elapsed >= warm_up + measure * 0.5:
 		_compared = true
 		_compare_threads(String(rows[scenarios[_current]]["label"]))
+	elif _held_shot and not _thread_compare and not _held_taken and _elapsed >= warm_up + measure * 0.5:
+		_held_taken = true
+		_save_held(String(rows[scenarios[_current]]["label"]))
 	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:
 		_census_taken = true
 		DrawCensusScript.report(get_tree(), String(rows[scenarios[_current]]["label"]))
@@ -394,6 +411,28 @@ func _compare_threads(label: String) -> void:
 	one.save_png("user://biome_frames/" + label.replace(" ", "_") + "_one.png")
 	_feel.call(&"set_effect_threads", true)
 	_feel.set_process(true)
+	tree.paused = false
+
+
+## The game held still (the tree paused, Feel not stepping: its view, motes and light as they
+## are), a few frames drawn, and that frame saved as `<label>_held_<separate|main>.png`, the render
+## thread's model in its name. Prints `BENCH: biome frames <label> held frame: saved to <path>`.
+func _save_held(label: String) -> void:
+	var tree: SceneTree = get_tree()
+	tree.paused = true
+	if _feel != null:
+		_feel.set_process(false)
+	# The first held frames let go of what was handed for one frame only (flashes, beams).
+	for i in 4:
+		await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	DirAccess.make_dir_recursive_absolute("user://biome_frames")
+	var name: String = label.replace(" ", "_") + "_held_" + ("separate" if MachineInfoScript.render_thread_separate() else "main") + ".png"
+	if image != null and image.save_png("user://biome_frames/" + name) == OK:
+		var tick: TickScript = tree.root.get_node_or_null("Tick") as TickScript
+		print("BENCH: biome frames %s held frame at tick %d (frame hash %d): saved to %s" % [label, tick.count if tick != null else -1, _frame_hash(), ProjectSettings.globalize_path("user://biome_frames/" + name)])
+	if _feel != null:
+		_feel.set_process(true)
 	tree.paused = false
 
 

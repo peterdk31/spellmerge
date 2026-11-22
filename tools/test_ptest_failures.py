@@ -29,6 +29,7 @@ class Reasons(unittest.TestCase):
             "UNIT RUNNER: in its batch the process crashed or timed out in it (exit 137), and it passes alone",
             "TEST FAILED: test_one: it stood in range (3 steps, needs 32)",
             "ERROR: a thing went wrong",
+            "      during: after its last test (test_one)",
         ])
 
     def test_a_script_error_is_a_reason(self) -> None:
@@ -47,6 +48,28 @@ class Reasons(unittest.TestCase):
             "          at: _unreachable (res://tests/net/test_net_rtc.gd:407)",
             "ERROR: no place",
         ])
+
+    def test_an_error_no_check_caught_names_the_test_it_was_logged_in(self) -> None:
+        # An engine thread's error (WebRTC's) is in no check: the next test to end is where it was.
+        log = "\n".join([
+            "SUITE START: res://tests/net/test_net_rtc.gd",
+            "TEST TIME: test_one 3 ms",
+            "ERROR: rtc::impl::DtlsTransport::doRecv@609: DTLS recv: Handshake failed",
+            "   at: LogCallback (src/WebRTCLibPeerConnection.cpp:53)",
+            "TEST TIME: test_two 28 ms",
+            "ERROR: late",
+            "TEST OK: test_net_rtc.gd (2 tests)",
+        ])
+        self.assertEqual(pf.reasons(log), [
+            "ERROR: rtc::impl::DtlsTransport::doRecv@609: DTLS recv: Handshake failed",
+            "   at: LogCallback (src/WebRTCLibPeerConnection.cpp:53)",
+            "      during: test_two",
+            "ERROR: late",
+            "      during: after its last test (test_two)",
+        ])
+
+    def test_an_error_in_a_log_that_is_no_suites_names_no_test(self) -> None:
+        self.assertEqual(pf.reasons("ERROR: at the start\nnext"), ["ERROR: at the start"])
 
     def test_a_crash_signal_is_a_reason(self) -> None:
         log = "SUITE START: x\nhandle_crash: Program crashed with signal 11\n[1] /lib/libc.so.6\n"

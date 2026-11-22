@@ -9,13 +9,14 @@ For every FAIL line of the results (ci/build/unit_tests.sh: "FAIL <seconds> <tes
 it prints the test and the lines of its log that say why: the runner's notes ("UNIT RUNNER:": a file
 that failed only in its batch, with the exit code of a crash or a timeout, or one run alone because
 its batch failed), the suite's "TEST FAILED:" lines, the engine's "ERROR:" lines with the "at:" line
-that places each, and a crash's signal ("handle_crash:"), at most LINES of them, or the log's last
-lines when none says. The logs are gone with the machine that ran them (a cloud session's
+that places each and the test of the suite it was logged in ("during:"), and a crash's signal
+("handle_crash:"), at most LINES of them, or the log's last lines when none says. The logs are gone with the machine that ran them (a cloud session's
 container), so a flaky failure is only explained if this reaches the report. Standard library only.
 """
 
 from __future__ import annotations
 
+import bisect
 import re
 import sys
 from pathlib import Path
@@ -27,17 +28,45 @@ REASON = re.compile(r"^(UNIT RUNNER:|TEST FAILED:|(SCRIPT )?ERROR:|handle_crash:
 ERROR = re.compile(r"^(SCRIPT )?ERROR:")
 # The line after an error that says where it was ("   at: func (res://file.gd:12)").
 PLACE = re.compile(r"^\s+at: ")
+# The line a suite prints as each of its tests ends, after_each included (tests/support/suite.gd).
+TEST_ENDED = re.compile(r"^TEST TIME: (\S+) ")
+
+
+def test_ends(lines: list[str]) -> list[tuple[int, str]]:
+    """Where each test of a suite ended in its log, and its name (none: the log is no suite's)."""
+    ends: list[tuple[int, str]] = []
+    for at, line in enumerate(lines):
+        found = TEST_ENDED.match(line)
+        if found:
+            ends.append((at, found.group(1)))
+    return ends
+
+
+def during(ends: list[tuple[int, str]], at: int) -> str | None:
+    """The test that was running when line `at` was logged: the first of `ends` after it.
+
+    An error no check caught (one an engine thread logs, as WebRTC's are) names no test, and a file's
+    log is its process's output in the order it was written. None when the log is no suite's."""
+    if not ends:
+        return None
+    after = bisect.bisect_right([where for where, _ in ends], at)
+    return ends[after][1] if after < len(ends) else "after its last test (" + ends[-1][1] + ")"
 
 
 def reasons(log_text: str) -> list[str]:
     """The lines of a test's log that say why it failed (see the module's docs)."""
     lines = log_text.splitlines()
+    ends = test_ends(lines)
     found: list[str] = []
     for at, line in enumerate(lines):
         if REASON.match(line):
             found.append(line)
-            if ERROR.match(line) and at + 1 < len(lines) and PLACE.match(lines[at + 1]):
-                found.append(lines[at + 1].rstrip())
+            if ERROR.match(line):
+                if at + 1 < len(lines) and PLACE.match(lines[at + 1]):
+                    found.append(lines[at + 1].rstrip())
+                test = during(ends, at)
+                if test is not None:
+                    found.append("      during: " + test)
     if not found:
         return [line for line in lines if line.strip()][-TAIL:]
     # The runner's note is last in a log but says the most: show it first.

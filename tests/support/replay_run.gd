@@ -11,7 +11,7 @@ extends RefCounted
 ##   frames are the same on every platform. In the hub (with no stone press) it first walks to the
 ##   rack and takes the storm, `rack_item` (`RackWalker`; the "HUD" sends A by it, the command
 ##   `item_take_requested`), onto its first free hand, LB, as a player takes it.
-## - **Fighter bots** (tests/bots/bot.gd) play a run's room. A bot reads the game through
+## - **Fighter bots** (bench/bots/bot.gd) play a run's room. A bot reads the game through
 ##   queries that fill the services' caches, and those count as state (the projectile manager's
 ##   threat grid and target table), so its run replays exactly with the bots watching again
 ##   (their frames dropped; core/sim/frames.gd).
@@ -31,12 +31,12 @@ extends RefCounted
 ##     await run.play(replay, 0, played)
 ##     # run.problems: what went wrong on the way (a bot that did not join, ...)
 
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command), mid-run while the wizard stands:
 ## a downed body's requests are refused (items I7b), so `record` says so if the wizard is down at
@@ -77,7 +77,7 @@ var stone_press_at: int = -1
 var snapshot_at: int = -1
 var snapshot: Snapshot = null
 ## The room a run of Play is in, or null for the game's own run: a run of that one room
-## (tests/support/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
+## (bench/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
 ## snapshot test plays every run's room template by it (online-ready N12, run generation RG3).
 var room: RoomBase = null
 ## The pace that room's enemies come in at (enemy spawning EA5; null: all at once), pinned with it.

@@ -17,7 +17,7 @@ extends SceneTree
 ##
 ## `test_stress.gd` runs a short version under `build.sh --quick --tests`.
 
-const RunnerScript := preload("res://tests/benchmark/stress_runner.gd")
+const RunnerScript := preload("res://bench/stress_runner.gd")
 
 
 func _initialize() -> void:

@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the bot (tests/bots/bot.gd), one behaviour per test: it takes a virtual device and
+## Tests for the bot (bench/bots/bot.gd), one behaviour per test: it takes a virtual device and
 ## fills its seat's input frames (the Frames autoload), an idler wants nothing, a fighter's brain
 ## (the enemies' AI, with the bot's profile) drives its own wizard and walks toward the enemies,
 ## casting with no windup (it is on the players' team), builds a random staff with a person's
@@ -12,7 +12,7 @@ extends "res://tests/support/suite.gd"
 ## tests start a run (two fighters, `play_requested`); after each test every bot leaves, any run is
 ## stopped and the seats' leaves are applied.
 
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 
 ## Physics frames a fighter is given to walk (the bots think at each tick's start).

@@ -8,7 +8,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## keeps the decoys and familiars the cards make (their kinds are its data, not a decision) and is
 ## left out; the bots' other scripts are tests that build staffs on purpose.
 const FOLDERS: Array[String] = ["res://gameplay/ai"]
-const FILES: Array[String] = ["res://tests/bots/bot.gd"]
+const FILES: Array[String] = ["res://bench/bots/bot.gd"]
 const LEFT_OUT: Array[String] = ["res://gameplay/ai/entities.gd"]
 
 

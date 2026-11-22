@@ -21,13 +21,13 @@ extends Node
 ## Started by `cover_cost.gd`. Prints `COVER COST OK` and quits 0, or `COVER COST FAILED` and 1 (no
 ## room, the run did not start, the scene was not as asked, or the log has an error).
 
-const BotScript := preload("res://tests/bots/bot.gd")
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
 const StandIn: EnemyBase = preload("res://tests/benchmark/prop_stand_in.tres")
 

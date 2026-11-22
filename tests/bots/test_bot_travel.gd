@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## A travelling bot crosses every kind of walkway (tests/bots/bot.gd, "Travel"; the owner,
+## A travelling bot crosses every kind of walkway (bench/bots/bot.gd, "Travel"; the owner,
 ## 2026-11-19: the four-bot smoke test's bots could not cross some bridges out of the start room, so
 ## they never reached a fight). Two crypt rooms joined by one walkway: straight east
 ## to west, straight north to south, and the corners (square, wide and tall), each in all four
@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 ## wants (each axis full on or off).
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 
 ## The rooms the walkways join (the first two that fit, any mirroring; the start room first, where

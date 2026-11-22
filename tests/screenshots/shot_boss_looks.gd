@@ -2,7 +2,7 @@ extends "res://tests/support/screenshot.gd"
 ## Every boss's look, played (boss plan OB9, docs/milestones/boss-old-broom.md, "The broom's data",
 ## Look): a recorded preview of each pose of its layered body, for the owner to review. Each boss of
 ## the registry is played alone in a room of its biome that hosts bosses (a pinned run of that room,
-## tests/support/pinned_run.gd), against one protected wizard who stands still, so its AI does what
+## bench/pinned_run.gd), against one protected wizard who stands still, so its AI does what
 ## it does in a fight: the poses are the game's own, read from the body's state (`BodyPose`).
 ##
 ## A clip is a run of frames (every EVERY ticks, FRAMES of them) from the first tick its pose

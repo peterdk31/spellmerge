@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the smoke tests' error logger (tests/smoke/error_log.gd), one kind of log line per
+## Tests for the smoke tests' error logger (bench/error_log.gd), one kind of log line per
 ## test, each on a new logger: it catches an error (with its text, or its code text when it has no
 ## rationale), a line starting `ERROR:` and the "restart failed" warning, and ignores other
 ## warnings and other lines; `get_lines` hands out a copy. The engine's calls are made by hand: a
@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ## this very test. The smoke test itself shows the engine reaches the logger only when it fails
 ## for real.
 
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
 
 var logger: Logger
 var no_trace: Array[ScriptBacktrace] = []

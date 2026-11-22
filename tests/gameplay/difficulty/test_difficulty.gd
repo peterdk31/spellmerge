@@ -5,13 +5,13 @@ extends "res://tests/support/suite.gd"
 ## skill follows: enemy AI AI10); an enemy or a boss about to stand
 ## (`enemy_standing`) takes it (`Actor.stat_scale`), so its data's health is multiplied by it; the level
 ## is the run's state, 1 again at every run's start, so the hub scales nothing; and in
-## play, a pinned room of the crypt arena (tests/support/pinned_run.gd) scaled by its players stands
+## play, a pinned room of the crypt arena (bench/pinned_run.gd) scaled by its players stands
 ## its enemies at the room's scale, also through a snapshot. (Deeper rooms of a biome, each fight at its
 ## own scale: tests/gameplay/flow/test_room_life.gd.)
 const Spawning := preload("res://tests/support/spawning.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const IMP: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 const DT: float = 1.0 / 60.0

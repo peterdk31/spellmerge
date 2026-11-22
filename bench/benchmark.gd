@@ -4,10 +4,11 @@ extends "res://bench/play_frames_runner.gd"
 ## scenarios on the fixed clock (play_frames_runner.gd, biome_frames_runner.gd, fixed_steps.gd: one
 ## tick a drawn frame, the fights from a fixed script, so every run plays the same), at the
 ## desktop's settings, then a results screen to screenshot (`results_screen.gd`) and the same table
-## in `user://benchmark.txt`. Started from the main menu by the user argument `--benchmark`
-## (hud/menus/main_menu): `Spellmerge.exe -- --benchmark` on Windows, `./Spellmerge.x86_64 --
-## --benchmark` on Linux; `--only=` (labels, comma separated) and `--picture=1280x720` as the play
-## frames take them (bench/README.md).
+## in `user://benchmark.txt`. Started by the main menu's Benchmark button in every build (the owner's
+## decision of 2026-11-22), or by the user argument `--benchmark` (`Spellmerge.exe -- --benchmark`
+## on Windows, `./Spellmerge.x86_64 -- --benchmark` on Linux), with `--only=` (labels, comma
+## separated) and `--picture=1280x720` as the play frames take them (bench/README.md). The web build
+## runs the web's rows (`WEB_LABELS`: its mote ring and shot cap) where it has them.
 ##
 ## A row a scenario: the frame's mean, 95th percentile and worst milliseconds, the simulation's
 ## (the Tick's steps), Feel's step, the GPU's and the renderer's CPU time where Godot reports them
@@ -21,6 +22,8 @@ const ResultsScreenScript := preload("res://bench/results_screen.gd")
 ## The scenarios run when `--only=` names none: one wizard at the start, near and far, then the
 ## split screen at its busiest in each mode (play_frames_runner.gd's labels).
 const DEFAULT_LABELS: PackedStringArray = ["1p start", "1p near", "1p far", "2p apart dynamic", "4p apart equal"]
+## The same in the web build: the one wizard's rows at the web's settings (the split rows have none).
+const WEB_LABELS: PackedStringArray = ["1p start web", "1p near web", "1p far web", "2p apart dynamic", "4p apart equal"]
 ## Where the table is written (and its name shown on the results screen).
 const RESULTS_FILE: String = "user://benchmark.txt"
 ## The table's columns, in the order of `row_cells`.
@@ -29,7 +32,12 @@ const ROW_COLUMNS: PackedStringArray = ["Scenario", "Frame ms", "p95", "Worst", 
 
 func _init() -> void:
 	super()
-	scenarios = scenarios_named(scenarios, DEFAULT_LABELS, rows)
+	# `--only=` picks from every row (stress_runner.gd's `_ready`); else the defaults.
+	var only_asked: bool = false
+	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		only_asked = only_asked or arg.begins_with("--only=")
+	if not only_asked:
+		scenarios = scenarios_named(scenarios, WEB_LABELS if OS.has_feature("web") else DEFAULT_LABELS, rows)
 	result_word = "BENCHMARK"
 
 
@@ -61,7 +69,8 @@ static func table_text(facts: PackedStringArray, summaries: Array[Dictionary], n
 	return "\n".join(lines) + "\n"
 
 
-## The run's end: the table printed, written to `RESULTS_FILE` and shown; the game stays open on it.
+## The run's end: the table printed, written to `RESULTS_FILE` (where the platform has files) and
+## shown; the game stays on it until its Back.
 func _finished(failed: Array[String]) -> void:
 	var facts: PackedStringArray = MachineInfoScript.lines(get_tree())
 	var notes := PackedStringArray()
@@ -80,4 +89,12 @@ func _finished(failed: Array[String]) -> void:
 	var rows_shown: Array[PackedStringArray] = []
 	for summary in summaries:
 		rows_shown.append(row_cells(summary))
-	get_tree().root.add_child(ResultsScreenScript.new(facts, ROW_COLUMNS, rows_shown, notes))
+	get_tree().root.add_child(ResultsScreenScript.new(facts, ROW_COLUMNS, rows_shown, notes, _back_to_menu))
+
+
+## The results screen's Back: the main menu again (`main_menu_requested`, as the pause menu's Main
+## menu asks it), and this runner goes.
+func _back_to_menu() -> void:
+	if _events != null:
+		_events.emit_signal(&"main_menu_requested", 0)
+	queue_free()

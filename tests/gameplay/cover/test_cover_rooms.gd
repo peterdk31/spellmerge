@@ -3,14 +3,14 @@ extends "res://tests/support/suite.gd"
 ## worked out as Flow lays it out and starts at rest as the party enters it, a fire lit there burns
 ## and Feel draws it, and a snapshot restored into the room shown keeps it. The room is a copy of the
 ## crypt arena under a stand-in grass that fills its biome (tests/support/stand_in_grass.gd), pinned
-## as a one-room biome (tests/support/pinned_run.gd). Every room of a biome's own cover, mirrored and
+## as a one-room biome (bench/pinned_run.gd). Every room of a biome's own cover, mirrored and
 ## through a snapshot into a joining game, is tests/gameplay/cover/test_cover_biome.gd's (CB3b; the
 ## row run's next room went with CB8).
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const DT: float = 1.0 / 60.0

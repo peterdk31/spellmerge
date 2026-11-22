@@ -39,7 +39,7 @@ const FOUR_BOT_NODE: String = "FourBotRunner"
 ## The user arguments that start the stress run and the projectile timings (tests/benchmark/),
 ## with the scripts and node names of their runners. Same rules as the 4-bot test.
 const STRESS_ARGUMENT: String = "--stress"
-const STRESS_RUNNER: String = "res://tests/benchmark/stress_runner.gd"
+const STRESS_RUNNER: String = "res://bench/stress_runner.gd"
 const STRESS_NODE: String = "StressRunner"
 const TIMING_ARGUMENT: String = "--projectile-timing"
 const TIMING_RUNNER: String = "res://tests/benchmark/projectile_timing_runner.gd"
@@ -72,6 +72,9 @@ const ONLINE_NODE: String = "OnlineRunner"
 const BENCHMARK_ARGUMENT: String = "--benchmark"
 const BENCHMARK_RUNNER: String = "res://bench/benchmark.gd"
 const BENCHMARK_NODE: String = "Benchmark"
+## Whether `--benchmark` has started its run in this process: its results screen brings this menu
+## back, which must not start it again (the other runners quit the game at their end).
+static var _benchmark_argument_used: bool = false
 
 ## The most characters of a pasted code passed on (the box's limit; net/ has its own).
 const CODE_MAX_CHARS: int = 16384
@@ -106,6 +109,7 @@ var display: Node = null
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
 @onready var _fullscreen: Button = %Fullscreen
+@onready var _benchmark: Button = %Benchmark
 @onready var _hint: Label = %Hint
 @onready var _host: Button = %Host
 @onready var _join: Button = %Join
@@ -139,10 +143,11 @@ func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	# The sounds first, so a press is marked before its handler moves the focus.
-	for chosen: Button in [_play, _fullscreen, _host, _join, _copy, _paste, _connect]:
+	for chosen: Button in [_play, _fullscreen, _benchmark, _host, _join, _copy, _paste, _connect]:
 		chosen.pressed.connect(_chose.bind(UiSounds.CHOOSE))
 	_cancel.pressed.connect(_chose.bind(UiSounds.BACK))
 	_play.pressed.connect(_on_play_pressed)
+	_benchmark.pressed.connect(_on_benchmark_pressed)
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
 	_fullscreen.pressed.connect(_on_fullscreen_pressed)
@@ -172,7 +177,8 @@ func _ready() -> void:
 	_start_runner(args, SPLIT_VIEWS_ARGUMENT, SPLIT_VIEWS_NODE)
 	_start_replay_hashes(args)
 	_start_runner(args, ONLINE_ARGUMENT, ONLINE_NODE)
-	_start_runner(args, BENCHMARK_ARGUMENT, BENCHMARK_NODE)
+	if not _benchmark_argument_used and _start_runner(args, BENCHMARK_ARGUMENT, BENCHMARK_NODE):
+		_benchmark_argument_used = true
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -189,7 +195,7 @@ func _start_four_bot_test(args: PackedStringArray) -> bool:
 	return _start_runner(args, FOUR_BOT_ARGUMENT, FOUR_BOT_NODE)
 
 
-## The same for the stress run (`--stress`, tests/benchmark/stress_runner.gd).
+## The same for the stress run (`--stress`, bench/stress_runner.gd).
 func _start_stress_test(args: PackedStringArray) -> bool:
 	return _start_runner(args, STRESS_ARGUMENT, STRESS_NODE)
 
@@ -212,13 +218,19 @@ func _start_replay_hashes(args: PackedStringArray) -> bool:
 func _start_runner(args: PackedStringArray, argument: String, node_name: String) -> bool:
 	if not argument in args:
 		return false
+	return _launch(node_name)
+
+
+## Adds the runner of `node_name` to the root (the stub `runner_factory` makes, in a test). Returns
+## true if one was queued.
+func _launch(node_name: String) -> bool:
 	var runner: Node = null
 	if runner_factory.is_valid():
 		runner = runner_factory.call() as Node
 	else:
 		runner = _make_runner(node_name)
 	if runner == null:
-		push_warning("Main menu: %s needs a build that includes tests/; ignored." % argument)
+		push_warning("Main menu: %s needs a build that includes its runner; ignored." % node_name)
 		return false
 	runner.name = node_name
 	# On the root, so the node outlives this menu when the flow swaps the scene.
@@ -241,7 +253,7 @@ func _runner_script(node_name: String) -> GDScript:
 				return load("res://tests/smoke/four_bot_runner.gd") as GDScript
 		STRESS_NODE:
 			if ResourceLoader.exists(STRESS_RUNNER):
-				return load("res://tests/benchmark/stress_runner.gd") as GDScript
+				return load("res://bench/stress_runner.gd") as GDScript
 		TIMING_NODE:
 			if ResourceLoader.exists(TIMING_RUNNER):
 				return load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
@@ -284,6 +296,13 @@ func _on_play_pressed() -> void:
 	events.hub_requested.emit(MENU_PLAYER)
 
 
+## Benchmark (the owner's decision of 2026-11-22, D1: an option of the menu in every build): the
+## shipped benchmark (bench/benchmark.gd), as `--benchmark` starts it; it ends on its results screen,
+## whose Back brings this menu again.
+func _on_benchmark_pressed() -> bool:
+	return _launch(BENCHMARK_NODE)
+
+
 func _on_host_pressed() -> void:
 	if events == null:
 		push_warning("Main menu: the Events autoload is missing, so Host does nothing.")
@@ -314,7 +333,7 @@ func _open_online() -> void:
 func _set_online_open(open: bool) -> void:
 	_online.visible = open
 	_hush_online_line(open)
-	for button: Control in [_play, _fullscreen, _host.get_parent() as Control, _hint]:
+	for button: Control in [_play, _fullscreen, _benchmark, _host.get_parent() as Control, _hint]:
 		button.visible = not open
 	if not open:
 		_fullscreen.visible = display != null

@@ -1,8 +1,9 @@
 extends CanvasLayer
 ## The benchmark's results (D1, 2026-11-22), for the owner to screenshot: what it ran on
 ## (`machine_info.gd`), then a row a scenario (`benchmark.gd`'s `ROW_COLUMNS`), over an opaque
-## panel above the game and the HUD, with where the text file was written. Esc, B or Back closes
-## the game. Drawn with the project theme; a tool's screen, so it shows whole at once.
+## panel above the game and the HUD, with where the text file was written. Its button, Esc or B
+## calls `back` (the benchmark's way back to the main menu). Drawn with the project theme; a tool's
+## screen, so it shows whole at once.
 
 ## Above every layer the game and the HUD draw on.
 const LAYER: int = 128
@@ -13,11 +14,13 @@ var _facts: PackedStringArray = PackedStringArray()
 var _header: PackedStringArray = PackedStringArray()
 var _rows: Array[PackedStringArray] = []
 var _notes: PackedStringArray = PackedStringArray()
+var _back: Callable = Callable()
+var _button: Button = null
 
 
 ## `facts` as "Name: value" lines, `header` the columns, `rows` one a scenario, `notes` the lines
-## under the table (where the file is, anything that went wrong).
-func _init(facts: PackedStringArray, header: PackedStringArray, rows: Array[PackedStringArray], notes: PackedStringArray) -> void:
+## under the table (where the file is, anything that went wrong), `back` what the button does.
+func _init(facts: PackedStringArray, header: PackedStringArray, rows: Array[PackedStringArray], notes: PackedStringArray, back: Callable) -> void:
 	name = "BenchmarkResults"
 	layer = LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -25,6 +28,7 @@ func _init(facts: PackedStringArray, header: PackedStringArray, rows: Array[Pack
 	_header = header
 	_rows = rows
 	_notes = notes
+	_back = back
 
 
 func _ready() -> void:
@@ -46,12 +50,25 @@ func _ready() -> void:
 	box.add_child(grid)
 	for line in _notes:
 		box.add_child(_label(line))
-	box.add_child(_label("Esc or B: quit"))
+	_button = Button.new()
+	_button.name = "Back"
+	_button.text = "Back to the main menu"
+	_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_button.pressed.connect(_go_back)
+	box.add_child(_button)
+	_button.grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel"):
-		get_tree().quit(0)
+		get_viewport().set_input_as_handled()
+		_go_back()
+
+
+func _go_back() -> void:
+	if _back.is_valid():
+		_back.call()
+	queue_free()
 
 
 static func _label(text: String) -> Label:

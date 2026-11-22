@@ -5,7 +5,9 @@ extends SceneTree
 ## shader once) behind the loading screen, then a pinned one-room run is started and drawn for a
 ## second (the light, the shadows, the mist, the motes, the floor's bake: what the warm-up draws
 ## with no room). Fails (`RENDERER SHADERS FAILED`, exit 1) on any error logged, a shader that does
-## not compile among them (the mote shader's 33 varyings did not on Vulkan, which has 32); else
+## not compile among them (the mote shader's 33 varyings did not on Vulkan, which has 32), or the
+## light grid not on the GPU with the Mobile renderer (its compute shader did not compile) or on it
+## with Compatibility; else
 ## `RENDERER SHADERS OK`. Needs a display (a headless run compiles nothing):
 ##
 ##   xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-method mobile --script res://tests/smoke/renderer_shaders.gd -- --expect=mobile
@@ -42,6 +44,14 @@ func _initialize() -> void:
 		flow.call("start_run", 0)
 		for i in ROOM_FRAMES:
 			await process_frame
+		# The light grid on the GPU where the renderer has compute (the Mobile renderer: its compute
+		# shader compiled), on the CPU on the web's (core/base/gpu_compute.gd).
+		var feel: Node = root.get_node_or_null("Feel")
+		var light: Object = feel.call(&"light") if feel != null else null
+		var on_gpu: bool = light != null and bool(light.call(&"on_gpu"))
+		print("RENDERER SHADERS: the light grid on the %s" % ("GPU" if on_gpu else "CPU"))
+		if light != null and on_gpu != (method != "gl_compatibility"):
+			failed.append("the light grid on the %s with %s" % ["GPU" if on_gpu else "CPU", method])
 		flow.call("stop_run")
 	else:
 		failed.append("the Flow and PlayerInput autoloads must exist")

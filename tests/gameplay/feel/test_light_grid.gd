@@ -12,7 +12,7 @@ const ROWS: int = 160
 
 ## A grid of `cell` px over views (one zoomed in, one far off; a third over the first's middle with
 ## `overlap`), its tints set, boxes that block light.
-func _grid(cell: float = LightGridScript.CELL, overlap: bool = false) -> LightGridScript:
+static func _grid(cell: float = LightGridScript.CELL, overlap: bool = false) -> LightGridScript:
 	var grid := LightGridScript.new()
 	grid.set_cell(cell)
 	var boxes := PackedVector4Array([Vector4(-40.0, -30.0, 600.0, 330.0), Vector4(1985.0, 993.0, 2310.0, 1170.0), Vector4(150.0, 90.0, 470.0, 270.0)])

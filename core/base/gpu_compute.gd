@@ -1,0 +1,73 @@
+class_name GpuCompute
+extends RefCounted
+## Whether an effect may be worked out by compute shaders on the GPU (the owner's decision of
+## 2026-11-22: the heaviest per-frame effects on the GPU, the desktop builds only): the one place
+## that says so, and the one place a compute shader is compiled (core/README.md, "Compute effects").
+##
+## - **Where:** the desktop builds' Mobile renderer (Vulkan, or Direct3D 12 on Windows) has a
+##   RenderingDevice and compute; the web's Compatibility renderer (OpenGL ES), the OpenGL fallback
+##   of a GPU with neither and a headless run have none. There `available()` is false and every
+##   effect keeps its CPU path, which stays the reference (an effect's GPU path is tested against
+##   it) and the fallback.
+## - **Switched for tests and benchmarks:** `allowed` (true by default) turns every GPU effect off at
+##   once; an effect asks `available()` when it is made or switched (`LightGrid.use_gpu`).
+## - **The render thread:** a RenderingDevice call is made on the render thread only, through
+##   `on_render_thread` (Godot's `RenderingServer.call_on_render_thread`: at once on the web's and
+##   CI's one thread, queued in order with the frame's other calls on the desktop's separate one), so
+##   what an effect dispatches reads the buffers handed before it and is drawn by the frame after it.
+## - **The shaders** are GLSL sources held as text constants in a script of their own
+##   (`light_grid_compute.gd`), compiled by `compile`: GLSL has no file type of its own in the project
+##   (AGENTS.md, hard rule 2: no `.glsl`; an open question with the owner) and `RDShaderSource` is no
+##   resource a `.tres` can hold. They are compiled only behind `available()`, never on the web.
+##
+## View only: nothing here touches the simulation.
+
+## Whether GPU effects may be used at all (tests and `--cpu-effects` turn it off).
+static var allowed: bool = true
+
+
+## Whether a compute effect can run here now: allowed, not the web, and a renderer with a
+## RenderingDevice (the Mobile or Forward+ renderer; never Compatibility or headless).
+static func available() -> bool:
+	if not allowed or OS.has_feature("web"):
+		return false
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		return false
+	return RenderingServer.get_rendering_device() != null
+
+
+## `job` run on the render thread (at once when this is it), where RenderingDevice calls belong.
+static func on_render_thread(job: Callable) -> void:
+	RenderingServer.call_on_render_thread(job)
+
+
+## The render thread's device (call from `on_render_thread`'s job only).
+static func device() -> RenderingDevice:
+	return RenderingServer.get_rendering_device()
+
+
+## A compute shader made from the GLSL `glsl` on `rd` (on the render thread): its RID, or an invalid
+## RID with the compiler's error pushed.
+static func compile(rd: RenderingDevice, glsl: String, name: String) -> RID:
+	var source := RDShaderSource.new()
+	source.language = RenderingDevice.SHADER_LANGUAGE_GLSL
+	source.source_compute = glsl
+	var spirv: RDShaderSPIRV = rd.shader_compile_spirv_from_source(source)
+	if spirv == null or spirv.compile_error_compute != "":
+		push_error("GpuCompute: %s does not compile: %s" % [name, spirv.compile_error_compute if spirv != null else "no SPIR-V"])
+		return RID()
+	return rd.shader_create_from_spirv(spirv, name)
+
+
+## `rids` freed on the render thread, in order (what an effect made there, once it is done with it).
+static func free_later(rids: Array[RID]) -> void:
+	on_render_thread(_free_now.bind(rids))
+
+
+static func _free_now(rids: Array[RID]) -> void:
+	var rd: RenderingDevice = device()
+	if rd == null:
+		return
+	for rid in rids:
+		if rid.is_valid():
+			rd.free_rid(rid)

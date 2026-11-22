@@ -27,6 +27,10 @@ extends "res://bench/stress_runner.gd"
 ## the 64 x 64 art). The window must be at least that big (`xvfb-run -s "-screen 0 1280x720x24"`).
 ## `--thread-compare` holds the game still halfway through and draws the same frame threaded and on one
 ## thread, comparing them pixel for pixel (`_compare_threads`).
+## `--gpu-compare` holds the game still halfway through and draws the same frame with the effects
+## worked out on the GPU and on the CPU (`Feel.set_gpu_effects`; the light grid), comparing them pixel
+## for pixel and saving both (`_compare_gpu`). `--cpu-effects` keeps every effect on the CPU (on the
+## GPU by default where the renderer has compute: core/base/gpu_compute.gd).
 ## `--one-thread` runs Feel's per-frame pieces on the main thread alone (gameplay/feel/feel_jobs.gd;
 ## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
@@ -98,6 +102,8 @@ var _shot_taken: bool = false
 ## compare the two pixel for pixel, and whether this scenario's is done (`_compare_threads`).
 var _thread_compare: bool = false
 var _compared: bool = false
+## `--gpu-compare`: whether to draw a held frame with the GPU's effects and the CPU's (`_compare_gpu`).
+var _gpu_compare: bool = false
 ## `--held-shot`: whether to save the held frame a scenario (`_save_held`), and whether it is saved.
 var _held_shot: bool = false
 var _held_taken: bool = false
@@ -121,6 +127,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	_shots = args.has("--shots")
 	_thread_compare = args.has("--thread-compare")
+	_gpu_compare = args.has("--gpu-compare")
 	_held_shot = args.has("--held-shot")
 	_census = args.has("--census")
 	# The fights from a fixed script (the owner, 2026-11-21): one tick a drawn frame, so each run of
@@ -219,6 +226,9 @@ func _scenario_started(scenario: Dictionary) -> void:
 		var threaded: bool = FeelJobsScript.default_threaded() and not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--one-thread")
 		_feel.call(&"set_effect_threads", threaded)
 		print("BENCH: biome frames %s effect threads: %s, %d cores, render thread %s" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), "separate (no viewport timed)" if not _gpu_timed else "the main thread's"])
+	if _feel != null and _feel.has_method(&"set_gpu_effects"):
+		var on_gpu: bool = _feel.call(&"set_gpu_effects", not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--cpu-effects"))
+		print("BENCH: biome frames %s gpu effects: %s (%s)" % [scenario["label"], "on" if on_gpu else "off", RenderingServer.get_current_rendering_method()])
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
 
@@ -304,6 +314,10 @@ func _measuring_started() -> void:
 	_tick_usec_seen = _tick_usec(tick)
 	if _feel != null and _feel.has_method(&"profile_parts"):
 		_feel.call(&"profile_parts", Time.get_ticks_usec)
+	var light: Object = _feel.call(&"light") if _feel != null and _feel.has_method(&"light") else null
+	if light != null:
+		light.set(&"profile_clock", Time.get_ticks_usec)
+		light.set(&"fill_usec", 0)
 	_panel_draws_seen = _panel_draws()
 	_counting = true
 
@@ -324,7 +338,10 @@ func _process(delta: float) -> void:
 	if _thread_compare and not _compared and _elapsed >= warm_up + measure * 0.5:
 		_compared = true
 		_compare_threads(String(rows[scenarios[_current]]["label"]))
-	elif _held_shot and not _thread_compare and not _held_taken and _elapsed >= warm_up + measure * 0.5:
+	elif _gpu_compare and not _compared and _elapsed >= warm_up + measure * 0.5:
+		_compared = true
+		_compare_gpu(String(rows[scenarios[_current]]["label"]))
+	elif _held_shot and not _thread_compare and not _gpu_compare and not _held_taken and _elapsed >= warm_up + measure * 0.5:
 		_held_taken = true
 		_save_held(String(rows[scenarios[_current]]["label"]))
 	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:
@@ -410,6 +427,37 @@ func _compare_threads(label: String) -> void:
 	threaded.save_png("user://biome_frames/" + label.replace(" ", "_") + "_threads.png")
 	one.save_png("user://biome_frames/" + label.replace(" ", "_") + "_one.png")
 	_feel.call(&"set_effect_threads", true)
+	_feel.set_process(true)
+	tree.paused = false
+
+
+## The game held still (the tree paused, Feel not stepping) and the same frame drawn with the effects
+## on the GPU, again so, then on the CPU (`Feel.set_gpu_effects`): the light grid is worked out anew
+## at every drawn frame from the lights it holds, so the frames compare the GPU's grid with the CPU's.
+## Prints `BENCH: biome frames <label> gpu compare: <n> px differ on the GPU twice, <m> px differ GPU
+## against CPU` and saves the two frames (`<label>_gpu.png`, `<label>_cpu.png`).
+func _compare_gpu(label: String) -> void:
+	if _feel == null or not _feel.has_method(&"set_gpu_effects"):
+		return
+	var tree: SceneTree = get_tree()
+	var was_on: bool = _feel.call(&"set_gpu_effects", true)
+	tree.paused = true
+	_feel.set_process(false)
+	# The first held frames let go of what was handed for one frame only (flashes, beams).
+	for i in 4:
+		await RenderingServer.frame_post_draw
+	var on_gpu: Image = get_viewport().get_texture().get_image()
+	await RenderingServer.frame_post_draw
+	var again: Image = get_viewport().get_texture().get_image()
+	_feel.call(&"set_gpu_effects", false)
+	for i in 3:
+		await RenderingServer.frame_post_draw
+	var on_cpu: Image = get_viewport().get_texture().get_image()
+	print("BENCH: biome frames %s gpu compare: %d px differ on the GPU twice, %d px differ GPU (%s) against CPU" % [label, _pixels_differ(on_gpu, again), _pixels_differ(on_gpu, on_cpu), "on" if was_on else "off: no compute here"])
+	DirAccess.make_dir_recursive_absolute("user://biome_frames")
+	on_gpu.save_png("user://biome_frames/" + label.replace(" ", "_") + "_gpu.png")
+	on_cpu.save_png("user://biome_frames/" + label.replace(" ", "_") + "_cpu.png")
+	_feel.call(&"set_gpu_effects", true)
 	_feel.set_process(true)
 	tree.paused = false
 
@@ -556,6 +604,10 @@ func _report_more(label: String) -> void:
 		print("BENCH: biome frames %s feel parts (ms a frame, total %.3f): %s" % [label, float(feel_total) / float(frames) / 1000.0, ", ".join(feel_parts)])
 		summary["feel_ms"] = float(feel_total) / float(frames) / 1000.0
 		_feel.set(&"step_profile", PackedInt64Array())
+	var light: Object = _feel.call(&"light") if _feel != null and _feel.has_method(&"light") else null
+	if light != null and (light.get(&"profile_clock") as Callable).is_valid():
+		print("BENCH: biome frames %s light fill (ms a frame on the main thread, %s): %.3f" % [label, "gpu" if light.call(&"on_gpu") else "cpu", float(light.get(&"fill_usec")) / float(frames) / 1000.0])
+		light.set(&"fill_usec", 0)
 	var order: Array[int] = []
 	for i in frames:
 		order.append(i)

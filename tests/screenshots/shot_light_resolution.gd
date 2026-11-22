@@ -1,12 +1,12 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of the light at its fixed resolution (the owner's decision of 2026-11-21,
-## docs/milestones/connected-biomes.md, "The light at a fixed resolution"; gameplay/feel/picture_grid.gd):
+## Screenshots of the light in a bigger picture (the owner's decisions of 2026-11-21 and 2026-11-22,
+## docs/milestones/connected-biomes.md, "The light at a fixed resolution" and "One pass"):
 ## the crypt's mist room in a fight (four wizards casting up into it: the shots' light, the torches',
 ## the room's dark and its mist) and the broom's hall, with spell light on.
 ##
 ## Shots, at the picture's size: `light_res_<w>x<h>_fight` and `light_res_<w>x<h>_hall`. The picture is
 ## the project's (640 x 360), or the size `--picture=WxH` asks for (the root's `content_scale_size`: the
-## cameras draw the same world finer, the light at its own resolution); run it at both, on two checkouts,
+## cameras draw the same world finer, the light a world pixel at a time); run it at both, on two checkouts,
 ## to compare them pixel by pixel. The HUD is hidden.
 
 const RegistryScript := preload("res://core/registry/registry.gd")

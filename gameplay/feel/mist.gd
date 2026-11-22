@@ -19,19 +19,13 @@ extends ColorRect
 ##   by `step`'s `hand_stirs` whenever their version changes; this knows nothing else of them), and
 ##   the bodies' feet (a short list, the ground cover's, handed to `step`) through `mist_parting.gd`.
 ## - **Lit** by the spell light's buffer (`use_light`).
-## - **At the light's resolution** (`use_passes`; the owner's decision of 2026-11-21, docs/milestones/
-##   connected-biomes.md, "The light at a fixed resolution"): while the picture is bigger than
-##   PictureGrid.SIZE, a twin of this rect in the spell light's pass under it (`SpellLight.under_holder`)
-##   works out how thick the mist is a block at a time (`mist_pass.gdshader`, with this rect's numbers:
-##   every uniform is set on both), and this rect takes it whole for each block and lights it by the
-##   light at the block's middle. Every room's twin is drawn in one pass, written as it is: the rooms'
-##   rects never overlap, so none overwrites another's.
+## - **A pixel at a time** at any size of picture (the one pass, 2026-11-22): how thick it is is
+##   worked out here for each world pixel it covers; nothing is drawn for it first.
 ##
 ## Nothing is made a frame: a frame sets the clock, steps the parting (written where a cell changed)
 ## and hands the stirs over when they changed.
 
 const SHADER: Shader = preload("res://gameplay/feel/mist.gdshader")
-const PASS_SHADER: Shader = preload("res://gameplay/feel/mist_pass.gdshader")
 const MistMaskScript := preload("res://gameplay/feel/mist_mask.gd")
 const MistPartingScript := preload("res://gameplay/feel/mist_parting.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
@@ -60,11 +54,6 @@ var mask: ImageTexture = null
 ## frame through `set_share`): its thickness times this. Read only.
 var share: float = 1.0
 
-## The twin drawing how thick the mist is in the pass at the light's resolution (`use_passes`; null
-## with none). Read only.
-var twin: ColorRect = null
-## Where the twin is to be drawn (`use_passes`; null: none), kept while this rect is out of the tree.
-var _holder: Node = null
 ## The room's walls and holes in its own px (from `room_origin`), as the mask is built from them.
 var _walls: Array[Rect2] = []
 var _holes: Array[Rect2] = []
@@ -137,59 +126,14 @@ func use_light(buffer: Texture2D) -> void:
 	(material as ShaderMaterial).set_shader_parameter(&"light_grid", buffer)
 
 
-## Its twin drawn under `holder` from now on (the spell light's pass under it, `SpellLight.under_holder`:
-## the picture bigger than PictureGrid.SIZE), with this rect's place and numbers; none with no holder.
-func use_passes(holder: Node) -> void:
-	_holder = holder
-	if not is_inside_tree():
-		_drop_twin()
-		return
-	if twin != null and not is_instance_valid(twin):
-		# Freed with the passes it was drawn in (the light made anew).
-		twin = null
-	if twin != null and twin.get_parent() == holder:
-		return
-	_drop_twin()
-	if holder == null:
-		return
-	twin = ColorRect.new()
-	twin.name = name
-	twin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var drawn := ShaderMaterial.new()
-	drawn.shader = PASS_SHADER
-	var from := material as ShaderMaterial
-	for uniform: Dictionary in PASS_SHADER.get_shader_uniform_list(true):
-		var named := StringName(String(uniform.get("name", "")))
-		if named != &"" and int(uniform.get("type", TYPE_NIL)) != TYPE_NIL:
-			drawn.set_shader_parameter(named, from.get_shader_parameter(named))
-	twin.material = drawn
-	holder.add_child(twin)
-	_refresh()
+## How many layers of billows it works out (1 to 3; EffectsQuality.mist_billows).
+func set_billows(layers: int) -> void:
+	_param(&"billows", clampi(layers, 1, 3))
 
 
-## The twin goes with this rect out of the tree (the mist freed), and comes back with it.
-func _exit_tree() -> void:
-	_drop_twin()
-
-
-func _enter_tree() -> void:
-	if _holder != null and is_instance_valid(_holder) and twin == null:
-		use_passes(_holder)
-
-
-func _drop_twin() -> void:
-	if twin != null and is_instance_valid(twin):
-		if twin.get_parent() != null:
-			twin.get_parent().remove_child(twin)
-		twin.queue_free()
-	twin = null
-
-
-## `uniform` set to `value`, on the twin too.
+## `uniform` set to `value`.
 func _param(uniform: StringName, value: Variant) -> void:
 	(material as ShaderMaterial).set_shader_parameter(uniform, value)
-	if twin != null and is_instance_valid(twin):
-		(twin.material as ShaderMaterial).set_shader_parameter(uniform, value)
 
 
 ## Not drawn while its room is one nobody has seen yet (`unseen_standing.gd`), drawn as it stands
@@ -206,15 +150,10 @@ func set_unseen(unseen: bool) -> void:
 func _refresh() -> void:
 	var shown: bool = mist != null and room_size.x > 0.0 and room_size.y > 0.0 and not _unseen
 	visible = shown
-	if twin != null and is_instance_valid(twin):
-		twin.visible = shown
 	if not shown:
 		return
 	position = room_origin
 	size = room_size
-	if twin != null and is_instance_valid(twin):
-		twin.position = room_origin
-		twin.size = room_size
 	_param(&"origin", room_origin)
 	if _stale or mask == null:
 		_stale = false
@@ -249,5 +188,3 @@ func step(now: float, feet: PackedVector2Array, count: int, stirs_version: int =
 	if hand_stirs.is_valid() and stirs_version != _stirs_version:
 		_stirs_version = stirs_version
 		hand_stirs.call(shading)
-		if twin != null and is_instance_valid(twin):
-			hand_stirs.call(twin.material as ShaderMaterial)

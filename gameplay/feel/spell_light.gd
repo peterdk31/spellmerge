@@ -47,9 +47,9 @@ extends Node
 ##   part of the world (`use_views`), side by side in the one texture. What reads the light by the screen
 ##   reads its own view's (`readers`, `view_readers.gd`: the first two views share an item told apart in
 ##   its shader, the third and fourth each draw a copy naming its view; `light_views.gdshaderinc`).
-## - **At a fixed resolution** (#902): while the picture is `grid_scale` times PictureGrid.SIZE the apply
-##   rect's factor and the mist's billows are worked out in a pass a view at PictureGrid.SIZE
-##   (`factor_passes`, `under_passes`, gameplay/feel/light_passes.gd) and taken whole for each block.
+## - **One pass, a pixel at a time** (the owner's one pass, 2026-11-22; docs/milestones/connected-biomes.md,
+##   "One pass"): at any size of picture the apply rect works its factor out at each pixel, from the
+##   grid (a few texels), with one read of the screen; no SubViewport works anything out for it.
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
@@ -57,9 +57,6 @@ const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
 const InfusionTableScript := preload("res://core/spells/infusion_table.gd")
 const APPLY_SHADER: Shader = preload("res://gameplay/feel/light_apply.gdshader")
-const FACTOR_SHADER: Shader = preload("res://gameplay/feel/light_factor.gdshader")
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
-const LightPassesScript := preload("res://gameplay/feel/light_passes.gd")
 ## The grid's cell by default (world px each way; LightGrid.CELLS the choices).
 const GRID_CELL: float = LightGridScript.CELL
 ## The split's cheaper light (SplitBudget's rungs name a light this many times smaller than its view
@@ -115,14 +112,6 @@ const GRID_CELL_UNIFORM: StringName = &"light_grid_cell"
 const GRID_SMOOTH: StringName = &"light_grid_smooth"
 const GRID_VIEWS: Array[StringName] = [&"light_grid_view_0", &"light_grid_view_1", &"light_grid_view_2", &"light_grid_view_3"]
 const GRID_SIZES: Array[StringName] = [&"light_grid_size_0", &"light_grid_size_1", &"light_grid_size_2", &"light_grid_size_3"]
-## The uniforms of `light_passes.gdshaderinc` that hold a view's pass (the first view's and every copy's
-## own, `ViewReaders.set_view_uniform`; the second view's), say which views have one and how much smaller
-## they are.
-const PASS_UNIFORMS: Array[StringName] = [&"light_pass_0", &"light_pass_1"]
-const PASS_VIEWS: StringName = &"light_pass_views"
-const PASS_SCALE: StringName = &"light_pass_scale"
-## The apply rect's uniforms its factor passes' rects share (`light_apply.gdshaderinc`'s).
-const APPLY_UNIFORMS: Array[StringName] = [&"ambient", &"shade", &"bands", &"lit_from", &"bright_from", &"tint_rects", &"tint_hues", &"tint_count"]
 ## Floats a light row holds (a 2D transform, a colour, custom data).
 const STRIDE: int = LightGridScript.STRIDE
 ## Where a spot row (`write_spot_row`) holds its light's reach, its middle's x and y, and its strength.
@@ -142,10 +131,6 @@ const MAX_TINTS: int = 40
 ## Flashes, cues, spots and carried lights are blocked.
 const SHOTS_BLOCKED: bool = false
 
-## The passes came or went (the picture's size crossed a whole multiple of PictureGrid.SIZE): what
-## draws under the light at its resolution (`under_holder`) draws its pass again.
-signal passes_changed
-
 ## The grid the light is worked out on, and the rect that applies it. Read only.
 var grid: LightGridScript = LightGridScript.new()
 var apply: ColorRect = null
@@ -155,18 +140,6 @@ var shade: Color = Color.WHITE
 var bands: int = DEFAULT_BANDS
 ## How many rooms' tints the apply rect reads (`set_room_tints`). Read only.
 var tint_count: int = 0
-## How many times bigger than PictureGrid.SIZE the picture is each way (PictureGrid.scale_of, at
-## every draw). Read only.
-var grid_scale: int = 1
-## Whether the light keeps its resolution (PictureGrid.SIZE a view) in a bigger picture; false draws it
-## at the picture's own (the benchmarks' A/B: `--light-at-picture`).
-var fixed_resolution: bool = true
-## The passes at the light's resolution while `grid_scale` is more than 1 (the picture at least twice
-## PictureGrid.SIZE each way; null at 1): the apply rect's factor a view, with its rects (one a view,
-## each on its view's layer), and what readers drawn under the light draw there (`under_holder`). Read only.
-var factor_passes: LightPassesScript = null
-var under_passes: LightPassesScript = null
-var factor_rects: Array[ColorRect] = []
 ## Whether the grid is read smoothed between the cells' middles (`set_grid_smooth`; the owner's default,
 ## 2026-11-21: smoothed, its bands still hard), and how many times it was worked out (for tests). Read only.
 var grid_smooth: bool = true
@@ -352,22 +325,16 @@ func release() -> void:
 
 
 ## Just before every draw, after the camera has moved: the spots written again if one came or went,
-## each reader's copies a view following it (`readers`), the passes at the light's resolution fitted
-## to the views, and the grid worked out over each view's part of the world from every light handed
+## each reader's copies a view following it (`readers`), and the grid worked out over each view's part of the world from every light handed
 ## over this frame (`_light_grid`), then handed to every reader.
 func follow() -> void:
 	if _spots_dirty and is_inside_tree():
 		draw_spots()
 	var root: Viewport = get_viewport()
-	if root != null:
-		var by: int = PictureGridScript.scale_of(root.get_visible_rect().size) if fixed_resolution else 1
-		if by != grid_scale:
-			_use_scale(by)
 	var count: int = 0
 	if _views.is_empty():
 		if root != null:
 			_view_boxes[0] = _world_box(root)
-			_fit_passes(0, root)
 			count = 1
 	else:
 		for k in _views.size():
@@ -375,7 +342,6 @@ func follow() -> void:
 			if shown == null or not is_instance_valid(shown):
 				break
 			_view_boxes[k] = _world_box(shown)
-			_fit_passes(k, shown)
 			count += 1
 	_light_grid(count)
 	# After the grid is handed over: the copies a view take this frame's grid, not last frame's.
@@ -480,18 +446,6 @@ func set_grid_smooth(on: bool) -> void:
 	_each_reader(GRID_SMOOTH, on)
 
 
-## View `k`'s passes fitted to `view` (while there are passes).
-func _fit_passes(k: int, view: Viewport) -> void:
-	if factor_passes == null or k >= factor_passes.count:
-		return
-	factor_passes.fit(k, view)
-	under_passes.fit(k, view)
-	# The pass under the light is drawn only while something is drawn in it (a mist's twin).
-	var wanted: int = SubViewport.UPDATE_ALWAYS if under_passes.holder().get_child_count() > 0 else SubViewport.UPDATE_DISABLED
-	if under_passes.viewports[k].render_target_update_mode != wanted:
-		under_passes.viewports[k].render_target_update_mode = wanted
-
-
 ## The views the light follows from now on, a grid each (`views`, in the order the split screen lays
 ## them out, at most VIEWS_MOST; empty: the one picture, this node's viewport). The split's cheaper
 ## light (`extra_downscale` past DOWNSCALE, the budget's rung while frames run slow) draws every view's
@@ -510,89 +464,13 @@ func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE, void_vi
 			_use_readers()
 			return
 	_views = views.slice(0, VIEWS_MOST)
-	_use_passes()
 	_use_readers()
 	follow()
 
 
-## The passes at the light's resolution for a picture `by` times PictureGrid.SIZE: made past 1, freed
-## at 1; every reader handed them.
-func _use_scale(by: int) -> void:
-	grid_scale = maxi(by, 1)
-	if grid_scale > 1 and factor_passes == null:
-		factor_passes = LightPassesScript.new("LightFactor")
-		add_child(factor_passes)
-		under_passes = LightPassesScript.new("LightUnder")
-		add_child(under_passes)
-	elif grid_scale == 1 and factor_passes != null:
-		for passes: LightPassesScript in [factor_passes, under_passes]:
-			remove_child(passes)
-			passes.queue_free()
-		factor_passes = null
-		under_passes = null
-		factor_rects.clear()
-	_use_passes()
-	passes_changed.emit()
-
-
-## A pass a view (while there are passes; the equal split's void quarter has none), each view's factor
-## rect reading its own view's grid; the passes drawn before their view, and every reader handed them.
-func _use_passes() -> void:
-	var count: int = maxi(_views.size(), 1)
-	if factor_passes != null:
-		factor_passes.use(count, grid_scale)
-		under_passes.use(count, grid_scale)
-		while factor_rects.size() < count:
-			factor_rects.append(_factor_rect(factor_rects.size()))
-		for k in factor_rects.size():
-			factor_rects[k].visible = k < count
-		# Each pass is drawn before the view that reads it (Godot draws a viewport's children first):
-		# made after the views, it would be read a frame late.
-		for k in count:
-			var reader: Viewport = _views[k] if k < _views.size() and is_instance_valid(_views[k]) else get_viewport()
-			if reader != null:
-				factor_passes.draw_before(k, reader)
-				under_passes.draw_before(k, reader)
-	_bind(apply.material as ShaderMaterial)
-	for key: StringName in _readers:
-		_bind(_readers[key] as ShaderMaterial)
-
-
-## View `k`'s factor rect: over the world in its factor pass, on that view's layer alone, drawn with the
-## apply rect's numbers (`APPLY_UNIFORMS` and the grid's, kept the same by `_set_apply`) and reading
-## view `k`'s grid.
-func _factor_rect(k: int) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.name = "Factor%d" % k
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rect.position = Vector2(-REACH, -REACH)
-	rect.size = Vector2(REACH, REACH) * 2.0
-	rect.visibility_layer = LightPassesScript.view_layer(k)
-	var material := ShaderMaterial.new()
-	material.shader = FACTOR_SHADER
-	var from := apply.material as ShaderMaterial
-	for uniform: StringName in APPLY_UNIFORMS:
-		material.set_shader_parameter(uniform, from.get_shader_parameter(uniform))
-	for uniform: StringName in [GRID_TEXTURE, GRID_CELL_UNIFORM, GRID_SMOOTH] + GRID_VIEWS + GRID_SIZES:
-		material.set_shader_parameter(uniform, from.get_shader_parameter(uniform))
-	material.set_shader_parameter(&"light_grid_view_id", k)
-	rect.material = material
-	factor_passes.holder().add_child(rect)
-	return rect
-
-
-## Where what reads the light under it draws its pass at the light's resolution (the mist's billows: an
-## item under it is drawn in every view's pass, and read back by the reader through `read_by`); null
-## while there are no passes (the picture at PictureGrid.SIZE).
-func under_holder() -> Node:
-	return under_passes.holder() if under_passes != null else null
-
-
-## The apply rect's uniform `uniform` set to `value`, on its factor rects too.
+## The apply rect's uniform `uniform` set to `value`.
 func _set_apply(uniform: StringName, value: Variant) -> void:
 	(apply.material as ShaderMaterial).set_shader_parameter(uniform, value)
-	for rect in factor_rects:
-		(rect.material as ShaderMaterial).set_shader_parameter(uniform, value)
 
 
 ## The readers drawn in each view for the views now (and the void quarter's).
@@ -621,8 +499,7 @@ func read_by(key: StringName, material: ShaderMaterial) -> void:
 	_use_readers()
 
 
-## The grid on `material` (its texture, cell, smoothing and every view's grid), and its passes at the
-## light's resolution (the apply rect's factor passes, the others' `under_passes`; none at PictureGrid.SIZE).
+## The grid on `material` (its texture, cell, smoothing and every view's grid).
 func _bind(material: ShaderMaterial) -> void:
 	material.set_shader_parameter(GRID_TEXTURE, grid.texture)
 	material.set_shader_parameter(GRID_CELL_UNIFORM, grid.cell)
@@ -630,17 +507,6 @@ func _bind(material: ShaderMaterial) -> void:
 	for k in VIEWS_MOST:
 		material.set_shader_parameter(GRID_VIEWS[k], _grid_view_keys[k])
 		material.set_shader_parameter(GRID_SIZES[k], _grid_size_keys[k] if _grid_size_keys[k].x >= 0.0 else Vector4.ZERO)
-	var passes: LightPassesScript = factor_passes if material == apply.material else under_passes
-	var count: int = passes.count if passes != null else 0
-	for k in VIEWS_MOST:
-		var drawn: Texture2D = passes.texture(k) if k < count else null
-		if k < PASS_UNIFORMS.size():
-			material.set_shader_parameter(PASS_UNIFORMS[k], drawn)
-		else:
-			# The third and fourth views' copies hold their own pass where the first view's is.
-			readers.set_view_uniform(material, k, PASS_UNIFORMS[0], drawn)
-	material.set_shader_parameter(PASS_VIEWS, (1 << count) - 1)
-	material.set_shader_parameter(PASS_SCALE, grid_scale)
 
 
 ## The grid's texture (the light round everything this frame, by view), for what draws by the light:

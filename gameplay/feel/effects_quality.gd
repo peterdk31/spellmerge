@@ -1,0 +1,35 @@
+extends RefCounted
+## How much the screen's effects cost (the owner's one pass, 2026-11-22; docs/milestones/connected-biomes.md,
+## "One pass"): one row of numbers a level, so a quality setting (Auto, Low, High: the coming one)
+## turns every effect down by choosing a row, and nothing else knows how. The spectacle reads it
+## (`Spectacle.set_effects_quality`) and hands each number to the effect it names; whether an effect
+## is drawn at all stays its own setting ("Dynamic lighting", "Shadows", "Fog", "Ambient particles").
+## View only.
+
+enum Level { LOW, HIGH }
+
+## The level the game draws at unless told (the look the owner chose).
+const DEFAULT_LEVEL: Level = Level.HIGH
+## The rows: the light's cell (world px, one of LightGrid.CELLS) and whether it is smoothed between the
+## cells' middles; the mist's layers of billows (1 to 3); the share of the air's motes given off (the
+## rooms', the kinds' and the void's).
+const ROWS: Dictionary[Level, Dictionary] = {
+	Level.LOW: {&"light_cell": 16.0, &"light_smooth": true, &"mist_billows": 1, &"air_share": 0.5},
+	Level.HIGH: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 3, &"air_share": 1.0},
+}
+
+## The level and its row's numbers (`_init`). Read only.
+var level: Level = DEFAULT_LEVEL
+var light_cell: float = 0.0
+var light_smooth: bool = false
+var mist_billows: int = 0
+var air_share: float = 0.0
+
+
+func _init(at: Level = DEFAULT_LEVEL) -> void:
+	level = at if ROWS.has(at) else DEFAULT_LEVEL
+	var row: Dictionary = ROWS[level]
+	light_cell = row[&"light_cell"]
+	light_smooth = row[&"light_smooth"]
+	mist_billows = row[&"mist_billows"]
+	air_share = row[&"air_share"]

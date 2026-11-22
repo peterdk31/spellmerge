@@ -79,13 +79,14 @@ func give_off(now: float, pool: MotesScript, view: Rect2) -> void:
 	give_off_in(now, pool, _one)
 
 
-## As `give_off`, each room within the views' boxes `seen` (each view's own; none: all of each room).
-func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript) -> void:
+## As `give_off`, each room within the views' boxes `seen` (each view's own; none: all of each room),
+## `scale` times as many (EffectsQuality.air_share).
+func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, scale: float = 1.0) -> void:
 	var near: int = 0
 	for i in _airs.size():
 		if seen.is_empty() or seen.total_area(AirMotesScript.VIEW_MARGIN, _rects[i]) > 0.0:
 			near += 1
-	var share: float = SHARE / float(maxi(near, 1))
+	var share: float = SHARE * scale / float(maxi(near, 1))
 	for i in _airs.size():
 		_airs[i].give_off_in(now, pool, seen, _rects[i], share)
 

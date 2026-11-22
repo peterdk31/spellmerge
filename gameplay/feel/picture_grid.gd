@@ -1,13 +1,9 @@
 extends RefCounted
 ## The picture the game is laid out for, and how much bigger the picture it is drawn in is (the
-## owner's decision of 2026-11-21, docs/milestones/connected-biomes.md, "The light at a fixed
-## resolution"): the one place that says the light's resolution.
+## owner's decisions of 2026-11-21, docs/milestones/connected-biomes.md, "The light at a fixed
+## resolution", and 2026-11-22, "One pass": nothing is drawn at SIZE for the light any more; the light
+## and the mist are worked out a world pixel at a time where they are drawn).
 ##
-## - **The light's resolution:** the passes worked out a pixel at a time over the whole picture (the
-##   spell light's buffers, its apply rect's light, the mist's billows) are drawn at SIZE a view,
-##   however big the picture is drawn, and sampled up into it in whole blocks of `scale_of` pixels
-##   each way (docs/STYLE.md, "Pixels stay hard": never blurred). A view of a split screen takes the
-##   share of SIZE its share of the screen is.
 ## - **The cameras' zoom 1** shows SIZE of the world: a picture `scale_of` times bigger draws the same
 ##   world at that zoom times more (the party camera, the split's views), so a bigger picture is a
 ##   finer one, not a wider one.
@@ -15,8 +11,7 @@ extends RefCounted
 ## The shipped picture is SIZE (project.godot), so `scale_of` is 1 there and nothing is drawn at
 ## another size. A benchmark draws 1280 x 720 (bench/biome_frames_runner.gd, `--picture=`).
 
-## The picture's size the light is drawn at (a view's share of it), and at which the cameras' zoom
-## is 1 (px).
+## The picture's size at which the cameras' zoom is 1 (px; a view's share of it).
 const SIZE: Vector2i = Vector2i(640, 360)
 
 

@@ -82,12 +82,26 @@ scons() { # scons <args...>: the pinned SCons on native/SConstruct
     godot_cpp="$GODOT_CPP" -j"$JOBS" "$@")
 }
 
+# The simulation's floats are the same on every machine (native/README.md, "The same on every
+# platform"): a desktop library with a fused multiply-add rounds once where its GDScript twin rounds
+# twice, so one built with any (a compiler, a flag or an intrinsic that slipped -ffp-contract=off)
+# is refused. objdump is binutils' (MinGW's for the DLL).
+# A call of the C library's fma fuses too, so it is refused with them.
+no_fma() { # no_fma <objdump> <library>
+  local dis found
+  dis=$("$1" -d --no-show-raw-insn "$2") # an objdump that fails fails the build
+  found=$(grep -cE '\svf(n)?m(add|sub)|call.*<_*fmaf?(@plt)?>' <<<"$dis" || true)
+  ((found == 0)) || { echo "$2 has $found fused multiply-adds; the kernels must not fuse" >&2; exit 1; }
+}
+
 setup_godot_cpp
 setup_scons
 for platform in "${platforms[@]}"; do
   echo "==> native module: $platform"
   case "$platform" in
-    linux) scons platform=linux target=template_release ;;
+    linux)
+      scons platform=linux target=template_release
+      no_fma objdump native/bin/libspellmerge.linux.template_release.x86_64.so ;;
     web)
       setup_emsdk
       # shellcheck disable=SC1091
@@ -104,7 +118,8 @@ for platform in "${platforms[@]}"; do
       if x86_64-w64-mingw32-objdump -p "$dll" | grep -iE 'DLL Name: *(libstdc|libgcc|libwinpthread)'; then
         echo "$dll needs MinGW's runtime DLLs (above); it must link them in" >&2
         exit 1
-      fi ;;
+      fi
+      no_fma x86_64-w64-mingw32-objdump "$dll" ;;
     *) echo "unknown platform $platform (linux, web, windows)" >&2; exit 2 ;;
   esac
 done

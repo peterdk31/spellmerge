@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Grid lighting (gameplay/feel/light_grid.gd; the owner's decision of 2026-11-21): the light at each
 ## cell's middle with the GPU light's falloff (light.gdshader's, before), colours and blocking; the views laid in one atlas on
-## the world's grid; the native kernel (`MoteKernel.light_grid_*`) the same as the GDScript to the
+## the world's grid; the native kernel (`LightKernel.light_grid_*`) the same as the GDScript to the
 ## byte, over seeded rows of every kind, beams and boxes.
 
 const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
@@ -156,6 +156,21 @@ func test_a_light_falls_off_as_the_shader_draws_it() -> void:
 	var want: float = pow(1.0 - (at - Vector2(100.0, 100.0)).length() / 40.0, 2.0)
 	check(is_equal_approx(near.r, want), "(1 - distance / reach)² at a cell's middle (%s against %s)" % [near.r, want])
 	check_equal(grid.light_at(0, Vector2(150.0, 100.0)), Color.BLACK, "nothing past its reach")
+
+
+## The grid's native calls are LightKernel's, a class of their own (the owner, 2026-11-22), not the
+## motes' kernel's.
+func test_the_grid_runs_in_its_own_kernel() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
+		return
+	var grid := LightGridScript.new()
+	if not grid.use_native(true):
+		check(false, "the native module is loaded but has no LightKernel (build it again: ci/build/native.sh)")
+		return
+	check_equal(grid.kernel.get_class(), "LightKernel", "its own class")
+	var motes: Object = NativeScript.mote_kernel()
+	check(not motes.has_method(&"light_grid_rows") and not motes.has_method(&"check_light_grid"), "the motes' kernel has no light calls")
 
 
 func test_the_native_kernel_lights_the_grid_as_the_gdscript_to_the_byte() -> void:

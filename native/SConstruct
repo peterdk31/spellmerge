@@ -6,6 +6,7 @@
 # fetches the pinned godot-cpp and SCons and passes godot_cpp=<its folder>:
 #   ci/build/native.sh [linux|windows|web ...]
 import os
+import sys
 
 godot_cpp = ARGUMENTS.get("godot_cpp", os.environ.get("GODOT_CPP", ""))
 if not godot_cpp:
@@ -16,13 +17,31 @@ if not godot_cpp:
 # about a thousand files and minutes of compiling.
 # godot-cpp reads the profile from the command line's variables only.
 ARGUMENTS.setdefault("build_profile", File("build_profile.json").abspath)
+# The desktop builds are the game's first target (the owner, 2026-11-22): linked as one program
+# (link-time optimisation), so godot-cpp's packed-array methods and the module's calls from one of
+# its files into another are inlined. godot-cpp's release target is -O3 already (`optimize=speed`).
+# The platform as godot-cpp reads it: `platform=` or `p=`, else the machine's own.
+HOST_PLATFORM = {"linux": "linux", "win32": "windows"}.get(sys.platform, "")
+desktop = ARGUMENTS.get("platform", ARGUMENTS.get("p", HOST_PLATFORM)) in ("linux", "windows")
+if desktop:
+    ARGUMENTS.setdefault("lto", "full")
 env = SConscript(os.path.join(godot_cpp, "SConstruct"), {"api_version": "4.7"})
 
 env.Append(CPPPATH=["src/"])
 # The same floats on every platform (online-ready N7, src/dmath.h): no multiply fused with an add
 # (an FMA rounds once where the GDScript twin rounds twice) and no fast-math, for every compiler the
 # module is built with (GCC for Linux and MinGW, Clang for the web).
-env.Append(CCFLAGS=["-ffp-contract=off", "-fno-fast-math"])
+FLOAT_FLAGS = ["-ffp-contract=off", "-fno-fast-math"]
+env.Append(CCFLAGS=FLOAT_FLAGS)
+# With link-time optimisation (the desktop) the code is made at the link, so the link is told the same.
+if desktop:
+    env.Append(LINKFLAGS=FLOAT_FLAGS)
+# The desktop's vector instructions: x86-64-v2 (SSE4.2, POPCNT; every x86-64 CPU since 2009)
+# in place of godot-cpp's plain x86-64 (SSE2). They change no result: without fast-math the
+# compiler never reorders a float sum to vectorise it, and with no contraction (above) never fuses.
+cpu = ARGUMENTS.get("cpu", "x86-64-v2")
+if env["platform"] in ("linux", "windows") and env["arch"] == "x86_64":
+    env.Append(CCFLAGS=["-march=" + cpu], LINKFLAGS=["-march=" + cpu])
 # The module's own threads (src/jobs.cpp, shot scale H5): std::thread wants -pthread on Linux.
 # MinGW links its thread runtime in with the C++ one (godot-cpp's use_static_cpp: -static), and the
 # web is built without threads (ci/build/native.sh: threads=no, so jobs.cpp runs every loop on the

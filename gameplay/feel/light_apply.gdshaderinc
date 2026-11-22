@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The spell light's factor on the world (gameplay/feel/spell_light.gd): what the apply rect multiplies
-// the picture by (light_apply.gdshader, where it is drawn; light_factor.gdshader, into a pass at the
-// light's resolution, gameplay/feel/light_passes.gd). See light_apply.gdshader for the steps, the
+// the picture by (light_apply.gdshader, where it is drawn, a pixel at a time). See light_apply.gdshader for the steps, the
 // ambient and the rooms' tints.
 
 // The room's light where no spell lights it (1.0: as it is), and the colour of its dark
@@ -33,13 +32,18 @@ uniform int tint_count = 0;
 vec4 room_tint(vec2 at) {
 	vec2 p = floor(at) + 0.5;
 	vec4 edge = vec4(1.0, 1.0, 1.0, 0.0);
+	vec4 inside = vec4(0.0);
+	bool found = false;
 	for (int k = 0; k < MAX_TINTS; k++) {
 		if (k >= tint_count) {
 			break;
 		}
 		vec4 r = tint_rects[k];
 		if (at.x >= r.x && at.y >= r.y && at.x < r.z && at.y < r.w) {
-			return tint_hues[k];
+			// Found (a flag and a break, not a return from inside the loop: lavapipe, D1's note).
+			inside = tint_hues[k];
+			found = true;
+			break;
 		}
 		vec2 out_by = max(max(r.xy - p, p - r.zw), vec2(0.0));
 		float band = floor(max(out_by.x, out_by.y) / EDGE_BAND);
@@ -50,7 +54,7 @@ vec4 room_tint(vec2 at) {
 			}
 		}
 	}
-	return edge;
+	return found ? inside : edge;
 }
 
 // The light a pixel adds for a light of brightest channel `most`.

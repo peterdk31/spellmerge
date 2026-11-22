@@ -57,6 +57,7 @@ const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
 const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
 const MistScript := preload("res://gameplay/feel/mist.gd")
+const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -175,6 +176,8 @@ var environment_interaction: bool = EnvironmentInteraction.default_on()
 ## How far the shadows and the mist have come in (0 to 1; `_fade_layers`). Read only.
 var _shadows_share: float = 0.0
 var _mist_share: float = 0.0
+## How much the effects cost (`set_effects_quality`). Read only.
+var quality: EffectsQualityScript = EffectsQualityScript.new()
 ## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
 ## for a light made later. Read only.
 var ambient: float = 1.0
@@ -293,8 +296,6 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
-	ShaderWarmupScript.want(MistScript.PASS_SHADER, ShaderWarmupScript.RECT)
-	ShaderWarmupScript.want(SpellLightScript.FACTOR_SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -389,9 +390,10 @@ func step(now: float, table: ActorsScript = null) -> void:
 	var seen: ViewBoxesScript = view_boxes()
 	source_motes.give_off_in(now, pool if motes_on() else null, seen, _standing)
 	var air_pool: MotesScript = pool if motes_on() and light != null and ambient_particles else null
-	air.give_off_in(now, air_pool, seen, projectiles.bounds() if projectiles != null else Rect2())
+	var air_share: float = AirMotesScript.RING_SHARE * quality.air_share
+	air.give_off_in(now, air_pool, seen, projectiles.bounds() if projectiles != null else Rect2(), air_share)
 	kind_air.lay(projectiles.grid() if projectiles != null else null)
-	kind_air.give_off_in(now, air_pool, seen)
+	kind_air.give_off_in(now, air_pool, seen, quality.air_share)
 	_give_off_void(now, seen)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
@@ -1119,6 +1121,24 @@ func set_floor_marks(on: bool) -> void:
 		pool.settle_into(marks)
 
 
+## The effects drawn at `level` (EffectsQuality.Level) from now on: the light's cell and smoothing, the
+## mists' billows and the air's share (the rooms', the kinds' and the void's), one row of numbers
+## (effects_quality.gd), taken in one frame (the owner's choice on easing it is open). Whether each is
+## drawn at all stays its own setting. Returns the level.
+func set_effects_quality(level: EffectsQualityScript.Level) -> EffectsQualityScript.Level:
+	quality = EffectsQualityScript.new(level)
+	if light != null:
+		_quality_on_light()
+	for each: MistScript in ([mist] if mist != null else []) + room_mists:
+		each.set_billows(quality.mist_billows)
+	return quality.level
+
+
+func _quality_on_light() -> void:
+	light.set_grid_cell(quality.light_cell)
+	light.set_grid_smooth(quality.light_smooth)
+
+
 ## The "Dynamic lighting" setting (once "Spell light"): on makes the light buffer and its rect, off frees them (no nodes).
 ## Returns the setting.
 func set_spell_light(on: bool) -> bool:
@@ -1140,8 +1160,8 @@ func _make_light(on: bool) -> void:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
-		light.passes_changed.connect(_hand_mist_passes)
 		add_child(light)
+		_quality_on_light()
 		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
@@ -1217,6 +1237,7 @@ func _fit_mist(at_once: bool) -> void:
 		_mist_share = 1.0 if at_once else 0.0
 		mist = MistScript.new(MARK_Z)
 		mist.set_share(_mist_share)
+		mist.set_billows(quality.mist_billows)
 		add_child(mist)
 		mist.lay(_room_size, _room_walls, _room_holes, _room_at)
 		mist.use(_mist_data)
@@ -1230,17 +1251,6 @@ func _fit_mist(at_once: bool) -> void:
 		for at in room_mists.size():
 			room_mists[at].use_light(light.buffer())
 			light.read_by(_later_key(at), room_mists[at].material as ShaderMaterial)
-		_hand_mist_passes()
-
-
-## Every mist's billows drawn in the light's pass under it while there is one (the picture bigger than
-## PictureGrid.SIZE; `SpellLight.under_holder`), again when the passes come or go.
-func _hand_mist_passes() -> void:
-	var holder: Node = light.under_holder() if light != null else null
-	if mist != null:
-		mist.use_passes(holder)
-	for later: MistScript in room_mists:
-		later.use_passes(holder)
 
 
 ## Later room `at`'s mist made (while the first room's is), as laid.
@@ -1248,6 +1258,7 @@ func _make_later_mist(at: int) -> void:
 	var made := MistScript.new(MARK_Z)
 	made.name = "Mist%d" % (at + 1)
 	made.set_share(_mist_share)
+	made.set_billows(quality.mist_billows)
 	add_child(made)
 	var walls: Array[Rect2] = []
 	walls.assign(_later_walls[at])
@@ -1259,7 +1270,6 @@ func _make_later_mist(at: int) -> void:
 	if light != null:
 		made.use_light(light.buffer())
 		light.read_by(_later_key(at), made.material as ShaderMaterial)
-		made.use_passes(light.under_holder())
 
 
 func _later_key(at: int) -> StringName:
@@ -1324,8 +1334,8 @@ func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
 	var into: MotesScript = void_pool if motes_on() and ambient_particles and in_biome else null
-	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
-	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
+	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
+	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
 
 
 ## The world rect the equal split's blank quarter shows the void of (`SplitScreen.void_rect`; empty:

@@ -231,7 +231,11 @@ func test_a_code_of_the_wrong_side_or_no_code_is_refused_and_another_may_be_give
 	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made")
 	var other_client := NetRtc.new(PackedStringArray())
 	check_equal([other_client.take(client.code()).name, other_client.problem()], [OnlineWhy.JOINERS_CODE, null], "a joining machine refuses a joining machine's code")
-	check_equal(_t(other_client.take(other_host.code())), "", "and takes a host's after")
+	# A host's code with its addresses hidden (`_unreachable`): the other host answers a check
+	# before it has any answer (RFC 8445 7.3), so with its real address this machine would begin a
+	# DTLS handshake that its close below cuts short, and on a busy machine the handshake's thread
+	# can log that as an engine error (2026-11-22).
+	check_equal(_t(other_client.take(_unreachable(other_host.code()))), "", "and takes a host's after")
 	sides.append(other_client)
 	check_equal(_t(host.take(client.code())), "", "the host takes the client's code after its refusals")
 	check(_t(host.take(client.code())) != "", "but only one")

@@ -7,7 +7,8 @@ extends "res://tests/support/screenshot.gd"
 ## Shots: `settings_graphics` (Fullscreen, Effects, Dynamic lighting, Shadows, Fog, Ambient particles,
 ## Environment interaction, Floor marks; Dynamic lighting focused), `settings_graphics_unlit`
 ## (Dynamic lighting off: Shadows, Fog and Ambient particles greyed), `settings_performance`,
-## `settings_graphics_effects` ("Effects: Auto" focused) and `settings_graphics_effects_low` (a step
+## `settings_graphics_effects` ("Effects: Auto" focused, with the row feel draws: "Auto (High)"),
+## `settings_graphics_effects_auto_medium` (feel drawing the medium row: "Auto (Medium)") and `settings_graphics_effects_low` (a step
 ## on: Low), `settings_audio` (Ambience volume a step down, at 90%) and `settings_interface`, each reached with
 ## RB, then `settings_keyboard` (P2 on the keyboard: the Z and C keys at the ends, E for Back; on
 ## Interface after Z from Graphics, round from the first tab). Each fails if the menu does not fit
@@ -47,6 +48,11 @@ func take() -> void:
 	ui_focus.call("focus", 0, menu.call("button", "Effects"))
 	await settle()
 	if not await _shot_fitting(menu, "settings_graphics_effects"):
+		return
+	# Auto as feel says it draws the medium row (the owner, 2026-11-22: "Auto (Medium)").
+	(root.get_node("Events") as Object).emit_signal(&"effects_row_changed", EffectsSetting.MEDIUM)
+	await settle()
+	if not await _shot_fitting(menu, "settings_graphics_effects_auto_medium"):
 		return
 	await _press(ui_focus, menu, "Effects")
 	if not await _shot_fitting(menu, "settings_graphics_effects_low"):

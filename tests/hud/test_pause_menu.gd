@@ -1145,6 +1145,24 @@ func test_a_later_menu_starts_with_the_saved_effects_and_tells_feel() -> void:
 	check(_heard["Effects"] == [EffectsSetting.LOW], "and tells feel when the Hud binds, got %s" % [_heard["Effects"]])
 
 
+## Auto shows the row feel draws now (the owner, 2026-11-22: "Auto (Medium)"), as it changes; a fixed
+## mode shows only itself.
+func test_auto_shows_the_row_feel_draws_as_it_changes() -> void:
+	_settings()
+	_bus.effects_row_changed.emit(EffectsSetting.MEDIUM)
+	check(_text_of("Effects").ends_with("Effects: Auto (Medium)"), "Auto drawing medium: %s" % _text_of("Effects"))
+	_bus.effects_row_changed.emit(EffectsSetting.LOW)
+	check(_text_of("Effects").ends_with("Effects: Auto (Low)"), "then low: %s" % _text_of("Effects"))
+	_press(0, "Effects")
+	_bus.effects_row_changed.emit(EffectsSetting.LOW)
+	check(_text_of("Effects").ends_with("Effects: Low"), "Low fixed: no row after it (%s)" % _text_of("Effects"))
+	for step in 3:
+		_press(0, "Effects")
+	_bus.effects_row_changed.emit(EffectsSetting.HIGH)
+	check(_text_of("Effects").ends_with("Effects: Auto (High)"), "Auto again: its row (%s)" % _text_of("Effects"))
+	check(EffectsSetting.every_word().has("Auto (Medium)"), "the menu's width counts the longest words")
+
+
 func test_a_saved_effects_mode_feel_does_not_know_loads_as_auto() -> void:
 	SaveFile.new(SAVE_PATH).set_setting(EffectsSetting.KEY, 9)
 	_setup(1)

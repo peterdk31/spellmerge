@@ -26,6 +26,18 @@ static func snap(mode: int) -> int:
 	return mode if mode >= 0 and mode < WORDS.size() else DEFAULT
 
 
-## The menu's word for `mode`.
-static func word_of(mode: int) -> String:
-	return WORDS[snap(mode)]
+## The menu's word for `mode`; for AUTO with the row it draws now (`row`: LOW, MEDIUM or HIGH, the
+## owner's ask of 2026-11-22), "Auto (Medium)".
+static func word_of(mode: int, row: int = -1) -> String:
+	var word: String = WORDS[snap(mode)]
+	if snap(mode) == AUTO and row >= LOW and row <= HIGH:
+		word = "%s (%s)" % [word, WORDS[row]]
+	return word
+
+
+## Every word the menu can show (for its width): the modes, and Auto with each row.
+static func every_word() -> Array[String]:
+	var out: Array[String] = WORDS.duplicate()
+	for row: int in [LOW, MEDIUM, HIGH]:
+		out.append(word_of(AUTO, row))
+	return out

@@ -2864,9 +2864,17 @@ func set_effects_mode(mode: int) -> void:
 	if effects_mode == EffectsSetting.AUTO:
 		effects_auto.reset()
 		_floor_wait = 0.0
-		_spectacle.set_effects_quality(effects_auto.level)
+		_draw_effects_row(effects_auto.level)
 	else:
-		_spectacle.set_effects_quality(EffectsQualityScript.of_setting(effects_mode))
+		_draw_effects_row(EffectsQualityScript.of_setting(effects_mode))
+
+
+## The effects drawn at `row` from now on, and the HUD told (`effects_row_changed`: its menu shows
+## Auto's row).
+func _draw_effects_row(row: EffectsQualityScript.Level) -> void:
+	_spectacle.set_effects_quality(row)
+	if events != null:
+		events.effects_row_changed.emit(EffectsQualityScript.setting_of(row))
 
 
 ## The watcher stepped by this drawn frame (`real_delta` seconds), its row drawn when it changes while
@@ -2893,7 +2901,7 @@ func _step_effects(real_delta: float) -> void:
 		effects_auto.failed_try()
 	var last_rung: int = SplitBudgetScript.RUNG_MOTES.size() - 1
 	if effects_auto.step(real_delta, split and rung > 0, split and rung < last_rung):
-		_spectacle.set_effects_quality(effects_auto.level)
+		_draw_effects_row(effects_auto.level)
 	if effects_auto.rise_blocked:
 		effects_auto.rise_blocked = false
 		if split:

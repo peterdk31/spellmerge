@@ -45,6 +45,7 @@ const EVENTS: Dictionary = {
 	&"ambient_particles_changed": [["on", TYPE_BOOL]],
 	&"fog_changed": [["on", TYPE_BOOL]],
 	&"effects_changed": [["mode", TYPE_INT]],
+	&"effects_row_changed": [["row", TYPE_INT]],
 	&"environment_interaction_changed": [["on", TYPE_BOOL]],
 	&"ambience_volume_changed": [["percent", TYPE_INT]],
 	&"music_volume_changed": [["percent", TYPE_INT]],
@@ -229,7 +230,7 @@ const NOT_PER_PLAYER: Array[StringName] = [
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"split_screen_changed", &"hud_corners_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"effects_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"music_volume_changed", &"sound_volume_changed", &"ui_volume_changed", &"ui_sound_requested", &"tailless_motes_changed", &"difficulty_changed", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"split_screen_changed", &"hud_corners_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"effects_changed", &"effects_row_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"music_volume_changed", &"sound_volume_changed", &"ui_volume_changed", &"ui_sound_requested", &"tailless_motes_changed", &"difficulty_changed", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

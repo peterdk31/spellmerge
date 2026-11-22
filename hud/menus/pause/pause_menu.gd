@@ -32,8 +32,9 @@ extends PanelContainer
 ## - **Graphics** tab: "Fullscreen: Off" (or On), "Effects: Auto" (or Low, Medium, High; the owner,
 ##   2026-11-21: `EffectsSetting`, `accept` steps to the next mode, saved as `effects` and sent as
 ##   `effects_changed` whenever the menu is bound, since feel draws the high row until told: Auto lets
-##   feel's frame-time watcher choose how much the effects cost, the others fix the row; this
-##   machine's view only), "Dynamic lighting: On", "Shadows: On", "Fog: On",
+##   feel's frame-time watcher choose how much the effects cost, shown with the row it draws now,
+##   "Auto (Medium)", as feel says it, `effects_row_changed`; the others fix the row; this machine's
+##   view only), "Dynamic lighting: On", "Shadows: On", "Fog: On",
 ##   "Ambient particles: On", "Environment interaction: On", "Floor marks: On".
 ##   "Fullscreen" asks `Display` (core) to fill the screen or not and stays on the tab; its word
 ##   follows the window itself, read each time the tab is shown, so leaving fullscreen with the
@@ -234,6 +235,9 @@ var screen_shake: bool = true
 var split_screen: int = SplitScreenSetting.DEFAULT
 ## The "Effects" setting (see the top): `EffectsSetting.DEFAULT` (Auto) by default.
 var effects: int = EffectsSetting.DEFAULT
+## The row feel draws now (`effects_row_changed`: `EffectsSetting.LOW`, MEDIUM or HIGH; -1 before it
+## says), shown after Auto: "Effects: Auto (Medium)".
+var effects_row: int = -1
 ## The "Damage numbers" setting (see the top): on by default.
 var damage_numbers: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
@@ -333,7 +337,7 @@ func _fit_widths() -> void:
 	needs[_put_style] = maxf(needs[_put_style], _width_of(_put_style, _worded(PUT_TEXT, ["Push right", "Replace"])))
 	needs[_reload_style] = maxf(needs[_reload_style], _width_of(_reload_style, _worded(RELOAD_TEXT, ["Button", "Next cast"])))
 	needs[_split] = maxf(needs[_split], _width_of(_split, _worded(SPLIT_TEXT, SplitScreenSetting.WORDS)))
-	needs[_effects_row] = maxf(needs[_effects_row], _width_of(_effects_row, _worded(EFFECTS_TEXT, EffectsSetting.WORDS)))
+	needs[_effects_row] = maxf(needs[_effects_row], _width_of(_effects_row, _worded(EFFECTS_TEXT, EffectsSetting.every_word())))
 	for on_page: int in _pages:
 		var widest: float = 0.0
 		if on_page == Page.SETTINGS:
@@ -397,6 +401,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScri
 		save = SaveFile.new()
 	_load_shake()
 	_load_split()
+	if _events != null:
+		_events.effects_row_changed.connect(_on_effects_row_changed)
 	_load_effects()
 	_load_numbers()
 	_load_shot_cap()
@@ -889,8 +895,7 @@ func _load_split() -> void:
 ## while the menu's default is Auto).
 func _load_effects() -> void:
 	effects = EffectsSetting.snap(int(save.get_setting(EffectsSetting.KEY, EffectsSetting.DEFAULT)))
-	_effects_row.set_meta(BASE_TEXT_META, EFFECTS_TEXT % EffectsSetting.word_of(effects))
-	_mark_focus()
+	_show_effects()
 	if _events != null:
 		_events.effects_changed.emit(effects)
 
@@ -898,11 +903,21 @@ func _load_effects() -> void:
 ## The "Effects" mode set to `mode`: shown, saved and sent.
 func _set_effects(mode: int) -> void:
 	effects = EffectsSetting.snap(mode)
-	_effects_row.set_meta(BASE_TEXT_META, EFFECTS_TEXT % EffectsSetting.word_of(effects))
-	_mark_focus()
+	_show_effects()
 	save.set_setting(EffectsSetting.KEY, effects)
 	if _events != null:
 		_events.effects_changed.emit(effects)
+
+
+## The row feel draws now: shown after Auto ("Auto (Medium)"), as it changes.
+func _on_effects_row_changed(row: int) -> void:
+	effects_row = row
+	_show_effects()
+
+
+func _show_effects() -> void:
+	_effects_row.set_meta(BASE_TEXT_META, EFFECTS_TEXT % EffectsSetting.word_of(effects, effects_row))
+	_mark_focus()
 
 
 ## The "Split screen" mode set to `mode`: shown, saved and sent.

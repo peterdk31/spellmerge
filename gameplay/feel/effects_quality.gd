@@ -49,6 +49,17 @@ static func of_setting(mode: int) -> Level:
 	return Level.HIGH
 
 
+## The "Effects" setting's word for `at` (`EffectsSetting.LOW`, MEDIUM, HIGH): what the menu shows
+## Auto drawing.
+static func setting_of(at: Level) -> int:
+	match at:
+		Level.LOW:
+			return EffectsSetting.LOW
+		Level.MEDIUM:
+			return EffectsSetting.MEDIUM
+	return EffectsSetting.HIGH
+
+
 func _init(at: Level = DEFAULT_LEVEL) -> void:
 	level = at if ROWS.has(at) else DEFAULT_LEVEL
 	var row: Dictionary = ROWS[level]

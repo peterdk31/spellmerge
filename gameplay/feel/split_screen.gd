@@ -25,11 +25,11 @@ extends Node
 ##   the cells), so the HUD stays in the screen's corners, drawn once over the views.
 ## - **Published** (`ScreenViews.publish` on the root) while there are two views or more, for what
 ##   reads the picture by the screen (the mouse, the item hints, a body's looks on screen).
-## - **The light, a buffer a view**, and the fallbacks: Feel hands `views()` to the spectacle every
+## - **The light, a grid a view**, and the fallbacks: Feel hands `views()` to the spectacle every
 ##   frame (`Spectacle.set_split`), with the fallbacks CB1 measured as the frame-time budget asks
 ##   for them (`budget`, `split_budget.gd`: the owner's targets, decision 31): `mote_share()` (the
-##   share of motes thrown while split) and `light_downscale()` (how much smaller the light buffers
-##   past the first view's are).
+##   share of motes thrown while split) and `light_downscale()` (past SpellLight.DOWNSCALE: every
+##   view's light grid in coarser cells).
 ##
 ## - **The equal split's blank quarter shows the void** (the owner, 2026-11-20): with three panes
 ##   the fourth is no view's (`SplitCamera.blank_count`), and over that quarter the void view draws:
@@ -72,18 +72,17 @@ const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divid
 ## void's black (`VoidBackdrop.GROW`) and past any view's limits.
 const VOID_AWAY: float = 1024.0
 ## A view's box is snapped out to this many screen pixels (`view_box`) at PictureGrid.SIZE, and that
-## times `PictureGrid.scale_of` in a bigger picture: a multiple of every light buffer's downscale
-## (SpellLight.DOWNSCALE and the budget's, both times the scale there) and of the blocks the light's
-## passes are drawn in, so a view's light buffer texels and blocks lie where the whole screen's would,
-## and the light looks the same in a box as on the screen.
+## times `PictureGrid.scale_of` in a bigger picture: a multiple of the blocks the light's passes are
+## drawn in (SpellLight.DOWNSCALE and the budget's, both times the scale there), so a view's blocks lie
+## where the whole screen's would, and the light looks the same in a box as on the screen (the light's
+## grid itself lies on the world's cells, wherever the box is).
 const BOX_SNAP: int = 8
-## A view's box reaches this many screen pixels past its cell's corners (`view_box`): the light
-## readers sample a light buffer linearly, so a cell pixel near the box's edge reads texels up to
-## half a texel past it; a texel is at most the budget's largest downscale (8) screen pixels at
-## PictureGrid.SIZE (times `PictureGrid.scale_of` in a bigger picture, as the pad is).
+## A view's box reaches this many screen pixels past its cell's corners (`view_box`): a light pass's
+## block near the box's edge reaches up to the budget's largest downscale (8) screen pixels past it
+## at PictureGrid.SIZE (times `PictureGrid.scale_of` in a bigger picture, as the pad is).
 const BOX_PAD: int = 8
 ## How much larger a view's box may be than its cell's needs, each way, before it is made again
-## (`kept_box`): a box resized makes its view's and its light buffer's render targets anew, so it
+## (`kept_box`): a box resized makes its view's render target anew, so it
 ## keeps its size while the dividers slide a few pixels, and is made with this much room.
 const BOX_SLACK: int = 32
 
@@ -177,7 +176,7 @@ func mote_share() -> float:
 	return budget.mote_share()
 
 
-## How many times smaller than its view a light buffer past the first view's is now (the budget's).
+## The light's downscale now (the budget's; past SpellLight.DOWNSCALE, coarser light cells).
 func light_downscale() -> int:
 	return budget.light_downscale()
 
@@ -280,7 +279,7 @@ func _show(slot: int, view: int, laid: ScreenViewsScript, screen: Vector2, box: 
 	if shown.size != box.size:
 		shown.size = box.size
 	shown.canvas_transform = laid.to_screen[view].translated(-Vector2(box.position))
-	# The world and this view's own readers of the light (its light buffer is the view's place in
+	# The world and this view's own readers of the light (its light grid is the view's place in
 	# `views()`, as the light is handed them).
 	var mask: int = ViewReadersScript.view_mask(view)
 	if shown.canvas_cull_mask != mask:

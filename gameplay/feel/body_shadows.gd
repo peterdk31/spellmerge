@@ -12,7 +12,7 @@ extends MultiMeshInstance2D
 ##   nothing of how they are drawn. Shots, flashes and cues cast no body shadow (thousands of rows;
 ##   they come and go faster than a shadow eases).
 ## - **Away from the light:** each light within its reach of the feet pulls the shadow away from it as
-##   much as it lights the feet (its strength times the light's falloff, `light.gdshader`), less what
+##   much as it lights the feet (its strength times the light's falloff, as the grid lights it, `light_grid.gd`), less what
 ##   blocks it (`LightBlockers.shade`: a body behind a pillar casts no shadow from the candle the
 ##   pillar hides), and the pulls add up, so two lights either side share the shadow and it never
 ##   flips from one to the other. It reaches LENGTH px at most (from FULL_AT light). A body's own

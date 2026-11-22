@@ -19,7 +19,7 @@ shader_type canvas_item;
 //   picture_grid.gd) how thick it is (mist_density.gdshaderinc) is worked out in a view's pass
 //   (mist_pass.gdshader, gameplay/feel/light_passes.gd) and taken whole for each block of the picture
 //   (light_passes.gdshaderinc); at PictureGrid.SIZE, and in a view with no pass, it is worked out here.
-// - **Lit:** the spell light's buffer under each pixel (`SCREEN_UV`, as the apply rect reads it)
+// - **Lit:** the spell light's grid under each world pixel (`view_light`, as the apply rect reads it)
 //   brings it out and tints it the light's colour, so it glows warm in a candle's pool, in a wizard's
 //   hat colour round their staff, and flares as a fireball passes.
 
@@ -46,7 +46,7 @@ void fragment() {
 	if (density < 0.004) {
 		discard;
 	}
-	vec3 shine = view_light(by_block ? light_pass_middle(SCREEN_UV, SCREEN_PIXEL_SIZE) : SCREEN_UV);
+	vec3 shine = view_light(floor(world) + 0.5);
 	float most = max(shine.r, max(shine.g, shine.b));
 	float bright = clamp(most / bright_from, 0.0, 1.0) * lit;
 	vec3 hue = most > 0.001 ? shine / most : vec3(1.0);

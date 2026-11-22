@@ -290,9 +290,7 @@ func _ready() -> void:
 	void_air.use(VOID_AIR)
 	void_blank_air.use(VOID_AIR)
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
-	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
-	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(MistScript.PASS_SHADER, ShaderWarmupScript.RECT)
@@ -1067,9 +1065,9 @@ func set_mote_density(density: float) -> float:
 
 
 ## The screen split into `views` (their viewports, in the split screen's order; empty: one
-## picture): the light follows each (a buffer a view; `extra_downscale` how much smaller those past
-## the first are), and the motes throw `share` of their count (the split's fallbacks; 1 and
-## SpellLight.DOWNSCALE: none). Called every drawn frame; nothing changes while it is the same.
+## picture): the light follows each (a grid a view; `extra_downscale` past SpellLight.DOWNSCALE, the
+## split's cheaper light: every view's grid in SpellLight.SPLIT_CHEAP_CELL cells), and the motes throw `share` of their count (the split's
+## fallback; 1: none). Called every drawn frame; nothing changes while it is the same.
 func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int = SpellLightScript.DOWNSCALE) -> void:
 	var next_share: float = clampf(share, 0.0, 1.0) if views.size() > 1 else 1.0
 	if next_share != split_share:

@@ -35,6 +35,7 @@ static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
 	}
 	ShotKernel::free_names();
 	MoteKernel::free_names();
+	MoteKernel::free_grid_names();
 	jobs::shutdown();
 }
 

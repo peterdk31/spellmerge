@@ -847,6 +847,37 @@ The owner decided two follow-ups on #899: hide what stands in unvisited rooms on
 - **The benchmark** (`tests/benchmark/fixed_steps.gd`, the stress runner's `fixed_frames`, on in the biome frames and the play frames): one tick a drawn frame (`Tick.step_physics`), Feel's view a tick's time a frame, the windows counted in ticks, so frame N shows tick N every run; `test_fixed_fights.gd` plays a fight twice and compares the state and the camera every 10 frames (by the real clock they differed from frame 10 on). `--real-clock` runs as before.
 - **Tests:** `tests/gameplay/feel/test_unseen_hidden.gd`; screenshots `tests/screenshots/shot_unseen_hidden.gd` (fails when an unvisited room holding foes and pickups shows more than its void's motes). Numbers: docs/LOG.md, "What stands unseen is hidden one by one".
 
+## Grid lighting (2026-11-21)
+
+The owner chose **grid lighting + one pass** in place of the per-pixel light passes (after #902), so that the light stays cheap in a 1280 x 720 picture: the light worked out on a coarse grid of world cells by the native module (mirrored by the GDScript fallback to the bit), uploaded as a small texture and stretched over the picture in hard steps; then one shader for every screen-wide effect (light, mist, air, shadows), a later PR. This is the first step, the grid. View only.
+
+- **The grid** (`gameplay/feel/light_grid.gd`, `LightGrid`): a grid a view (up to four, side by side in one small texture), its first cell on a multiple of the cell in the world, so the light never swims as the camera moves; `CELL` 8 px by default, `CELLS` 8, 12 and 16 for a quality setting (`SpellLight.set_grid_cell`). Each light adds its colour times (1 - its distance from its middle as a share of its reach)² at every cell whose middle it reaches (the GPU light's falloff, its ellipse along its way), blocked by the boxes as before (`LightBlockers.lit_as`, `shade_between`: the boxes near the light only); cells add up and are cut at 1, a byte a channel.
+- **The same rows:** the shots' (each projectile batch's rows drawn this frame, `ProjectileManager.light_rows`, kept while `light_rows_wanted`, let go at the next draw), runes', Feel's flashes', the cues', the room's spots' (their flicker by Feel's clock) and the carried lights', and the live beams' paths (a band each, rounded past its ends), each read as the GPU light read it. The colours are the shader's glow (`LightGrid.look_glow`, the infusions read from `InfusionTable.published`). Every handed-over array is let go once the grid has read it, so its owner writes it in place again.
+- **Native** (`native/src/light_grid.cpp`): `MoteKernel.light_grid_rows`, `light_grid_beam` and `light_grid_bake` on the grid's arrays in place, its numbers and members checked when switched on (`check_light_grid`); compared byte for byte by `tests/gameplay/feel/test_light_grid.gd` (seeded rows of every kind, beams, boxes, at 8, 12 and 16 px, views apart and overlapping, a beam narrower than a cell), which fails when one rounding in the C++ is changed. Methods of the drawing kernel: a class of its own would need the owner's `ci/smbot/rules.py` (`NATIVE_CLASSES`).
+- **No light buffer any more:** the SubViewport a view the GPU drew the light into, its batches, mirrors and beam meshes, and `light.gdshader` and `light_beam.gdshader` are gone. Every reader (the apply rect, its factor pass at a bigger picture, the mist, the lit-only motes) takes the cell its world point lies in (`light_grid.gdshaderinc`, `view_light(world)`): one sampler where there were four. By default `light_grid_smooth` weighs the four nearest cells' middles, its bands still cut hard; whole cells are an option. The split's cheaper-light rung (`SplitBudget`) draws every view's grid in 16 px cells (below).
+- **Tests:** `test_light_grid.gd` (the views on the world's grid, the falloff at a cell's middle, the glows, the kernel against the GDScript), `test_light.gd` (the rows read, the grid following the view, flashes, cues, beams, spots and a card's light reach on the grid), `test_shadows.gd` (the grid blocked by the pick, a carried light lit from where it stands), `test_split_screen.gd` (a grid a view, the third view's copy reading this frame's grid), `test_light_resolution.gd`. Screenshots: the cell sizes, nearest and smoothed, against main (PR's branch `shots/perf/grid-light`).
+- **Measured** (`play_frames.gd` on the fixed clock, fixed_steps.gd, under xvfb on llvmpipe, 4 cores; frame / GPU ms; 1p rows at the web's load, 2p and 4p at the desktop's; one clean round each, the fixed clock's runs repeating within a few per cent):
+
+  | scenario | 640 main | 640 grid | 1280 main | 1280 grid |
+  | --- | --- | --- | --- | --- |
+  | 1p start web | 26.5 / 16.8 | 26.0 / 16.4 | 52.5 / 42.3 | 52.0 / 41.7 |
+  | 1p near web | 28.0 / 17.9 | 26.2 / 16.8 | 61.1 / 50.2 | 61.1 / 49.7 |
+  | 1p far web | 40.6 / 25.4 | 39.5 / 24.4 | 74.0 / 59.0 | 72.9 / 58.0 |
+  | 2p apart dynamic | 65.0 / 44.3 | 61.1 / 41.1 | 110.0 / 87.6 | 103.6 / 82.5 |
+  | 4p apart equal | 106.0 / 72.5 | 104.6 / 70.6 | 167.1 / 130.1 | 162.6 / 126.0 |
+
+  The light buffers drew in about 0.6 to 1.2 ms a view on llvmpipe; the grid costs less on the CPU than that (the frames are shorter everywhere, most in the splits, where a buffer a view was drawn). What a 1280 x 720 picture still doubles is the root's own fill (the picture, the screen copy the apply rect multiplies, the mist): the one pass's to take on next.
+
+### Answered by the owner (2026-11-21, on #907)
+
+1. **The default look is smoothed, 8 px cells** (`light_grid_smooth` on: the four nearest cells' middles weighed, the bands still hard, as the light looked before); whole cells stay an option (`SpellLight.set_grid_smooth`).
+2. **Every light reaches at least a cell each way**, so none falls between the cells' middles and blinks (`LightGrid._lamp`, a beam's reach too; the kernel the same; `test_a_light_smaller_than_a_cell_still_lights_the_cells_round_it`).
+3. **The split's cheaper light is coarser cells:** while split and the frame-time budget takes its light rung (`SplitBudget`, a downscale past `SpellLight.DOWNSCALE`), every view's grid is drawn in `SPLIT_CHEAP_CELL` (16 px) cells; the cell set again when frames are fast or the screen is one picture (`test_the_splits_cheaper_light_is_coarser_cells`).
+4. **A `LightKernel` class of its own:** allowed by the owner for this PR (the one `NATIVE_CLASSES` line in `ci/smbot/rules.py`), but this session's permission check refused the `ci/` edit when the allowance came relayed through another session, so the methods stay on `MoteKernel` for now; moving them is a one-line `rules.py` edit plus a header, for the owner to apply or allow directly.
+5. GPU and web numbers: none yet.
+
+The cell's change when the budget takes or gives back the rung is one frame's (8 to 16 px, and lights under 16 px grow to a cell with it): the budget's hysteresis keeps it rare, but it is a jump, asked of the owner on #907.
+
 ## The tick cheaper, the game the same (2026-11-21)
 
 The owner's choice after #900 for this round's CPU work, part C: hidden rooms' cover views idle more, and the simulation's tick cheaper, the state hash unchanged. As built (docs/LOG.md, 2026-11-21, "The tick and hidden cover views a little cheaper"):

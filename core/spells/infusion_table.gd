@@ -25,6 +25,12 @@ const MARK: float = 128.0 / 255.0
 ## The registry folder the cards are in.
 const SPELL_FOLDER: StringName = &"spells"
 
+## The table last published (`publish`), and how many times one was: what reads it on the CPU (Feel's
+## grid lighting, gameplay/feel/light_grid.gd) takes it again when the count moves. View only.
+const VIEW: Array[StringName] = [&"published", &"published_version"]
+static var published: PackedColorArray = PackedColorArray()
+static var published_version: int = 0
+
 
 ## The table of the infusion cards among `cards`: LAYERS colours, an infusion's layer its tint
 ## (alpha 1), every other transparent. Two infusions of one layer: the first by id keeps it (a test
@@ -75,3 +81,5 @@ static func texture(table: PackedColorArray) -> ImageTexture:
 ## (`Spells.register_bodies`); again only if the cards change.
 static func publish(table: PackedColorArray) -> void:
 	RenderingServer.global_shader_parameter_set(PARAMETER, texture(table))
+	published = table.duplicate()
+	published_version += 1

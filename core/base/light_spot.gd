@@ -42,7 +42,7 @@ const ART: StringName = &"light_art"
 const TINT: StringName = &"light_tint"
 ## How far its light reaches, in pixels (to where it is gone).
 const DEFAULT_REACH: float = 56.0
-## How bright it is at its middle (a shot's light is 0.9, `light.gdshader`'s `shot_strength`).
+## How bright it is at its middle (a shot's light is 0.9, LightGrid.SHOT_STRENGTH).
 const DEFAULT_STRENGTH: float = 0.7
 ## How much it flickers: its strength drops by up to this share, a step a few times a second.
 const DEFAULT_FLICKER: float = 0.25

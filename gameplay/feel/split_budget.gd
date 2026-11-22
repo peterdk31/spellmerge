@@ -6,8 +6,8 @@ extends RefCounted
 ## View only, on real time: it reads the drawn frames' times, nothing in the simulation.
 ##
 ## The rungs, in CB1's order of what saves most for least look (docs/milestones/connected-biomes.md,
-## "CB1's numbers"): a cheaper light a view (the light buffers past the first view's twice as small
-## again each way), then half the motes, then a quarter. Light off and a view's own room's shots only
+## "CB1's numbers"): a cheaper light (every view's light grid in coarser cells,
+## SpellLight.SPLIT_CHEAP_CELL), then half the motes, then a quarter. Light off and a view's own room's shots only
 ## are not rungs yet: they wait for a GPU run to say they are needed.
 ##
 ## A rung up after the frames' average has been over the target for UP_SECONDS; a rung down after it
@@ -24,7 +24,7 @@ const AVERAGE_SPEED: float = 4.0
 const UP_SECONDS: float = 1.0
 const DOWN_SECONDS: float = 3.0
 const DOWN_SHARE: float = 0.75
-## The rungs: the light buffers' downscale past the first view, and the share of motes thrown.
+## The rungs: the light's downscale (past SpellLight.DOWNSCALE: the coarser cells), and the share of motes thrown.
 const RUNG_DOWNSCALE: PackedInt32Array = [SpellLightScript.DOWNSCALE, SpellLightScript.DOWNSCALE * 2, SpellLightScript.DOWNSCALE * 2, SpellLightScript.DOWNSCALE * 2]
 const RUNG_MOTES: PackedFloat32Array = [1.0, 1.0, 0.5, 0.25]
 
@@ -71,7 +71,7 @@ func step(delta: float, views: int) -> void:
 		_under = 0.0
 
 
-## The light buffers' downscale past the first view on this rung.
+## The light's downscale on this rung (past SpellLight.DOWNSCALE: coarser light cells).
 func light_downscale() -> int:
 	return RUNG_DOWNSCALE[rung]
 

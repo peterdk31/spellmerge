@@ -10,7 +10,7 @@
 4. **Threads on the desktop only**, the web single-threaded with the same result.
 5. **Later:** the tick on its own thread beside the drawing. That needs the simulation's state off the nodes; the data layout here is chosen for it, but it is not this series' job.
 
-The steps are **SN1 to SN5**, and a later one (SN for simulation native).
+The steps are **SN1 to SN4** (SN for simulation native), then a pause, and a later step.
 
 ## What a tick costs now (SN1's profile)
 

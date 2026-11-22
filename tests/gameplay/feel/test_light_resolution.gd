@@ -60,7 +60,7 @@ func test_at_the_shipped_picture_the_light_has_no_passes() -> void:
 	if light.grid_scale != 1:
 		return
 	check(light.factor_passes == null and light.under_passes == null and light.under_holder() == null, "no pass at PictureGrid.SIZE")
-	check_equal(light.viewport.size, Vector2i(ceili(size.x / SpellLightScript.DOWNSCALE), ceili(size.y / SpellLightScript.DOWNSCALE)), "the buffer is a quarter of the view, as before")
+	check_equal(Vector2i(light.grid.view_size[0], light.grid.view_size[1]), Vector2i(ceili(size.x / light.grid.cell), ceili(size.y / light.grid.cell)), "the grid covers the view in cells of its own size")
 	var apply := light.apply.material as ShaderMaterial
 	check_equal(_int(apply.get_shader_parameter(SpellLightScript.PASS_VIEWS)), 0, "the apply rect works its light out where it is drawn")
 	light.release()
@@ -82,7 +82,8 @@ func test_a_bigger_picture_draws_the_light_at_its_resolution_and_back() -> void:
 		return
 	check_equal(light.grid_scale, 2, "a picture twice as big each way")
 	check_equal(changed[0], 1, "the passes came, once")
-	check_equal(light.viewport.size, Vector2i(160, 90), "the buffer keeps its size: a quarter of PictureGrid.SIZE")
+	var shown: Rect2 = (root.global_canvas_transform * root.canvas_transform).affine_inverse() * root.get_visible_rect()
+	check(light.grid.view_size[0] * light.grid.cell >= shown.size.x and light.grid.view_size[0] * light.grid.cell < shown.size.x + 2.0 * light.grid.cell, "the grid's cells are the world's, covering what the picture shows (%s cells over %s)" % [light.grid.view_size[0], shown.size.x])
 	check(light.factor_passes != null and light.under_holder() != null, "a factor pass and a pass under the light")
 	var factor: SubViewport = light.factor_passes.viewports[0]
 	check_equal(factor.size, PictureGridScript.SIZE, "the factor pass is PictureGrid.SIZE")
@@ -97,7 +98,7 @@ func test_a_bigger_picture_draws_the_light_at_its_resolution_and_back() -> void:
 	check(factor.canvas_cull_mask & rect.visibility_layer != 0, "which its pass draws")
 	var drawn := rect.material as ShaderMaterial
 	check(drawn.shader == SpellLightScript.FACTOR_SHADER, "with the factor shader")
-	check(drawn.get_shader_parameter(&"light_buffer") == light.viewport.get_texture(), "reading the view's buffer")
+	check(drawn.get_shader_parameter(&"light_grid") == light.grid.texture and int(drawn.get_shader_parameter(&"light_grid_view_id")) == 0, "reading the view's grid")
 	check(is_equal_approx(float(drawn.get_shader_parameter(&"ambient")), 0.6), "with the apply rect's ambient")
 	light.set_bands(0)
 	light.set_ambient(0.7)

@@ -213,7 +213,6 @@ func _scenario(scenario: Dictionary) -> void:
 	if _light:
 		_spell_light = SpellLightScript.new(_mgr, LIGHT_Z)
 		root.add_child(_spell_light)
-		RenderingServer.viewport_set_measure_render_time(_spell_light.viewport.get_viewport_rid(), true)
 		if _blockers:
 			_block_light()
 		if _use_mist:
@@ -272,7 +271,8 @@ func _scenario(scenario: Dictionary) -> void:
 		last = now
 		times.append(RenderingServer.viewport_get_measured_render_time_gpu(root.get_viewport_rid()))
 		if _spell_light != null:
-			light_times.append(RenderingServer.viewport_get_measured_render_time_gpu(_spell_light.viewport.get_viewport_rid()))
+			# Grid lighting: no light buffer is drawn; its cost is the CPU's (in the frame's wall time).
+			light_times.append(0.0)
 	if times.is_empty():
 		print("BENCH: shot gpu %s: frames saved" % label)
 		return

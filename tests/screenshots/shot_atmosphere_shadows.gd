@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the crypt's shadows (docs/milestones/atmosphere.md, C): light stopped by the
-## pillars and the standing walls (`light_blockers.gd`, `light.gdshader`'s blockers) and the bodies'
+## pillars and the standing walls (`light_blockers.gd`, the grid's blockers) and the bodies'
 ## short hard shadows cast away from the light near them (`body_shadows.gd`), in a crypt room in a
 ## fight: four wizards casting up into it among its pillars.
 ##

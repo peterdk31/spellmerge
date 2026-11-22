@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The spell light's buffers, one a view (gameplay/feel/spell_light.gd; connected biomes CB6,
-// docs/milestones/connected-biomes.md): what reads the light by its pixel's place on the screen
-// (`SCREEN_UV`: the apply rect, the lit-only motes, the mist) reads the buffer of the view it is
-// drawn in. With one picture that is `light_buffer`, the world camera's.
-// While the screen is split each view draws the world again through its own canvas transform, and
-// has a buffer of its own that follows it (`light_buffer` the first view's, then `light_buffer_1`
-// to `light_buffer_3`). Which view a reader is drawn in (`ViewReaders`,
+// The spell light a view (gameplay/feel/spell_light.gd; connected biomes CB6,
+// docs/milestones/connected-biomes.md): what reads the light (the apply rect, the lit-only motes, the
+// mist) reads the grid of the view it is drawn in (light_grid.gdshaderinc: a grid a view, side by side
+// in one texture; grid lighting, the owner's decision of 2026-11-21), at its world point.
+// While the screen is split each view draws the world again through its own canvas transform. Which
+// view a reader is drawn in (`ViewReaders`,
 // gameplay/feel/view_readers.gd; the owner's decisions of 2026-11-20):
 // - the third and fourth views draw a copy of it, on their own visibility layer, with their own copy
 //   of the material, which names its view by the uniform `light_view_id` (2 or 3);
@@ -15,12 +14,9 @@
 //   (`CANVAS_MATRIX`, and the viewport's size from `SCREEN_MATRIX`), `ViewReaders.view_of` line for line.
 //
 // A shader that includes this calls `LIGHT_VIEW_FIND` in its vertex function and reads the light
-// with `view_light(SCREEN_UV)` in its fragment function.
+// with `view_light(world)` (its world point) in its fragment function.
 
-uniform sampler2D light_buffer : hint_default_black, filter_linear, repeat_disable;
-uniform sampler2D light_buffer_1 : hint_default_black, filter_linear, repeat_disable;
-uniform sampler2D light_buffer_2 : hint_default_black, filter_linear, repeat_disable;
-uniform sampler2D light_buffer_3 : hint_default_black, filter_linear, repeat_disable;
+#include "res://gameplay/feel/light_grid.gdshaderinc"
 // The view a copy is drawn in (ViewReaders.VIEW_ID); 0: the item itself (the one picture, or one of
 // the first two views).
 uniform int light_view_id = 0;
@@ -58,16 +54,7 @@ int light_view_of(mat4 canvas, mat4 screen) {
 	return best;
 }
 
-// The light at `uv` on the screen, from the buffer of the view this is drawn in.
-vec3 view_light(vec2 uv) {
-	if (light_view == 1) {
-		return textureLod(light_buffer_1, uv, 0.0).rgb;
-	}
-	if (light_view == 2) {
-		return textureLod(light_buffer_2, uv, 0.0).rgb;
-	}
-	if (light_view == 3) {
-		return textureLod(light_buffer_3, uv, 0.0).rgb;
-	}
-	return textureLod(light_buffer, uv, 0.0).rgb;
+// The light at world point `world`, from the grid of the view this is drawn in (light_grid.gdshaderinc).
+vec3 view_light(vec2 world) {
+	return grid_light(light_view, world);
 }

@@ -438,7 +438,7 @@ func cap() -> int:
 	return _cap
 
 
-## The light buffer the lit-only kinds (`MoteKind.lit_only`) read (the spell light's, handed over
+## The light the lit-only kinds (`MoteKind.lit_only`) read (the spell light's grid, handed over
 ## by the spectacle; docs/milestones/atmosphere.md, B) and the light's brightest channel from which
 ## they show in their shadow, base, light and white-hot shade (`SpellLight.lit_steps`, from the
 ## same numbers its apply rect lights the floor by), or a null buffer with spell light off: then
@@ -446,7 +446,7 @@ func cap() -> int:
 func set_light(buffer: Texture2D, steps: Vector4 = DEFAULT_LIT_STEPS) -> void:
 	_light = buffer
 	lit_steps = steps
-	_material.set_shader_parameter(&"light_buffer", buffer)
+	_material.set_shader_parameter(&"light_grid", buffer)
 	_material.set_shader_parameter(&"light_on", buffer != null)
 	_material.set_shader_parameter(&"lit_steps", steps)
 

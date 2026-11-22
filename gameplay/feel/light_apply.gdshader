@@ -20,9 +20,8 @@ shader_type canvas_item;
 // factor is clamped to 1 in an 8-bit target, the web's included), and light added on top would
 // wash a dark floor out instead of lighting its colours.
 
-// The light buffer (the light viewport's texture: the same view, smaller; a view's own while the
-// screen is split, light_views.gdshaderinc). Linear, so a band's edge is cut at the world's pixels,
-// not the buffer's.
+// The light: the grid of the view it is drawn in, at the pixel's world point (light_views.gdshaderinc,
+// light_grid.gdshaderinc; grid lighting).
 #include "res://gameplay/feel/light_views.gdshaderinc"
 #include "res://gameplay/feel/light_passes.gdshaderinc"
 #include "res://gameplay/feel/light_apply.gdshaderinc"
@@ -44,7 +43,7 @@ void fragment() {
 		factor = light_unpack_factor(light_pass_at(SCREEN_UV, SCREEN_PIXEL_SIZE));
 		unchanged = factor == vec3(1.0);
 	} else {
-		factor = light_factor(view_light(SCREEN_UV), world_at, unchanged);
+		factor = light_factor(view_light(world_at), world_at, unchanged);
 	}
 	if (unchanged) {
 		discard;

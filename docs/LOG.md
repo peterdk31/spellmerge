@@ -2,10 +2,38 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-
 ## 2026-11-22: One pass
 
 The owner's second step after grid lighting (docs/milestones/connected-biomes.md, "One pass"). Measured first at 1280 x 720: once the light is a grid, #902's passes cost more than they save, so the light's factor passes and the mist's pass are gone and both are worked out a world pixel at a time where they are drawn; the apply rect is the one full-screen pass (light, ambient, tints, one screen read). The mist stays its own draw under the bodies: a ground mask in the screen's alpha would merge it, but Vulkan's screen copy keeps no alpha (open with the owner). A table of the effects' cost (`EffectsQuality`, LOW and HIGH: the light's cell and smoothing, the mists' billows, the air's share) for the coming quality setting, `Spectacle.set_effects_quality`.
+
+## 2026-11-22: The desktop's native module optimised (D2)
+
+The owner's decision of 2026-11-22: the game is optimised for its Windows and Linux builds first, so build the native module for the desktop with stronger optimisation, bit-exact with its GDScript and the same on every machine. godot-cpp's release target was already `-O3`. What changed (`native/SConstruct`): the desktop libraries are linked whole (LTO, `lto=full`, with the float flags passed to the link too) and built for `x86-64-v2` (SSE4.2; Godot 4.7 will not start without it) in place of plain x86-64. The web is built as before. `ci/build/native.sh` now refuses a Linux or Windows library that holds a fused multiply-add instruction or calls the C library's `fma` (`no_fma`), so a flag, compiler or intrinsic that slips past `-ffp-contract=off` fails the build. `x86-64-v3` (AVX2) was built and measured too. It was no faster than v2 and often slower, and Godot has no CPU feature tag to pick a second library by, so there is no AVX2 library.
+
+The same game: the four whole biomes' state hash (`tick_hash.gd --sturdy --hash-every=1`), main's library and this one, is identical every tick: 1p seed 11 (12,087 ticks), 2p seed 23 (18,417), 3p seed 37 (17,109) and 4p seed 11 (14,280). The kernels' side-by-side tests (`test_native_kernel.gd`, `test_native_motes.gd`, `test_wall_slide.gd`, `test_light_grid.gd`, `test_dmath.gd`, `test_projectiles_step_exact.gd`) and the determinism and snapshot tests pass with the v2 library, and with the v3 one too. No fast-math, no `-Ofast`, and no FMA in any build.
+
+Measured, headless, native on 3 threads, this 4-core container, medians of 3 taken in turn (main → v2+LTO, the shipped build → v3+LTO), ms:
+
+| measure | main | v2 + LTO | v3 + LTO |
+|---|---|---|---|
+| shot_scale storm 30k, hit pass in the kernel | 3.11 | 2.64 | 2.80 |
+| shot_scale crowd 30k, in the kernel | 2.20 | 1.91 | 2.10 |
+| shot_scale crowd_all 30k, in the kernel | 7.78 | 6.54 | 7.14 |
+| shot_scale crowd_all 100k, in the kernel | 19.02 | 16.55 | 16.80 |
+| shot_scale crowd_all 100k, update_draw | 7.90 | 6.95 | 7.07 |
+| shot_scale crowd_all 100k, manager step | 69.4 | 65.2 | 68.6 |
+| shot_scale storm 100k, common pass | 0.365 | 0.378 | 0.363 |
+| stress desktop, the hit pass's kernel a tick | 2.01 | 1.73 | 1.87 |
+| stress desktop, the tick | 26.7 | 25.8 | 27.6 |
+| mote_write shed, us a mote | 2.75 | 2.71 | 2.75 |
+| mote_write burst, us a mote | 0.566 | 0.566 | 0.668 |
+| the light grid (test_light_grid's scene, 6 kinds of rows and a beam), 8 px / 16 px cells | 1.36 / 0.58 | 1.43 / 0.57 | - |
+
+So the hit pass's kernel is about 13 to 16% faster and the draw writing about 12% at 100k shots. The motes and the common pass are unchanged within the noise, and the light grid at 8 px read 5% slower (1.36 → 1.43; best runs 1.23 → 1.28), likely noise. The play frames (xvfb, llvmpipe, the fixed clock, desktop load, medians of 3 taken in turn, frame / sim / Feel ms, main → this): 1p near 26.9 / 1.31 / 2.86 → 26.5 / 1.17 / 2.78; 1p far 36.7 / 2.65 / 3.79 → 32.0 / 2.30 / 3.58; 4p apart Equal 95.3 / 8.25 / 8.13 → 87.6 / 8.09 / 7.79. At a run's load the kernels are a small part of a frame, so read these as no worse, not as the change's size. The Windows DLL was cross-built here with MinGW (LTO, v2, no runtime DLLs, no FMA) but not run.
+## 2026-11-22: LightKernel
+
+Grid lighting's native methods (`check_light_grid`, `light_grid_rows`, `light_grid_beam`, `light_grid_bake`) moved off `MoteKernel` into a class of their own, `LightKernel` (`native/src/light_kernel.h`, `light_grid.cpp`; `NativeScript.light_kernel()`), by the owner's permission for its `NATIVE_CLASSES` line in `ci/smbot/rules.py`. The maths is unchanged, compared byte for byte as before; `test_the_grid_runs_in_its_own_kernel`. `ci/tests/test_rules.py` does not list the new class yet (owner-only).
+
 ## 2026-11-21: Grid lighting
 
 The owner's choice after #902: grid lighting, then one pass, so the light stays cheap at 1280 x 720. The spell light is now worked out on the CPU on a grid of world cells (8 px by default; 12 and 16 for a quality setting), a grid a view in one small texture, its cells on the world's grid so it never swims (`gameplay/feel/light_grid.gd`), in the native module (`MoteKernel.light_grid_*`, native/src/light_grid.cpp, byte for byte with the GDScript in `test_light_grid.gd`), from the same rows the GPU's light read: shots, runes, flashes, cues, spots, carried lights and beams, with the same falloff, colours and blocking. The light buffers (a SubViewport a view), their batches and mirrors, `light.gdshader` and `light_beam.gdshader` are gone; every reader takes the cell its world point lies in (one sampler where there were four). On llvmpipe on the fixed clock (frame ms, main then grid): 640 x 360 start 26.5 to 26.0, near 28.0 to 26.2, far 40.6 to 39.5, two views 65.0 to 61.1, four 106.0 to 104.6; 1280 x 720 52.5 to 52.0, 61.1 to 61.1, 74.0 to 72.9, 110.0 to 103.6, 167.1 to 162.6. What 1280 x 720 still doubles is the root's fill, the one pass's next. Read whole, the cells are blockier than the buffer's linear light; read smoothed (`light_grid_smooth`) they look like before. Screenshots on `shots/perf/grid-light`. Details: docs/milestones/connected-biomes.md, "Grid lighting".

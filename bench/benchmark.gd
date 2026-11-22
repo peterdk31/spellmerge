@@ -28,7 +28,7 @@ const WEB_LABELS: PackedStringArray = ["1p start web", "1p near web", "1p far we
 ## Where the table is written (and its name shown on the results screen).
 const RESULTS_FILE: String = "user://benchmark.txt"
 ## The table's columns, in the order of `row_cells`.
-const ROW_COLUMNS: PackedStringArray = ["Scenario", "Frame ms", "p95", "Worst", "Sim", "Feel", "GPU", "Render CPU", "Calls", "Primitives"]
+const ROW_COLUMNS: PackedStringArray = ["Scenario", "Effects", "Frame ms", "p95", "Worst", "Sim", "Feel", "GPU", "Render CPU", "Calls", "Primitives"]
 
 
 ## What the run changes in the game, kept at its start and put back at its end (`_put_back`): the
@@ -40,6 +40,7 @@ const ROW_COLUMNS: PackedStringArray = ["Scenario", "Frame ms", "p95", "Worst", 
 var _kept_scale: Vector2i = Vector2i.ZERO
 var _kept_split: int = SplitScreenSetting.DEFAULT
 var _kept_motes: int = 0
+var _kept_effects: int = EffectsSetting.DEFAULT
 var _kept_native: bool = true
 var _kept_wall_native: bool = true
 var _put_back_done: bool = false
@@ -52,7 +53,8 @@ func _init() -> void:
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
 		only_asked = only_asked or arg.begins_with("--only=")
 	if not only_asked:
-		scenarios = scenarios_named(scenarios, WEB_LABELS if OS.has_feature("web") else DEFAULT_LABELS, rows)
+		var labels: PackedStringArray = WEB_LABELS if OS.has_feature("web") else DEFAULT_LABELS
+		scenarios = scenarios_named(scenarios, labels_at(labels, quality_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args())), rows)
 	result_word = "BENCHMARK"
 
 
@@ -70,6 +72,7 @@ func _ready() -> void:
 	if feel != null and feel.has_method(&"set_mote_cap"):
 		_kept_split = int(feel.get(&"split_mode"))
 		_kept_motes = int(feel.get(&"mote_cap"))
+		_kept_effects = int(feel.get(&"effects_mode"))
 	var projectiles: Node = root.get_node_or_null("Projectiles")
 	if projectiles != null:
 		_kept_native = bool(projectiles.get(&"native"))
@@ -105,6 +108,7 @@ func _put_back() -> void:
 	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		_feel.call(&"set_split_mode", _kept_split)
 		_feel.call(&"set_mote_cap", _kept_motes)
+		_feel.call(&"set_effects_mode", _kept_effects)
 	if _projectiles != null:
 		_projectiles.set(&"native", _kept_native)
 	WallSlide.use_native(_kept_wall_native)
@@ -115,10 +119,22 @@ func _exit_tree() -> void:
 	super()
 
 
+## `labels` as `with_quality` names them at `qualities` (each label once a row when there are several).
+static func labels_at(labels: PackedStringArray, qualities: PackedStringArray) -> PackedStringArray:
+	if qualities.size() < 2:
+		return labels
+	var out := PackedStringArray()
+	for label in labels:
+		for quality in qualities:
+			out.append("%s %s" % [label, quality])
+	return out
+
+
 ## One summary's cells, in `ROW_COLUMNS`' order.
 static func row_cells(summary: Dictionary) -> PackedStringArray:
 	return PackedStringArray([
 		String(summary.get("label", "")),
+		String(summary.get("effects", "")),
 		"%.2f" % float(summary.get("frame_ms", 0.0)),
 		"%.2f" % float(summary.get("p95_ms", 0.0)),
 		"%.2f" % float(summary.get("worst_ms", 0.0)),
@@ -149,6 +165,8 @@ func _finished(failed: Array[String]) -> void:
 	_put_back()
 	var facts: PackedStringArray = MachineInfoScript.lines(get_tree())
 	var notes := PackedStringArray()
+	for summary in summaries:
+		summary["effects"] = effects_drawn.get(String(summary.get("label", "")), "")
 	for reason in failed:
 		notes.append("Note: " + reason)
 	var text: String = table_text(facts, summaries, notes)

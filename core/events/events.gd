@@ -129,6 +129,10 @@ signal shadows_changed(on: bool)
 signal ambient_particles_changed(on: bool)
 ## Sender: hud. The "Fog" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether a room's floor mist is drawn (`FogSetting` in core/settings; atmosphere F; only while the light is on). Heard by feel, which makes or frees its mist.
 signal fog_changed(on: bool)
+## Sender: hud. The "Effects" setting in the pause menu (Settings, Graphics) changed, or the saved choice was loaded when the menu was bound (sent then always, since feel draws the high row until told): how much the screen's effects cost on this machine (`EffectsSetting` in core/settings: AUTO, the frames' times choose the row, or LOW, MEDIUM, HIGH). Heard by feel, which draws its effects at that row (`EffectsQuality`) or lets its frame-time watcher choose (`EffectsAuto`). The view's only: it changes nothing in the game.
+signal effects_changed(mode: int)
+## Sender: feel. The row of the screen's effects drawn changed, or was set again by an "Effects" mode (`effects_changed`): `row` is `EffectsSetting.LOW`, MEDIUM or HIGH. Heard by hud, whose pause menu shows Auto's row ("Effects: Auto (Medium)"; the owner, 2026-11-22). The view's only.
+signal effects_row_changed(row: int)
 ## Sender: hud. The "Environment interaction" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether the room's lights, cover, dust and mist take notice of the shots and blasts (`EnvironmentInteraction` in core/settings; atmosphere E). Heard by feel, which turns its stirs on or off (off: what was stirred eases back to rest).
 signal environment_interaction_changed(on: bool)
 ## Sender: hud. The "Ambience volume" slider in the pause menu (Settings, Audio) moved, or a saved choice was loaded when the menu was bound: how loud the room's sound is, in percent (`AmbienceVolume`, `AudioVolumes` in core/settings; atmosphere D). Heard by core/audio, which eases its `Ambience` bus to it.

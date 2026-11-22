@@ -12,6 +12,7 @@ const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const MistScript := preload("res://gameplay/feel/mist.gd")
 const LightGridScript := preload("res://gameplay/feel/light_grid.gd")
 const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
@@ -75,6 +76,51 @@ func test_every_level_has_a_row_the_effects_can_take() -> void:
 	check(high.light_cell == LightGridScript.CELL and high.light_smooth and high.mist_billows == 3 and high.air_share == 1.0, "the high row is the look as it was")
 	var low := EffectsQualityScript.new(EffectsQualityScript.Level.LOW)
 	check(low.light_cell > high.light_cell and low.mist_billows < high.mist_billows and low.air_share < high.air_share, "the low row is cheaper in each")
+	var medium := EffectsQualityScript.new(EffectsQualityScript.Level.MEDIUM)
+	check(medium.light_cell == high.light_cell and medium.light_smooth, "the medium row keeps the high row's light")
+	check(medium.mist_billows < high.mist_billows and medium.mist_billows > low.mist_billows, "its mist between the two")
+	check(medium.air_share < high.air_share and medium.air_share > low.air_share, "and its air")
+	check_equal(LightGridScript.CELLS[LightGridScript.CELLS.size() - 1], low.light_cell, "the low row's light: the grid's coarsest cell")
+	check_equal(SpellLightScript.SPLIT_CHEAP_CELL, low.light_cell, "the split's cheaper light is the low row's light (one cell for both)")
+	for level: int in EffectsQualityScript.Level.values():
+		check(int(EffectsQualityScript.lower(level as EffectsQualityScript.Level)) == maxi(level - 1, 0), "a row lower than %d" % level)
+		check(int(EffectsQualityScript.higher(level as EffectsQualityScript.Level)) == mini(level + 1, EffectsQualityScript.Level.HIGH), "a row higher than %d" % level)
+
+
+## The "Effects" setting (EffectsSetting) reaches the spectacle through Feel: a fixed mode draws its row;
+## Auto draws the watcher's (gameplay/feel/effects_auto.gd), high at first, and follows it as the frames
+## run slow; a fixed mode stops following. Feel draws the high row until told.
+func test_the_setting_chooses_the_row_through_feel() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var bus: EventsScript = made[0]
+	var spectacle: SpectacleScript = feel.spectacle()
+	check_equal(feel.effects_mode, EffectsSetting.HIGH, "high until told")
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.HIGH), "the high row drawn")
+	_frames_of(feel, 0.1, 5.0)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.HIGH), "slow frames change nothing until Auto is chosen")
+	bus.effects_changed.emit(EffectsSetting.LOW)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.LOW), "Low: the low row")
+	bus.effects_changed.emit(EffectsSetting.MEDIUM)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.MEDIUM), "Medium: the medium row")
+	var rows: Array[int] = []
+	bus.effects_row_changed.connect(func(row: int) -> void: rows.append(row))
+	bus.effects_changed.emit(EffectsSetting.AUTO)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.HIGH), "Auto: high at first")
+	check(rows == [EffectsSetting.HIGH], "the HUD told the row drawn (%s)" % [rows])
+	_frames_of(feel, 0.1, 2.5)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.MEDIUM), "Auto, slow frames: a row down")
+	check(rows == [EffectsSetting.HIGH, EffectsSetting.MEDIUM], "and told again as Auto changes it (%s)" % [rows])
+	check_equal(int(spectacle.quality.level), int(feel.effects_auto.level), "the watcher's row")
+	bus.effects_changed.emit(EffectsSetting.HIGH)
+	_frames_of(feel, 0.1, 5.0)
+	check_equal(int(spectacle.quality.level), int(EffectsQualityScript.Level.HIGH), "High: fixed, slow frames or not")
+
+
+## `seconds` of Feel's drawn frames, each `delta` long.
+func _frames_of(feel: FeelScript, delta: float, seconds: float) -> void:
+	for frame in roundi(seconds / delta):
+		feel.step(delta)
 
 
 func _billows(mist: MistScript) -> int:

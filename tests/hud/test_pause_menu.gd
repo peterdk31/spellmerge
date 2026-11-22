@@ -54,6 +54,7 @@ const SIGNAL_OF: Dictionary = {
 	"TaillessMotes": &"tailless_motes_changed",
 	"ScreenShake": &"screen_shake_changed",
 	"SplitScreen": &"split_screen_changed",
+	"Effects": &"effects_changed",
 	"DamageNumbers": &"damage_numbers_changed",
 	"FloorMarks": &"floor_marks_changed",
 	"SpellLight": &"spell_light_changed",
@@ -70,7 +71,7 @@ const SIGNAL_OF: Dictionary = {
 const TAB_ORDER: Array[String] = ["Graphics", "Performance", "Audio", "Interface"]
 ## Each Settings tab's rows, in order.
 const TAB_ROWS: Dictionary = {
-	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"],
+	"Graphics": ["Fullscreen", "Effects", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"],
 	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap"],
 	"Audio": ["MusicVolume", "SoundVolume", "AmbienceVolume", "UiVolume"],
 	"Interface": ["ScreenShake", "SplitScreen", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"],
@@ -870,6 +871,8 @@ func test_the_greyed_rows_stay_greyed_and_skipped_after_a_tab_switch() -> void:
 	_do(0, &"page_prev")
 	for row in NEED_LIGHT:
 		check(_menu().button(row).disabled, "%s still greyed back on Graphics" % row)
+	# The tab's first row (Fullscreen), then Effects, then Dynamic lighting.
+	_do(0, &"move_down")
 	_do(0, &"move_down")
 	_do(0, &"move_down")
 	check(_focused("EnvironmentInteraction"), "down from Dynamic lighting still skips them")
@@ -1107,6 +1110,63 @@ func test_a_saved_split_screen_feel_does_not_know_loads_as_dynamic() -> void:
 	SaveFile.new(SAVE_PATH).set_setting(SplitScreenSetting.KEY, 7)
 	_setup(1)
 	check_equal(int(_menu().get("split_screen")), SplitScreenSetting.DYNAMIC, "an unknown saved mode: Dynamic")
+
+
+# --- Effects ---------------------------------------------------------------------------------
+# "Effects: Auto" by default (the frames choose the row), sent to feel whenever the Hud binds (feel
+# draws the high row until told); accept steps to Low, Medium, High and back to Auto, each sent and
+# saved; a later menu starts with the saved mode.
+
+
+func test_effects_says_auto_by_default_and_tells_feel() -> void:
+	_settings()
+	check(_text_of("Effects").ends_with("Effects: Auto"), "Auto at the start: %s" % _text_of("Effects"))
+	check(_heard["Effects"] == [EffectsSetting.AUTO], "feel is told Auto when the Hud binds, got %s" % [_heard["Effects"]])
+
+
+func test_effects_steps_through_every_mode_saved_and_sent() -> void:
+	_settings()
+	var sent: Array = [EffectsSetting.AUTO]
+	for mode: int in [EffectsSetting.LOW, EffectsSetting.MEDIUM, EffectsSetting.HIGH, EffectsSetting.AUTO]:
+		_press(0, "Effects")
+		sent.append(mode)
+		var word: String = EffectsSetting.word_of(mode)
+		check(_text_of("Effects").ends_with("Effects: " + word), "accept: %s (%s)" % [word, _text_of("Effects")])
+		check_equal(int(_menu().get("effects")), mode, "the menu holds %s" % word)
+		check(_heard["Effects"] == sent, "feel is told %s, got %s" % [word, _heard["Effects"]])
+		check_equal(int(SaveFile.new(SAVE_PATH).get_setting(EffectsSetting.KEY, -1)), mode, "the save remembers %s" % word)
+
+
+func test_a_later_menu_starts_with_the_saved_effects_and_tells_feel() -> void:
+	_settings()
+	_press(0, "Effects")
+	_setup(1)
+	check_equal(int(_menu().get("effects")), EffectsSetting.LOW, "a later menu starts with Low")
+	check(_heard["Effects"] == [EffectsSetting.LOW], "and tells feel when the Hud binds, got %s" % [_heard["Effects"]])
+
+
+## Auto shows the row feel draws now (the owner, 2026-11-22: "Auto (Medium)"), as it changes; a fixed
+## mode shows only itself.
+func test_auto_shows_the_row_feel_draws_as_it_changes() -> void:
+	_settings()
+	_bus.effects_row_changed.emit(EffectsSetting.MEDIUM)
+	check(_text_of("Effects").ends_with("Effects: Auto (Medium)"), "Auto drawing medium: %s" % _text_of("Effects"))
+	_bus.effects_row_changed.emit(EffectsSetting.LOW)
+	check(_text_of("Effects").ends_with("Effects: Auto (Low)"), "then low: %s" % _text_of("Effects"))
+	_press(0, "Effects")
+	_bus.effects_row_changed.emit(EffectsSetting.LOW)
+	check(_text_of("Effects").ends_with("Effects: Low"), "Low fixed: no row after it (%s)" % _text_of("Effects"))
+	for step in 3:
+		_press(0, "Effects")
+	_bus.effects_row_changed.emit(EffectsSetting.HIGH)
+	check(_text_of("Effects").ends_with("Effects: Auto (High)"), "Auto again: its row (%s)" % _text_of("Effects"))
+	check(EffectsSetting.every_word().has("Auto (Medium)"), "the menu's width counts the longest words")
+
+
+func test_a_saved_effects_mode_feel_does_not_know_loads_as_auto() -> void:
+	SaveFile.new(SAVE_PATH).set_setting(EffectsSetting.KEY, 9)
+	_setup(1)
+	check_equal(int(_menu().get("effects")), EffectsSetting.AUTO, "an unknown saved mode: Auto")
 
 
 # --- Show FPS ----------------------------------------------------------------------------------

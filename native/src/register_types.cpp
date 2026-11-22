@@ -13,6 +13,7 @@
 #include "dmath_kernel.h"
 #include "ground_kernel.h"
 #include "jobs.h"
+#include "light_kernel.h"
 #include "mote_kernel.h"
 #include "shot_kernel.h"
 
@@ -27,6 +28,7 @@ static void initialize_spellmerge(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(DMathKernel);
 	GDREGISTER_CLASS(BodyKernel);
 	GDREGISTER_CLASS(GroundKernel);
+	GDREGISTER_CLASS(LightKernel);
 }
 
 static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
@@ -35,7 +37,7 @@ static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
 	}
 	ShotKernel::free_names();
 	MoteKernel::free_names();
-	MoteKernel::free_grid_names();
+	LightKernel::free_names();
 	jobs::shutdown();
 }
 

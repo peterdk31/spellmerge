@@ -26,6 +26,9 @@ Measured, headless, native on 3 threads, this 4-core container, medians of 3 tak
 | the light grid (test_light_grid's scene, 6 kinds of rows and a beam), 8 px / 16 px cells | 1.36 / 0.58 | 1.43 / 0.57 | - |
 
 So the hit pass's kernel is about 13 to 16% faster and the draw writing about 12% at 100k shots. The motes and the common pass are unchanged within the noise, and the light grid at 8 px read 5% slower (1.36 → 1.43; best runs 1.23 → 1.28), likely noise. The play frames (xvfb, llvmpipe, the fixed clock, desktop load, medians of 3 taken in turn, frame / sim / Feel ms, main → this): 1p near 26.9 / 1.31 / 2.86 → 26.5 / 1.17 / 2.78; 1p far 36.7 / 2.65 / 3.79 → 32.0 / 2.30 / 3.58; 4p apart Equal 95.3 / 8.25 / 8.13 → 87.6 / 8.09 / 7.79. At a run's load the kernels are a small part of a frame, so read these as no worse, not as the change's size. The Windows DLL was cross-built here with MinGW (LTO, v2, no runtime DLLs, no FMA) but not run.
+## 2026-11-22: LightKernel
+
+Grid lighting's native methods (`check_light_grid`, `light_grid_rows`, `light_grid_beam`, `light_grid_bake`) moved off `MoteKernel` into a class of their own, `LightKernel` (`native/src/light_kernel.h`, `light_grid.cpp`; `NativeScript.light_kernel()`), by the owner's permission for its `NATIVE_CLASSES` line in `ci/smbot/rules.py`. The maths is unchanged, compared byte for byte as before; `test_the_grid_runs_in_its_own_kernel`. `ci/tests/test_rules.py` does not list the new class yet (owner-only).
 
 ## 2026-11-21: Grid lighting
 

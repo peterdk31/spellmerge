@@ -19,7 +19,7 @@ extends RefCounted
 ##   (the GPU light's falloff, its ellipse along its way; its reach at least a cell each way, so no
 ##   light falls between the cells' middles), blocked as the shader blocks it
 ##   (`LightBlockers.shade_between`, the boxes near it only); the cells add up and are cut at 1.
-## - **Native:** while the module is loaded, `add_rows`, `add_beam` and `bake` run in `MoteKernel`
+## - **Native:** while the module is loaded, `add_rows`, `add_beam` and `bake` run in `LightKernel`
 ##   (`light_grid_rows`, `light_grid_beam`, `light_grid_bake`), on this object's arrays in place, to
 ##   the bit as here (tests/gameplay/feel/test_light_grid.gd compares them byte for byte). Here is the
 ##   reference and the fallback.
@@ -130,7 +130,7 @@ func _init() -> void:
 ## (its numbers and this object's members checked first: a mismatch is an error and the GDScript
 ## runs), else here. Returns whether they run natively.
 func use_native(on: bool) -> bool:
-	kernel = NativeScript.mote_kernel() if on else null
+	kernel = NativeScript.light_kernel() if on else null
 	if kernel != null:
 		var wrong: PackedStringArray = kernel.call(&"check_light_grid", self)
 		if not wrong.is_empty():

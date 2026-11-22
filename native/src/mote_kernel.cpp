@@ -734,8 +734,4 @@ void MoteKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("give_off", "motes", "given", "count", "has_marks"), &MoteKernel::give_off);
 	ClassDB::bind_method(D_METHOD("check_regions", "regions"), &MoteKernel::check_regions);
 	ClassDB::bind_method(D_METHOD("region_rows", "regions", "motes", "from", "count", "now"), &MoteKernel::region_rows);
-	ClassDB::bind_method(D_METHOD("check_light_grid", "grid"), &MoteKernel::check_light_grid);
-	ClassDB::bind_method(D_METHOD("light_grid_rows", "grid", "rows", "count", "kind", "reach", "pad", "now", "blocked"), &MoteKernel::light_grid_rows);
-	ClassDB::bind_method(D_METHOD("light_grid_beam", "grid", "path", "points", "beam_reach", "colour"), &MoteKernel::light_grid_beam);
-	ClassDB::bind_method(D_METHOD("light_grid_bake", "grid"), &MoteKernel::light_grid_bake);
 }

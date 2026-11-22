@@ -72,6 +72,46 @@ inline double gap(int64_t side, double left, double right, double up, double dow
 inline double way_x(int64_t side) { return side == LEFT ? -1.0 : (side == RIGHT ? 1.0 : 0.0); }
 inline double way_y(int64_t side) { return side == UP ? -1.0 : (side == DOWN ? 1.0 : 0.0); }
 
+// `RoomGrid.WALK_*` and `WALKED_*` (checked by tests/core/test_body_walk.gd, which reaches every branch).
+constexpr int64_t WALK_WALLS = 1, WALK_FOOTPRINTS = 2, WALK_HOLES = 4;
+constexpr int64_t WALKED_OVER_HOLE = 1, WALKED_NEAR_HOLE = 2;
+
+// `RoomGrid.is_hole` (the grid has holes): a point outside the grid is over the void.
+bool is_hole(const uint8_t *holes, const uint8_t *walls, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &point) {
+	const int64_t cx = floori(((double)point.x - (double)origin.x) / cell);
+	const int64_t cy = floori(((double)point.y - (double)origin.y) / cell);
+	if (cx < 0 || cx >= w || cy < 0 || cy >= h) {
+		return true;
+	}
+	const int64_t at = cy * w + cx;
+	return holes[at] != 0 && walls[at] == 0;
+}
+
+// `RoomGrid.touches_hole` (the grid has holes): the cell's box in single precision, as the GDScript's
+// Vector2s, its distance compared in doubles.
+bool touches_hole(const uint8_t *holes, const uint8_t *walls, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &center,
+		double radius) {
+	const double r = maxf(radius, 0.0);
+	const int64_t x0 = maxi(floori(((double)center.x - r - (double)origin.x) / cell), 0);
+	const int64_t x1 = mini(floori(((double)center.x + r - (double)origin.x) / cell), w - 1);
+	const int64_t y0 = maxi(floori(((double)center.y - r - (double)origin.y) / cell), 0);
+	const int64_t y1 = mini(floori(((double)center.y + r - (double)origin.y) / cell), h - 1);
+	const Vector2 size((real_t)cell, (real_t)cell);
+	for (int64_t cy = y0; cy <= y1; cy++) {
+		for (int64_t cx = x0; cx <= x1; cx++) {
+			const int64_t at = cy * w + cx;
+			if (holes[at] == 0 || walls[at] != 0) {
+				continue;
+			}
+			const Vector2 low = origin + Vector2((real_t)cx, (real_t)cy) * (real_t)cell;
+			if ((double)center.distance_squared_to(center.clamp(low, low + size)) < r * r) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 } // namespace
 
 bool BodyKernel::configure(const Dictionary &config) {
@@ -193,8 +233,58 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, const PackedByteAr
 	return Vector2(px, py);
 }
 
+Vector3 BodyKernel::walk(const PackedByteArray &walls, const PackedByteArray &walk, const PackedByteArray &ground, const PackedByteArray &holes,
+		int64_t w, int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
+		const Vector2 &crossed, double radius, double reach) const {
+	ERR_FAIL_COND_V_MSG(!_ready, Vector3(from.x, from.y, 0.0), "BodyKernel: configure it first");
+	const bool has_holes = (flags & WALK_HOLES) != 0;
+	// `RoomGrid.slide_body`: with holes the walk minds them (the walking grid) unless it crosses; with
+	// nothing laid, the whole way.
+	auto slide_on = [&](const Vector2 &at, const Vector2 &by, bool crossing) -> Vector2 {
+		const bool minds_holes = has_holes && !crossing;
+		if ((flags & (WALK_WALLS | WALK_FOOTPRINTS)) == 0 && !minds_holes) {
+			return at + by;
+		}
+		return slide(walls, minds_holes ? walk : ground, w, h, cell, origin, at, by, radius, mask);
+	};
+	if (!has_holes) {
+		const Vector2 to = slide_on(from, motion, false);
+		return Vector3(to.x, to.y, 0.0);
+	}
+	ERR_FAIL_COND_V_MSG(holes.size() < w * h || walls.size() < w * h, Vector3(from.x, from.y, 0.0), "BodyKernel.walk: the grids are smaller than w * h");
+	const uint8_t *hp = holes.ptr();
+	const uint8_t *wp = walls.ptr();
+	// Main's `Actor._move_over_holes`, now `RoomGrid.gd_walk_body`: what crosses first, then the walk.
+	Vector2 at = from;
+	if (crossed != Vector2()) {
+		at = slide_on(from, crossed, true);
+	}
+	const Vector2 step = motion - crossed;
+	Vector2 to;
+	if (step == Vector2() && crossed != Vector2()) {
+		to = at;
+	} else if (is_hole(hp, wp, w, h, cell, origin, at)) {
+		to = slide_on(at, step, true);
+	} else if (crossed != Vector2() && touches_hole(hp, wp, w, h, cell, origin, at, radius)) {
+		const Vector2 walked = slide_on(at, step, true);
+		to = is_hole(hp, wp, w, h, cell, origin, walked) ? at : walked;
+	} else {
+		to = slide_on(at, step, false);
+	}
+	int64_t found = 0;
+	if (is_hole(hp, wp, w, h, cell, origin, to)) {
+		found = WALKED_OVER_HOLE;
+	} else if (touches_hole(hp, wp, w, h, cell, origin, to, reach)) {
+		found = WALKED_NEAR_HOLE;
+	}
+	return Vector3(to.x, to.y, (real_t)found);
+}
+
 void BodyKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("configure", "config"), &BodyKernel::configure);
 	ClassDB::bind_method(D_METHOD("slide", "cells", "ground", "w", "h", "cell", "origin", "from", "motion", "radius", "mask"),
 			&BodyKernel::slide);
+	ClassDB::bind_method(D_METHOD("walk", "walls", "walk", "ground", "holes", "w", "h", "cell", "origin", "flags", "mask", "from", "motion", "crossed",
+								 "radius", "reach"),
+			&BodyKernel::walk);
 }

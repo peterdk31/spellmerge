@@ -11,6 +11,7 @@
 #include "shot_kernel.h"
 #include "dmath.h"
 #include "jobs.h"
+#include "grid_ray.h"
 #include "packed.h"
 
 #include <cmath>
@@ -1029,67 +1030,12 @@ struct HitPass {
 		}
 	}
 
-	// `RoomGrid.wall_hit` with its default visits.
+	// `RoomGrid.wall_hit` with its default visits (grid_ray.h, shared with `BodyKernel`'s rays).
 	double wall_hit(const Vector2 &from, const Vector2 &to) {
 		if (!has_walls) {
 			return -1.0;
 		}
-		const Vector2 start = (from - wall_origin) / (real_t)WALL_CELL;
-		const Vector2 delta = (to - from) / (real_t)WALL_CELL;
-		int64_t cx = floori(start.x);
-		int64_t cy = floori(start.y);
-		// `start.x + delta.x` in GDScript adds two floats, which are doubles.
-		const int64_t end_x = floori((double)start.x + (double)delta.x);
-		const int64_t end_y = floori((double)start.y + (double)delta.y);
-		if (cx == end_x && cy == end_y) {
-			if (cx >= 0 && cx < wall_w && cy >= 0 && cy < wall_h && wall_cells[cy * wall_w + cx] != 0) {
-				return 0.0;
-			}
-			return -1.0;
-		}
-		if (std::abs(end_x - cx) <= 1 && std::abs(end_y - cy) <= 1 && MIN(cx, end_x) >= 0 && MAX(cx, end_x) < wall_w &&
-				MIN(cy, end_y) >= 0 && MAX(cy, end_y) < wall_h) {
-			const int64_t row0 = cy * wall_w;
-			const int64_t row1 = end_y * wall_w;
-			if (wall_cells[row0 + cx] == 0 && wall_cells[row0 + end_x] == 0 && wall_cells[row1 + cx] == 0 &&
-					wall_cells[row1 + end_x] == 0) {
-				return -1.0;
-			}
-		}
-		const int64_t step_x = delta.x > 0.0f ? 1 : -1;
-		const int64_t step_y = delta.y > 0.0f ? 1 : -1;
-		double next_x = INFINITY;
-		double next_y = INFINITY;
-		double per_x = INFINITY;
-		double per_y = INFINITY;
-		if (delta.x != 0.0f) {
-			per_x = std::abs(1.0 / (double)delta.x);
-			next_x = ((double)(cx + (step_x > 0 ? 1 : 0)) - (double)start.x) / (double)delta.x;
-		}
-		if (delta.y != 0.0f) {
-			per_y = std::abs(1.0 / (double)delta.y);
-			next_y = ((double)(cy + (step_y > 0 ? 1 : 0)) - (double)start.y) / (double)delta.y;
-		}
-		double t = 0.0;
-		const int64_t full = std::abs(end_x - cx) + std::abs(end_y - cy) + 1;
-		for (int64_t v = 0; v < full; v++) {
-			if (cx >= 0 && cx < wall_w && cy >= 0 && cy < wall_h && wall_cells[cy * wall_w + cx] != 0) {
-				return t;
-			}
-			if (next_x < next_y) {
-				t = next_x;
-				next_x += per_x;
-				cx += step_x;
-			} else {
-				t = next_y;
-				next_y += per_y;
-				cy += step_y;
-			}
-			if (t > 1.0) {
-				return -1.0;
-			}
-		}
-		return -1.0;
+		return grid_ray::wall_hit(wall_cells.p, wall_w, wall_h, WALL_CELL, wall_origin, from, to);
 	}
 
 	// `_cell_info`.

@@ -56,6 +56,14 @@ public:
 			int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
 			const Vector2 &crossed, double radius, double reach) const;
 
+	// `RoomGrid.wall_hit` on `cells` (the grid has walls; sim-native SN4: the long rays of an AI's sight
+	// and line of fire, `RoomGrid` hands over only paths past its fast ones), t in [0, 1] or -1 (-2, logged, for a grid smaller than w * h).
+	double wall_hit(const PackedByteArray &cells, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &from, const Vector2 &to) const;
+	// `RoomGrid._way_hit` past its checks (an AI's walk: `ground_clear`, `walk_clear`, `clear_run`, sight
+	// past a mouth): `ground` the walking or the ground grid, `walls` minded by `wall_mask` (-2, logged, for grids smaller than w * h).
+	double way_hit(const PackedByteArray &walls, const PackedByteArray &ground, int64_t w, int64_t h, double cell, const Vector2 &origin, const Vector2 &from,
+			const Vector2 &to, int64_t wall_mask, bool with_walls, bool with_ground) const;
+
 	// `RoomLife.gd_find_places` on the bodies: for each of the first `count` actor ids in `ids`, the body
 	// whose instance id `nodes` keeps there; one in the tree that keeps `projectiles` (the manager whose
 	// grid this is) has its `room` set to the place it stands in (`RoomGrid.place_at` on

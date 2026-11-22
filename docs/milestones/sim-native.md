@@ -1,6 +1,6 @@
 # The simulation's hot paths in C++, built for threads
 
-**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 (Flow's waking) built ("Built (SN2)"); SN3 (the foes' nearest-foe search) built ("Built (SN3)"); SN4 (the long rays) built ("Built (SN4)"); SN5 on are each a PR of their own, in the order below, the next opened once the last is merged.
+**Status (2026-11-22): paused after SN4, by the owner's decision of 2026-11-22.** SN1 (this document and the first kernel, a body's walk), SN2 (Flow's waking), SN3 (the foes' nearest-foe search) and SN4 (the room grid's long rays) are built ("Built (SN1)" to "Built (SN4)" below). There is no SN5 for now: the tick is 1.0 to 1.6 ms headless at 1 to 4 players, and the next pure kernels by profile gain little (SN4 already showed none in play). When the series resumes, its next big step is the state off the nodes (the body table as the state, the tick on its own thread beside the drawing), with the two-phase step and the simulation's threads on it ("The order", the "later" row).
 
 **The owner's decisions (2026-11-22):**
 
@@ -61,7 +61,7 @@ Each step moves a path whose work is a pure function of arrays, keeps the order 
 | **SN2** | **Flow's waking** (`RoomLife.wake`'s first pass: every open body's place found where its node stands and set as its `room`, in one `BodyKernel.places` call), and a native-on/native-off compare in the regular suite | Flow's step, once a tick | moved up from SN5 by SN2's profile: the waking was 0.17 ms a tick at 4p, the largest single path left (below) |
 | **SN3** | **The foes' look for their nearest foe** (`ProjectileManager.nearest_target`, which `AIBrain._find_target` asks ring by ring: `ShotKernel.nearest_target`) | each foe's think, in id order, as now | SN3's profile in a crowd (below): the target's search was the brain's largest part, not the perception |
 | **SN4** | **The room grid's long rays** (`RoomGrid.wall_hit` and `_way_hit` past `NATIVE_RAY_CELLS`: an AI's line of fire, sight, walk and ground checks, `clear_run`, the harm exit's search; `BodyKernel.wall_hit`, `way_hit`, on `grid_ray.h`, which the shots' hit pass shares) | where they are asked, as now | the owner's decision of 2026-11-22 (below): the next pure kernels by profile, the game the same |
-| SN5 | **Whatever the profile names next**, measured again after SN4 | | |
+| (SN5) | none for now: the series paused after SN4 (the owner, 2026-11-22) | | |
 | later | **The body table, the foes' perception in two phases and the simulation's threads**, with the state off the nodes (the tick on its own thread): waiting for that step, by the owner's decision of 2026-11-22 | | |
 
 Every step keeps the game exactly as it is. The two-phase step (later) is the one whose parallel part reads the state of the tick's start where today a foe reads what the bodies before it in id order did this tick: that changes the game (not the determinism), which the owner accepted (2026-11-22): that step records a new baseline.
@@ -142,6 +142,8 @@ Rules for every split: a part never reads what another part of the same pass wri
 1. **The two-phase step was accepted** (later set aside by answer 3): a foe's perception is worked out from the state at the tick's start, so the game changes once. That PR records a new `tick_hash` baseline and says which replays and fixtures it records again; the game stays deterministic on every machine and at any thread count.
 2. **Threads: the best solution**, as recommended: the module's own pool (`jobs::for_spans`) inside a kernel's passes, `WorkerThreadPool` only where GDScript has several independent kernel calls to make at once ("The threading model").
 3. **SN4 by the profile (2026-11-22):** the two-phase perception skipped for now; the two-phase step and the simulation's threads wait for the state-off-the-nodes step; SN4 is the next pure, order-preserving kernels by profile.
+
+4. **The series pauses after SN4** (2026-11-22): #922 merges for its shared walk, and no SN5 for now; the state off the nodes, with the two-phase step and the threads, stays the next big step whenever it resumes.
 
 ## Open questions for the owner
 

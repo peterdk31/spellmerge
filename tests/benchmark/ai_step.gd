@@ -6,7 +6,7 @@ extends SceneTree
 ## pass of `Actor.step` over the whole crowd per physics step. The wizards walk in circles and cast a bolt at the crowd every few steps, so the enemies' dodging and leading have
 ## shots and moving targets to read. Nothing is random but the AI's own seeded numbers.
 ##
-## godot --headless --path . --script res://tests/benchmark/ai_step.gd [-- --enemies=N --steps=N]
+## godot --headless --path . --script res://tests/benchmark/ai_step.gd [-- --enemies=N --steps=N --no-native: the manager's and the walls' kernels off]
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
@@ -35,6 +35,10 @@ func _initialize() -> void:
 		elif arg.begins_with("--enemies="):
 			count = arg.trim_prefix("--enemies=").to_int()
 	var world := Fixture.new(root, 4)
+	if "--no-native" in OS.get_cmdline_user_args():
+		# The GDScript the native module stands for (the manager's queries and passes, the walls).
+		world.projectiles.native = false
+		WallSlide.use_native(false)
 	var kinds: Array[EnemyBase] = []
 	for path in STRAYS:
 		kinds.append(load(path) as EnemyBase)

@@ -9,6 +9,9 @@ extends RefCounted
 ##   of a GPU with neither and a headless run have none. There `available()` is false and every
 ##   effect keeps its CPU path, which stays the reference (an effect's GPU path is tested against
 ##   it) and the fallback.
+## - **Not on a software device:** a RenderingDevice whose device is the CPU (llvmpipe) keeps the CPU
+##   paths unless `on_software` (the PR's measure: the compute work took the same cores, the splits'
+##   frames a few per cent slower).
 ## - **Switched for tests and benchmarks:** `allowed` (true by default) turns every GPU effect off at
 ##   once; an effect asks `available()` when it is made or switched (`LightGrid.use_gpu`).
 ## - **The render thread:** a RenderingDevice call is made on the render thread only, through
@@ -25,6 +28,10 @@ extends RefCounted
 
 ## Whether GPU effects may be used at all (tests and `--cpu-effects` turn it off).
 static var allowed: bool = true
+## Whether they may run on a device that is the CPU itself (a software Vulkan such as llvmpipe: the
+## "GPU" work then takes the same cores the CPU path would, and measured slower in the splits; off by
+## default, on for tests and `--gpu-on-software`).
+static var on_software: bool = false
 
 
 ## Whether a compute effect can run here now: allowed, not the web, and a renderer with a
@@ -34,7 +41,10 @@ static func available() -> bool:
 		return false
 	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
 		return false
-	return RenderingServer.get_rendering_device() != null
+	var rd: RenderingDevice = RenderingServer.get_rendering_device()
+	if rd == null:
+		return false
+	return on_software or RenderingServer.get_video_adapter_type() != RenderingDevice.DEVICE_TYPE_CPU
 
 
 ## `job` run on the render thread (at once when this is it), where RenderingDevice calls belong.

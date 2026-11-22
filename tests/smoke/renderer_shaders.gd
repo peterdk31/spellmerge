@@ -34,8 +34,15 @@ func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--expect=") and arg.trim_prefix("--expect=") != method:
 			failed.append("drawing with %s, not %s (no driver for it?)" % [method, arg.trim_prefix("--expect=")])
+	# The light grid's compute shader compiled and run on a software Vulkan too (CI's llvmpipe), which
+	# the game itself leaves on the CPU (core/base/gpu_compute.gd).
+	GpuCompute.on_software = true
 	if not await WarmUp.run(root):
 		failed.append("the warm-up did not finish")
+	var feel_node: Node = root.get_node_or_null("Feel")
+	if feel_node != null:
+		# The light made before this was set picks the GPU again.
+		feel_node.call(&"set_gpu_effects", true)
 	var flow: Node = root.get_node_or_null("Flow")
 	var input: Node = root.get_node_or_null("PlayerInput")
 	if flow != null and input != null:

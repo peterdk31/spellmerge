@@ -15,8 +15,14 @@ const LightGridTest := preload("res://tests/gameplay/feel/test_light_grid.gd")
 const BYTES_APART_MOST: int = 1
 
 
+func before_each() -> void:
+	# This container's Vulkan is llvmpipe, a software device: let the GPU path run on it here.
+	GpuCompute.on_software = true
+
+
 func after_each() -> void:
 	GpuCompute.allowed = true
+	GpuCompute.on_software = false
 
 
 func test_with_no_compute_the_grid_stays_on_the_cpu() -> void:

@@ -30,7 +30,8 @@ extends "res://bench/stress_runner.gd"
 ## `--gpu-compare` holds the game still halfway through and draws the same frame with the effects
 ## worked out on the GPU and on the CPU (`Feel.set_gpu_effects`; the light grid), comparing them pixel
 ## for pixel and saving both (`_compare_gpu`). `--cpu-effects` keeps every effect on the CPU (on the
-## GPU by default where the renderer has compute: core/base/gpu_compute.gd).
+## GPU by default where the renderer has compute and is not a software device: core/base/gpu_compute.gd;
+## `--gpu-on-software` lets it run on llvmpipe too).
 ## `--one-thread` runs Feel's per-frame pieces on the main thread alone (gameplay/feel/feel_jobs.gd;
 ## on the worker threads by default on the desktop), to compare the two.
 ## `--census` prints the frame's draw census once a scenario, halfway through (draw_census.gd), and
@@ -227,6 +228,7 @@ func _scenario_started(scenario: Dictionary) -> void:
 		_feel.call(&"set_effect_threads", threaded)
 		print("BENCH: biome frames %s effect threads: %s, %d cores, render thread %s" % [scenario["label"], "on" if threaded else "off", OS.get_processor_count(), "separate (no viewport timed)" if not _gpu_timed else "the main thread's"])
 	if _feel != null and _feel.has_method(&"set_gpu_effects"):
+		GpuCompute.on_software = (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--gpu-on-software")
 		var on_gpu: bool = _feel.call(&"set_gpu_effects", not (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--cpu-effects"))
 		print("BENCH: biome frames %s gpu effects: %s (%s)" % [scenario["label"], "on" if on_gpu else "off", RenderingServer.get_current_rendering_method()])
 	if _feel != null and _feel.has_method(&"profile_parts"):

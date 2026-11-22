@@ -53,6 +53,46 @@ func test_a_frame_with_no_light_is_dark_on_the_gpu() -> void:
 	grid.use_gpu(false)
 
 
+func test_rows_that_give_no_light_light_nothing_round_the_worlds_origin() -> void:
+	# Regression (the review): a row with no light became a lamp whose box (1, 1, -1, -1) a tile over
+	# the world's origin kept, and lit as a beam of no reach: 0/0 in every cell there.
+	if not GpuCompute.available():
+		return
+	var grid: LightGridScript = LightGridTest._grid()
+	grid.set_blockers(PackedVector4Array(), PackedVector4Array(), 0)
+	check(grid.use_gpu(true), "on the GPU")
+	var dead: PackedFloat32Array = LightGridTest._rows(LightGridScript.ROWS_SHOT, 21)
+	for i in LightGridTest.ROWS:
+		dead[i * LightGridScript.STRIDE + 5] = 2.0
+	grid.clear()
+	grid.add_rows(dead, LightGridTest.ROWS, LightGridScript.ROWS_SHOT, 1.0, 0.0, 0.0, false)
+	grid.bake()
+	var bytes: PackedByteArray = grid.gpu.read_back(grid.atlas_width, grid.atlas_height)
+	var lit: int = 0
+	for c in grid.atlas_width * grid.atlas_height:
+		if bytes[c * 4] + bytes[c * 4 + 1] + bytes[c * 4 + 2] > 0:
+			lit += 1
+	check_equal(lit, 0, "no cell lit by shots that are not live (the first view spans the origin)")
+	grid.use_gpu(false)
+
+
+func test_batches_that_change_their_order_keep_their_buffers() -> void:
+	if not GpuCompute.available():
+		return
+	var grid: LightGridScript = LightGridTest._grid()
+	check(grid.use_gpu(true), "on the GPU")
+	var small: PackedFloat32Array = LightGridTest._rows(LightGridScript.ROWS_SHOT, 31).slice(0, 40 * LightGridScript.STRIDE)
+	var big: PackedFloat32Array = LightGridTest._rows(LightGridScript.ROWS_RUNE, 32)
+	for frame in 6:
+		grid.clear()
+		if frame % 2 == 0:
+			grid.add_rows(small, 40, LightGridScript.ROWS_SHOT, 1.0, 0.0, 0.0, false)
+		grid.add_rows(big, LightGridTest.ROWS, LightGridScript.ROWS_RUNE, 1.0, 0.0, 0.0, false)
+		grid.bake()
+	check_equal(grid.gpu.slots_sized, 2, "a buffer each, sized once, though the big batch is first every other frame")
+	grid.use_gpu(false)
+
+
 func test_switching_back_hands_the_cpus_texture() -> void:
 	if not GpuCompute.available():
 		return

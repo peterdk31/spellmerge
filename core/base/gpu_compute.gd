@@ -14,7 +14,8 @@ extends RefCounted
 ## - **The render thread:** a RenderingDevice call is made on the render thread only, through
 ##   `on_render_thread` (Godot's `RenderingServer.call_on_render_thread`: at once on the web's and
 ##   CI's one thread, queued in order with the frame's other calls on the desktop's separate one), so
-##   what an effect dispatches reads the buffers handed before it and is drawn by the frame after it.
+##   what an effect dispatches at a frame's `frame_pre_draw` reads the buffers handed before it and is
+##   drawn by that frame.
 ## - **The shaders** are `.glsl` files (imported by Godot as `RDShaderFile`; AGENTS.md, hard rule 2,
 ##   the owner's decision of 2026-11-22: in `core/` or `gameplay/feel/`, drawing only), each loaded
 ##   with a literal `load()` only behind `available()` (so never on the web or the OpenGL fallback;

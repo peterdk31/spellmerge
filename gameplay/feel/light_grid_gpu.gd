@@ -64,6 +64,8 @@ var ready: bool = false
 ## Frames dispatched, and lamps lit the last frame (for tests and benchmarks). Read only.
 var dispatched: int = 0
 var lamps_last: int = 0
+## How many times a slot's MultiMesh was sized anew (for tests: not a frame once the batches settle).
+var slots_sized: int = 0
 
 # The render thread's (made and used there only).
 var _rd: RenderingDevice = null
@@ -93,6 +95,9 @@ var _segments: int = 0
 var _lamps: int = 0
 var _beam_pieces: int = 0
 var _too_many_said: bool = false
+## The frame each slot was last handed rows in (`begin` counts frames), so a slot is used once a frame.
+var _slot_used: PackedInt64Array = PackedInt64Array()
+var _frames_begun: int = 0
 ## The jobs the render thread runs (made once: no Callable a frame).
 var _dispatch_job: Callable = Callable()
 var _make_job: Callable = Callable()
@@ -201,6 +206,8 @@ func _init() -> void:
 	_push.resize(PUSH_BYTES)
 	_mesh_rows.resize(SLOTS)
 	_mesh_rows.fill(-1)
+	_slot_used.resize(SLOTS)
+	_slot_used.fill(-1)
 	for slot in SLOTS:
 		_meshes.append(RID())
 		_sets.append(RID())
@@ -221,6 +228,12 @@ func _init() -> void:
 
 ## Let go of everything made on the GPU (the light switched off or the grid freed).
 func release() -> void:
+	var was_ready: bool = ready
+	# A dispatch still queued sees `ready` false and does nothing; force_sync waits for any that runs
+	# now, so nothing it reads is freed under it (and this object outlives it).
+	ready = false
+	if was_ready:
+		RenderingServer.force_sync()
 	for slot in _meshes.size():
 		if _meshes[slot].is_valid():
 			RenderingServer.free_rid(_meshes[slot])
@@ -228,8 +241,7 @@ func release() -> void:
 	if texture != null:
 		texture.texture_rd_rid = RID()
 		texture = null
-	if ready:
-		ready = false
+	if was_ready:
 		# Freed by the render thread after every dispatch queued before (not through this object,
 		# which may be gone by then). The uniform sets go with the buffers they were made over.
 		GpuCompute.free_later([_empty_set, _set0, _lamp_buffer, _frame_buffer, _empty_rows, _atlas, _pipeline, _shader])
@@ -237,6 +249,7 @@ func release() -> void:
 
 ## The frame begins: no rows, no beams yet.
 func begin() -> void:
+	_frames_begun += 1
 	_segments = 0
 	_lamps = 0
 	_beam_pieces = 0
@@ -252,7 +265,8 @@ func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad
 			_too_many_said = true
 			push_error("LightGridGpu: more than %d batches of lights in a frame; the rest are left out" % SEGMENTS_MOST)
 		return
-	var slot: int = _segments
+	var instances: int = rows.size() / STRIDE
+	var slot: int = _slot_for(instances)
 	var staged: Staged = _staged[_turn]
 	var handed: PackedFloat32Array = rows
 	if kind == ROWS_SPOT:
@@ -260,7 +274,8 @@ func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad
 		handed = staged.spots[slot].data
 	if not _hand(slot, handed):
 		return
-	staged.put_segment(slot, slot, kind, count, _lamps, blocked, reach, pad)
+	staged.put_segment(_segments, slot, kind, count, _lamps, blocked, reach, pad)
+	_slot_used[slot] = _frames_begun
 	_lamps += count
 	_segments += 1
 
@@ -329,6 +344,22 @@ func read_back(width: int, height: int) -> PackedByteArray:
 
 # --- The main thread's ---------------------------------------------------------------------------
 
+## A slot for a batch of `instances` rows this frame: one not used yet this frame whose MultiMesh
+## already holds that many, so a batch that moves in the frame's order (another batch came or went)
+## does not make the slot's buffer anew; else the first slot free this frame. A slot is a MultiMesh
+## and a spots' copy a turn; the beams have the last one.
+func _slot_for(instances: int) -> int:
+	var free: int = -1
+	for slot in SEGMENTS_MOST:
+		if _slot_used[slot] == _frames_begun:
+			continue
+		if _mesh_rows[slot] == instances:
+			return slot
+		if free < 0:
+			free = slot
+	return free
+
+
 ## Hand `rows` to slot `slot`'s MultiMesh (its instance count follows the array's size). False when it
 ## cannot be (no whole rows).
 func _hand(slot: int, rows: PackedFloat32Array) -> bool:
@@ -339,6 +370,7 @@ func _hand(slot: int, rows: PackedFloat32Array) -> bool:
 		_meshes[slot] = RenderingServer.multimesh_create()
 	if _mesh_rows[slot] != instances:
 		_mesh_rows[slot] = instances
+		slots_sized += 1
 		RenderingServer.multimesh_allocate_data(_meshes[slot], instances, RenderingServer.MULTIMESH_TRANSFORM_2D, true, true)
 	RenderingServer.multimesh_set_buffer(_meshes[slot], rows)
 	return true

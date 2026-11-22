@@ -329,7 +329,8 @@ void row_to_lamp(uint i) {
 		colour = glow_of(at) * (SHOT_STRENGTH * rows[at + 6]);
 	}
 	if (hx <= 0.0 || dot(colour, colour) <= 0.0) {
-		write_lamp(i, vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(1.0, 1.0, -1.0, -1.0));
+		// No light: a box over no tile (and its type 0, which `lamp_at` never lights).
+		write_lamp(i, vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(1e30, 1e30, -1e30, -1e30));
 		return;
 	}
 	hx = max(hx, cell);
@@ -360,7 +361,9 @@ void row_to_lamp(uint i) {
 		}
 	}
 	float big = max(hx, hy);
-	write_lamp(i, vec4(cx, cy, hx, hy), vec4(wx, wy, 1.0, uintBitsToFloat(near_bits)), vec4(colour, 0.0), vec4(lit, 0.0, 0.0), vec4(cx - big, cy - big, cx + big, cy + big));
+	// The near boxes' bits as two 16-bit halves, each a whole float (a float's bit pattern could be
+	// flushed or made canonical on its way through memory).
+	write_lamp(i, vec4(cx, cy, hx, hy), vec4(wx, wy, 1.0, 0.0), vec4(colour, 0.0), vec4(lit, float(near_bits & 0xFFFFu), float(near_bits >> 16u)), vec4(cx - big, cy - big, cx + big, cy + big));
 }
 
 // --- Mode 1: a cell (LightGrid._lamp's and add_beam's loops, then bake) -----------------------------
@@ -370,6 +373,9 @@ vec3 lamp_at(uint lamp, vec2 p, int n) {
 	vec4 l0 = lamps[at];
 	vec4 l1 = lamps[at + 1u];
 	vec4 l2 = lamps[at + 2u];
+	if (l1.z == 0.0) {
+		return vec3(0.0);
+	}
 	if (l1.z == 1.0) {
 		float dx = p.x - l0.x;
 		float dy = p.y - l0.y;
@@ -380,9 +386,10 @@ vec3 lamp_at(uint lamp, vec2 p, int n) {
 			return vec3(0.0);
 		}
 		float open = 1.0;
-		uint near_bits = floatBitsToUint(l1.w);
+		vec4 l3 = lamps[at + 3u];
+		uint near_bits = uint(l3.z) | (uint(l3.w) << 16u);
 		if (near_bits != 0u) {
-			open = 1.0 - shade_between(p, lamps[at + 3u].xy, n, near_bits);
+			open = 1.0 - shade_between(p, l3.xy, n, near_bits);
 		}
 		return l2.rgb * (f * f * open);
 	}

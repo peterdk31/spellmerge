@@ -23,6 +23,10 @@ extends RefCounted
 ##   (`light_grid_rows`, `light_grid_beam`, `light_grid_bake`), on this object's arrays in place, to
 ##   the bit as here (tests/gameplay/feel/test_light_grid.gd compares them byte for byte). Here is the
 ##   reference and the fallback.
+## - **GPU:** while `use_gpu` holds a `LightGridGpu` (the desktop's Mobile renderer, `GpuCompute`), the
+##   rows and beams are handed to it and a compute shader lights the cells straight into the texture
+##   the readers sample (`light_grid_gpu.gd`): `rgb` and `bytes` are not written then. It comes before
+##   the kernel; the kernel, then here, are the fallback.
 ## - **The colours** are the shader's: a shot's, rune's, flash's or cue's glow from its row's colour
 ##   and core (`glow_of`: `shot_look.gdshaderinc`'s `look_from_color(...).glow`, its palette's
 ##   infusions read from the infusion table, `use_tints`), a spot's its own colour.
@@ -33,6 +37,7 @@ extends RefCounted
 
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const NativeScript := preload("res://core/native/native.gd")
+const LightGridGpuScript := preload("res://gameplay/feel/light_grid_gpu.gd")
 
 ## The cell's size (world px each way) by default.
 const CELL: float = 8.0
@@ -111,10 +116,12 @@ var blocker_bodies: PackedVector4Array = PackedVector4Array()
 var blocker_count: int = 0
 ## The infusion table (InfusionTable's, `use_tints`; every layer none until handed). Read only.
 var tints: PackedColorArray = PackedColorArray()
-## The atlas as a texture (made again only when the atlas grows). Read only.
-var texture: ImageTexture = null
+## The atlas as a texture (made again only when the atlas grows; the GPU's atlas while `gpu`). Read only.
+var texture: Texture2D = null
 ## The kernel these calls run in (null: here). Read only.
 var kernel: Object = null
+## The GPU's grid these calls hand their rows to (null: the kernel's or here). Read only.
+var gpu: LightGridGpuScript = null
 ## The views the GDScript's loops light this call (`_views_from`).
 var _first_lit: int = 0
 var _last_lit: int = 0
@@ -142,6 +149,21 @@ func use_native(on: bool) -> bool:
 			push_error("LightGrid: the native kernel does not match: %s" % ", ".join(wrong))
 			kernel = null
 	return kernel != null
+
+
+## `add_rows`, `add_beam` and `bake` handed to a compute shader from now on while `on` and the GPU can
+## (GpuCompute.available: the desktop's Mobile renderer), else the kernel's or here. Returns whether
+## they run on the GPU. The texture changes with it: the readers bind it again (SpellLight).
+func use_gpu(on: bool) -> bool:
+	if on and gpu == null and GpuCompute.available():
+		gpu = LightGridGpuScript.new()
+		if not gpu.ready:
+			gpu = null
+	elif not on and gpu != null:
+		gpu.release()
+		gpu = null
+	texture = gpu.texture if gpu != null else _upload.texture
+	return gpu != null
 
 
 ## The cell (world px each way; at least 4).
@@ -194,6 +216,9 @@ func fit(boxes: PackedVector4Array, count: int) -> void:
 
 ## Every cell dark again (the frame's start).
 func clear() -> void:
+	if gpu != null:
+		gpu.begin()
+		return
 	rgb.fill(0.0)
 
 
@@ -206,6 +231,10 @@ func clear() -> void:
 func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad: float, now: float, blocked: bool, first_view: int = 0, views: int = VIEWS_MOST) -> void:
 	count = mini(count, rows.size() / STRIDE)
 	if count <= 0 or not lights_views(first_view, views):
+		return
+	if gpu != null:
+		# Every view at once (`can_split` is false): the shader lights each view's cells.
+		gpu.add_rows(rows, count, kind, reach, pad, now, blocked)
 		return
 	if kernel != null:
 		kernel.call(&"light_grid_rows", self, rows, count, kind, reach, pad, now, blocked, first_view, views)
@@ -222,6 +251,9 @@ func add_rows(rows: PackedFloat32Array, count: int, kind: int, reach: float, pad
 func add_beam(path: PackedVector3Array, points: int, beam_reach: float, colour: Color, first_view: int = 0, views: int = VIEWS_MOST) -> void:
 	points = mini(points, path.size())
 	if points < 2 or not lights_views(first_view, views) or beam_reach <= 0.0:
+		return
+	if gpu != null:
+		gpu.add_beam(path, points, beam_reach, colour, cell)
 		return
 	if kernel != null:
 		kernel.call(&"light_grid_beam", self, path, points, beam_reach, colour, first_view, views)
@@ -304,11 +336,14 @@ func _views_from(first_view: int, views: int) -> void:
 ## Whether views may be lit on threads of their own (`add_rows`' `first_view`): in the kernel only,
 ## which writes a call's own cells in place; the GDScript's loops keep to one thread.
 func can_split() -> bool:
-	return kernel != null
+	return kernel != null and gpu == null
 
 
 ## The frame's light into the texture: each cell's colour cut at 1, a byte a channel.
 func bake() -> void:
+	if gpu != null:
+		gpu.bake(cell, view_count, view_origin, view_size, view_at, tints, blocker_boxes, blocker_bodies, blocker_count)
+		return
 	if kernel != null:
 		kernel.call(&"light_grid_bake", self)
 	else:
@@ -359,7 +394,9 @@ func _grow(width: int, height: int) -> void:
 		bytes[c * 4 + 2] = 0
 	_bytes_other = bytes.duplicate()
 	_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, _bytes_other)
-	texture = _upload.hand(_image)
+	var on_cpu: Texture2D = _upload.hand(_image)
+	# The GPU's atlas is made at its most once: it does not grow.
+	texture = gpu.texture if gpu != null else on_cpu
 
 
 # --- One row (the GPU light's vertex stage, then its fragment stage at each cell) ------------------

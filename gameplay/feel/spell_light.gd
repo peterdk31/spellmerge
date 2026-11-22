@@ -145,6 +145,10 @@ var tint_count: int = 0
 ## 2026-11-21: smoothed, its bands still hard), and how many times it was worked out (for tests). Read only.
 var grid_smooth: bool = true
 var grids_baked: int = 0
+## Microseconds the grid's fill and bake took on this thread since the benchmark last read them, timed
+## while `profile_clock` is set (benchmarks only; none by default). Read only.
+var fill_usec: int = 0
+var profile_clock: Callable = Callable()
 ## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
 var spots_written: int = 0
 ## Where the spots are left out (`hide_unseen`; null: none).
@@ -230,6 +234,7 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 		_projectiles.light_rows_wanted = true
 	grid.set_cell(GRID_CELL)
 	grid.use_native(true)
+	grid.use_gpu(true)
 	_view_boxes.resize(VIEWS_MOST)
 	_grid_view_keys.resize(VIEWS_MOST)
 	_grid_size_keys.resize(VIEWS_MOST)
@@ -276,6 +281,12 @@ func set_blockers(boxes: PackedVector4Array, bodies: PackedVector4Array, count: 
 ## How many boxes block light (for tests).
 func blocker_count() -> int:
 	return grid.blocker_count
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		# What the GPU's grid made is the renderer's until let go.
+		grid.use_gpu(false)
 
 
 func _enter_tree() -> void:
@@ -371,6 +382,7 @@ static func _world_box(view: Viewport) -> Vector4:
 ## The grid over the first `count` views' boxes, worked out from every light handed over this frame,
 ## baked into its texture and handed to the readers; the rows handed over let go.
 func _light_grid(count: int) -> void:
+	var since: int = int(profile_clock.call()) if profile_clock.is_valid() else 0
 	if InfusionTableScript.published_version != _tints_version:
 		_tints_version = InfusionTableScript.published_version
 		grid.use_tints(InfusionTableScript.published)
@@ -417,6 +429,8 @@ func _light_grid(count: int) -> void:
 	_beams_lit = 0
 	grid.bake()
 	grids_baked += 1
+	if profile_clock.is_valid():
+		fill_usec += int(profile_clock.call()) - since
 	_hand_grid_views()
 
 
@@ -553,6 +567,17 @@ func _bind(material: ShaderMaterial) -> void:
 	for k in VIEWS_MOST:
 		material.set_shader_parameter(GRID_VIEWS[k], _grid_view_keys[k])
 		material.set_shader_parameter(GRID_SIZES[k], _grid_size_keys[k] if _grid_size_keys[k].x >= 0.0 else Vector4.ZERO)
+
+
+## Whether the grid is worked out by the GPU (LightGrid.use_gpu), not on this machine's CPU.
+func on_gpu() -> bool:
+	return grid.gpu != null
+
+
+## The grid worked out by the GPU from now on while `on` and it can (GpuCompute), else on the CPU;
+## the readers take its texture at the next draw. Returns whether it is on the GPU.
+func use_gpu(on: bool) -> bool:
+	return grid.use_gpu(on)
 
 
 ## The grid's texture (the light round everything this frame, by view), for what draws by the light:

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cgux1d56vr73p"
+path="res://.godot/imported/light_grid.glsl-f23840b19c8e90483725766f774ddff4.res"
+
+[deps]
+
+source_file="res://gameplay/feel/light_grid.glsl"
+dest_files=["res://.godot/imported/light_grid.glsl-f23840b19c8e90483725766f774ddff4.res"]
+
+[params]
+

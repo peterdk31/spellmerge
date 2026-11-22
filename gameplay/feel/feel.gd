@@ -2831,6 +2831,16 @@ func set_effect_threads(on: bool) -> bool:
 	return _spectacle.jobs.threaded
 
 
+## Whether the effects that can are worked out by compute shaders on the GPU (`GpuCompute`: on by
+## default on the desktop's Mobile renderer, never on the web's Compatibility one or headless; the light
+## grid, `light_grid_gpu.gd`). This machine's, never a run's: what is drawn is the same within a byte
+## of light either way. Returns whether the light grid is on the GPU now.
+func set_gpu_effects(on: bool) -> bool:
+	GpuCompute.allowed = on
+	var lit: SpellLightScript = light()
+	return lit.use_gpu(on) if lit != null else false
+
+
 ## The "Dynamic lighting" setting (once "Spell light"; `Spectacle.set_spell_light`). Returns the
 ## setting.
 func set_spell_light(on: bool) -> bool:

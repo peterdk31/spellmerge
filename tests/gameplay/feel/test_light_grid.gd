@@ -158,6 +158,19 @@ func test_a_light_falls_off_as_the_shader_draws_it() -> void:
 	check_equal(grid.light_at(0, Vector2(150.0, 100.0)), Color.BLACK, "nothing past its reach")
 
 
+## The grid's native calls are LightKernel's, a class of their own (the owner, 2026-11-22), not the
+## motes' kernel's.
+func test_the_grid_runs_in_its_own_kernel() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
+		return
+	var grid := LightGridScript.new()
+	check(grid.use_native(true), "the kernel is switched on")
+	check_equal(grid.kernel.get_class(), "LightKernel", "its own class")
+	var motes: Object = NativeScript.mote_kernel()
+	check(not motes.has_method(&"light_grid_rows") and not motes.has_method(&"check_light_grid"), "the motes' kernel has no light calls")
+
+
 func test_the_native_kernel_lights_the_grid_as_the_gdscript_to_the_byte() -> void:
 	if not NativeScript.loaded():
 		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")

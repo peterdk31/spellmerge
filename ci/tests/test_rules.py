@@ -411,6 +411,22 @@ class RepoTest(unittest.TestCase):
         self.assertIn(("file-type", "error", "core/spells/fast.cpp"), found)
         self.assertIn(("binary", "error", "native/bin/libspellmerge.so"), found)
 
+    def test_compute_shaders_are_claudes_only_and_only_for_drawing(self) -> None:
+        # The desktop builds' compute shaders (the owner, 2026-11-22): core/ and gameplay/feel/ only.
+        self.write("gameplay/feel/light_fill.glsl", "#[compute]\n#version 450\nvoid main() {}\n")
+        self.write("core/display/blur.glsl", "#[compute]\n#version 450\nvoid main() {}\n")
+        self.commit()
+        self.assertEqual(self.check(BOT), [])
+        found = self.check()
+        for path in ("gameplay/feel/light_fill.glsl", "core/display/blur.glsl"):
+            self.assertIn(("file-type", "error", path), found)
+        self.write("gameplay/ai/think.glsl", "#[compute]\n#version 450\nvoid main() {}\n")
+        self.write("content/relics/a/glow.glsl", "#[compute]\n#version 450\nvoid main() {}\n")
+        self.commit()
+        found = self.check(BOT)
+        for path in ("gameplay/ai/think.glsl", "content/relics/a/glow.glsl"):
+            self.assertIn(("file-type", "error", path), found)
+
     def test_godot_shaders_and_shader_includes_are_allowed(self) -> None:
         # The shot shaders share code through includes (the owner, 2026-10-29).
         self.write("content/relics/a/glow.gdshader", "shader_type canvas_item;\n#include \"res://content/relics/a/glow.gdshaderinc\"\n")

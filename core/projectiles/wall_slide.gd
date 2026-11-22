@@ -76,6 +76,13 @@ static func slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: in
 	return gd_slide(cells, ground, w, h, cell, origin, from, motion, radius, mask)
 
 
+## The native module's `BodyKernel.walk` (sim-native SN1): a body's whole walk over the room grid,
+## `RoomGrid.walk_body`'s, which calls it only while `native_on()` and is its twin otherwise
+## (`RoomGrid.gd_walk_body`).
+static func walk(walls: PackedByteArray, walk_cells: PackedByteArray, ground: PackedByteArray, holes: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, flags: int, mask: int, from: Vector2, motion: Vector2, crossed: Vector2, radius: float, reach: float) -> Vector3:
+	return _kernel.call(&"walk", walls, walk_cells, ground, holes, w, h, cell, origin, flags, mask, from, motion, crossed, radius, reach)
+
+
 ## `slide` in GDScript: the reference the native kernel mirrors, and the fallback without it.
 static func gd_slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float, mask: int = 255) -> Vector2:
 	var px: float = from.x

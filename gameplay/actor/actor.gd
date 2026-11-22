@@ -71,7 +71,7 @@ extends Node2D
 ## A bridge's mouth (connected biomes CB2) stops a body as a wall unless a wizard drives it
 ## (`passes_mouths`). Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
 ## `Actors.touching`: a dust heap walked into, boss plan OB5). In a room with holes the move is slid
-## in two parts (hub rework HR-H1, `_move_over_holes`): what crosses holes, then its own walk, which
+## in two parts (hub rework HR-H1, `RoomGrid.walk_body`): what crosses holes, then its own walk, which
 ## stops at a hole's lip.
 ##
 ## Falls (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4 and 5): right after its move, a
@@ -425,10 +425,13 @@ func move(delta: float) -> void:
 	var to: Vector2 = unhindered
 	var holes: bool = projectiles != null and projectiles.grid().has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
-	if holes:
-		to = _move_over_holes(from, delta)
-	elif projectiles != null:
-		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius(), false, passes_mouths())
+	var found: int = 0
+	if projectiles != null:
+		# The slides and the holes at its end in one call (`RoomGrid.walk_body`, sim-native SN1).
+		var radius: float = wall_radius()
+		var walked: Vector3 = projectiles.grid().walk_body(from, velocity * delta, mover.crossing * delta, radius, passes_mouths(), radius + HoleRules.GROUND_MARGIN)
+		to = Vector2(walked.x, walked.y)
+		found = int(walked.z)
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -436,7 +439,7 @@ func move(delta: float) -> void:
 		mover.held_up(velocity * delta, to - from)
 		velocity = (to - from) / delta
 	if holes:
-		_check_ground(crossed)
+		_check_ground(crossed, found)
 	find_room()
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
@@ -453,20 +456,20 @@ func find_room() -> void:
 ## After a move in a room with holes (hub rework HR-H2, see the class doc): a body whose centre ends
 ## over a hole with nothing crossing (`crossed`: this move had a share that crosses; a move of its
 ## Mover with time left; a local stop holding it) falls, or, a boss, is put on the nearest ground;
-## one standing clear of every hole keeps the place as its last ground.
-func _check_ground(crossed: bool) -> void:
+## one standing clear of every hole keeps the place as its last ground. `found`: the walk's look at
+## where it ended (`RoomGrid.walk_body`: over a hole, or within `HoleRules.GROUND_MARGIN` of one).
+func _check_ground(crossed: bool, found: int) -> void:
 	if fall_left > 0.0 or _dying or _leaving:
 		return
 	var at: Vector2 = global_position
-	var grid: RoomGrid = projectiles.grid()
-	if grid.is_hole(at):
+	if found == RoomGrid.WALKED_OVER_HOLE:
 		if crossed or _hold_shown or mover.is_moving():
 			return
 		if never_falls():
-			global_position = grid.nearest_ground(at, wall_radius())
+			global_position = projectiles.grid().nearest_ground(at, wall_radius())
 			return
 		_fall()
-	elif not grid.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
+	elif found != RoomGrid.WALKED_NEAR_HOLE:
 		ground = at
 		has_ground = true
 
@@ -591,40 +594,6 @@ func placed() -> void:
 	has_ground = false
 	ground = Vector2.ZERO
 
-
-## Where the body's move by `velocity` over `delta` ends in a room with holes (hub rework HR-H1,
-## docs/milestones/hub-rework.md, "Holes" 2 and 3), slid in two parts: first what crosses holes (the
-## Mover's `crossing`: its dashes and what is done to it), then its own walk, which stops at a hole's
-## lip. One slide of the sum could not tell the parts apart. The walk:
-## - **from over a hole** crosses: it is not pushed back out (a centre in a blocked cell leaves by its
-##   nearest open side), so a jump onto a hole (a teleport, a swap, a portal's exit, whatever step it
-##   came in) or a push into one keeps the body there (falling is HR-H2's);
-## - **while something crosses and the circle already reaches over a lip** is slid against the ground
-##   alone, so it never pushes the body back out against the push (a push slower than the body's
-##   radius a tick would never carry it in, and a carry would be pinned at the lip as at a wall), and
-##   is dropped if it would set the centre over a hole: it never steps in;
-## - **while something crosses and the body does not walk** is not slid (a still walk would push it
-##   back off the lip it is carried over);
-## - **otherwise** stops at the lip (a circle only over a lip, with nothing crossing, is nudged back
-##   onto the ground, as at a wall).
-func _move_over_holes(from: Vector2, delta: float) -> Vector2:
-	var radius: float = wall_radius()
-	var motion: Vector2 = velocity * delta
-	var crossed: Vector2 = mover.crossing * delta
-	var grid: RoomGrid = projectiles.grid()
-	var through: bool = passes_mouths()
-	var at: Vector2 = from
-	if crossed != Vector2.ZERO:
-		at = grid.slide_body(from, crossed, radius, true, through)
-	var walk: Vector2 = motion - crossed
-	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
-		return at
-	if grid.is_hole(at):
-		return grid.slide_body(at, walk, radius, true, through)
-	if crossed != Vector2.ZERO and grid.touches_hole(at, radius):
-		var walked: Vector2 = grid.slide_body(at, walk, radius, true, through)
-		return at if grid.is_hole(walked) else walked
-	return grid.slide_body(at, walk, radius, false, through)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against

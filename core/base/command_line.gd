@@ -5,8 +5,9 @@ extends RefCounted
 ## A desktop build is given its own arguments after a `--` (`OS.get_cmdline_user_args()`), the
 ## engine's before it. The web has no `--`: its page's start config (`args`, which the test pages
 ## of `smbot.websmoke` fill) reaches the game as `OS.get_cmdline_args()`, and a player's page passes
-## none. So on the web those are the game's own arguments too. A check that read only the user
-## arguments missed every web automation: the web test build took its replay runs for a player's,
+## none. So on the web those are the game's own arguments too, all but those the engine takes as
+## its own options and never hands on (`--benchmark` is one: on the web it never reaches the game).
+## A check that read only the user arguments missed every web automation: the web test build took its replay runs for a player's,
 ## recorded them with boss intros on (`SessionRules.boss_intros`, a rule in the replay's header)
 ## and so parted from every desktop at tick 0 (the platform compare, tools/platform_hashes.py).
 
@@ -28,9 +29,14 @@ static func user_arguments_of(user: PackedStringArray, engine: PackedStringArray
 ## True when nobody is there to play: under a test script, or started with arguments of the game's
 ## own (a test, a bot, a benchmark, a replay run).
 static func automated() -> bool:
+	return automated_of(scripted(), user_arguments())
+
+
+## True when a test script is the main loop.
+static func scripted() -> bool:
 	var tree: MainLoop = Engine.get_main_loop()
-	return automated_of(tree != null and tree.get_script() != null, user_arguments())
+	return tree != null and tree.get_script() != null
 
 
-static func automated_of(scripted: bool, user_args: PackedStringArray) -> bool:
-	return scripted or not user_args.is_empty()
+static func automated_of(under_script: bool, user_args: PackedStringArray) -> bool:
+	return under_script or not user_args.is_empty()

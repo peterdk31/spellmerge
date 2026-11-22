@@ -29,4 +29,11 @@ func test_a_desktops_engine_arguments_are_not_the_games() -> void:
 
 func test_a_test_script_is_automated() -> void:
 	check(CommandLine.automated_of(true, PackedStringArray()), "under a test script")
-	check(CommandLine.automated(), "this run, under the test runner")
+	check(CommandLine.scripted(), "the test runner is a script")
+	check(CommandLine.automated(), "so this run is automated")
+
+
+func test_on_the_web_both_lists_are_the_games() -> void:
+	var user := PackedStringArray(["--a"])
+	var page := PackedStringArray(["--b"])
+	check_equal(CommandLine.user_arguments_of(user, page, true), PackedStringArray(["--a", "--b"]), "the user list, then the page's")

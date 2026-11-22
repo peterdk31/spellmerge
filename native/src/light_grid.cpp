@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Grid lighting in native code (gameplay/feel/light_grid.gd; the owner's decision of 2026-11-21):
-// MoteKernel's `light_grid_rows`, `light_grid_beam` and `light_grid_bake` do what LightGrid's
+// LightKernel's `light_grid_rows`, `light_grid_beam` and `light_grid_bake` do what LightGrid's
 // `add_rows`, `add_beam` and `bake` do in GDScript, on the grid's own arrays in place, to the bit
 // (tests/gameplay/feel/test_light_grid.gd compares them byte for byte). A GDScript `float` is a
 // double here and a Vector2, Vector3, Vector4 or Color is single precision (as `glow`, a Vector3,
@@ -10,9 +10,11 @@
 // float and written back rounded. What only draws keeps std:: maths (native/README.md): the spots'
 // flicker's `sin` is the C library's, as GDScript's is.
 
-#include "mote_kernel.h"
+#include "light_kernel.h"
 
 #include <cmath>
+
+#include <godot_cpp/core/class_db.hpp>
 
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
@@ -436,7 +438,7 @@ void row_light(Grid &gr, const float *row, int64_t kind, double reach, double pa
 
 } // namespace
 
-PackedStringArray MoteKernel::check_light_grid(Object *object) const {
+PackedStringArray LightKernel::check_light_grid(Object *object) const {
 	PackedStringArray wrong;
 	ERR_FAIL_NULL_V(object, wrong);
 	const GridNames &k = gn();
@@ -474,7 +476,7 @@ PackedStringArray MoteKernel::check_light_grid(Object *object) const {
 	return wrong;
 }
 
-void MoteKernel::light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now,
+void LightKernel::light_grid_rows(Object *grid, const PackedFloat32Array &rows, int64_t count, int64_t kind, double reach, double pad, double now,
 		bool blocked) {
 	ERR_FAIL_NULL(grid);
 	Grid gr;
@@ -489,7 +491,7 @@ void MoteKernel::light_grid_rows(Object *grid, const PackedFloat32Array &rows, i
 	}
 }
 
-void MoteKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour) {
+void LightKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, int64_t points, double beam_reach, const Color &colour) {
 	ERR_FAIL_NULL(grid);
 	Grid gr;
 	ERR_FAIL_COND(!gr.load(grid));
@@ -558,7 +560,7 @@ void MoteKernel::light_grid_beam(Object *grid, const PackedVector3Array &path, i
 	}
 }
 
-void MoteKernel::light_grid_bake(Object *grid) {
+void LightKernel::light_grid_bake(Object *grid) {
 	ERR_FAIL_NULL(grid);
 	const GridNames &k = gn();
 	const int64_t width = grid->get(k.atlas_width);
@@ -576,9 +578,16 @@ void MoteKernel::light_grid_bake(Object *grid) {
 	}
 }
 
-void MoteKernel::free_grid_names() {
+void LightKernel::free_names() {
 	if (grid_names != nullptr) {
 		memdelete(grid_names);
 		grid_names = nullptr;
 	}
+}
+
+void LightKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("check_light_grid", "grid"), &LightKernel::check_light_grid);
+	ClassDB::bind_method(D_METHOD("light_grid_rows", "grid", "rows", "count", "kind", "reach", "pad", "now", "blocked"), &LightKernel::light_grid_rows);
+	ClassDB::bind_method(D_METHOD("light_grid_beam", "grid", "path", "points", "beam_reach", "colour"), &LightKernel::light_grid_beam);
+	ClassDB::bind_method(D_METHOD("light_grid_bake", "grid"), &LightKernel::light_grid_bake);
 }

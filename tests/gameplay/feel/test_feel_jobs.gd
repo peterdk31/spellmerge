@@ -172,10 +172,10 @@ func test_the_rooms_mists_parted_a_room_a_thread_are_the_same() -> void:
 			same = same and _mists[room].live_cells() == alone[room].live_cells()
 	check(same, "every room's cells parted as on one thread, every frame")
 	var picture_same: bool = true
+	var parted: bool = false
 	for room in 5:
-		var threaded_picture: Image = _mists[room].texture.get_image()
-		var one_picture: Image = alone[room].texture.get_image()
-		if threaded_picture != null and one_picture != null:
-			picture_same = picture_same and threaded_picture.get_data() == one_picture.get_data()
-	check(picture_same, "and every room's picture the same")
+		picture_same = picture_same and _mists[room].picture_data() == alone[room].picture_data()
+		parted = parted or _mists[room].live_cells() > 0
+	check(picture_same, "and every room's picture the same, byte for byte")
+	check(parted, "with cells parted to compare")
 	check(jobs.groups == 90, "the rooms ran on the threads")

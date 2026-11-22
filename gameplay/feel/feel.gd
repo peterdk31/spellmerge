@@ -103,6 +103,7 @@ const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const FeelJobsScript := preload("res://gameplay/feel/feel_jobs.gd")
 const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
@@ -2804,11 +2805,11 @@ func set_floor_marks(on: bool) -> void:
 
 
 ## Whether the per-frame effects' independent pieces run on the worker threads (`feel_jobs.gd`: on by
-## default where the engine has threads, never on the web). This machine's, never a run's: what is
-## drawn is the same either way. Returns the setting.
+## default where the engine has threads, never on the web or one core, whatever is asked). This
+## machine's, never a run's: what is drawn is the same either way. Returns the setting.
 func set_effect_threads(on: bool) -> bool:
-	_spectacle.jobs.threaded = on
-	return on
+	_spectacle.jobs.threaded = on and FeelJobsScript.default_threaded()
+	return _spectacle.jobs.threaded
 
 
 ## The "Dynamic lighting" setting (once "Spell light"; `Spectacle.set_spell_light`). Returns the

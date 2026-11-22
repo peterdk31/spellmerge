@@ -1,15 +1,16 @@
 extends RefCounted
 ## Feel's per-frame work on independent pieces, on the engine's worker threads on the desktop (the
 ## owner's decision of 2026-11-22, "the per-frame effects on worker threads"): a room's mist parted,
-## a cover view's cells walked, a view's part of the light grid lit. One place knows threads; an
+## a view's part of the light grid lit. One place knows threads; an
 ## effect hands it a job, a Callable taking a piece's number, and how many pieces there are.
 ##
 ## - **The rules a job keeps:** a piece writes only what is its own (its room's arrays, its view's
 ##   cells) and reads what no piece writes; it touches no node, no scene tree, no RenderingServer and
 ##   no resource another piece holds; it allocates nothing. Whatever is handed to the GPU is handed
 ##   after the join, on the main thread, in the pieces' order. So what is drawn is the same on one
-##   thread or many, and does not hang on the threads' timing (`test_feel_jobs.gd` draws a fixed
-##   frame both ways and compares it pixel by pixel).
+##   thread or many, and does not hang on the threads' timing (`test_feel_jobs.gd` compares the
+##   threaded effects' arrays byte for byte; the play frames' `--shots` with and without
+##   `--one-thread` compare whole frames pixel for pixel).
 ## - **How:** `run(job, count)` hands pieces 1 to count - 1 to `WorkerThreadPool` as one group task,
 ##   runs piece 0 on the calling thread meanwhile, and returns once every piece is done: nothing
 ##   waits longer than it did on one thread. One group at a time (a job may not run another).
@@ -47,8 +48,13 @@ static func default_threaded() -> bool:
 func run(job: Callable, count: int) -> void:
 	if count <= 0:
 		return
+	if _job.is_valid():
+		# Called from a piece (not done today): in turn on its thread, writing nothing here.
+		for piece in count:
+			job.call(piece)
+		return
 	pieces += count
-	if not threaded or count == 1 or _job.is_valid():
+	if not threaded or count == 1:
 		for piece in count:
 			job.call(piece)
 		return

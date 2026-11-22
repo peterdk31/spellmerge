@@ -154,6 +154,11 @@ func parted_at(point: Vector2) -> float:
 	return _shown[y * width + x]
 
 
+## The picture's bytes as `work` left them (for tests: the texture's own copy is the renderer's).
+func picture_data() -> PackedByteArray:
+	return _image.get_data() if _image != null else PackedByteArray()
+
+
 ## How many cells are not closed (for tests).
 func live_cells() -> int:
 	return _live_count

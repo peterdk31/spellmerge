@@ -221,7 +221,7 @@ var _room_at: Vector2 = Vector2.ZERO
 ## and what it was laid with, by the same index. View only.
 var room_mists: Array[MistScript] = []
 ## Where the per-frame effects' independent pieces run (the rooms' mists, the light's views): on the
-## worker threads on the desktop, on this thread on the web (`feel_jobs.gd`; `set_threaded`).
+## worker threads on the desktop, on this thread on the web (`feel_jobs.gd`; `Feel.set_effect_threads`).
 var jobs: FeelJobsScript = FeelJobsScript.new()
 ## The mists stepped this frame (`_step_mists`; the first `_mists_stepped`), and their piece, made once.
 var _stepping: Array[MistScript] = []

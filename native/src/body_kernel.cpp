@@ -11,7 +11,11 @@
 
 #include <cmath>
 
+#include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/rect2.hpp>
+#include <vector>
 
 using namespace godot;
 
@@ -112,10 +116,55 @@ bool touches_hole(const uint8_t *holes, const uint8_t *walls, int64_t w, int64_t
 	return false;
 }
 
+// `RoomGrid.NO_PLACE` and `RoomGrid.ASK_GDSCRIPT` (a body `places` leaves to GDScript), checked by
+// `configure` against the GDScript's.
+constexpr int64_t NO_PLACE = -1, ASK_GDSCRIPT = -2;
+
+// `RoomGrid.place_at`, the places' rectangles handed over as `Rect2`s (single precision, as theirs).
+int64_t place_at(const std::vector<Rect2> &rects, const uint8_t *cells, const uint8_t *over, const uint8_t *mixed, const uint8_t *touched, int64_t w,
+		int64_t h, double cell, const Vector2 &origin, const Vector2 &point) {
+	const int64_t n = (int64_t)rects.size();
+	if (n == 0) {
+		return NO_PLACE;
+	}
+	const int64_t x = floori(((double)point.x - (double)origin.x) / cell);
+	const int64_t y = floori(((double)point.y - (double)origin.y) / cell);
+	if (x >= 0 && x < w && y >= 0 && y < h) {
+		const int64_t at = y * w + x;
+		if (mixed[at] != 0) {
+			for (int64_t place = 0; place < n; place++) {
+				if (over[place] != 0 && rects[place].has_point(point)) {
+					return place;
+				}
+			}
+		}
+		const int64_t guess = (int64_t)cells[at] - 1;
+		if (guess >= 0 && rects[guess].has_point(point)) {
+			return guess;
+		}
+		if (touched[at] == 0) {
+			return NO_PLACE;
+		}
+	}
+	for (int64_t place = 0; place < n; place++) {
+		if (over[place] != 0 && rects[place].has_point(point)) {
+			return place;
+		}
+	}
+	for (int64_t place = 0; place < n; place++) {
+		if (rects[place].has_point(point)) {
+			return place;
+		}
+	}
+	return NO_PLACE;
+}
+
 } // namespace
 
 bool BodyKernel::configure(const Dictionary &config) {
-	_ready = config.has("ITERATIONS") && config.has("MIN_STRIDE");
+	_ready = config.has("ITERATIONS") && config.has("MIN_STRIDE") && config.get("NO_PLACE", 0) == Variant(NO_PLACE) &&
+			config.get("ASK_GDSCRIPT", 0) == Variant(ASK_GDSCRIPT);
+	ERR_FAIL_COND_V_MSG(!_ready, false, "BodyKernel: WallSlide's numbers are missing, or RoomGrid's NO_PLACE or ASK_GDSCRIPT is not the kernel's");
 	if (_ready) {
 		_iterations = config["ITERATIONS"];
 		_min_stride = config["MIN_STRIDE"];
@@ -280,6 +329,57 @@ Vector3 BodyKernel::walk(const PackedByteArray &walls, const PackedByteArray &wa
 	return Vector3(to.x, to.y, (real_t)found);
 }
 
+bool BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
+		const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
+		int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const {
+	ERR_FAIL_COND_V_MSG(!_ready, false, "BodyKernel: configure it first");
+	ERR_FAIL_COND_V_MSG(count > ids.size() || count > places.size(), false, "BodyKernel.places: the ids or the places are fewer than count");
+	const int64_t n_rects = rects.size();
+	ERR_FAIL_COND_V_MSG(n_rects > 0 && (over.size() < n_rects || cells.size() < w * h || mixed.size() < w * h || touched.size() < w * h), false,
+			"BodyKernel.places: the places' grids are smaller than they say");
+	std::vector<Rect2> &boxes = _boxes;
+	boxes.resize((size_t)n_rects);
+	for (int64_t i = 0; i < n_rects; i++) {
+		boxes[(size_t)i] = rects[i];
+	}
+	const Variant manager(projectiles);
+	static const StringName ROOM("room");
+	static const StringName PROJECTILES("projectiles");
+	// The caller's array, written through its buffer (native/README.md, "The object's arrays").
+	int32_t *out = const_cast<int32_t *>(places.ptr());
+	const int32_t *id = ids.ptr();
+	for (int64_t n = 0; n < count; n++) {
+		const int64_t at = id[n];
+		Object *object = (at >= 0 && at < nodes.size() && nodes[at] != 0) ? ObjectDB::get_instance((uint64_t)nodes[at]) : nullptr;
+		Node2D *body = Object::cast_to<Node2D>(object);
+		const Variant room = body != nullptr ? body->get(ROOM) : Variant();
+		if (room.get_type() != Variant::INT) {
+			// No body, or none of an actor (`as Actor` is null): no place.
+			out[n] = (int32_t)NO_PLACE;
+			continue;
+		}
+		if (!body->is_inside_tree()) {
+			out[n] = (int32_t)(int64_t)room;
+			continue;
+		}
+		// `Actor.find_room`: the place it stands in, by its own manager's grid (none without one).
+		// Its manager compared as a Variant, never followed (a freed one is no pointer to read).
+		const Variant own = body->get(PROJECTILES);
+		const bool none = own.get_type() == Variant::NIL;
+		if (!none && own != manager) {
+			// Another manager's body (a test's world beside the game's): GDScript finds its place.
+			out[n] = (int32_t)ASK_GDSCRIPT;
+			continue;
+		}
+		const int64_t place = (!none && n_rects > 0) ? place_at(boxes, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), w, h, cell, origin, body->get_global_position()) : NO_PLACE;
+		if (place != (int64_t)room) {
+			body->set(ROOM, place);
+		}
+		out[n] = (int32_t)place;
+	}
+	return true;
+}
+
 void BodyKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("configure", "config"), &BodyKernel::configure);
 	ClassDB::bind_method(D_METHOD("slide", "cells", "ground", "w", "h", "cell", "origin", "from", "motion", "radius", "mask"),
@@ -287,4 +387,7 @@ void BodyKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("walk", "walls", "walk", "ground", "holes", "w", "h", "cell", "origin", "flags", "mask", "from", "motion", "crossed",
 								 "radius", "reach"),
 			&BodyKernel::walk);
+	ClassDB::bind_method(D_METHOD("places", "nodes", "ids", "count", "projectiles", "rects", "cells", "over", "mixed", "touched", "w", "h", "cell", "origin",
+								 "places"),
+			&BodyKernel::places);
 }

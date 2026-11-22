@@ -132,19 +132,25 @@ func wake(table: ActorsScript, projectiles: ProjectileManagerScript) -> void:
 	var count: int = table.open_ids(_ids)
 	if _places.size() < count:
 		_places.resize(count)
-	# Each body is looked up once: its place is kept for the second pass (the performance pass,
-	# 2026-11-21; the shots' places between move no body).
+	# Every body's place made current and kept for the second pass, in one native call when the
+	# module is loaded (sim-native SN2, `RoomGrid.find_places`), else `gd_find_places`.
+	if projectiles == null or not projectiles.grid().find_places(table.nodes(), _ids, count, projectiles, _places):
+		gd_find_places(table, count)
+	# Each place awake while a body that acts is in it, asked of the bodies in id order; a place
+	# already awake is not asked again (`keeps_awake` changes nothing). Asked after every body's
+	# place is found, as before between them: what it reads is the body's own, never a place.
 	for n in count:
-		var body := table.node_of(_ids[n]) as Actor
-		if body == null:
-			_places[n] = RoomGrid.NO_PLACE
-			continue
-		if body.is_inside_tree():
-			body.find_room()
-			# A place already awake is not asked again (`keeps_awake` changes nothing).
-			if body.room >= 0 and body.room < awake.size() and awake[body.room] == 0 and keeps_awake(body, table):
-				awake[body.room] = 1
-		_places[n] = body.room
+		var place: int = _places[n]
+		if place == RoomGrid.ASK_GDSCRIPT:
+			var asked := table.node_of(_ids[n]) as Actor
+			if asked != null:
+				asked.find_room()
+			place = asked.room if asked != null else RoomGrid.NO_PLACE
+			_places[n] = place
+		if place >= 0 and place < awake.size() and awake[place] == 0:
+			var body := table.node_of(_ids[n]) as Actor
+			if body != null and body.is_inside_tree() and keeps_awake(body, table):
+				awake[place] = 1
 	if projectiles != null:
 		projectiles.shot_places(projectiles.grid(), _shot_places)
 		for place in mini(awake.size(), _shot_places.size()):
@@ -153,6 +159,21 @@ func wake(table: ActorsScript, projectiles: ProjectileManagerScript) -> void:
 	table.sleep_with_places(_ids, count, _places, awake)
 	if projectiles != null:
 		tell_awake(projectiles.grid())
+
+
+## `wake`'s first pass in GDScript: the reference `BodyKernel.places` mirrors, and the fallback.
+## Each open body in the tree has its place made current (`Actor.find_room`); `_places[n]` is the
+## `room` of the `n`th open body after (NO_PLACE for a missing one), each body looked up once (the
+## performance pass, 2026-11-21; the shots' places between move no body).
+func gd_find_places(table: ActorsScript, count: int) -> void:
+	for n in count:
+		var body := table.node_of(_ids[n]) as Actor
+		if body == null:
+			_places[n] = RoomGrid.NO_PLACE
+			continue
+		if body.is_inside_tree():
+			body.find_room()
+		_places[n] = body.room
 
 
 ## True when `body` keeps the place it is in awake: it acts (a seat drives it, or it is no world prop

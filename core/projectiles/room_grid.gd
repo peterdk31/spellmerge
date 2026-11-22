@@ -797,6 +797,12 @@ func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = 
 	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius, minded)
 
 
+## A ray crossing more cells than this (an AI's sight, line of fire and walk checks) is walked in C++
+## when the module is loaded (`wall_hit`, `_way_hit`; sim-native SN4); a shorter one costs less here
+## than the call. Either gives the same bits (tests/core/test_grid_rays.gd).
+const NATIVE_RAY_CELLS: int = 4
+
+
 ## A body's whole walk over the grid (sim-native SN1, docs/milestones/sim-native.md): `Actor.move`'s
 ## grid work in one call. A circle of `radius` at `from` moves by `motion`, of which `crossed` crosses
 ## holes (the Mover's `crossing` for this move); in a room with holes what crosses is slid first, then
@@ -962,6 +968,12 @@ func wall_hit(from: Vector2, to: Vector2) -> float:
 		var row1: int = end_y * _wall_w
 		if _wall_cells[row0 + cx] == 0 and _wall_cells[row0 + end_x] == 0 and _wall_cells[row1 + cx] == 0 and _wall_cells[row1 + end_x] == 0:
 			return -1.0
+	if absi(end_x - cx) + absi(end_y - cy) > NATIVE_RAY_CELLS and WallSlide.native_on():
+		# A long ray (an AI's sight and line of fire) in C++ (sim-native SN4), the walk below to the bit;
+		# -2 only for a grid the kernel refused.
+		var hit: float = WallSlide.wall_hit(_wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, to)
+		if hit != -2.0:
+			return hit
 	var step_x: int = 1 if delta.x > 0.0 else -1
 	var step_y: int = 1 if delta.y > 0.0 else -1
 	var next_x: float = INF
@@ -999,7 +1011,8 @@ func wall_hit(from: Vector2, to: Vector2) -> float:
 ## holes (`set_holes`), on the path from `from` to `to`, as `wall_hit` finds a wall: t in [0, 1] where
 ## the path enters it, -1 when there is none. Not a shot's (shots hit a blocking body, they do not stop
 ## on its ground): an AI's walk and sight (`ground_clear`, `walk_clear`, `clear_run`, `sight_clear` past
-## a mouth), so it has none of `wall_hit`'s fast paths, and the native kernels have no copy of it.
+## a mouth), so it has none of `wall_hit`'s fast paths. A long way (past NATIVE_RAY_CELLS) is walked by
+## the native module's `BodyKernel.way_hit` when it is loaded (sim-native SN4), this loop to the bit.
 func _way_hit(from: Vector2, to: Vector2, wall_mask: int, ground: bool, holes: bool) -> float:
 	var with_holes: bool = holes and _has_holes
 	var walls: bool = wall_mask != 0 and _has_walls
@@ -1011,6 +1024,11 @@ func _way_hit(from: Vector2, to: Vector2, wall_mask: int, ground: bool, holes: b
 	var delta: Vector2 = (to - from) / WALL_CELL
 	var cx: int = floori(start.x)
 	var cy: int = floori(start.y)
+	if absi(floori(start.x + delta.x) - cx) + absi(floori(start.y + delta.y) - cy) > NATIVE_RAY_CELLS and WallSlide.native_on():
+		# A long way (an AI's walk and sight) in C++ (sim-native SN4), the walk below to the bit.
+		var way: float = WallSlide.way_hit(_wall_cells, grid, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, to, wall_mask, walls, with_ground)
+		if way != -2.0:
+			return way
 	var step_x: int = 1 if delta.x > 0.0 else -1
 	var step_y: int = 1 if delta.y > 0.0 else -1
 	var next_x: float = INF

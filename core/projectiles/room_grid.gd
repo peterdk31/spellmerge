@@ -773,7 +773,8 @@ func nearest_ground(point: Vector2, radius: float) -> Vector2:
 ## room's holes, whose lip a walk stops at; and, unless it goes `through_mouths` (a body a wizard
 ## drives: connected biomes CB2, `Actor.passes_mouths`), the mouths. The kernel is handed the walls,
 ## the bits of them it minds, and one other grid: the ground and the holes merged for a walk
-## (`_walk_cells`), the ground alone for a crossing.
+## (`_walk_cells`), the ground alone for a crossing. Mirrored in `walk_body`'s flags and mask and in
+## `BodyKernel.walk`'s `slide_on` (native/src/body_kernel.cpp): change them together.
 func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false, through_mouths: bool = false) -> Vector2:
 	var holes: bool = _has_holes and not crossing
 	if not _has_walls and _footprints_laid == 0 and not holes:
@@ -785,12 +786,16 @@ func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = 
 ## A body's whole walk over the grid (sim-native SN1, docs/milestones/sim-native.md): `Actor.move`'s
 ## grid work in one call. A circle of `radius` at `from` moves by `motion`, of which `crossed` crosses
 ## holes (the Mover's `crossing` for this move); in a room with holes what crosses is slid first, then
-## the walk (`slide_body`, see `Actor.move` for the rules), and the end is looked at for holes: the
+## the walk (`slide_body`; the rules are `gd_walk_body`'s comment), and the end is looked at for holes: the
 ## answer's x and y are where it ends, its z `WALKED_OVER_HOLE` when that is over a hole, else
 ## `WALKED_NEAR_HOLE` when a circle of `reach` there touches one, else 0 (always 0 with no holes).
 ## Runs the native module's `BodyKernel.walk` when it is loaded (`WallSlide.native_on`), else
 ## `gd_walk_body`, the reference it mirrors (tests/core/test_body_walk.gd compares them to the bit).
 func walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector3:
+	if not _has_walls and _footprints_laid == 0 and not _has_holes:
+		# Nothing laid: the whole way, as `slide_body` goes, with no call made.
+		var whole: Vector2 = from + motion
+		return Vector3(whole.x, whole.y, 0.0)
 	if WallSlide.native_on():
 		var flags: int = (WALK_WALLS if _has_walls else 0) | (WALK_FOOTPRINTS if _footprints_laid != 0 else 0) | (WALK_HOLES if _has_holes else 0)
 		var minded: int = PAST_MOUTHS if through_mouths and _has_mouths else 255

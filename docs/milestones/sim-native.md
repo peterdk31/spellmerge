@@ -1,6 +1,6 @@
 # The simulation's hot paths in C++, built for threads
 
-**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) in its PR; SN2 on are each a PR of their own, in the order below, the next opened once the last is merged.
+**Status (2026-11-22): the owner's go-ahead of 2026-11-22.** SN1 (this document and the first kernel, a body's walk) built ("Built (SN1)" below); SN2 on are each a PR of their own, in the order below, the next opened once the last is merged.
 
 **The owner's decisions (2026-11-22):**
 
@@ -36,7 +36,7 @@ Measured headless with the native module, `tick_hash.gd --profile-steps` (bots p
 | the Mover's step (`Mover.step`) | 0.041 | 0.014 |
 | the rest of the step (health, the hurtbox, the inventory, the looks' clock, a hold) | 0.084 | 0.026 |
 | **the move** (`Actor.move`) | **0.130** | **0.039** |
-| of which: the slide over holes (`_move_over_holes`: two or three `slide_body` calls with `is_hole`/`touches_hole` between) | 0.052 (all bodies) | |
+| of which: the slide over holes (main's `_move_over_holes`: two or three `slide_body` calls with `is_hole`/`touches_hole` between) | 0.052 (all bodies) | |
 | the ground under it (`_check_ground`: `is_hole`, `touches_hole`) | 0.034 (all bodies) | |
 | the room it stands in (`find_room`: `RoomGrid.place_at`) | 0.014 (all bodies) | |
 | the touches (`_touch`: `Actors.touching`, the props' `touched`) | 0.018 (all bodies) | |
@@ -57,7 +57,7 @@ Each step moves a path whose work is a pure function of arrays, keeps the order 
 
 | PR | What moves to C++ | Where it runs | Why in this order |
 |---|---|---|---|
-| **SN1** | **A body's walk:** `Actor.move`'s grid work in one call (`BodyKernel.walk`: the slides over holes or the plain slide, the hole under the body's end and whether its circle reaches a hole, the place it ends in) | each body's move, in id order as now | the largest pure path (above); one native call a body where there were up to six |
+| **SN1** | **A body's walk:** `Actor.move`'s grid work in one call (`BodyKernel.walk`: the slides over holes or the plain slide, the hole under the body's end and whether its circle reaches a hole) | each body's move, in id order as now | the largest pure path (above); one native call a body where there were up to five (three slides and two hole tests); the room it ends in (`find_room`) joins in SN2 |
 | SN2 | **The body table:** a body's position, velocity, radius, walk mask and flags as columns of the actor table (structure of arrays by actor id, below), written by the body as it moves; the touches (`Actors.touching`) and `_push_place`'s clip read it | no change of order | the layout every later kernel reads; no gain of its own but the touches' |
 | SN3 | **The foes' perception** (`AIBrain._perceive`'s queries: the nearest foe in rings, the line of fire, the threat, the harm exit's cell search) as one kernel call per think over the body table and the room grid | each foe's think, in id order | the AI's arithmetic, grows with awake foes |
 | SN4 | **The bodies' step in two phases** (needs the owner, "Open questions"): every awake foe's perception worked out for the tick first, from the state as the bodies' step found it, then each body's step and move in id order as now, reading its own answer | phase 1 on the threads, phase 2 in id order | the first step with independent parts; changes the game once |
@@ -90,7 +90,7 @@ Rules for every split: a part never reads what another part of the same pass wri
 - **SN1 adds no state:** the kernel computes what `Actor.move` computed and the same members are written; nothing is walked differently.
 - **Columns that follow the nodes are DERIVED** (and `rebuild_derived` writes them from the bodies after a restore), so the hash and the snapshot walk exactly what they walk now. A column made the state is walked as the table's packed array (one leaf of the engine's hash a column, cheaper than the bodies' members), and the node's member it replaces leaves the walk: the hash of a whole game then changes its value, not its meaning, so such a move is its own PR and compares main against branch by a state walk, not by the hash's value (a desync test of both sides' states, `Desync.compare`).
 - **Results tables are DERIVED scratch**, refilled each tick before they are read: never in a snapshot, never hashed.
-- **The mirror:** each kernel's GDScript twin stays where the code was (SN1: `RoomGrid.gd_walk`, the reference the C++ mirrors line by line), the kernel called when the module is loaded and the twin otherwise (`WallSlide`'s pattern); its side-by-side test steps both on the same arrays and compares every result byte for byte, every branch reached.
+- **The mirror:** each kernel's GDScript twin stays where the code was (SN1: `RoomGrid.gd_walk_body`, the reference the C++ mirrors line by line), the kernel called when the module is loaded and the twin otherwise (`WallSlide`'s pattern); its side-by-side test steps both on the same arrays and compares every result byte for byte, every branch reached.
 
 ## The threading model
 
@@ -103,9 +103,13 @@ Rules for every split: a part never reads what another part of the same pass wri
 
 `tick_hash.gd --profile-steps`, headless, native, main against the branch at 1 to 4 players (the four biomes' seeds), the same machine, one run after the other. Whole biomes take about two minutes a run here. The per-path timers of SN1's table are a patch kept out of the tree (a simulation script may not read the clock: core/sim/README.md, "The line").
 
-## SN1: a body's walk
+## Built (SN1): a body's walk
 
-**Built:** see "Built (SN1)" below once merged.
+- **One call a move.** `Actor.move` hands the grid its move, what of it crosses holes, its radius, whether it passes mouths and the reach its ground is looked at within (`RoomGrid.walk_body`); the answer is where it ends and the holes there (`WALKED_OVER_HOLE`, `WALKED_NEAR_HOLE`), which `_check_ground` reads in place of asking `is_hole` and `touches_hole` again. With the module loaded it is `BodyKernel.walk` (a new method of the class, no new class), else `RoomGrid.gd_walk_body`: main's `_move_over_holes` and the holes `_check_ground` asked, in the same order, through the grid's own `slide_body`, `is_hole` and `touches_hole`. A grid with nothing laid answers the whole way with no call. No member was added or moved: the state, the hash and the snapshots are as they were.
+- **The same game.** The four biomes' state hash every tick (1p seed 11, 2p 23, 3p 37, 4p 11; 12,087 to 18,417 ticks each) is identical between main and this branch with the native module on, and identical between main and this branch with it off.
+- **Tests:** `tests/core/test_body_walk.gd`: 12,000 walks in seeded rooms of walls, mouths, holes and the props' ground (with and without walls), a third of them on quarter pixels with whole radii so the comparisons' boundaries are met; the kernel against its twin run in GDScript all the way down (its slides `WallSlide.gd_slide`), byte for byte, and the twin against main's calls kept frozen in the test; every branch of the walk and every flag of its end reached. Two mutants of the C++ (a `<` made `<=` in the hole test, the void outside the grid made ground) each fail it. The wiring in the actor: `test_move_holes.gd`, `test_fall.gd`, and the hash compare.
+- **Measured** (headless, native, `tick_hash.gd --profile-steps`, main → this, ms a tick, one run each; the other steps move by a few per cent between runs): the bodies 1p 0.293 → 0.259, 2p 0.375 → 0.357, 3p 0.468 → 0.440, 4p 0.606 → 0.551; the whole tick 1.162 → 1.052, 1.273 → 1.250, 1.407 → 1.369, 1.740 → 1.640.
+- **Found on the way, on main:** with the native module off, main's own run of the four biomes parts from its run with the module on (1p at tick 820, 2p 1464, 3p 1033, 4p 889): some kernel or its fallback is not the same to the bit as its GDScript in play, though each side-by-side test passes. This branch changes neither side. A machine without the module never plays online today (every build has it), but a desync between the two is a mirror broken somewhere; to be found with the desync report (`Desync.compare` of the two runs at that tick) before SN2.
 
 ## Open questions for the owner
 

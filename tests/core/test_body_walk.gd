@@ -11,8 +11,8 @@ extends "res://tests/support/suite.gd"
 const CELL: float = RoomGrid.WALL_CELL
 const W: int = 40
 const H: int = 30
-## The margin the walk's end is looked at for holes within (`Actor.move`'s, `HoleRules.GROUND_MARGIN`).
-const MARGIN: float = 4.0
+## The margin the walk's end is looked at for holes within (`Actor.move`'s).
+const MARGIN: float = HoleRules.GROUND_MARGIN
 
 
 func after_each() -> void:
@@ -27,7 +27,8 @@ func _native() -> bool:
 	return WallSlide.native_on()
 
 
-## A room of `kind` (0 open, 1 blocks and mouths, 2 holes, 3 blocks, holes and the props' ground),
+## A room of `kind` (0 open, 1 blocks and mouths, 2 holes, 3 blocks, holes and the props' ground,
+## 4 holes and the props' ground with no walls, 5 the props' ground alone),
 ## seeded by `rng`, its corner at `origin`.
 func _room(rng: RandomNumberGenerator, kind: int, origin: Vector2) -> RoomGrid:
 	var grid := RoomGrid.new()
@@ -40,20 +41,23 @@ func _room(rng: RandomNumberGenerator, kind: int, origin: Vector2) -> RoomGrid:
 				grid.add_mouth(Rect2(at, size))
 			else:
 				grid.add_wall(Rect2(at, size))
-	if kind >= 2:
+	if kind >= 2 and kind <= 4:
 		var holes: Array[Rect2] = []
 		for hole in rng.randi_range(1, 6):
 			var at := origin + Vector2(rng.randf_range(0.0, W * CELL), rng.randf_range(0.0, H * CELL))
 			holes.append(Rect2(at, Vector2(rng.randf_range(4.0, 90.0), rng.randf_range(4.0, 90.0))))
 		grid.set_holes(holes)
-	if kind == 3:
+	if kind >= 3:
 		for prop in rng.randi_range(1, 4):
 			var centre := origin + Vector2(rng.randf_range(0.0, W * CELL), rng.randf_range(0.0, H * CELL))
 			grid.set_footprint(prop, centre, Vector2(rng.randf_range(8.0, 30.0), rng.randf_range(8.0, 30.0)) if prop % 2 == 0 else Vector2.ZERO, rng.randf_range(4.0, 14.0))
 	return grid
 
 
-## The twin's answer worked out by the grid's own calls, as `Actor.move` made them before SN1.
+## The twin's answer worked out by the grid's own calls: main's `Actor._move_over_holes` and the
+## holes `_check_ground` asked of, as they stood before SN1 (`origin/main:gameplay/actor/actor.gd`),
+## kept here frozen. How the actor uses the answer is `tests/gameplay/actor/test_move_holes.gd`'s and
+## `test_fall.gd`'s, and the game's `tick_hash.gd` compare.
 func _by_the_grid(grid: RoomGrid, from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through: bool, reach: float) -> Vector3:
 	if not grid.has_holes():
 		var slid: Vector2 = grid.slide_body(from, motion, radius, false, through)
@@ -100,7 +104,7 @@ func test_the_native_walk_gives_the_twins_bits_on_every_branch() -> void:
 	var found: Dictionary = {}
 	for room in 48:
 		var origin := Vector2(rng.randf_range(-60.0, 60.0), rng.randf_range(-60.0, 60.0))
-		var grid: RoomGrid = _room(rng, room % 4, origin)
+		var grid: RoomGrid = _room(rng, room % 6, origin)
 		var moves: Array[Array] = []
 		for n in 250:
 			var from: Vector2 = origin + Vector2(rng.randf_range(-16.0, W * CELL + 16.0), rng.randf_range(-16.0, H * CELL + 16.0))

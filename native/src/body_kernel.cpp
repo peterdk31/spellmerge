@@ -254,7 +254,7 @@ Vector3 BodyKernel::walk(const PackedByteArray &walls, const PackedByteArray &wa
 	ERR_FAIL_COND_V_MSG(holes.size() < w * h || walls.size() < w * h, Vector3(from.x, from.y, 0.0), "BodyKernel.walk: the grids are smaller than w * h");
 	const uint8_t *hp = holes.ptr();
 	const uint8_t *wp = walls.ptr();
-	// `Actor._move_over_holes`, as `RoomGrid.gd_walk_body` has it: what crosses first, then the walk.
+	// Main's `Actor._move_over_holes`, now `RoomGrid.gd_walk_body`: what crosses first, then the walk.
 	Vector2 at = from;
 	if (crossed != Vector2()) {
 		at = slide_on(from, crossed, true);

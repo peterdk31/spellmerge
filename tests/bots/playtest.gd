@@ -25,8 +25,11 @@ extends "res://tests/support/screenshot.gd"
 ## `--sturdy` heals the standing wizards every half second: a playtest looks for rough edges on the way
 ## to the boss, not at the balance (the seed sweep's, tests/smoke/four_bot_sweep.gd).
 ##
-## `--fail-on-errors` exits with 1 when an error was logged (`PLAYTEST error` lines), so a run on a
-## separate render thread (`--rendering-method mobile --render-thread separate`) checks it logs none.
+## `--fail-on-errors` exits with 1 when an error was logged (`PLAYTEST error` lines) or a font drew a
+## glyph in play that was not warmed (`PLAYTEST glyphs drawn in play`, core/base/glyph_warmup.gd: a
+## glyph drawn in play writes the font's atlas as a separate render thread reads it), so a run, even
+## headless, checks the separate render thread's safety, and on it (`--rendering-method mobile
+## --render-thread separate`) that it logs none.
 
 const BotScript := preload("res://bench/bots/bot.gd")
 const ErrorLogScript := preload("res://bench/error_log.gd")
@@ -233,9 +236,12 @@ func take() -> void:
 		bot.leave()
 	if not _plain and not _build:
 		_flow.set(&"play_bag", _bag_had)
+	var unwarmed: PackedStringArray = GlyphWarmup.drawn_since_warm()
+	for line: String in unwarmed:
+		print("PLAYTEST glyphs drawn in play: " + line)
 	var errors: int = _log.call("get_lines").size()
-	if _fail_on_errors and errors > 0:
-		fail("%d engine errors logged (PLAYTEST error lines)" % errors)
+	if _fail_on_errors and errors + unwarmed.size() > 0:
+		fail("%d engine errors logged (PLAYTEST error lines), %d font sizes drew glyphs in play (PLAYTEST glyphs lines: list them in GlyphWarmup)" % [errors, unwarmed.size()])
 
 
 ## A report line, with the game time.

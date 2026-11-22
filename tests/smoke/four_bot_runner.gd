@@ -26,7 +26,9 @@ extends Node
 ##    arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (bench/error_log.gd, which has a unit test; it
-##    starts after the autoloads load, so errors during startup are not covered).
+##    starts after the autoloads load, so errors during startup are not covered), and
+##  - no font drew a glyph in play that was not warmed before it (core/base/glyph_warmup.gd: on a
+##    separate render thread such a glyph writes the font's atlas as the render thread reads it).
 ## If the run does not start within HUB_LIMIT game seconds in the hub, or is not cleared within
 ## TIME_LIMIT game seconds of its start, the test fails.
 ##
@@ -426,6 +428,10 @@ func _finish(failed: Array[String]) -> void:
 	if _probe != null:
 		_probe.call("report")
 	failed.append_array(_errors())
+	# A glyph drawn in play writes the font's atlas as a separate render thread reads it
+	# (core/base/glyph_warmup.gd): every size drawn is warmed before play.
+	for line: String in GlyphWarmup.drawn_since_warm():
+		failed.append("a font drew glyphs in play, not warmed (list its size in GlyphWarmup): " + line)
 	if not standalone:
 		finished.emit(failed, _replay_seed, _run_seed)
 		return

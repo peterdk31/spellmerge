@@ -246,6 +246,9 @@ var _cheat_code: CheatCode = null
 
 
 func _ready() -> void:
+	# Every glyph the HUD draws rasterized now, never in play (core/base/glyph_warmup.gd: safe with
+	# a separate render thread).
+	GlyphWarmup.warm_game()
 	_staff_mana.resize(PLAYER_COUNT * PlayerPanelScript.STAFF_COUNT)
 	_staff_mana.fill(INF)
 	_staff_reserved.resize(PLAYER_COUNT * PlayerPanelScript.STAFF_COUNT)

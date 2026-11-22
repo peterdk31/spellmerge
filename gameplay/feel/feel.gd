@@ -840,6 +840,9 @@ func _exit_tree() -> void:
 
 func _ready() -> void:
 	_rng.seed = 1
+	# The damage numbers' glyphs rasterized now, never in play (core/base/glyph_warmup.gd: safe with
+	# a separate render thread).
+	GlyphWarmup.warm_game()
 	_juiced_frame.resize(ActorsScript.ACTORS)
 	_juiced_frame.fill(-1)
 	_juiced_step.resize(ActorsScript.ACTORS)

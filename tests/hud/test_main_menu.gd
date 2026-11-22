@@ -13,7 +13,8 @@ extends "res://tests/support/suite.gd"
 const MENU_SCENE_PATH: String = "res://hud/menus/main_menu/main_menu.tscn"
 const EventsScript := preload("res://core/events/events.gd")
 const RUNNER_NODE: String = "FourBotRunner"
-const RUNNER_NAMES: Array[String] = ["FourBotRunner", "StressRunner", "ProjectileTimingRunner", "HubStormRunner", "ReplayHashesRunner", "OnlineRunner"]
+const RUNNER_NAMES: Array[String] = ["FourBotRunner", "StressRunner", "ProjectileTimingRunner", "HubStormRunner", "ReplayHashesRunner", "OnlineRunner", "Benchmark"]
+const MenuScript := preload("res://hud/menus/main_menu/main_menu.gd")
 const FOUR_BOT: PackedStringArray = ["--four-bot"]
 const STRESS: PackedStringArray = ["--stress"]
 const TIMING: PackedStringArray = ["--projectile-timing"]
@@ -33,6 +34,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	MenuScript.forget_benchmark_argument()
 	for node_name in RUNNER_NAMES:
 		var runner: Node = root.get_node_or_null(NodePath(node_name))
 		if runner != null:
@@ -123,7 +125,7 @@ func test_a_repeated_benchmark_start_leaves_one_runner() -> void:
 
 
 func test_every_runner_constant_names_a_file_in_the_build() -> void:
-	for constant: String in ["FOUR_BOT_RUNNER", "STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "SPLIT_VIEWS_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER"]:
+	for constant: String in ["FOUR_BOT_RUNNER", "STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "SPLIT_VIEWS_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER", "BENCHMARK_RUNNER"]:
 		check(ResourceLoader.exists(String(_menu.get(constant))), "%s does not exist" % constant)
 
 
@@ -133,7 +135,7 @@ func test_an_unknown_runner_name_makes_nothing() -> void:
 
 func test_each_runner_loads_the_file_its_constant_names() -> void:
 	# Each literal path in the menu is its constant (the real runners are not made here).
-	for pair: Array in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["HubStormRunner", "STORM_RUNNER"], ["SplitViewsRunner", "SPLIT_VIEWS_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
+	for pair: Array in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["HubStormRunner", "STORM_RUNNER"], ["SplitViewsRunner", "SPLIT_VIEWS_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], ["Benchmark", "BENCHMARK_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
 		var script: GDScript = _menu.call("_runner_script", pair[0]) as GDScript
 		check(script != null and script.resource_path == String(_menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
 
@@ -179,3 +181,30 @@ func test_its_sounds_a_silent_move_a_choice_and_cancel_a_back() -> void:
 	await process_frame
 	(_menu.get_node("%Cancel") as Button).pressed.emit()
 	check_equal(sounds, [UiSounds.BACK], "Cancel is a back, and Host's focus after it no move")
+
+
+func test_the_benchmark_button_adds_the_benchmark_runner() -> void:
+	# The owner's decision of 2026-11-22 (D1): a Benchmark option in the menu of every build.
+	var button: Button = _menu.get_node("%Benchmark") as Button
+	check(button.visible, "the Benchmark button shows")
+	button.pressed.emit()
+	await process_frame
+	check_equal(_count_named("Benchmark"), 1, "Benchmark added its runner")
+	check_equal(_built, 1, "one runner made")
+
+
+func test_the_benchmark_button_hides_while_the_online_box_is_open() -> void:
+	_menu.call("_set_online_open", true)
+	check(not (_menu.get_node("%Benchmark") as Button).visible, "hidden behind the online box")
+	_menu.call("_set_online_open", false)
+	check((_menu.get_node("%Benchmark") as Button).visible, "back with the menu")
+
+
+func test_the_benchmark_argument_starts_it_once_a_process() -> void:
+	# Its results screen's Back shows the menu again, which reads the command line again.
+	check(_start(&"_start_benchmark", PackedStringArray(["--benchmark"])), "the first start")
+	await process_frame
+	root.get_node("Benchmark").free()
+	check(not _start(&"_start_benchmark", PackedStringArray(["--benchmark"])), "not again once its run ended")
+	await process_frame
+	check_equal(_count_named("Benchmark"), 0, "no second runner")

@@ -1,5 +1,5 @@
 extends SceneTree
-## Runs a short version of the stress scene (tests/benchmark/stress_runner.gd) under
+## Runs a short version of the stress scene (bench/stress_runner.gd) under
 ## `ci/build/build.sh --quick --tests`: all four scenarios (a web build skips the desktop one), a few
 ## seconds each. The full run is `stress.gd`.
 ##
@@ -7,7 +7,7 @@ extends SceneTree
 ## tests/support/suite.gd takes it; the checks before the run are made in each):
 # unit-test-shards: 4
 
-const RunnerScript := preload("res://tests/benchmark/stress_runner.gd")
+const RunnerScript := preload("res://bench/stress_runner.gd")
 const Suite := preload("res://tests/support/suite.gd")
 
 

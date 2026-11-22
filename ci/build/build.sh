@@ -27,7 +27,9 @@
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
 #                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
 #                                     8 at once; PNGs in build/screenshots/, and shots.txt there
-#                                     saying which script made each one.
+#                                     saying which script made each one; with a Vulkan driver, a
+#                                     second set of the shader scripts drawn with Vulkan as
+#                                     vulkan_<name>.png (SHOTS_VULKAN="shot_a ..." picks them).
 #                                     SHOTS_ONLY="shot_a shot_b" runs only those scripts;
 #                                     SHOT_JOBS=1 runs them one at a time.
 #   ci/build/build.sh --quick --clips   the same, then the clip recorder (tests/clips/record.gd)
@@ -289,38 +291,86 @@ screenshots() {
     echo "xvfb-run is not installed, so the screenshots are drawn on the display $DISPLAY"
     virtual=0
   fi
-  local runs="$PWD/build/screenshot-runs" script name png display=() scripts=() failed=()
+  local runs="$PWD/build/screenshot-runs" script display=() failed=()
   local cores; cores=$(nproc)
   local parallel="${SHOT_JOBS:-$((cores < 8 ? cores : 8))}"
   rm -rf build/screenshots "$runs" && mkdir -p build/screenshots "$runs"
   : > build/screenshots/shots.txt
-  while IFS= read -r script; do
-    name=$(basename "$script" .gd)
-    if [[ -n "${SHOTS_ONLY:-}" && " $SHOTS_ONLY " != *" $name "* ]]; then continue; fi
-    scripts+=("$script")
-    while (($(jobs -rp | wc -l) >= parallel)); do wait -n || true; done
-    if ((virtual)); then
-      display=(xvfb-run --server-num=$((100 + ${#scripts[@]})) --server-args="-screen 0 1280x720x24")
-    fi
-    (XDG_DATA_HOME="$runs/$name" godot_checked "shot-$name" "${display[@]}" "$GODOT" --path . \
-      --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script "res://$script" \
-      || touch "$runs/$name.failed") &
-  done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
-  wait
-  for script in "${scripts[@]}"; do
-    name=$(basename "$script" .gd)
-    [[ -f "$runs/$name.failed" ]] && failed+=("$script")
-    for png in "$runs/$name/godot/app_userdata/$GAME_NAME/screenshots"/*.png; do
-      [[ -f "$png" ]] || continue
-      cp "$png" build/screenshots/
-      echo "$name $(basename "$png")" >> build/screenshots/shots.txt
+  local all=()
+  while IFS= read -r script; do all+=("$script"); done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
+  # The gallery in the web's renderer (Compatibility, OpenGL), every script.
+  shot_set gl_compatibility opengl3 "" 100 "${all[@]}"
+  # A second set in the desktop builds' renderer (Mobile, Vulkan; lavapipe on a runner), so a
+  # drawing bug only the desktop shows is seen (the owner, 2026-11-22, D1): the scripts that show
+  # the shaders, saved as vulkan_<name>.png beside the gallery's own. Needs a Vulkan driver.
+  if compgen -G "/usr/share/vulkan/icd.d/*.json" >/dev/null; then
+    local vulkan=() wanted
+    for wanted in ${SHOTS_VULKAN:-shot_flashes shot_carrier_looks shot_spell_light shot_atmosphere_mist shot_atmosphere_shadows shot_motes shot_baked_floors shot_boss_intro shot_benchmark}; do
+      [[ -f "tests/screenshots/$wanted.gd" ]] && vulkan+=("tests/screenshots/$wanted.gd")
     done
-  done
+    shot_set mobile vulkan vulkan_ 200 "${vulkan[@]}"
+  else
+    echo "::warning::no Vulkan driver (sudo apt-get install mesa-vulkan-drivers), so no Vulkan screenshots were taken"
+  fi
   ls -l build/screenshots
+  display=()
+  ((virtual)) && display=(xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24")
+  renderer_shaders "${display[@]}" || failed+=("tests/smoke/renderer_shaders.gd")
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"
     return 1
   fi
+}
+
+# One set of screenshots: shot_set <rendering method> <driver> <file prefix> <first display number>
+# <scripts...>. Runs up to $parallel at once (the caller's), each with a data folder of its own under
+# $runs, copies their PNGs to build/screenshots/ as <prefix><name>.png and lists them in shots.txt; a
+# script that fails is added to the caller's `failed`. SHOTS_ONLY narrows it as it does the gallery.
+shot_set() {
+  local method="$1" driver="$2" prefix="$3" first="$4" script name png count=0 ran=()
+  shift 4
+  for script in "$@"; do
+    name=$(basename "$script" .gd)
+    if [[ -n "${SHOTS_ONLY:-}" && " $SHOTS_ONLY " != *" $name "* ]]; then continue; fi
+    ran+=("$script")
+    count=$((count + 1))
+    while (($(jobs -rp | wc -l) >= parallel)); do wait -n || true; done
+    if ((virtual)); then
+      display=(xvfb-run --server-num=$((first + count)) --server-args="-screen 0 1280x720x24")
+    fi
+    (XDG_DATA_HOME="$runs/$prefix$name" godot_checked "shot-$prefix$name" "${display[@]}" "$GODOT" --path . \
+      --rendering-method "$method" --rendering-driver "$driver" --audio-driver Dummy --fixed-fps 60 --script "res://$script" \
+      || touch "$runs/$prefix$name.failed") &
+  done
+  wait
+  for script in "${ran[@]}"; do
+    name=$(basename "$script" .gd)
+    [[ -f "$runs/$prefix$name.failed" ]] && failed+=("$script ($method)")
+    for png in "$runs/$prefix$name/godot/app_userdata/$GAME_NAME/screenshots"/*.png; do
+      [[ -f "$png" ]] || continue
+      cp "$png" "build/screenshots/$prefix$(basename "$png")"
+      echo "$name $prefix$(basename "$png")" >> build/screenshots/shots.txt
+    done
+  done
+}
+
+# Every shader compiled and drawn by both renderers (D1, 2026-11-22): the web's (Compatibility,
+# OpenGL) and the desktop builds' (Mobile, Vulkan; lavapipe on a runner, `mesa-vulkan-drivers`).
+# Without a Vulkan driver the Vulkan pass only warns. The arguments are the display to draw on.
+renderer_shaders() {
+  local status=0 data="$PWD/build/renderer-shaders"
+  rm -rf "$data" && mkdir -p "$data"
+  XDG_DATA_HOME="$data" godot_checked renderer-shaders-gl "$@" "$GODOT" --path . --rendering-method gl_compatibility \
+    --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd \
+    -- --expect=gl_compatibility || status=1
+  if compgen -G "/usr/share/vulkan/icd.d/*.json" >/dev/null; then
+    XDG_DATA_HOME="$data" godot_checked renderer-shaders-vulkan "$@" "$GODOT" --path . --rendering-method mobile \
+      --rendering-driver vulkan --audio-driver Dummy --fixed-fps 60 --script res://tests/smoke/renderer_shaders.gd \
+      -- --expect=mobile || status=1
+  else
+    echo "::warning::no Vulkan driver (sudo apt-get install mesa-vulkan-drivers), so the shaders were not checked on Vulkan"
+  fi
+  return $status
 }
 
 # The recorder saves one folder per clip to user://clips/ (the format is in ci/smbot/clips.py);
@@ -348,7 +398,7 @@ clips() {
   fi
   rm -rf "$saved"
   godot_checked clips timeout 1500 xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
-    "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/clips/record.gd \
+    "$GODOT" --path . --rendering-method gl_compatibility --rendering-driver opengl3 --audio-driver Dummy --script res://tests/clips/record.gd \
     -- "${ids[@]}" \
     || echo "::warning::the clip recorder failed (build/logs/clips.log); the clips it saved are kept"
   if [[ -d "$saved" ]]; then

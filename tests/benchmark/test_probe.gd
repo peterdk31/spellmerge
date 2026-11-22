@@ -1,8 +1,8 @@
 extends SceneTree
-## Tests for tests/benchmark/probe.gd: it counts frames, finds the percentile, and
+## Tests for bench/probe.gd: it counts frames, finds the percentile, and
 ## reports without failing.
 
-const ProbeScript := preload("res://tests/benchmark/probe.gd")
+const ProbeScript := preload("res://bench/probe.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
 var _failures: Array[String] = []

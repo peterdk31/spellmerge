@@ -14,7 +14,7 @@ extends SceneTree
 ## ... -- --quality=each                    every scenario at each row ("1p near low", ... "high")
 ## ... -- --picture=1280x720                 the picture drawn at that size (the world drawn finer)
 
-const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
+const RunnerScript := preload("res://bench/play_frames_runner.gd")
 
 
 func _initialize() -> void:

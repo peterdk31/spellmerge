@@ -5,8 +5,8 @@ extends "res://tests/support/suite.gd"
 ## draws. What a frame costs is the runner's (biome_frames.gd, in a window): headless runs draw
 ## nothing.
 
-const RunnerScript := preload("res://tests/benchmark/biome_frames_runner.gd")
-const StressScript := preload("res://tests/benchmark/stress_runner.gd")
+const RunnerScript := preload("res://bench/biome_frames_runner.gd")
+const StressScript := preload("res://bench/stress_runner.gd")
 
 
 func test_every_seed_has_both_loads_together_and_apart_in_each_split() -> void:

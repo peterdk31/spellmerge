@@ -186,7 +186,7 @@ func _physics_process(_delta: float) -> void:
 
 ## One physics step: the ticks the frames service says are due, each `run`; returns how many ran.
 ## The engine's physics step calls it; a benchmark's fixed clock calls it once a drawn frame instead
-## (tests/benchmark/fixed_steps.gd, the engine's step switched off), never the game.
+## (bench/fixed_steps.gd, the engine's step switched off), never the game.
 func step_physics() -> int:
 	# First, also under a picture's pause: a live replay's feed reads what arrived and sends.
 	var due: int = frames.begin_step(DT) if frames != null and frames.auto_tick else 1

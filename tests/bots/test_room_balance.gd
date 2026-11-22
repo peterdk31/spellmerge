@@ -14,7 +14,7 @@ extends SceneTree
 ## delta), so a busy machine takes longer, not fewer game seconds.
 ## The numbers are in docs/LOG.md.
 
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 
 const COUNTS: Array[int] = [1, 2, 3, 4]
 const TIME_LIMIT: float = 120.0

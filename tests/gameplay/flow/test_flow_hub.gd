@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 ## service applies them at a tick's start (`Events.apply_command`), unless a test says otherwise.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const PinnedRun := preload("res://bench/pinned_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const DT: float = 1.0 / 60.0

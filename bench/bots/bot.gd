@@ -64,15 +64,15 @@ extends FrameSource
 
 enum Mode { FIGHTER, IDLER }
 
-const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
+const FuzzerScript := preload("res://bench/bots/staff_fuzzer.gd")
 const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const RouteScript := preload("res://tests/bots/bot_route.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
-const HubScript := preload("res://tests/bots/bot_hub.gd")
+const RouteScript := preload("res://bench/bots/bot_route.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
+const HubScript := preload("res://bench/bots/bot_hub.gd")
 ## How a bot plays (the brain's numbers).
-const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
+const PROFILE: AIProfile = preload("res://bench/bots/bot_profile.tres")
 
 ## The staff a bot builds into: RB, over its start `dash` (RT keeps its `bolt`).
 const BUILD_STAFF: int = 0

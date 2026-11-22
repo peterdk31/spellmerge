@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## benchmark's, `tests/benchmark/prop_stand_in.tscn`: Health, a Hurtbox and a Caster of two
 ## `fire` + `blast` staffs, no controller, no Mover) in the hub. The Tick never steps a still one,
 ## a blast still lands on its neighbours, and one given a driver is stepped until it is let go.
-const BotScript := preload("res://tests/bots/bot.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const StandIn: EnemyBase = preload("res://tests/benchmark/prop_stand_in.tres")

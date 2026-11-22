@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the bots' hub errand (tests/bots/bot_hub.gd; the owner, 2026-11-20, after #886: the
+## Tests for the bots' hub errand (bench/bots/bot_hub.gd; the owner, 2026-11-20, after #886: the
 ## bots' runs start in the hub, where each takes a staff from the rack as a player would): two bots
 ## started in the hub (the hub recorded, as the runners start it) draw their builds there, the mender
 ## walks to the rack's Firebolt and takes it with A, both walk onto the teleporter stone and P1
@@ -7,9 +7,9 @@ extends "res://tests/support/suite.gd"
 ## LB, its cards as they lay). The same replay seed plays the same errand, tick for tick. A bot with
 ## no build only walks to the stone.
 
-const BotScript := preload("res://tests/bots/bot.gd")
-const BuildsScript := preload("res://tests/bots/bot_builds.gd")
-const HubScript := preload("res://tests/bots/bot_hub.gd")
+const BotScript := preload("res://bench/bots/bot.gd")
+const BuildsScript := preload("res://bench/bots/bot_builds.gd")
+const HubScript := preload("res://bench/bots/bot_hub.gd")
 
 ## The replay seed the hub is recorded with (the builds and the run's seed follow from it).
 const REPLAY_SEED: int = 11

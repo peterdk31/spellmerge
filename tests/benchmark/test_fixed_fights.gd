@@ -7,13 +7,13 @@ extends SceneTree
 ## and shortened (a second's warm-up, two measured); the frame times are the full run's
 ## (play_frames.gd, in a window). The unit test runner finds it by its name, as every test_*.gd.
 
-const RunnerScript := preload("res://tests/benchmark/play_frames_runner.gd")
+const RunnerScript := preload("res://bench/play_frames_runner.gd")
 ## A fight: one wizard and its bot among a room's foes, at the web's load.
 const SCENARIO: String = "1p far web"
 const HASH_EVERY: int = 10
 
 
-class Runner extends "res://tests/benchmark/play_frames_runner.gd":
+class Runner extends "res://bench/play_frames_runner.gd":
 	func _finish(failed: Array[String]) -> void:
 		var found: Array[String] = failed.duplicate()
 		if not fixed_frames:

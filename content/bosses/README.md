@@ -53,7 +53,7 @@ A boss that needs one of these needs that general piece built first (in the shar
 2. Give it a name and its line of lore, and add its name and story to docs/STORY.md.
 3. Write its staffs (the cards, the `wind_up` that telegraphs each attack), its profile and its phases in the `.tres`; set `biomes` to the biome whose runs it ends.
 4. Replace the parts' art (the broom's are grids, `<part>.grid.json`, that `tools/pixel_grid.py` makes into SVGs), their pivots, offsets, frames and numbers, the face's own sheets (`eyes`, `brows`) and its `anchor` and `glow`; list each sprite in its `assets.json`; commit the `.uid` and `.import` files Godot creates.
-5. Rewrite its test for its own data. Try it in play: a run of its biome stands it in its boss room, and a test plays it in a run of one room (`tests/support/pinned_run.gd`, `fill` boss).
+5. Rewrite its test for its own data. Try it in play: a run of its biome stands it in its boss room, and a test plays it in a run of one room (`bench/pinned_run.gd`, `fill` boss).
 6. Run the checks below, then open a PR with a GIF or video of the whole fight.
 
 ## Example to copy

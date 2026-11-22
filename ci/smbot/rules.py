@@ -55,6 +55,7 @@ BOT_PATHS = (
     "CLAUDE.md",
     "llms.txt",
     "core/",
+    "bench/",  # the benchmark and the bots (bench/README.md): they ship in every build and drive the game
     "native/",  # the native module's C++ (native/README.md): Claude's and the owner's only
     "net/",  # the netcode (net/README.md): the one folder that may hold networking classes
     "server/",  # the room server (server/signal/README.md): Claude's and the owner's only; its deploy is the owner's

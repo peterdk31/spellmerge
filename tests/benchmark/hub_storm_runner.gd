@@ -45,9 +45,9 @@ extends Node
 ## CPU time of the mote pool's calls, each a frame and per 60th of a game second (a frame at
 ## 60 FPS; a headless run draws more frames than that).
 
-const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
-const ProbeScript := preload("res://tests/benchmark/probe.gd")
-const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
+const ErrorLogScript := preload("res://bench/error_log.gd")
+const ProbeScript := preload("res://bench/probe.gd")
+const TreeProfileScript := preload("res://bench/tree_profile.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")

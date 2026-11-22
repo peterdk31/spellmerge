@@ -15,11 +15,15 @@ extends RefCounted
 ##   runs piece 0 on the calling thread meanwhile, and returns once every piece is done: nothing
 ##   waits longer than it did on one thread. One group at a time (a job may not run another).
 ## - **One thread:** with `threaded` off every piece runs in order on the calling thread, as on the
-##   web build, which has no threads (`OS.has_feature("threads")` false); `Feel.set_effect_threads`
+##   web build, which has no threads (`OS.has_feature("threads")` false), and on a machine of fewer
+##   than CORES_FOR_THREADS cores; `Feel.set_effect_threads`
 ##   switches it, and benchmarks and tests run both ways. It is this machine's, never a run's: it
 ##   changes no result.
 ##
 ## View only: nothing here touches the simulation.
+
+## The fewest cores on which Feel's pieces run on the worker threads by default (`threads_by_default`).
+const CORES_FOR_THREADS: int = 4
 
 ## Whether pieces run on the worker threads (false: all on the calling thread). The default is the
 ## build's: threads where the engine has them, none on the web.
@@ -37,10 +41,16 @@ func _init() -> void:
 	_offset_job = _run_offset
 
 
-## Whether this build runs Feel's pieces on threads by default: where the engine has threads, and
-## more than one core to run them on.
+## Whether this build runs Feel's pieces on threads by default (`threads_by_default` on this machine).
 static func default_threaded() -> bool:
-	return OS.has_feature("threads") and not OS.has_feature("web") and OS.get_processor_count() > 1
+	return threads_by_default(OS.has_feature("threads") and not OS.has_feature("web"), OS.get_processor_count())
+
+
+## Whether a build with threads (`has_threads`: the engine has them and it is not the web) on a machine
+## of `cores` cores runs Feel's pieces on them by default: with CORES_FOR_THREADS or more (the owner's
+## answer on #917, 2026-11-22: on fewer, the workers take the cores the rest of the frame needs).
+static func threads_by_default(has_threads: bool, cores: int) -> bool:
+	return has_threads and cores >= CORES_FOR_THREADS
 
 
 ## Run `job` (taking a piece's number, 0 to `count` - 1) on every piece, on the threads while

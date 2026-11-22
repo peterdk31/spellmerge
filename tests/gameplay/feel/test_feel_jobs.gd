@@ -59,7 +59,17 @@ func test_the_web_runs_every_piece_on_its_one_thread() -> void:
 	if OS.has_feature("web") or not OS.has_feature("threads"):
 		check(not FeelJobsScript.default_threaded(), "no threads by default")
 	else:
-		check(FeelJobsScript.default_threaded() == (OS.get_processor_count() > 1), "threads by default on a desktop of more than one core")
+		check(FeelJobsScript.default_threaded() == (OS.get_processor_count() >= FeelJobsScript.CORES_FOR_THREADS), "threads by default on a desktop of enough cores")
+
+
+func test_threads_by_default_only_with_four_cores_or_more() -> void:
+	# The owner's answer on #917: on fewer cores the workers take what the rest of the frame needs.
+	check(FeelJobsScript.CORES_FOR_THREADS == 4, "four cores")
+	for cores in [1, 2, 3]:
+		check(not FeelJobsScript.threads_by_default(true, cores), "no threads by default on %d cores" % cores)
+	for cores in [4, 6, 16]:
+		check(FeelJobsScript.threads_by_default(true, cores), "threads by default on %d cores" % cores)
+	check(not FeelJobsScript.threads_by_default(false, 16), "none where the build has no threads (the web), whatever the cores")
 
 
 ## A grid over three views (the third over the first's middle) with tints and boxes, as the light

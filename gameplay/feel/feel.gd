@@ -2821,7 +2821,7 @@ func set_floor_marks(on: bool) -> void:
 
 
 ## Whether the per-frame effects' independent pieces run on the worker threads (`feel_jobs.gd`: on by
-## default where the engine has threads, never on the web or one core, whatever is asked). This
+## default where the engine has threads and 4 or more cores, never on the web or fewer cores, whatever is asked). This
 ## machine's, never a run's: what is drawn is the same either way. Returns the setting.
 func set_effect_threads(on: bool) -> bool:
 	_spectacle.jobs.threaded = on and FeelJobsScript.default_threaded()

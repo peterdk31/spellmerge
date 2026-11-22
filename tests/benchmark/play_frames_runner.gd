@@ -28,9 +28,13 @@ const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 const PASS_SETTERS: Dictionary[String, StringName] = {"light": &"set_spell_light", "shadows": &"set_shadows", "air": &"set_ambient_particles", "fog": &"set_fog"}
 
 
+## The rows' words for `--quality=` and each one's fixed "Effects" mode (`EffectsSetting`).
+const QUALITY_MODES: Dictionary[String, int] = {"low": EffectsSetting.LOW, "medium": EffectsSetting.MEDIUM, "high": EffectsSetting.HIGH}
+
+
 func _init() -> void:
 	super()
-	rows = play_rows()
+	rows = with_quality(play_rows(), quality_asked(OS.get_cmdline_user_args() + OS.get_cmdline_args()))
 	scenarios = []
 	for index in rows.size():
 		scenarios.append(index)
@@ -62,16 +66,45 @@ static func _row(label: String, players: int, enemies: int, idle: bool, spread: 
 	return {"label": label, "players": players, "enemies": enemies, "shots": cap, "fill": 0, "idle": idle, "seed": PLAY_SEED, "spread": spread, "split": split, "motes": motes}
 
 
+## The effects' rows `--quality=` asks for in `args`: low, medium or high alone, or each of them
+## (`--quality=each`); high when it names none.
+static func quality_asked(args: PackedStringArray) -> PackedStringArray:
+	for arg in args:
+		if arg.begins_with("--quality="):
+			var asked: String = arg.trim_prefix("--quality=")
+			if asked == "each":
+				return PackedStringArray(QUALITY_MODES.keys())
+			if QUALITY_MODES.has(asked):
+				return PackedStringArray([asked])
+	return PackedStringArray(["high"])
+
+
+## `scenarios` at each row of `qualities` (its "quality"); with more than one, each label says its row
+## ("1p near low"), so `--only=` names them so.
+static func with_quality(scenarios: Array[Dictionary], qualities: PackedStringArray) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for scenario: Dictionary in scenarios:
+		for quality: String in qualities:
+			var row: Dictionary = scenario.duplicate()
+			row["quality"] = quality
+			if qualities.size() > 1:
+				row["label"] = "%s %s" % [scenario["label"], quality]
+			out.append(row)
+	return out
+
+
 ## The scenario's mote ring (the "Particles" setting) taken before its run starts, and the passes
 ## `--off=` names switched off by their settings (light, shadows, air, fog: Feel's `set_spell_light`,
-## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs; `--quality=low` or
-## `high` draws the effects at that row (gameplay/feel/effects_quality.gd).
+## `set_shadows`, `set_ambient_particles`, `set_fog`), to tell what each pass costs; the effects drawn
+## at the scenario's fixed row (its "quality", `--quality=`: Feel's `set_effects_mode`,
+## gameplay/feel/effects_quality.gd; never Auto, whose row follows the machine), told in a `BENCH:` line.
 func _start_play(scenario: Dictionary) -> void:
+	var quality: String = String(scenario.get("quality", "high"))
+	if _feel != null and _feel.has_method(&"set_effects_mode"):
+		_feel.call(&"set_effects_mode", QUALITY_MODES.get(quality, EffectsSetting.HIGH))
+		var drawn: int = int(((_feel.call(&"spectacle") as Object).get(&"quality") as Object).get(&"level"))
+		print("BENCH: play frames %s: effects at %s" % [scenario["label"], String(EffectsQualityScript.Level.keys()[drawn]).to_lower()])
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
-		if arg.begins_with("--quality=") and _feel != null:
-			var level: int = EffectsQualityScript.Level.LOW if arg.trim_prefix("--quality=") == "low" else EffectsQualityScript.Level.HIGH
-			(_feel.call(&"spectacle") as Object).call(&"set_effects_quality", level)
-			print("BENCH: play frames %s: effects at %s" % [scenario["label"], arg.trim_prefix("--quality=")])
 		if arg.begins_with("--off=") and _feel != null:
 			for part in arg.trim_prefix("--off=").split(","):
 				var setter: StringName = PASS_SETTERS.get(part, &"")

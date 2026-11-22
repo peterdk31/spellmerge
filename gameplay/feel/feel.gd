@@ -127,6 +127,8 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
+const EffectsAutoScript := preload("res://gameplay/feel/effects_auto.gd")
+const EffectsQualityScript := preload("res://gameplay/feel/effects_quality.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
@@ -558,6 +560,14 @@ var _markers: TeammateMarkersScript = null
 var split_screen: SplitScreenScript = null
 ## How it splits (`SplitScreenSetting`; `set_split_mode`): the Voronoi split by default.
 var split_mode: int = SplitScreenSetting.DEFAULT
+## The "Effects" setting (`EffectsSetting`; `set_effects_mode`). HIGH, a fixed row, until told (the
+## pause menu always tells, its default Auto), so tests and benchmarks, whose frames are not the
+## machine's, draw the look the owner chose. Read only.
+var effects_mode: int = EffectsSetting.HIGH
+## The "Effects: Auto" watcher (`effects_auto.gd`): stepped every drawn frame; its row is drawn while
+## `effects_mode` is AUTO. The one place the effects' row is chosen; the split screen's budget
+## (`split_budget.gd`) only adds its own fallbacks on top while split, and holds it from rising.
+var effects_auto: EffectsAutoScript = EffectsAutoScript.new()
 ## The split camera's HUD corners last sent to the HUD (`hud_corners_changed`), by its count.
 var _corners_sent: int = 0
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
@@ -1074,6 +1084,7 @@ func _ready() -> void:
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.split_screen_changed.connect(set_split_mode)
+	events.effects_changed.connect(set_effects_mode)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -1162,6 +1173,7 @@ func step(real_delta: float) -> void:
 		_spectacle.set_void_blank(split_screen.void_rect())
 		_tell_hud_corners()
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
+	_step_effects(real_delta)
 	_profile_mark(0)
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
@@ -2838,6 +2850,28 @@ func set_split_mode(mode: int) -> void:
 	split_mode = SplitScreenSetting.snap(mode)
 	if split_screen != null:
 		split_screen.camera.set_equal(split_mode == SplitScreenSetting.EQUAL)
+
+
+## The "Effects" setting's `mode` (`EffectsSetting`; the pause menu's "Effects", `effects_changed`):
+## AUTO lets the watcher choose the row from the drawn frames' times, starting at HIGH; LOW, MEDIUM
+## and HIGH draw that row. Taken in one frame (the owner's exception to "Smooth", 2026-11-22). View only.
+func set_effects_mode(mode: int) -> void:
+	effects_mode = EffectsSetting.snap(mode)
+	if effects_mode == EffectsSetting.AUTO:
+		effects_auto.reset()
+		_spectacle.set_effects_quality(effects_auto.level)
+	else:
+		_spectacle.set_effects_quality(EffectsQualityScript.of_setting(effects_mode))
+
+
+## The watcher stepped by this drawn frame (`real_delta` seconds), its row drawn when it changes while
+## the setting is Auto. Held from rising while the split screen's budget has a fallback taken.
+func _step_effects(real_delta: float) -> void:
+	if effects_mode != EffectsSetting.AUTO:
+		return
+	var held: bool = split_screen != null and split_screen.budget.rung > 0
+	if effects_auto.step(real_delta, held):
+		_spectacle.set_effects_quality(effects_auto.level)
 
 
 ## Tell the HUD where each seat's corner panel and menus sit now (`hud_corners_changed`), once a

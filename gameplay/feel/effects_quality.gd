@@ -1,12 +1,14 @@
 extends RefCounted
 ## How much the screen's effects cost (the owner's one pass, 2026-11-22; docs/milestones/connected-biomes.md,
 ## "One pass"): one row of numbers a level, so a quality setting (Auto, Low, High: the coming one)
-## turns every effect down by choosing a row, and nothing else knows how. The spectacle reads it
+## turns every effect down by choosing a row, and nothing else knows how ("Effects", `EffectsSetting` in
+## core/settings: Low, Medium and High a row each, Auto a row chosen by the frames' times,
+## `effects_auto.gd`; the owner's choice of 2026-11-21). The spectacle reads it
 ## (`Spectacle.set_effects_quality`) and hands each number to the effect it names; whether an effect
 ## is drawn at all stays its own setting ("Dynamic lighting", "Shadows", "Fog", "Ambient particles").
 ## View only.
 
-enum Level { LOW, HIGH }
+enum Level { LOW, MEDIUM, HIGH }
 
 ## The level the game draws at unless told (the look the owner chose).
 const DEFAULT_LEVEL: Level = Level.HIGH
@@ -15,6 +17,7 @@ const DEFAULT_LEVEL: Level = Level.HIGH
 ## rooms', the kinds' and the void's).
 const ROWS: Dictionary[Level, Dictionary] = {
 	Level.LOW: {&"light_cell": 16.0, &"light_smooth": true, &"mist_billows": 1, &"air_share": 0.5},
+	Level.MEDIUM: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 2, &"air_share": 0.75},
 	Level.HIGH: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 3, &"air_share": 1.0},
 }
 
@@ -24,6 +27,26 @@ var light_cell: float = 0.0
 var light_smooth: bool = false
 var mist_billows: int = 0
 var air_share: float = 0.0
+
+
+## The level a step cheaper than `at` (LOW stays LOW), and a step dearer (HIGH stays HIGH).
+static func lower(at: Level) -> Level:
+	return maxi(int(at) - 1, int(Level.LOW)) as Level
+
+
+static func higher(at: Level) -> Level:
+	return mini(int(at) + 1, int(Level.HIGH)) as Level
+
+
+## The row the "Effects" setting's fixed `mode` names (`EffectsSetting`: LOW, MEDIUM, HIGH; AUTO's row is
+## the watcher's, `effects_auto.gd`, and HIGH until it has watched).
+static func of_setting(mode: int) -> Level:
+	match mode:
+		EffectsSetting.LOW:
+			return Level.LOW
+		EffectsSetting.MEDIUM:
+			return Level.MEDIUM
+	return Level.HIGH
 
 
 func _init(at: Level = DEFAULT_LEVEL) -> void:

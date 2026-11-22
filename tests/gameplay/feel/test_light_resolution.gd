@@ -41,7 +41,7 @@ func _int(value: Variant) -> int:
 
 
 func test_the_grid_scale_is_the_whole_times_the_picture_holds_the_grid() -> void:
-	check_equal(PictureGridScript.SIZE, Vector2i(640, 360), "the light's resolution is the game's picture")
+	check_equal(PictureGridScript.SIZE, Vector2i(640, 360), "the game's picture, at which the cameras' zoom is 1")
 	check_equal(PictureGridScript.scale_of(Vector2(640.0, 360.0)), 1, "the shipped picture: 1")
 	check_equal(PictureGridScript.scale_of(Vector2(1280.0, 720.0)), 2, "1280 x 720: 2")
 	check_equal(PictureGridScript.scale_of(Vector2(1920.0, 1080.0)), 3, "1920 x 1080: 3")

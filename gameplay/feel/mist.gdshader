@@ -10,7 +10,7 @@ shader_type canvas_item;
 // - **Where it lies:** `mask` (MistMask: how far each place is from a wall and from a pit, and how
 //   deep in a wall it is) thickens it toward the walls within `edge_reach` and the pits within
 //   `pit_reach`, thin over the middle (`middle`), spilling `spill` over a wall's edge.
-// - **Its billows:** three layers of value noise in world px, each drifting its own way at Feel's
+// - **Its billows:** up to three layers of value noise in world px (`billows`, EffectsQuality's row), each drifting its own way at Feel's
 //   clock (`view_time`), so the sheet slowly turns over as it drifts; `patchy` opens floor between.
 // - **Pushed:** the shots' wake drags it along and a blast's wave pushes it out and thins it
 //   (stir.gdshaderinc, the world's stirs); `parted` (MistParting) parts it round the bodies' feet and

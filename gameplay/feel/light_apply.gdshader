@@ -32,8 +32,10 @@ void vertex() {
 }
 
 void fragment() {
+	// A world pixel at a time (whole-pixel bands at any size of picture, as the mist and the tints).
+	vec2 at = floor(world_at) + 0.5;
 	bool unchanged;
-	vec3 factor = light_factor(view_light(world_at), world_at, unchanged);
+	vec3 factor = light_factor(view_light(at), at, unchanged);
 	if (unchanged) {
 		discard;
 	}

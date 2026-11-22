@@ -72,14 +72,14 @@ const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divid
 ## void's black (`VoidBackdrop.GROW`) and past any view's limits.
 const VOID_AWAY: float = 1024.0
 ## A view's box is snapped out to this many screen pixels (`view_box`) at PictureGrid.SIZE, and that
-## times `PictureGrid.scale_of` in a bigger picture: a multiple of the blocks the light's passes are
-## drawn in (SpellLight.DOWNSCALE and the budget's, both times the scale there), so a view's blocks lie
-## where the whole screen's would, and the light looks the same in a box as on the screen (the light's
-## grid itself lies on the world's cells, wherever the box is).
+## times `PictureGrid.scale_of` in a bigger picture. Once the multiple of the light passes' blocks;
+## since the one pass (2026-11-22) the light lies on the world's pixels wherever a box is, and the
+## snap is kept as it was (a box a few pixels larger costs little, and lies on whole world pixels at
+## the cameras' zoom 1).
 const BOX_SNAP: int = 8
-## A view's box reaches this many screen pixels past its cell's corners (`view_box`): a light pass's
-## block near the box's edge reaches up to the budget's largest downscale (8) screen pixels past it
-## at PictureGrid.SIZE (times `PictureGrid.scale_of` in a bigger picture, as the pad is).
+## A view's box reaches this many screen pixels past its cell's corners (`view_box`; times
+## `PictureGrid.scale_of` in a bigger picture). Once room for the light passes' blocks past the edge;
+## kept as it was since the one pass.
 const BOX_PAD: int = 8
 ## How much larger a view's box may be than its cell's needs, each way, before it is made again
 ## (`kept_box`): a box resized makes its view's render target anew, so it

@@ -1122,10 +1122,11 @@ func set_floor_marks(on: bool) -> void:
 
 
 ## The effects drawn at `level` (EffectsQuality.Level) from now on: the light's cell and smoothing, the
-## mists' billows and the air's share, one row of numbers (effects_quality.gd). Whether each is drawn
-## at all stays its own setting. Returns the level.
-func set_effects_quality(level: int) -> int:
-	quality = EffectsQualityScript.new(level as EffectsQualityScript.Level)
+## mists' billows and the air's share (the rooms', the kinds' and the void's), one row of numbers
+## (effects_quality.gd), taken in one frame (the owner's choice on easing it is open). Whether each is
+## drawn at all stays its own setting. Returns the level.
+func set_effects_quality(level: EffectsQualityScript.Level) -> EffectsQualityScript.Level:
+	quality = EffectsQualityScript.new(level)
 	if light != null:
 		_quality_on_light()
 	for each: MistScript in ([mist] if mist != null else []) + room_mists:
@@ -1333,8 +1334,8 @@ func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
 	var into: MotesScript = void_pool if motes_on() and ambient_particles and in_biome else null
-	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
-	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE, grid if in_biome else null, void_covers)
+	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
+	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
 
 
 ## The world rect the equal split's blank quarter shows the void of (`SplitScreen.void_rect`; empty:

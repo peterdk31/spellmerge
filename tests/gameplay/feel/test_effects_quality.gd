@@ -79,7 +79,7 @@ func test_every_level_has_a_row_the_effects_can_take() -> void:
 
 func _billows(mist: MistScript) -> int:
 	var value: Variant = (mist.material as ShaderMaterial).get_shader_parameter(&"billows")
-	return int(value) if value != null else 3
+	return int(value) if value != null else -1
 
 
 func test_the_spectacle_hands_each_number_to_its_effect() -> void:
@@ -96,9 +96,18 @@ func test_the_spectacle_hands_each_number_to_its_effect() -> void:
 		return
 	check_equal(spectacle.light.grid.cell, LightGridScript.CELL, "high: the light in 8 px cells")
 	check_equal(_billows(spectacle.mist), 3, "high: three layers of billows")
-	check_equal(spectacle.set_effects_quality(EffectsQualityScript.Level.LOW), int(EffectsQualityScript.Level.LOW), "low taken")
+	check_equal(int(spectacle.set_effects_quality(EffectsQualityScript.Level.LOW)), int(EffectsQualityScript.Level.LOW), "low taken")
 	check_equal(spectacle.light.grid.cell, 16.0, "low: the light in coarser cells")
+	check(spectacle.light.grid_smooth == spectacle.quality.light_smooth, "and smoothed as its row says")
 	check_equal(_billows(spectacle.mist), 1, "low: one layer of billows")
+	# A later room's mist (a biome's) takes the level too.
+	var later := own(MistScript.new(SpectacleScript.MARK_Z)) as MistScript
+	spectacle.room_mists.append(later)
+	spectacle.set_effects_quality(EffectsQualityScript.Level.HIGH)
+	check_equal(_billows(later), 3, "a later room's mist: three layers")
+	spectacle.set_effects_quality(EffectsQualityScript.Level.LOW)
+	check_equal(_billows(later), 1, "and one")
+	spectacle.room_mists.erase(later)
 	bus.spell_light_changed.emit(false)
 	bus.spell_light_changed.emit(true)
 	_frames(feel, 1)
@@ -107,3 +116,18 @@ func test_the_spectacle_hands_each_number_to_its_effect() -> void:
 	spectacle.set_effects_quality(EffectsQualityScript.Level.HIGH)
 	check_equal(spectacle.light.grid.cell, LightGridScript.CELL, "high again: 8 px cells")
 	check_equal(_billows(spectacle.mist), 3, "and three layers")
+
+
+## The mist's shader works out as many layers as it is told, three the sum as it was (in its order),
+## and the script keeps the number to 1 to 3.
+func test_the_mists_billows_are_its_shaders_and_kept_in_range() -> void:
+	var density: String = (load("res://gameplay/feel/mist_density.gdshaderinc") as ShaderInclude).code
+	check(density.contains("uniform int billows = 3;"), "the shader takes the number of layers, three unless told")
+	var first: int = density.find("float n = mist_noise((q - moved) / scale);")
+	var second: int = density.find("n = 0.55 * n + 0.3 * mist_noise(")
+	var third: int = density.find("n += billows > 2 ? 0.15 * mist_noise(")
+	check(first >= 0 and second > first and third > second, "three layers add up in the order they did: (0.55 a + 0.3 b) + 0.15 c")
+	var mist := own(MistScript.new(SpectacleScript.MARK_Z)) as MistScript
+	for asked: int in [0, 1, 2, 3, 9]:
+		mist.set_billows(asked)
+		check_equal(_billows(mist), clampi(asked, 1, 3), "%d asked: %d" % [asked, clampi(asked, 1, 3)])

@@ -109,6 +109,10 @@ _NATIVE_BANNED = re.compile(
 # server (check_signal_source). No dependency is ever committed (node_modules stays out).
 SIGNAL_DIR = "server/signal/"
 BOT_SIGNAL_TYPES = frozenset({".js", ".toml"})
+# Compute shaders for the desktop builds' RenderingDevice (the owner, 2026-11-22): Claude's only,
+# for drawing only, in these folders (AGENTS.md hard rule 2).
+BOT_COMPUTE_TYPES = frozenset({".glsl"})
+BOT_COMPUTE_DIRS = ("core/", "gameplay/feel/")
 SIGNAL_TESTS = SIGNAL_DIR + "test/"
 SIGNAL_IMPORTS = frozenset({"cloudflare:workers", "node:crypto", "node:http"})
 SIGNAL_TEST_IMPORTS = frozenset({"node:assert/strict", "node:test"})
@@ -417,6 +421,7 @@ def check_file_type(change: Change, role: str) -> list[Finding]:
         allowed = (name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
                    or (path.startswith(NATIVE_DIR) and (suffix in BOT_NATIVE_TYPES or name in BOT_NATIVE_NAMES))
                    or (path.startswith(SIGNAL_DIR) and suffix in BOT_SIGNAL_TYPES)
+                   or (path.startswith(BOT_COMPUTE_DIRS) and suffix in BOT_COMPUTE_TYPES)
                    or (path.startswith(ISSUE_FORMS) and suffix in (".yml", ".yaml")))
     else:
         allowed = name in CONTRIBUTOR_NAMES or suffix in CONTRIBUTOR_TYPES

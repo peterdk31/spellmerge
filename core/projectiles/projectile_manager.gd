@@ -910,8 +910,9 @@ var _wait_state: PackedByteArray = PackedByteArray()
 var _wait_from: PackedByteArray = PackedByteArray()
 ## The one-shot list `_catch_up` hands the passes (scratch, DERIVED: the native hit pass catches a
 ## homing shot up itself and never writes it, so as state it parted a run with the module from one
-## without), and `_pass_shield`'s list in slot order.
+## without).
 var _one: PackedInt32Array = PackedInt32Array([0])
+## `_pass_shield`'s list in slot order.
 var _shield_order: PackedInt32Array = PackedInt32Array()
 ## True while `_catch_up` runs a waiting shot's passes (they do not make it wait again).
 var _catching_up: bool = false

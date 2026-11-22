@@ -46,6 +46,16 @@ The simulation's kernels must give the same bits on Linux, Windows and the web, 
 
 What only draws (`MoteKernel`, `GroundKernel`) keeps `std::` maths: it differs between machines without changing the game. The ground's drawing is compared with its GDScript and the baked art by `tests/gameplay/feel/test_ground_drawing.gd`.
 
+### The desktop builds optimised (the owner, 2026-11-22)
+
+The game is optimised for its Windows and Linux builds first. Every build is godot-cpp's release target, `-O3` (`optimize=speed`). On top of that, `native/SConstruct` builds the desktop libraries (Linux and MinGW's Windows; the web stays as it was):
+
+- **Linked whole** (`lto=full`): the kernels' calls into godot-cpp's packed arrays and `dmath.h` are inlined across files. The float flags are passed to the link as well, since with link-time optimisation the code is made there.
+- **For `x86-64-v2`** (SSE4.2, SSSE3, POPCNT) in place of godot-cpp's plain `x86-64` (SSE2). Godot 4.7 itself will not start without SSE4.2, so no machine that runs the game is left out.
+- **No AVX2 library.** `x86-64-v3` (AVX2) was built and measured against v2 and was no faster (docs/LOG.md, 2026-11-22). The kernels' loops are branches and reads of memory, not long runs of arithmetic, so there is little for wider vectors to do. Godot also has no CPU feature tag to pick a second library by, so v3 would have needed a dispatch inside the module. Measure again before adding one (`shot_scale.gd`, `stress.gd`, `mote_write.gd`).
+- **The same bits.** Vector instructions change no result: without fast-math the compiler never reorders a float sum to vectorise it, `-ffp-contract=off` never fuses a multiply and an add, and SSE's `sqrt` is correctly rounded. As a guard, `ci/build/native.sh` refuses a desktop library that holds any fused multiply-add instruction (`no_fma`, by objdump), whether it came from a flag, a compiler or an intrinsic. The kernels' side-by-side tests and `tick_hash.gd`'s whole-biome hash compare check the result (four biomes, main's library and this one, identical every tick).
+- `cpu=` (SCons) builds for another `-march` level, for measuring only. The shipped builds use the default.
+
 ## Building
 
 ```sh
@@ -53,7 +63,7 @@ ci/build/native.sh linux web windows     # the libraries and the .gdextension (b
 ```
 
 - **Pinned tools** (`ci/build/godot.env`, kept in `~/.cache/spellmerge-native`): godot-cpp 10.0.0 at its commit, built for the 4.7 API and only for the engine classes in `build_profile.json`, so a build takes seconds; SCons from its hash-checked wheel; Emscripten 4.0.20 for the web. That is the version Godot 4.7's own web templates were built with (godotengine/build-containers, branch 4.7). A side module from any other version may not load.
-- **Platforms:** Linux (`linux.x86_64`), the web (`web.wasm32`, no threads) and Windows (`windows.x86_64`, cross-built with MinGW-w64, the C++ runtime linked in). The Web presets use the extension-capable template (`variant/extensions_support=true`), which adds about 1 MB to the download. macOS is not a target.
+- **Platforms:** Linux (`linux.x86_64`, x86-64-v2, LTO), the web (`web.wasm32`, no threads) and Windows (`windows.x86_64`, cross-built with MinGW-w64, the C++ runtime linked in, x86-64-v2, LTO; above, "The desktop builds optimised"). The Web presets use the extension-capable template (`variant/extensions_support=true`), which adds about 1 MB to the download. macOS is not a target.
 - **CI** keeps the tools in one cache, `native-*` keyed on `ci/build/godot.env`. Only the daily build saves it (it builds every platform); the preview, the clips and the bot's sessions only restore it. After a restore `native.sh` checks the pins again (the commits, the wheel's hash, no edited godot-cpp or emsdk sources), cleans godot-cpp's tree and builds it from the pinned sources, and unpacks SCons fresh into `build/`. The toolchain emsdk installed is trusted as downloaded, not hashed.
 - **Windows** is cross-built with MinGW-w64, and `native.sh` refuses a DLL that imports MinGW's runtime DLLs (players have none).
 - **Every build has the module** (owner, 2026-11-02). `ci/build/build.sh` builds Linux for `--quick`, the web for `--web`, and all three for a full build. A platform that doesn't build fails the run, and so does an export without its library or an exported test run that ran without it. Once the Linux library is built, `SPELLMERGE_NATIVE=required` makes the comparing tests fail if the module did not load. `NATIVE=0` leaves it out for a local look at the GDScript only; CI refuses it. A full build here needs MinGW-w64 (`x86_64-w64-mingw32-g++`; on Ubuntu `g++-mingw-w64-x86-64-posix`, which the workflows install).

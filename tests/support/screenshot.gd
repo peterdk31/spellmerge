@@ -52,6 +52,11 @@ func _initialize() -> void:
 	var registry: Node = root.get_node_or_null("Registry")
 	if pin_room and flow != null and registry != null:
 		flow.set("run_id_to_play", PinnedRun.pin(registry, PINNED_ROOM))
+	# The effects at the high row, never "Effects: Auto" (the HUD's menu tells Feel the saved setting
+	# when it binds at boot): a shot must not change with how busy the machine drawing it is.
+	var feel: Node = root.get_node_or_null("Feel")
+	if feel != null and feel.has_method("set_effects_mode"):
+		feel.call("set_effects_mode", EffectsSetting.HIGH)
 	await take()
 	if not _failed:
 		quit(0)

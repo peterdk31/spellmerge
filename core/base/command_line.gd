@@ -7,8 +7,8 @@ extends RefCounted
 ## of `smbot.websmoke` fill) reaches the game as `OS.get_cmdline_args()`, and a player's page passes
 ## none. So on the web those are the game's own arguments too, all but those the engine takes as
 ## its own options and never hands on (`--benchmark` is one: on the web it never reaches the game).
-## A check that read only the user arguments missed every web automation: the web test build took its replay runs for a player's,
-## recorded them with boss intros on (`SessionRules.boss_intros`, a rule in the replay's header)
+## A check that read only the user arguments missed every web automation: the web test build took
+## its replay runs for a player's, recorded them with boss intros on (`SessionRules.boss_intros`, a rule in the replay's header)
 ## and so parted from every desktop at tick 0 (the platform compare, tools/platform_hashes.py).
 
 

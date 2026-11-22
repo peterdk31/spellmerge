@@ -165,7 +165,9 @@ func test_the_grid_runs_in_its_own_kernel() -> void:
 		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "the native module is loaded")
 		return
 	var grid := LightGridScript.new()
-	check(grid.use_native(true), "the kernel is switched on")
+	if not grid.use_native(true):
+		check(false, "the native module is loaded but has no LightKernel (build it again: ci/build/native.sh)")
+		return
 	check_equal(grid.kernel.get_class(), "LightKernel", "its own class")
 	var motes: Object = NativeScript.mote_kernel()
 	check(not motes.has_method(&"light_grid_rows") and not motes.has_method(&"check_light_grid"), "the motes' kernel has no light calls")

@@ -58,7 +58,7 @@ func test_the_table_text_is_the_facts_a_header_the_rows_and_the_notes() -> void:
 
 func test_the_file_written_is_the_constant() -> void:
 	# The rules want the user:// path written out where the file is opened.
-	var source: String = (BenchmarkScript as GDScript).source_code
+	var source: String = FileAccess.get_file_as_string("res://bench/benchmark.gd")
 	check(source.contains('FileAccess.open("%s"' % BenchmarkScript.RESULTS_FILE), "the literal is RESULTS_FILE")
 
 

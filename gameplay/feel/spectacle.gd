@@ -223,6 +223,10 @@ var room_mists: Array[MistScript] = []
 ## Where the per-frame effects' independent pieces run (the rooms' mists, the light's views): on the
 ## worker threads on the desktop, on this thread on the web (`feel_jobs.gd`; `Feel.set_effect_threads`).
 var jobs: FeelJobsScript = FeelJobsScript.new()
+## The fewest mists stepped in a frame that are parted on the threads (fewer on this one): a room's
+## parting is about 0.05 ms, and handing a few to the workers cost more than it saved (measured
+## 2026-11-22, `play_frames.gd`, 1p near: Feel 0.45 ms slower with two or three rooms' mists threaded).
+const MISTS_THREADED_FROM: int = 4
 ## The mists stepped this frame (`_step_mists`; the first `_mists_stepped`), and their piece, made once.
 var _stepping: Array[MistScript] = []
 var _mists_stepped: int = 0
@@ -457,7 +461,11 @@ func _step_mists(now: float, seen: ViewBoxesScript) -> void:
 			_add_stepped(later)
 	for k in _mists_stepped:
 		_stepping[k].begin_step(now, stirs.version, stirs.hand_to)
-	jobs.run(_part_mist, _mists_stepped)
+	if _mists_stepped >= MISTS_THREADED_FROM:
+		jobs.run(_part_mist, _mists_stepped)
+	else:
+		for k in _mists_stepped:
+			_part_mist_of(k)
 	for k in _mists_stepped:
 		_stepping[k].end_step()
 		_stepping[k] = null

@@ -13,7 +13,7 @@ extends RefCounted
 ##   finer one, not a wider one.
 ##
 ## The shipped picture is SIZE (project.godot), so `scale_of` is 1 there and nothing is drawn at
-## another size. A benchmark draws 1280 x 720 (tests/benchmark/biome_frames_runner.gd, `--picture=`).
+## another size. A benchmark draws 1280 x 720 (bench/biome_frames_runner.gd, `--picture=`).
 
 ## The picture's size the light is drawn at (a view's share of it), and at which the cameras' zoom
 ## is 1 (px).

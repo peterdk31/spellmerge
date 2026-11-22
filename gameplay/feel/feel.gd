@@ -413,7 +413,7 @@ var input: InputManagerScript = null
 var _auto_actors: ActorsScript = null
 ## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
 var drive_engine: bool = true
-## A benchmark's fixed clock (tests/benchmark/fixed_steps.gd): while above 0, every drawn frame is
+## A benchmark's fixed clock (bench/fixed_steps.gd): while above 0, every drawn frame is
 ## this many seconds of the view (the camera's easing, the motes, the reveals), as the Tick runs one
 ## tick a frame, so what is drawn is the same every run; 0: the real clock. Never set by the game.
 var fixed_view_delta: float = 0.0

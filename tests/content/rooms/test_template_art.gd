@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## only what matters to play: the floor covers the room, each wall sprite draws over a collision
 ## shape and each shape is drawn (a ground drawn from a shape by its wall art, or, a floating room's
 ## edge, by the dark round its slab), decoration never blocks anything, and a ground drawn from a
-## shape keeps the fight readable (crypt rework, docs/milestones/crypt-rework.md, rule 6). Which
+## shape keeps the fight readable (crypt rework, docs/milestones/crypt-rework.md, rule 6); and of
+## every piece a biome lays, its walkways and seams too, that it draws no backdrop of its own. Which
 ## tile, torch or decal goes where is free to change.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -34,6 +35,21 @@ func _layout(room: RoomBase) -> Node:
 
 func test_the_templates_are_found() -> void:
 	check(templates.size() >= 1, "the templates are found (%d)" % templates.size())
+
+
+## The owner, 2026-11-23 ("some of the rooms / bridges have an ugly background outside their edge"):
+## no room, bridge or seam a biome lays draws a backdrop of its own under its slab, so the world's
+## void (Feel's) shows round every edge. Each piece once had a `Void` tile over its whole rectangle.
+func test_no_biome_piece_draws_a_backdrop_of_its_own() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var walkways: int = 0
+	var pieces: Array[RoomBase] = RoomScan.biome_pieces(registry)
+	for piece: RoomBase in pieces:
+		walkways += int(piece.walkway)
+		var layout: Node = own(piece.scene.instantiate()) as Node
+		check_equal(RoomScan.drawn_under_floor(layout), PackedStringArray(), "%s: nothing of its own is drawn under its slab" % piece.id)
+	check(pieces.size() - walkways >= 4 and walkways >= 2, "the biomes' rooms and walkways are found (%d, %d of them walkways)" % [pieces.size(), walkways])
 
 
 func test_floor_covers_the_whole_room() -> void:

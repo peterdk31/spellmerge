@@ -22,6 +22,18 @@ static func templates(registry: RegistryScript) -> Array[RoomBase]:
 	return found
 
 
+## Every piece a biome lays (the room templates, `templates`, and the walkways between them, seams
+## among them), by id. `registry` has been scanned.
+static func biome_pieces(registry: RegistryScript) -> Array[RoomBase]:
+	var found: Array[RoomBase] = templates(registry)
+	for item: Resource in registry.get_all(&"rooms"):
+		var room := item as RoomBase
+		if room != null and room.walkway and room.scene != null:
+			found.append(room)
+	found.sort_custom(func(a: RoomBase, b: RoomBase) -> bool: return String(a.id) < String(b.id))
+	return found
+
+
 ## The positions of the Marker2D children of `group` (for example "PlayerSpawns").
 static func markers(root: Node, group: String) -> PackedVector2Array:
 	var points: PackedVector2Array = PackedVector2Array()
@@ -69,6 +81,23 @@ static func sprite_rect(sprite: Sprite2D) -> Rect2:
 	return Rect2(sprite.position, size)
 
 
+## The names of what `root` (a room's, a bridge's or a seam's layout) draws under its `Floor`: its
+## own children at a lower z (a layout with no `Floor` is named too). A biome's piece draws none (the owner, 2026-11-23: no background of a
+## room's own round its edge): what shows off its slab is the world's void, Feel's
+## (gameplay/feel/void_backdrop.gd), and a backdrop over the piece's rectangle would hide it.
+static func drawn_under_floor(root: Node) -> PackedStringArray:
+	var found: PackedStringArray = PackedStringArray()
+	var ground: CanvasItem = root.get_node_or_null("Floor") as CanvasItem
+	if ground == null:
+		found.append("(no Floor)")
+		return found
+	for child: Node in root.get_children():
+		var item: CanvasItem = child as CanvasItem
+		if item != null and item != ground and item.visible and item.z_index < ground.z_index:
+			found.append(String(item.name))
+	return found
+
+
 ## The game scripts in a room's scene: none is allowed. Its placements and zones (`RoomPlacement`,
 ## `RoomZone`, props W8c), its sockets (`RoomSocket`, connected biomes CB2) and its previews
 ## (`RoomPreview`, ground cover GC3) are not counted: scripts holding what stands where or showing
@@ -84,8 +113,8 @@ static func scripts_below(node: Node) -> int:
 
 ## What keeps `room` (its layout instanced as `root`) from being a floating crypt room (crypt rework,
 ## docs/milestones/crypt-rework.md, the owner's second round), one line each: its floor the ground
-## drawn from its shape with no wall art (its edge an invisible wall over the dark), its own `Void`
-## behind the slab, a crypt room's `ambient` and `shade` (rule 6; docs/milestones/atmosphere.md, A), its floor-mark and debris colours named (rule
+## drawn from its shape with no wall art (its edge an invisible wall over the dark), nothing of its
+## own drawn under its slab (`drawn_under_floor`), a crypt room's `ambient` and `shade` (rule 6; docs/milestones/atmosphere.md, A), its floor-mark and debris colours named (rule
 ## 9), at least `pillars` `crypt_pillar` props, `sockets` sockets on its lip for the biome's bridges
 ## (a fight room's two, a way in and a way on; connected biomes CB8) and no exit prop of the row run.
 ## Its other props (a boss hall's dust heaps) are its own.
@@ -96,9 +125,8 @@ static func floating_room_problems(room: RoomBase, root: Node, pillars: int, soc
 		problems.append("its floor is not a ground drawn from its shape")
 	elif ground.get_node_or_null("Walls/WallArt") != null:
 		problems.append("its ground draws wall art: a floating room's edge is an invisible wall over the dark")
-	var void_art: Sprite2D = root.get_node_or_null("Void") as Sprite2D
-	if void_art == null or ground == null or void_art.z_index >= (ground as CanvasItem).z_index:
-		problems.append("its own Void is not drawn behind the slab")
+	for under: String in drawn_under_floor(root):
+		problems.append("%s is drawn under its slab, over the void" % under)
 	if not is_equal_approx(room.ambient, CRYPT_AMBIENT):
 		problems.append("its ambient is %.2f, not a crypt room's %.2f (rule 6; atmosphere A)" % [room.ambient, CRYPT_AMBIENT])
 	if not room.shade.is_equal_approx(CRYPT_SHADE):

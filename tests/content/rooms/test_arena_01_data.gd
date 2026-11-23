@@ -32,7 +32,7 @@ func test_spawn_groups_hold_only_markers() -> void:
 		check(RoomScan.only_markers(room_root, group), "%s holds only Marker2D nodes" % group)
 
 
-## A floating room drawn from its shape, its own Void behind the slab, its five pillars props and its
+## A floating room drawn from its shape, nothing of its own under the slab, its five pillars props and its
 ## four sockets: west and east, and off-centre north and south ones (the owner, 2026-11-20: doorways
 ## anywhere along an edge) (`RoomScan.floating_room_problems`).
 func test_it_is_a_floating_room_drawn_from_its_shape() -> void:

@@ -1001,6 +1001,7 @@ func _ready() -> void:
 	_tints.bind(events)
 	if _spectacle != null:
 		_spectacle.kind_air.pieces = _hearing
+		_spectacle.void_edges.pieces = _hearing
 	_mouth_symbols = MouthSymbolsScript.new()
 	_mouth_symbols.name = "MouthSymbols"
 	_mouth_symbols.pieces = _hearing

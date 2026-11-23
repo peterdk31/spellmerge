@@ -24,6 +24,7 @@ const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
+const VoidEdgesScript := preload("res://gameplay/feel/void_edges.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
 
@@ -481,6 +482,67 @@ func test_the_void_is_black_with_motes_outside_the_rooms() -> void:
 	flow.stop_run()
 	feel.call(&"_step_rooms", 0.0, 1)
 	check_equal(backdrop.rect(), Rect2(), "outside a biome, no void is drawn")
+
+
+## The owner, 2026-11-23 ("the real background" round a room's or a bridge's edge, not one of its
+## own): off its slab, inside its own rectangle, an entered piece shows the void, and the void's
+## motes are given off there as between the pieces; never over its floor, a wall standing on it (the
+## nave's sarcophagus) or a mouth.
+func test_the_void_and_its_motes_reach_a_pieces_slab_inside_its_rectangle() -> void:
+	var map: BiomeMap = _start(1)
+	feel.call(&"_step_rooms", 0.0, 1)
+	var spectacle: Node = feel.call(&"spectacle")
+	var edges: VoidEdgesScript = spectacle.get(&"void_edges") as VoidEdgesScript
+	var grid: RoomGrid = _grid()
+	edges.lay(grid)
+	var room: Rect2 = grid.place_rect(0)
+	var corner: Vector2 = room.position + Vector2(4.0, 4.0)
+	check(edges.count(0) > 0 and edges.shows(corner, 0), "the nave's corner lies off its slab (%d cells)" % edges.count(0))
+	check(not edges.shows(_wizard(0).global_position, 0), "its floor does not")
+	# Every wall cell and mouth of the nave: a wall standing on its floor (its sarcophagus) and a
+	# mouth are never the void.
+	var standing: int = 0
+	var mouths: int = 0
+	var wrong: int = 0
+	for y in range(4, int(room.size.y), int(RoomGrid.WALL_CELL)):
+		for x in range(4, int(room.size.x), int(RoomGrid.WALL_CELL)):
+			var at: Vector2 = room.position + Vector2(x, y)
+			var cell: int = grid.cell_at(at)
+			var shown: bool = edges.shows(at, 0)
+			mouths += int((cell & RoomGrid.MOUTH_CELL) != 0)
+			standing += int((cell & RoomGrid.ROOM_CELL) != 0 and not shown)
+			wrong += int(shown and ((cell & RoomGrid.ROOM_CELL) == 0 or (cell & RoomGrid.MOUTH_CELL) != 0))
+	check(standing > 0, "the nave's sarcophagus stands on its floor: walls that are not the void (%d cells)" % standing)
+	check_equal(wrong, 0, "no open cell and no mouth is the void (%d mouth cells in the nave)" % mouths)
+	var bridges: int = 0
+	for place in range(map.room_templates.size(), grid.places()):
+		var bridge: Rect2 = grid.place_rect(place)
+		bridges += 1
+		check(edges.shows(bridge.position + Vector2(4.0, 4.0), place) and not edges.shows(bridge.get_center(), place), "bridge %d: its corner is the void, its walkway is not" % place)
+	check(bridges > 0, "the map's bridges are laid (%d)" % bridges)
+	check(AirMotesScript.is_void(corner, grid, [], edges) and not AirMotesScript.is_void(corner, grid, []), "the air asks the edges")
+	# The void's motes leave from the strip off the slab, none from the floor beside it.
+	var air: AirMotesScript = spectacle.get(&"void_air") as AirMotesScript
+	var void_pool: MotesScript = spectacle.get(&"void_pool") as MotesScript
+	var seen := ViewBoxesScript.new()
+	seen.set_one(Rect2(room.position, Vector2(96.0, 96.0)))
+	air.given = 0
+	var now: float = spectacle.get(&"_clock")
+	for i in 400:
+		now += 0.1
+		void_pool.step(now)
+		spectacle.call(&"_give_off_void", now, seen)
+	check(air.given > 0, "the void's motes are given off round the corner of the nave (%d)" % air.given)
+	seen.set_one(Rect2(room.get_center() - Vector2(8.0, 8.0), Vector2(16.0, 16.0)))
+	air.given = 0
+	for i in 200:
+		now += 0.1
+		spectacle.call(&"_give_off_void", now, seen)
+	check_equal(air.given, 0, "none over the middle of its floor")
+	# A new world is read again; outside a biome nothing is the void.
+	flow.stop_run()
+	spectacle.call(&"_give_off_void", now + 1.0, seen)
+	check_equal(edges.count(0), 0, "outside a biome, no edges")
 
 
 ## The owner, 2026-11-21: an unvisited room is not black, it looks like the void round it, the void's

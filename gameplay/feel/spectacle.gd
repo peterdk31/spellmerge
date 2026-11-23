@@ -45,6 +45,7 @@ const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const KindAirScript := preload("res://gameplay/feel/kind_air.gd")
+const VoidEdgesScript := preload("res://gameplay/feel/void_edges.gd")
 ## The void's air (`void_air`) and the most of the motes' ring it may hold at once (in a pool of its
 ## own, `void_pool`, of twice that many rows, the air filling at most VOID_POOL_SHARE of it).
 const VOID_AIR: MoteSource = preload("res://gameplay/feel/presets/void_air.tres")
@@ -265,6 +266,10 @@ var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 ## room is the void, the owner, 2026-11-21: `void_covers`), into `void_pool`, within VOID_SHARE of
 ## the motes' ring, under the motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
 var void_air: AirMotesScript = AirMotesScript.new(_ramp_table)
+## Where a laid piece shows the void inside its own rectangle, off its slab (void_edges.gd; the
+## owner, 2026-11-23): the void's motes are given off there too. Feel hands it its room hearing
+## (`void_edges.pieces`).
+var void_edges: VoidEdgesScript = VoidEdgesScript.new()
 ## The same void's motes over the world the equal split's blank quarter shows (the owner,
 ## 2026-11-20; `set_void_blank`, the split screen's void view, past the biome's corner), so the blank
 ## shows the void as it drifts between the slabs.
@@ -1375,14 +1380,16 @@ func _free_faded() -> void:
 
 
 ## The void's motes owed since the last frame (`void_air`, into `void_pool`), over `view` outside the
-## grid's places or over the dark of an unvisited room (`void_covers`); none outside a biome (a grid
+## grid's places, off a piece's slab inside its rectangle (`void_edges`) or over the dark of an
+## unvisited room (`void_covers`); none outside a biome (a grid
 ## with no places).
 func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
 	var into: MotesScript = void_pool if motes_on() and ambient_particles and in_biome else null
-	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
-	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers)
+	void_edges.lay(grid if in_biome else null)
+	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers, void_edges)
+	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers, void_edges)
 
 
 ## The world rect the equal split's blank quarter shows the void of (`SplitScreen.void_rect`; empty:

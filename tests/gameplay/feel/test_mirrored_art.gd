@@ -110,9 +110,6 @@ func test_every_mirrored_rooms_art_lies_over_what_is_hit_there() -> void:
 				continue
 			var named: String = "%s mirrored %d" % [room.id, mirror]
 			check_equal(layout.has_meta(MirroredArtScript.PLACED_META), mirror != 0, "%s: its art is put as it is mirrored" % named)
-			var dark := layout.get_node_or_null("Void") as Sprite2D
-			if dark != null:
-				check(_world_rect(dark, dark.get_rect()).encloses(flow.biome.room_rect(0)), "%s: the dark behind its slab still covers it" % named)
 			walls_seen += _check_walls(layout, named)
 			_check_floor_decoration(layout, named)
 			props_seen += _check_props(named)

@@ -349,6 +349,7 @@ func _process(delta: float) -> void:
 	if _census and not _census_taken and _elapsed >= warm_up + measure * 0.5:
 		_census_taken = true
 		DrawCensusScript.report(get_tree(), String(rows[scenarios[_current]]["label"]))
+		_report_motes(String(rows[scenarios[_current]]["label"]))
 		if (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--census-calls"):
 			var probe := DrawCensusScript.CallProbe.new()
 			add_child(probe)
@@ -652,3 +653,17 @@ func _panels_shown() -> int:
 		if (hud.call(&"get_panel", seat) as CanvasItem).is_visible_in_tree():
 			shown += 1
 	return shown
+
+
+## `--census`: the motes' rows drawn against those alive, and the chunks they are drawn in (a row
+## whose mote is gone is folded away in the shader, but still a vertex job and part of a draw call).
+func _report_motes(label: String) -> void:
+	var pool: Object = _feel.call(&"motes") if _feel != null and _feel.has_method(&"motes") else null
+	var regions: Object = pool.get(&"regions") if pool != null else null
+	if regions == null or not regions.call(&"is_on"):
+		print("BENCH: census %s motes: not drawn by room" % label)
+		return
+	var drawn: int = regions.call(&"rows_drawn")
+	var alive: int = regions.call(&"rows_alive", float(pool.call(&"clock")))
+	var chunks: int = regions.call(&"chunks_shown")
+	print("BENCH: census %s motes: %d rows drawn in %d chunks (%d a chunk of %d), %d alive (%d%%)" % [label, drawn, chunks, drawn / maxi(chunks, 1), int(regions.get(&"ROWS")), alive, alive * 100 / maxi(drawn, 1)])

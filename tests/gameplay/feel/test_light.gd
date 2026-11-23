@@ -110,9 +110,10 @@ func test_off_leaves_no_nodes_and_on_makes_them_again() -> void:
 	_items(feel, found)
 	var viewports: int = 0
 	for child: Node in feel.find_children("*", "SubViewport", true, false):
-		if not child.is_queued_for_deletion():
+		# The damage numbers' glyph sheets are theirs, whatever the light is.
+		if not child.is_queued_for_deletion() and not feel.damage_numbers().is_ancestor_of(child):
 			viewports += 1
-	check_equal(viewports, 0, "off: no SubViewport under Feel")
+	check_equal(viewports, 0, "off: no SubViewport of the light's under Feel")
 	for item in found:
 		check(item.material == null or (item.material as ShaderMaterial) == null or (item.material as ShaderMaterial).shader != SpellLightScript.APPLY_SHADER, "off: no apply rect")
 	check(not manager.light_rows_wanted, "off: the shots' rows kept for nobody")

@@ -7,8 +7,12 @@ extends Node2D
 ## oldest number gives way.
 ##
 ## A number's text is written once, at the first step after its hit (a slot reused within the frame
-## shows its last hit), and drawn glyph by glyph (`draw_char`): a whole string drawn is shaped and
-## cached by the font as an object of its own, a glyph is not, so a storm makes no object per frame. Each rises from where its actor said for as
+## shows its last hit), and drawn glyph by glyph from a sheet of its font size's glyphs
+## (`number_glyphs.gd`, made the first time a size is shown and kept): a whole string drawn is shaped
+## and cached by the font as an object of its own, a glyph is not, so a storm makes no object per
+## frame; and every glyph, outline and line is a region of the one sheet, so the numbers of one size
+## are one draw call however they overlap (the performance pass, 2026-11-23: with the screen split
+## every view draws every number, and the font's own two textures made a call a change). Each rises from where its actor said for as
 ## long as it said, fading out, in whole pixels. Numbers one after the other start in three lanes
 ## (LANES: to the side and a line up from the one before), so the hits of one moment (a multicast)
 ## stay apart.
@@ -27,9 +31,6 @@ const Z: int = 22
 ## The plain text: its font size, outline and outline colour (the dummy's labels').
 const FONT_SIZE: int = 8
 const OUTLINE: int = 3
-## The most numbers a run holds, so a screen full of numbers tests each against at most this many
-## (a run is two draw calls; ending one early only costs two more).
-const RUN_MOST: int = 16
 const OUTLINE_COLOR: Color = Color(0.078, 0.071, 0.122, 1.0)
 ## The colours of a plain hit and of a heal (docs/STYLE.md; the heal cue's green).
 const PLAIN_COLOR: Color = Color.WHITE
@@ -45,6 +46,7 @@ const ELEMENT_FOLDER: StringName = &"spells"
 const GLYPHS: PackedStringArray = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-"]
 
 const EventsScript := preload("res://core/events/events.gd")
+const NumberGlyphsScript := preload("res://gameplay/feel/number_glyphs.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The bus (Feel's) and the registry the element colours come from (null: every hit plain).
@@ -69,8 +71,6 @@ var _spared: PackedByteArray = PackedByteArray()
 var _new: PackedByteArray = PackedByteArray()
 var _text: PackedStringArray = PackedStringArray()
 var _width: PackedFloat32Array = PackedFloat32Array()
-## Each character a number may have, as a string of its own, by its code (made once).
-var _glyphs: Dictionary[int, String] = {}
 var _next: int = 0
 ## Numbers showing, and whether a new one waits for its text.
 var _live: int = 0
@@ -78,9 +78,8 @@ var _fresh: bool = false
 ## An element's colour by its id, read once from the registry.
 var _tints: Dictionary[StringName, Color] = {}
 var _font: Font = null
-## The run of numbers being drawn (slots) and their boxes, sized once.
-var _run: PackedInt32Array = PackedInt32Array()
-var _run_box: Array[Rect2] = []
+## The glyphs' sheet of each font size shown so far (`number_glyphs.gd`), kept.
+var _sheets: Dictionary[int, NumberGlyphsScript] = {}
 
 
 func _ready() -> void:
@@ -88,8 +87,10 @@ func _ready() -> void:
 	z_index = Z
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_font = ThemeDB.fallback_font
-	for glyph in GLYPHS:
-		_glyphs[glyph.unicode_at(0)] = glyph
+	# The sheets' pixels are premultiplied (`number_glyphs.gd`): drawn so, with `_tinted` colours.
+	var blend := CanvasItemMaterial.new()
+	blend.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+	material = blend
 	# Packed arrays are values: each is sized where it lives.
 	_left.resize(SLOTS)
 	_left.fill(0.0)
@@ -104,8 +105,8 @@ func _ready() -> void:
 	_new.fill(0)
 	_text.resize(SLOTS)
 	_width.resize(SLOTS)
-	_run.resize(SLOTS)
-	_run_box.resize(SLOTS)
+	# The plain size's sheet before the first hit, so its first number has its glyphs.
+	_sheet_of(FONT_SIZE)
 	if events != null:
 		events.damage_number_shown.connect(show_number)
 		events.damage_numbers_changed.connect(set_shown)
@@ -135,6 +136,7 @@ func show_number(_actor: int, position: Vector2, amount: float, element: StringN
 	_seconds[slot] = seconds
 	_rise[slot] = rise
 	_font_size[slot] = maxi(roundi(float(FONT_SIZE) * size), 1)
+	_sheet_of(_font_size[slot])
 	_start[slot] = position + LANES[slot % LANES.size()] * size
 	_amount[slot] = amount
 	_colour[slot] = HEAL_COLOR if kind == EventsScript.NUMBER_HEAL else _tint_of(element)
@@ -216,65 +218,78 @@ func _tint_of(element: StringName) -> Color:
 	return _tints[element]
 
 
-## The numbers in slot order, a run at a time: a run's outlines, then its glyphs (and a spared
-## hit's line), so a run is two draw calls (the outlines and the glyphs are two textures of the
-## font) where a number each was two (the performance pass, 2026-11-21). A number joins the run
-## only while its box meets none of the run's, so where two numbers overlap the later still draws
-## wholly over the earlier: the same pixels as drawing them one by one.
+## The numbers in slot order, each its outlines, then its glyphs (and a spared hit's line), all
+## regions of its size's sheet: the same pixels as the font drawing them one by one with each glyph
+## on a whole pixel, in a draw call a run of numbers of one size in slot order (`sheets_drawn_now`:
+## sizes that alternate change sheet each time; every actor's numbers are the plain size today). A number whose sheet is not drawn yet (the
+## frame its size is first shown) waits for it.
 func _draw() -> void:
-	_runs(true)
-
-
-## How many runs the numbers showing now are drawn in (for tests).
-func runs_now() -> int:
-	return _runs(false)
-
-
-## The numbers showing parted into runs, each drawn when `drawing`; how many runs.
-func _runs(drawing: bool) -> int:
-	var count: int = 0
-	var runs: int = 0
 	for slot in SLOTS:
 		if _left[slot] <= 0.0 or _new[slot] == 1:
 			continue
-		var box: Rect2 = _box_of(slot)
-		if count == RUN_MOST:
-			if drawing:
-				_draw_run(count)
-			runs += 1
-			count = 0
-		for k in count:
-			if _run_box[k].intersects(box):
-				if drawing:
-					_draw_run(count)
-				runs += 1
-				count = 0
-				break
-		_run[count] = slot
-		_run_box[count] = box
-		count += 1
-	if count > 0:
-		if drawing:
-			_draw_run(count)
-		runs += 1
-	return runs
-
-
-## The first `count` numbers of the run: every outline, then every glyph.
-func _draw_run(count: int) -> void:
-	for k in count:
-		var slot: int = _run[k]
-		_draw_outline(_text[slot], _at_of(slot), _font_size[slot], Color(OUTLINE_COLOR, _alpha_of(slot)))
-	for k in count:
-		var slot: int = _run[k]
-		var colour: Color = _colour[slot]
-		colour.a = _alpha_of(slot)
+		var sheet: NumberGlyphsScript = _sheets.get(_font_size[slot])
+		if sheet == null or not sheet.ready_now():
+			continue
+		var texture: Texture2D = sheet.get_texture()
 		var at: Vector2 = _at_of(slot)
-		var size: int = _font_size[slot]
-		_draw_glyphs(_text[slot], at, size, colour)
+		var alpha: float = _alpha_of(slot)
+		var text: String = _text[slot]
+		_draw_text(sheet, texture, text, at, true, _tinted(OUTLINE_COLOR, alpha))
+		var colour: Color = _tinted(_colour[slot], alpha)
+		_draw_text(sheet, texture, text, at, false, colour)
 		if _spared[slot] == 1:
-			var y: float = at.y - roundf(float(size) * 0.35)
-			draw_line(Vector2(at.x - 1.0, y), Vector2(at.x + _width[slot] + 1.0, y), colour, 1.0)
+			var y: float = at.y - roundf(float(_font_size[slot]) * 0.35)
+			draw_texture_rect_region(texture, Rect2(at.x - 1.0, y - 0.5, _width[slot] + 2.0, 1.0), sheet.white_region(), colour)
+
+
+## How many times the numbers showing now change sheet in the order they are drawn: the draw calls
+## they take (for tests; one while every number is of one size).
+func sheets_drawn_now() -> int:
+	var changes: int = 0
+	var last: int = -1
+	for slot in SLOTS:
+		if _left[slot] <= 0.0 or _new[slot] == 1:
+			continue
+		if _font_size[slot] != last:
+			last = _font_size[slot]
+			changes += 1
+	return changes
+
+
+## The sheets made so far (for tests).
+func sheets_made() -> int:
+	return _sheets.size()
+
+
+## The sheet of the glyphs at `size`, made the first time it is asked for.
+func _sheet_of(size: int) -> NumberGlyphsScript:
+	var sheet: NumberGlyphsScript = _sheets.get(size)
+	if sheet == null:
+		sheet = NumberGlyphsScript.new(_font, size, OUTLINE, GLYPHS)
+		sheet.name = "Glyphs%d" % size
+		_sheets[size] = sheet
+		add_child(sheet)
+	return sheet
+
+
+## `colour` at `alpha`, premultiplied (the sheets are drawn with a premultiplied blend).
+static func _tinted(colour: Color, alpha: float) -> Color:
+	return Color(colour.r * alpha, colour.g * alpha, colour.b * alpha, alpha)
+
+
+## `text`'s glyphs (`outline`: their outlines) from `at` (its baseline's left), each its region of
+## `sheet`; the outlines of a number are all drawn before its glyphs, so a glyph's outline never
+## covers the one before.
+func _draw_text(sheet: NumberGlyphsScript, texture: Texture2D, text: String, at: Vector2, outline: bool, colour: Color) -> void:
+	var x: float = at.x
+	for i in text.length():
+		var code: int = text.unicode_at(i)
+		if not sheet.has(code):
+			continue
+		# On a whole pixel: the sheet holds each glyph as the font draws it there (between pixels the
+		# font draws another cut of it, by quarters of a pixel).
+		draw_texture_rect_region(texture, sheet.place_of(code, Vector2(roundf(x), at.y)), sheet.region_of(code, outline), colour)
+		x += sheet.advance_of(code)
 
 
 ## Slot `slot`'s number's alpha now (it fades as it rises; a spared hit's dimmer).
@@ -287,30 +302,3 @@ func _alpha_of(slot: int) -> float:
 func _at_of(slot: int) -> Vector2:
 	var age: float = 1.0 - _left[slot] / _seconds[slot]
 	return (_start[slot] + Vector2(-_width[slot] * 0.5, -_rise[slot] * age)).round()
-
-
-## A box round everything slot `slot`'s number draws now (its glyphs, their outline, a spared
-## hit's line), larger than it, never smaller.
-func _box_of(slot: int) -> Rect2:
-	var size: float = float(_font_size[slot])
-	var pad: float = float(OUTLINE) + 2.0
-	var at: Vector2 = _at_of(slot)
-	return Rect2(at.x - pad, at.y - size * 1.5 - pad, _width[slot] + pad * 2.0, size * 2.0 + pad * 2.0)
-
-
-## `text`'s outlines from `at` (its baseline's left), glyph by glyph; `_draw_glyphs` the glyphs
-## over them, so a glyph's outline never covers the one before.
-func _draw_outline(text: String, at: Vector2, size: int, outline: Color) -> void:
-	var x: float = at.x
-	for i in text.length():
-		var code: int = text.unicode_at(i)
-		draw_char_outline(_font, Vector2(x, at.y), _glyphs.get(code, "?") as String, size, OUTLINE, outline)
-		x += _font.get_char_size(code, size).x
-
-
-func _draw_glyphs(text: String, at: Vector2, size: int, colour: Color) -> void:
-	var x: float = at.x
-	for i in text.length():
-		var code: int = text.unicode_at(i)
-		draw_char(_font, Vector2(x, at.y), _glyphs.get(code, "?") as String, size, colour)
-		x += _font.get_char_size(code, size).x

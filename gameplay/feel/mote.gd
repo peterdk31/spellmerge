@@ -1005,6 +1005,11 @@ func draw_quad() -> Mesh:
 	return _mesh
 
 
+## Feel's clock at the last step (what the shader's clock stands at; for the benchmarks).
+func clock() -> float:
+	return _now
+
+
 ## The ring's chunks with rows made; with `regions` on, the rooms' chunks drawn now.
 func chunks_made() -> int:
 	var made: int = 0

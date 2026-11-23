@@ -11,6 +11,7 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const DrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
+const NumberGlyphsScript := preload("res://gameplay/feel/number_glyphs.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const SECONDS: float = 0.8
@@ -48,22 +49,44 @@ func test_a_number_per_hit_that_fades_out() -> void:
 	check_equal(drawer.live(), 0, "gone after its seconds")
 
 
-## The performance pass (2026-11-21): numbers apart are drawn in one run (their outlines, then
-## their glyphs: two draw calls), and a number over another starts a run of its own, so it still
-## draws wholly over the one before.
-func test_numbers_apart_share_a_run_and_one_over_another_starts_its_own() -> void:
+## The performance pass (2026-11-23): every glyph, outline and line of a number is a region of its
+## font size's one sheet (`number_glyphs.gd`), so numbers of one size are one draw call however
+## they overlap; a sheet is made the first time its size is shown and kept.
+func test_numbers_of_one_size_share_a_sheet_however_they_overlap() -> void:
 	var drawer: DrawerScript = _drawer()
+	check_equal(drawer.sheets_made(), 1, "the plain size's sheet is made before the first hit")
 	for n in 5:
 		_bus.damage_number_shown.emit(0, Vector2(40.0 + 60.0 * n, 50.0), 12.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0)
+	_bus.damage_number_shown.emit(0, Vector2(42.0, 52.0), 7.0, &"", EventsScript.NUMBER_SPARED, 16.0, SECONDS, 1.0)
 	drawer.step(0.0)
-	check_equal(drawer.runs_now(), 1, "five numbers apart: one run")
-	_bus.damage_number_shown.emit(0, Vector2(42.0, 52.0), 7.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0)
+	check_equal([drawer.sheets_drawn_now(), drawer.sheets_made()], [1, 1], "six numbers, one over another and one struck through: one sheet, one draw call")
+	_bus.damage_number_shown.emit(0, Vector2(300.0, 52.0), 7.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 2.0)
+	_bus.damage_number_shown.emit(0, Vector2(340.0, 52.0), 8.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 2.0)
 	drawer.step(0.0)
-	check_equal(drawer.runs_now(), 2, "a sixth over the first: a run of its own after them")
-	for n in DrawerScript.RUN_MOST:
-		_bus.damage_number_shown.emit(0, Vector2(40.0 + 60.0 * (n % 8), 200.0 + 40.0 * float(n / 8)), 3.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0)
+	check_equal([drawer.sheets_drawn_now(), drawer.sheets_made()], [2, 2], "numbers twice the size: a second sheet, made once")
+	var nodes: int = drawer.get_child_count()
+	for n in 40:
+		_bus.damage_number_shown.emit(0, Vector2(40.0 + 3.0 * n, 80.0), 3.0, &"", EventsScript.NUMBER_HIT, 16.0, SECONDS, 1.0 + float(n % 2))
 	drawer.step(0.0)
-	check(drawer.runs_now() >= 3, "a run holds RUN_MOST numbers at most")
+	check_equal([drawer.sheets_made(), drawer.get_child_count()], [2, nodes], "a storm of both sizes makes no sheet and no node")
+
+
+## A sheet holds each character's glyph and its outline in cells with the outline's room round
+## them, and a cell is placed so the glyph's baseline starts where the font would draw it.
+func test_a_sheet_places_each_glyph_where_the_font_draws_it() -> void:
+	var sheet: NumberGlyphsScript = own(NumberGlyphsScript.new(ThemeDB.fallback_font, 8, DrawerScript.OUTLINE, DrawerScript.GLYPHS)) as NumberGlyphsScript
+	var right: float = 0.0
+	for glyph in DrawerScript.GLYPHS:
+		var code: int = glyph.unicode_at(0)
+		var region: Rect2 = sheet.region_of(code, false)
+		var outline: Rect2 = sheet.region_of(code, true)
+		check(region.position.x >= right and not region.intersects(outline), "%s: a cell of its own, its outline's below" % glyph)
+		check(Rect2(Vector2.ZERO, Vector2(sheet.size)).encloses(outline), "%s: inside the sheet" % glyph)
+		right = region.end.x
+		var place: Rect2 = sheet.place_of(code, Vector2(100.0, 50.0))
+		check_equal([place.size, place.position + Vector2(float(sheet.pad), float(sheet.baseline))], [region.size, Vector2(100.0, 50.0)], "%s: drawn a pixel a texel, its baseline at the asked place" % glyph)
+		check(sheet.pad > DrawerScript.OUTLINE and is_equal_approx(sheet.advance_of(code), ThemeDB.fallback_font.get_char_size(code, 8).x), "%s: room for its outline, the font's advance" % glyph)
+	check(sheet.white_region().position.x >= right and not sheet.has("x".unicode_at(0)), "the white square after the glyphs; no other character")
 
 
 func test_the_oldest_gives_way_when_every_slot_shows_one() -> void:

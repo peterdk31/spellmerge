@@ -220,6 +220,8 @@ func test_a_chunk_is_free_once_its_motes_are_gone_and_used_again() -> void:
 	_burst(motes, 0, ROOM_A.get_center(), 60)
 	motes.step(0.05)
 	check_equal(motes.chunks_shown(), 1, "a chunk drawn while its motes live")
+	check_equal([motes.regions.rows_drawn(), motes.regions.rows_alive(motes.clock())], [60, 60], "its rows drawn, each mote alive")
+	check_equal([motes.regions.rows_drawn(), motes.regions.rows_alive(motes.clock() + MotesScript.LIFE_MAX)], [60, 0], "the rows are drawn until the chunk is free, though their motes are gone by then")
 	motes.step(0.05 + MotesScript.LIFE_MAX)
 	check_equal(motes.chunks_shown(), 0, "hidden once they are gone")
 	var made: int = motes.regions.chunks_made()

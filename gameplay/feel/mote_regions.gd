@@ -311,6 +311,32 @@ func chunks_shown() -> int:
 	return shown
 
 
+## The rows drawn now: every shown chunk's filled rows (for tests and the benchmarks).
+func rows_drawn() -> int:
+	var rows: int = 0
+	for c in _nodes.size():
+		if _nodes[c].visible:
+			rows += _fill[c]
+	return rows
+
+
+## Of the rows drawn now, those whose mote is alive at the clock time `now`: the others are folded
+## away in the shader, but their vertices are still worked out (for tests and the benchmarks).
+func rows_alive(now: float) -> int:
+	var rows: int = 0
+	for c in _nodes.size():
+		if not _nodes[c].visible:
+			continue
+		var buffer: PackedFloat32Array = _buffers[c]
+		for i in _fill[c]:
+			var o: int = i * DRAW_STRIDE
+			var born: float = buffer[o + ROW_BORN]
+			var life: float = float(buffer[o + ROW_LIFE]) * LIFE_MAX
+			if life > 0.0 and now >= born and now < born + life:
+				rows += 1
+	return rows
+
+
 ## The box region `region` draws in: the world for the crossers, else its place grown by REACH.
 func box_of(region: int) -> AABB:
 	return _box(region)

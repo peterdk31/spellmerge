@@ -35,7 +35,8 @@ const SCREEN_LAYER: int = 1 << 1
 const LAYER: int = 5
 ## The farthest wizard's site is this far from the screen's edge (`VoronoiCells.sites`).
 const MARGIN: float = 96.0
-## A view's zoom (the game's closest, PartyCamera.MAX_ZOOM).
+## A view's zoom (the game's closest when CB1 was measured; PartyCamera.MAX_ZOOM is 0.8 since
+## 2026-11-23, and this scene keeps the zoom its numbers were measured at).
 const ZOOM: float = 1.0
 ## The divider round each cell: its width (screen pixels) and colour (the void's dark).
 const DIVIDER_WIDTH: float = 2.0

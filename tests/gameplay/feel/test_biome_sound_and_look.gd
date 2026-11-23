@@ -18,9 +18,11 @@ const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ViewBoxesScript := preload("res://gameplay/feel/view_boxes.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
+const FoeMarkersScript := preload("res://gameplay/feel/foe_markers.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const UnseenRoomsScript := preload("res://gameplay/feel/unseen_rooms.gd")
@@ -795,12 +797,14 @@ func test_the_blank_quarters_void_gets_its_own_drifting_motes() -> void:
 	spectacle.call(&"set_void_blank", Rect2())
 
 
-## Enemies still spawning in count as close foes from the moment they start (the owner, 2026-11-19):
-## the camera zooms out as they appear.
-func test_spawning_foes_are_close_from_the_moment_they_start() -> void:
+## A fight's foe out of view gets a marker at the picture's edge (the owner, 2026-11-23), one still
+## spawning in from the moment it starts: with the game's own actors, grid and sealed room, and a
+## picture that looks away from the room.
+func test_a_spawning_foe_out_of_view_gets_a_marker_from_the_moment_it_starts() -> void:
 	var map: BiomeMap = _start(1, [IMP, IMP] as Array[StringName])
 	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 40.0)
 	var spawning: Actor = null
+	var spawning_id: int = ActorsScript.NONE
 	for i in 240:
 		tick.run(DT)
 		var ids := PackedInt32Array()
@@ -808,18 +812,74 @@ func test_spawning_foes_are_close_from_the_moment_they_start() -> void:
 			var body := actors.node_of(ids[n]) as Actor
 			if body != null and actors.team_of(ids[n]) == ActorsScript.TEAM_ENEMIES and body.is_spawning():
 				spawning = body
+				spawning_id = ids[n]
 				break
 		if spawning != null:
 			break
 	check(spawning != null, "an imp spawns in the sealed antechamber")
 	if spawning == null:
 		return
-	var foes: CloseFoesScript = feel.get(&"close_foes") as CloseFoesScript
-	foes.find(actors, _grid())
+	var markers: FoeMarkersScript = feel.call(&"foe_markers") as FoeMarkersScript
+	check(markers != null and markers.is_inside_tree(), "Feel made the foe markers")
+	if markers == null:
+		return
+	# A picture far from the room: the imp is out of it.
+	var away := ScreenViewsScript.new()
+	away.set_single(Vector2(640.0, 360.0), Transform2D(0.0, Vector2.ONE, 0.0, -(spawning.global_position + Vector2(4000.0, 0.0))), 0b0001)
+	markers.step(1.0, actors, _grid(), 0b0001, away)
 	var found: bool = false
-	for i in foes.count:
-		found = found or foes.at[i] == spawning.global_position
-	check(found, "the imp still spawning in (share %.2f) is a close foe already" % spawning.spawn_share())
+	for i in markers.count:
+		found = found or markers.foe_of(i) == spawning_id
+	check(found, "the imp still spawning in (share %.2f) has a marker already (%d markers)" % [spawning.spawn_share(), markers.count])
+
+
+## The wiring, through Feel's own step: a seat played on this machine (the keyboard's) in a sealed
+## fight, a foe put out of its picture, and Feel's step marks it (the room grid, the seats here and
+## the picture are Feel's own).
+func test_feels_step_marks_a_fights_foe_out_of_the_picture() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry)
+	check_equal(input.call(&"join_as", InputManagerScript.KEYBOARD, 0), 0, "the keyboard joined seat 0")
+	var fights: Array[RoomFight] = [RoomFight.new(), RoomFight.of([IMP, IMP] as Array[StringName]), RoomFight.new()]
+	check(flow.start_biome(0, map, fights), "the biome starts")
+	tick.run(DT)
+	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 40.0)
+	var grid: RoomGrid = _grid()
+	var foe: Actor = null
+	for i in 240:
+		tick.run(DT)
+		var ids := PackedInt32Array()
+		for n in actors.open_ids(ids):
+			if actors.team_of(ids[n]) == ActorsScript.TEAM_ENEMIES and actors.node_of(ids[n]) is Actor:
+				foe = actors.node_of(ids[n]) as Actor
+				break
+		if foe != null and grid.sealed_at(_wizard(0).global_position):
+			break
+	check(foe != null and grid.sealed_at(_wizard(0).global_position), "the antechamber's fight is under way, sealed")
+	if foe == null:
+		return
+	var markers: FoeMarkersScript = feel.call(&"foe_markers") as FoeMarkersScript
+	# The wizard in one corner of the room, every foe beside it: all in the picture.
+	var room: Rect2 = grid.place_rect(grid.place_at(_wizard(0).global_position))
+	_wizard(0).global_position = room.end - Vector2(56.0, 56.0)
+	var ids := PackedInt32Array()
+	for n in actors.open_ids(ids):
+		if actors.team_of(ids[n]) == ActorsScript.TEAM_ENEMIES and actors.node_of(ids[n]) is Node2D:
+			(actors.node_of(ids[n]) as Node2D).global_position = room.end - Vector2(96.0, 96.0)
+	for i in 90:
+		feel.call(&"step", DT)
+	check_equal(markers.count, 0, "every foe beside the wizard, in the picture: no marker")
+	var party: Object = feel.get(&"party_camera") as Object
+	var camera: Camera2D = party.get(&"camera") as Camera2D
+	var looked: Transform2D = Transform2D(0.0, camera.zoom, 0.0, camera.position)
+	# One foe to the far corner, out of the picture at the default zoom.
+	foe.global_position = room.position + Vector2(56.0, 56.0)
+	for i in 30:
+		feel.call(&"step", DT)
+	check(Transform2D(0.0, camera.zoom, 0.0, camera.position).is_equal_approx(looked), "Feel's camera did not move or zoom for the foe of the sealed fight (%s, %s)" % [camera.position, camera.zoom])
+	check_equal(markers.count, 1, "the foe in the far corner of the %s room: Feel's step marks it" % room.size)
+	if markers.count == 1:
+		check_equal(actors.node_of(markers.foe_of(0)), foe, "that foe")
+		check(markers.way_of(0).x < 0.0 and markers.way_of(0).y < 0.0, "pointing up and left, at it (%s)" % markers.way_of(0))
 
 
 func test_a_gather_doors_lamps_are_lit_in_their_wizards_hat_colours() -> void:

@@ -518,7 +518,8 @@ func _four_spread() -> Array[Vector2]:
 	_open_camera()
 	for slot in range(1, 4):
 		input.add_virtual_device(slot)
-	var corners: Array[Vector2] = [Vector2(40.0, 40.0), Vector2(600.0, 40.0), Vector2(40.0, 340.0), Vector2(600.0, 340.0)]
+	# Wider than the default picture (800 x 450 at zoom 0.8), so the camera must zoom out.
+	var corners: Array[Vector2] = [Vector2(40.0, 40.0), Vector2(840.0, 40.0), Vector2(40.0, 440.0), Vector2(840.0, 440.0)]
 	for slot in 4:
 		_wizard(slot).global_position = corners[slot]
 	coop.refresh_wizards()
@@ -555,7 +556,7 @@ func test_players_back_together_zoom_back_in() -> void:
 	for slot in 4:
 		_wizard(slot).global_position = Vector2(300.0 + 4.0 * slot, 200.0)
 	_fit_and_snap()
-	check(is_equal_approx(party.camera.zoom.x, PartyCameraScript.MAX_ZOOM), "together again: the zoom is back to 1, got %f" % party.camera.zoom.x)
+	check(is_equal_approx(party.camera.zoom.x, PartyCameraScript.MAX_ZOOM), "together again: the zoom is back to the default, got %f" % party.camera.zoom.x)
 
 
 func test_a_downed_wizard_stays_in_the_picture() -> void:
@@ -724,11 +725,9 @@ func _keyboard_and_a_guest() -> bool:
 func test_feels_camera_heads_for_the_wizard_played_here_alone() -> void:
 	if not _keyboard_and_a_guest():
 		return
-	# The keyboard's wizard and its own close foes (the owner, 2026-11-19), never the guest's wizard.
-	var foes: Object = feel.get("close_foes")
-	var framed: Rect2 = foes.call("box_for", 0b0001, Rect2(_wizard(0).global_position, Vector2.ZERO)) as Rect2
-	check(party.target_position.is_equal_approx(framed.get_center()), "Feel's step heads the camera for the keyboard's wizard and its close foes alone (%s, %f)" % [party.target_position, party.target_zoom])
-	check(not framed.has_point(_wizard(1).global_position) or framed.get_area() == 0.0, "not for the guest's wizard")
+	# The keyboard's wizard alone: never the guest's wizard, and no enemy (the owner, 2026-11-23).
+	check(party.target_position.is_equal_approx(_wizard(0).global_position), "Feel's step heads the camera for the keyboard's wizard alone (%s)" % party.target_position)
+	check(is_equal_approx(party.target_zoom, PartyCameraScript.MAX_ZOOM), "at the default zoom, not zoomed out for the guest's wizard (%f)" % party.target_zoom)
 
 
 ## The wizard played elsewhere is out of the picture: Feel marks it at the picture's edge.

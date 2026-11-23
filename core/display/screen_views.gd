@@ -29,6 +29,10 @@ var screen: Vector2 = Vector2.ZERO
 var seats: PackedInt32Array = PackedInt32Array()
 var to_screen: Array[Transform2D] = []
 var anchor: PackedVector2Array = PackedVector2Array()
+## By view: a number that stays the view's own while it lives (the split camera's slot; 0 for the
+## one picture; the view's place here unless its writer says), so what follows a view from frame to
+## frame (Feel's foe markers) knows it again when the views before it come and go.
+var ids: PackedInt32Array = PackedInt32Array()
 ## By view: its cell's corners (`corners(view)` of them from `view * CORNERS_MOST`), clockwise on
 ## screen (y points down).
 var cell_points: PackedVector2Array = PackedVector2Array()
@@ -39,6 +43,9 @@ func _init() -> void:
 	seats.resize(VIEWS_MOST)
 	to_screen.resize(VIEWS_MOST)
 	anchor.resize(VIEWS_MOST)
+	ids.resize(VIEWS_MOST)
+	for view in VIEWS_MOST:
+		ids[view] = view
 	cell_points.resize(VIEWS_MOST * CORNERS_MOST)
 	cell_counts.resize(VIEWS_MOST)
 
@@ -70,6 +77,7 @@ func set_single(screen_size: Vector2, transform: Transform2D, held: int) -> void
 	seats[0] = held
 	to_screen[0] = transform
 	anchor[0] = screen_size * 0.5
+	ids[0] = 0
 	cell_points[0] = Vector2.ZERO
 	cell_points[1] = Vector2(screen_size.x, 0.0)
 	cell_points[2] = screen_size
@@ -117,6 +125,14 @@ func view_at(point: Vector2) -> int:
 	return -1
 
 
+## The view whose id is `id` (`ids`), or -1.
+func view_of_id(id: int) -> int:
+	for view in count:
+		if ids[view] == id:
+			return view
+	return -1
+
+
 ## The view holding seat `seat`, or -1.
 func view_of_seat(seat: int) -> int:
 	for view in count:
@@ -143,6 +159,27 @@ func cell_holds(view: int, point: Vector2, margin: float) -> bool:
 		if edge.cross(point - a) / length < -margin:
 			return false
 	return true
+
+
+## How far along `to` from the screen point `from` (0 to 1) a point stays `inset` screen pixels
+## inside view `view`'s cell: where a marker at that view's own edge sits (the screen's edge or a
+## divider, never in another view's cell).
+func reach_inside(view: int, from: Vector2, to: Vector2, inset: float) -> float:
+	var reach: float = 1.0
+	var n: int = cell_counts[view]
+	var base: int = view * CORNERS_MOST
+	for i in n:
+		var a: Vector2 = cell_points[base + i]
+		var edge: Vector2 = cell_points[base + (i + 1) % n] - a
+		var length: float = edge.length()
+		if length <= 0.0:
+			continue
+		# Inside is where the cross is positive (the cells run clockwise on screen).
+		var inside: float = edge.cross(from - a) / length
+		var outward: float = edge.cross(to) / length
+		if outward < 0.0:
+			reach = minf(reach, (inside - inset) / -outward)
+	return clampf(reach, 0.0, 1.0)
 
 
 ## The view that shows the world point `world` in its own cell (`margin` screen pixels to spare,

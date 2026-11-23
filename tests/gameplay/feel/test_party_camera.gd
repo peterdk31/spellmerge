@@ -5,7 +5,6 @@ extends "res://tests/support/suite.gd"
 ## (tests/gameplay/coop/test_coop.gd).
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 
 var _table: ActorsScript
 var _party: PartyCameraScript
@@ -95,86 +94,29 @@ func test_a_new_room_is_jumped_to() -> void:
 	check_equal(_camera.position, Vector2(800.0, 500.0), "no easing across a new room")
 
 
-# --- Close foes (the owner, 2026-11-19) ------------------------------------------------------------
-
-## A foe within reach of a wizard is framed with it; one far off is not.
-func test_a_close_foe_is_framed_with_the_wizard() -> void:
+## The default zoom (the owner, 2026-11-23): one wizard is seen at 0.8, and an enemy body in the
+## table is no wizard: only the seats' own bodies and the actors they drive are held.
+func test_one_wizard_is_seen_at_the_default_zoom_and_an_enemy_is_not_held() -> void:
 	_body(Vector2(100.0, 100.0), 0)
-	_body(Vector2(100.0, 100.0 + CloseFoesScript.REACH - 10.0))
-	_body(Vector2(100.0 + CloseFoesScript.REACH * 3.0, 100.0))
-	var foes := CloseFoesScript.new()
-	foes.find(_table, null)
-	check_equal(foes.count, 1, "only the foe within reach is close")
+	_body(Vector2(1400.0, 100.0))
 	_party.look(_table, 0b0001)
-	var alone: float = _party.target_zoom
-	_party.look(_table, 0b0001, foes)
-	check(_party.target_zoom < alone, "zoomed out for the foe (%f < %f)" % [_party.target_zoom, alone])
 	_party.snap()
-	var picture: Rect2 = _party.visible_rect()
-	check(picture.has_point(Vector2(100.0, 100.0)) and picture.has_point(Vector2(100.0, 100.0 + CloseFoesScript.REACH - 10.0)), "the wizard and the foe are both in the picture")
+	check(is_equal_approx(PartyCameraScript.MAX_ZOOM, 0.8), "the default zoom is 0.8")
+	check(is_equal_approx(_camera.zoom.x, PartyCameraScript.MAX_ZOOM), "one wizard: the default zoom (%f)" % _camera.zoom.x)
+	check_equal(_camera.position, Vector2(100.0, 100.0), "on the wizard, not between it and the enemy")
+	_party.look(_table, 0)
+	check_equal(_party.target_position, Vector2(100.0, 100.0), "nor with no seat here: everyone held is every seat's wizard")
 
 
-## In a sealed fight every foe of the room is framed, but never past the widest zoom, and the
-## wizards always stay in the picture.
-func test_a_sealed_rooms_foes_are_framed_down_to_the_widest_zoom_and_the_wizards_stay_in() -> void:
-	var grid := RoomGrid.new()
-	grid.size_to(Rect2(-4096.0, -4096.0, 8192.0, 8192.0))
-	var room: int = grid.add_place(Rect2(-2048.0, -2048.0, 4096.0, 4096.0))
-	grid.set_sealed(room, true)
-	_body(Vector2(0.0, 0.0), 0)
-	_body(Vector2(1800.0, 0.0))
-	var foes := CloseFoesScript.new()
-	foes.find(_table, grid)
-	check_equal(foes.count, 1, "a sealed room's foe is close however far")
-	grid.set_sealed(room, false)
-	foes.find(_table, grid)
-	check_equal(foes.count, 0, "unsealed, past reach, it is not")
-	grid.set_sealed(room, true)
-	foes.find(_table, grid)
-	_party.look(_table, 0b0001, foes)
-	check_equal(_party.target_zoom, PartyCameraScript.MIN_ZOOM, "zoomed out no further than the widest")
-	_party.snap()
-	check(_party.visible_rect().grow(-PartyCameraScript.CAMERA_MARGIN + 1.0).has_point(Vector2.ZERO), "the wizard stays in, its margin kept")
-
-
-## A foe in another place (behind a wall, in the next room) is not framed.
-func test_a_foe_in_another_room_is_not_framed() -> void:
-	var grid := RoomGrid.new()
-	grid.size_to(Rect2(-1024.0, -1024.0, 2048.0, 2048.0))
-	grid.add_place(Rect2(-512.0, -256.0, 512.0, 512.0))
-	grid.add_place(Rect2(32.0, -256.0, 512.0, 512.0))
-	_body(Vector2(-40.0, 0.0), 0)
-	_body(Vector2(80.0, 0.0))
-	var foes := CloseFoesScript.new()
-	foes.find(_table, grid)
-	check_equal(foes.count, 0, "the foe beyond the wall is not close")
-
-
-## A foe coming close eases the picture out, never in one jump (docs/STYLE.md, "Smooth").
-func test_a_foe_coming_close_eases_the_zoom() -> void:
+## A room smaller than the default picture (800 x 450 at PictureGrid.SIZE) is seen closer: never
+## past its edge.
+func test_a_room_smaller_than_the_default_picture_is_seen_closer() -> void:
+	_camera.limit_left = 0
+	_camera.limit_top = 0
+	_camera.limit_right = 640
+	_camera.limit_bottom = 360
 	_body(Vector2(100.0, 100.0), 0)
-	var foes := CloseFoesScript.new()
-	foes.find(_table, null)
-	_party.look(_table, 0b0001, foes)
+	_party.look(_table, 0b0001)
 	_party.snap()
-	var before: float = _camera.zoom.x
-	_body(Vector2(100.0, 100.0 + CloseFoesScript.REACH - 4.0))
-	foes.find(_table, null)
-	_party.look(_table, 0b0001, foes)
-	var goal: float = _party.target_zoom
-	check(goal < before, "it heads out (%f < %f)" % [goal, before])
-	_party.step(1.0 / 60.0)
-	var first: float = _camera.zoom.x
-	check(first < before and first > goal, "the first frame moves only part of the way (%f between %f and %f)" % [first, before, goal])
-	check(before - first < (before - goal) * 0.25, "a small step, not a jump")
-
-
-## The foes' part of the box is cut down to fit, keeping the wizards' box whole.
-func test_fit_around_keeps_the_inner_box() -> void:
-	var inner := Rect2(0.0, 0.0, 100.0, 50.0)
-	var framed := Rect2(-300.0, 0.0, 500.0, 50.0)
-	var cut: Rect2 = PartyCameraScript.fit_around(inner, framed, Vector2(300.0, 1000.0))
-	check(cut.encloses(inner), "the wizards' box kept whole")
-	check(is_equal_approx(cut.size.x, 300.0), "cut to the most it may be: %s" % cut)
-	check(is_equal_approx(cut.position.x, -150.0) and is_equal_approx(cut.end.x, 150.0), "each side in proportion: %s" % cut)
-	check_equal(PartyCameraScript.fit_around(inner, framed, Vector2(50.0, 50.0)), inner, "no room: the wizards' box alone")
+	check(is_equal_approx(_camera.zoom.x, 1.0), "the smallest room fills the picture (%f)" % _camera.zoom.x)
+	check(Rect2(0.0, 0.0, 640.0, 360.0).grow(0.01).encloses(_party.visible_rect()), "nothing past the room is shown: %s" % _party.visible_rect())

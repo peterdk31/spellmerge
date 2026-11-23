@@ -3,15 +3,15 @@ extends "res://tests/support/suite.gd"
 ## local players go back near each other, the voronoi line split does not disappear for some time";
 ## gameplay/feel/split_camera.gd, MERGE_TIME). A merging view used to go only once its picture was
 ## within SETTLED of the one it merged into, easing onto it at the party camera's pull: while that
-## picture kept moving (the wizards walking on together, close foes in a fight moving the party
-## camera) it never got there, and the divider stayed. Here wizards walk back together at a wizard's
-## pace (2 to 4 seats, with and without close foes, standing still or walking on together, Dynamic
+## picture kept moving (the wizards walking on together, the party camera's own easing; until
+## 2026-11-23 also close foes in a fight, which no longer move a camera) it never got there, and the
+## divider stayed. Here wizards walk back together at a wizard's
+## pace (2 to 4 seats, standing still or walking on together, Dynamic
 ## and Equal) and the divider must be gone within MERGE_BOUND of their standing within JOIN_REACH,
 ## with no jump; at the edges (the fit, JOIN_REACH) it does not flicker. With the hand-made
 ## twelve-room row (tests/support/biome_maps.gd), as test_split_camera.gd does.
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
@@ -37,7 +37,6 @@ var _holder: SubViewport
 var _camera: Camera2D
 var _party: PartyCameraScript
 var _split: SplitCameraScript
-var _foes: CloseFoesScript
 var _rooms: PackedVector2Array = PackedVector2Array()
 
 
@@ -54,7 +53,6 @@ func before_each() -> void:
 	_party = PartyCameraScript.new()
 	_party.follow(_camera)
 	_split = SplitCameraScript.new()
-	_foes = CloseFoesScript.new()
 	_rooms = _room_middles()
 
 
@@ -90,12 +88,11 @@ func _body(team: int, seat: int, at: Vector2) -> Node2D:
 	return node
 
 
-## A drawn frame as Feel steps it: the close foes, the party camera, then the split.
+## A drawn frame as Feel steps it: the party camera, then the split.
 func _frame() -> void:
-	_foes.find(_table, null)
-	_party.look(_table, 0, _foes)
+	_party.look(_table, 0)
 	_party.step(FRAME)
-	_split.step(FRAME, _table, 0, _camera, SCREEN, _foes)
+	_split.step(FRAME, _table, 0, _camera, SCREEN)
 
 
 ## The wizards of `wizards` all stand within JOIN_REACH of each other.
@@ -115,15 +112,14 @@ static func _gap(a: Transform2D, b: Transform2D) -> float:
 	return most
 
 
-## `seats` wizards far apart walk back to seat 0's at a wizard's pace and stay (`fight`: two foes
-## circle them, so the party camera never rests; `walk_on`: once there they walk on together;
+## `seats` wizards far apart walk back to seat 0's at a wizard's pace and stay (`walk_on`: once there they walk on together;
 ## `equal`: equal panes; `far`: one more seat stands far off, so the screen stays split and the
 ## walkers' views merge into one another). Checks the walkers share one picture (the one picture, or
 ## one view beside the far seat's) within MERGE_BOUND of their standing within JOIN_REACH and keep
 ## it, a divider changes a pixel a frame at most and has shrunk before its view goes, and the last
 ## views' pictures were the one drawn. Returns the merge's time (seconds from together to merged).
-func _merge_case(seats: int, fight: bool, walk_on: bool, equal: bool, far: bool = false) -> float:
-	var what: String = "%d seats%s%s%s%s" % [seats, ", a fight" if fight else "", ", walking on" if walk_on else "", ", equal" if equal else "", ", one far" if far else ""]
+func _merge_case(seats: int, walk_on: bool, equal: bool, far: bool = false) -> float:
+	var what: String = "%d seats%s%s%s" % [seats, ", walking on" if walk_on else "", ", equal" if equal else "", ", one far" if far else ""]
 	_split.set_equal(equal)
 	var wizards: Array[Node2D] = []
 	for seat in seats:
@@ -134,11 +130,6 @@ func _merge_case(seats: int, fight: bool, walk_on: bool, equal: bool, far: bool 
 	for seat in seats:
 		walkers |= 1 << seat
 	var merged_views: int = 2 if far else 0
-	var foes: Array[Node2D] = []
-	if fight:
-		for i in 2:
-			foes.append(_body(ActorsScript.TEAM_ENEMIES, 0, _rooms[STARTS[0]]))
-	var angle: float = 0.0
 	for i in 120:
 		_frame()
 	check(_split.split and _split.views.count >= 2, "%s: apart, split" % what)
@@ -167,10 +158,6 @@ func _merge_case(seats: int, fight: bool, walk_on: bool, equal: bool, far: bool 
 				# On together, away from the far seat (west).
 				for wizard in wizards:
 					wizard.global_position += Vector2(-PACE * FRAME if far else PACE * FRAME, 0.0)
-		if fight:
-			angle += 1.5 * FRAME
-			for i in foes.size():
-				foes[i].global_position = wizards[0].global_position + Vector2.from_angle(angle + PI * i) * 150.0
 		_frame()
 		if together_at < 0 and _together(wizards):
 			together_at = frame
@@ -245,98 +232,77 @@ func test_two_seats_walking_back_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(2, false, false, false)
+	_merge_case(2, false, false)
 
 
 func test_two_seats_walking_back_and_on_together_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(2, false, true, false)
-
-
-func test_two_seats_in_a_fight_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(2, true, false, false)
+	_merge_case(2, true, false)
 
 
 func test_three_seats_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(3, false, false, false)
-
-
-func test_three_seats_in_a_fight_walking_on_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(3, true, true, false)
+	_merge_case(3, false, false)
 
 
 func test_four_seats_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(4, false, false, false)
-
-
-func test_four_seats_in_a_fight_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(4, true, false, false)
+	_merge_case(4, false, false)
 
 
 func test_equal_panes_two_seats_walking_on_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(2, false, true, true)
-
-
-func test_equal_panes_four_seats_in_a_fight_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(4, true, false, true)
+	_merge_case(2, true, true)
 
 
 func test_two_seats_beside_a_far_one_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(2, false, false, false, true)
-
-
-func test_two_seats_beside_a_far_one_walking_on_in_a_fight_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(2, true, true, false, true)
+	_merge_case(2, false, false, true)
 
 
 func test_three_seats_beside_a_far_one_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(3, false, false, false, true)
-
-
-func test_three_seats_beside_a_far_one_in_a_fight_merge_in_time() -> void:
-	if _rooms.size() < 12:
-		check(false, "the biome's rooms were read")
-		return
-	_merge_case(3, true, false, false, true)
+	_merge_case(3, false, false, true)
 
 
 func test_equal_panes_two_seats_beside_a_far_one_merge_in_time() -> void:
 	if _rooms.size() < 12:
 		check(false, "the biome's rooms were read")
 		return
-	_merge_case(2, false, true, true, true)
+	_merge_case(2, true, true, true)
+
+
+func test_three_seats_walking_on_merge_in_time() -> void:
+	if _rooms.size() < 12:
+		check(false, "the biome's rooms were read")
+		return
+	_merge_case(3, true, false)
+
+
+func test_equal_panes_four_seats_merge_in_time() -> void:
+	if _rooms.size() < 12:
+		check(false, "the biome's rooms were read")
+		return
+	_merge_case(4, false, true)
+
+
+func test_two_seats_beside_a_far_one_walking_on_merge_in_time() -> void:
+	if _rooms.size() < 12:
+		check(false, "the biome's rooms were read")
+		return
+	_merge_case(2, true, false, true)
 
 
 # --- No flicker at the edges -----------------------------------------------------------------------

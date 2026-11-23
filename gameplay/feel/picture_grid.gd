@@ -6,7 +6,8 @@ extends RefCounted
 ##
 ## - **The cameras' zoom 1** shows SIZE of the world: a picture `scale_of` times bigger draws the same
 ##   world at that zoom times more (the party camera, the split's views), so a bigger picture is a
-##   finer one, not a wider one.
+##   finer one, not a wider one. (The cameras rest at `PartyCamera.MAX_ZOOM`, 0.8, since
+##   2026-11-23: 800 x 450 of the world in SIZE.)
 ##
 ## The shipped picture is SIZE (project.godot), so `scale_of` is 1 there and nothing is drawn at
 ## another size. A benchmark draws 1280 x 720 (bench/biome_frames_runner.gd, `--picture=`).

@@ -6,6 +6,7 @@ extends Node2D
 ## sits at the screen's edge, on the line from the middle of the view nearest it (where that view's
 ## wizards are drawn: its anchor) to where that view would draw it, pointing the way. A downed
 ## teammate's pulses, with a ring round it: a revive needs someone to walk there.
+## (The foes of a fight out of a view have smaller markers of their own, `foe_markers.gd`.)
 ##
 ## Only the wizards of seats that are not this machine's get one (`Frames.seats_here`); with no
 ## seat here the camera holds everyone, so nobody does. It marks a seat's own body, where a revive
@@ -85,7 +86,7 @@ func step(table: ActorsScript, seats_here: int, views: ScreenViewsScript, clock:
 			var view: int = _nearest_view(views, world)
 			var from: Vector2 = views.anchor[view]
 			var to: Vector2 = views.to_screen[view] * world - from
-			var reach: float = _reach_in_cell(views, view, from, to)
+			var reach: float = views.reach_inside(view, from, to, INSET)
 			_seat[count] = seat
 			_at[count] = from + to * reach
 			_way[count] = to.normalized()
@@ -94,25 +95,6 @@ func step(table: ActorsScript, seats_here: int, views: ScreenViewsScript, clock:
 			count += 1
 	if count > 0 or before > 0:
 		queue_redraw()
-
-
-## How far along `to` from `from` (0 to 1) a point stays INSET inside view `view`'s cell (so the
-## marker sits at that view's own edge, the screen's or a divider, never in another view's cell).
-static func _reach_in_cell(views: ScreenViewsScript, view: int, from: Vector2, to: Vector2) -> float:
-	var reach: float = 1.0
-	var n: int = views.corners(view)
-	for i in n:
-		var a: Vector2 = views.corner(view, i)
-		var edge: Vector2 = views.corner(view, (i + 1) % n) - a
-		var length: float = edge.length()
-		if length <= 0.0:
-			continue
-		# Inside is where the cross is positive (the cells run clockwise on screen).
-		var inside: float = edge.cross(from - a) / length
-		var outward: float = edge.cross(to) / length
-		if outward < 0.0:
-			reach = minf(reach, (inside - INSET) / -outward)
-	return clampf(reach, 0.0, 1.0)
 
 
 ## The view of `views` whose wizards stand nearest `world` (its anchor taken back into the world).

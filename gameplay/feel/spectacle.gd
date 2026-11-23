@@ -267,8 +267,8 @@ var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 ## the motes' ring, under the motes' and the "Ambient particles" switches (the light need not be on); nothing outside a biome.
 var void_air: AirMotesScript = AirMotesScript.new(_ramp_table)
 ## Where a laid piece shows the void inside its own rectangle, off its slab (void_edges.gd; the
-## owner, 2026-11-23): the void's motes are given off there too. Feel hands it its room hearing
-## (`void_edges.pieces`).
+## owner, 2026-11-23): the void's motes are given off there too. Each piece is told as it is laid
+## (`_on_room_built`).
 var void_edges: VoidEdgesScript = VoidEdgesScript.new()
 ## The same void's motes over the world the equal split's blank quarter shows (the owner,
 ## 2026-11-20; `set_void_blank`, the split screen's void view, past the biome's corner), so the blank
@@ -1387,7 +1387,6 @@ func _give_off_void(now: float, seen: ViewBoxesScript) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var in_biome: bool = grid != null and grid.places() > 0
 	var into: MotesScript = void_pool if motes_on() and ambient_particles and in_biome else null
-	void_edges.lay(grid if in_biome else null)
 	void_air.give_off_in(now, into, seen, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers, void_edges)
 	void_blank_air.give_off(now, into if _void_blank.has_area() else null, _void_blank, Rect2(), VOID_POOL_SHARE * quality.air_share, grid if in_biome else null, void_covers, void_edges)
 
@@ -1468,6 +1467,7 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# A biome's pieces stand at their places (connected biomes CB3), mirrored as they are placed (the
 	# grid's walls, decision 6): their walls there, as the world has them.
 	var walls: Array[Rect2] = PieceShape.laid_walls(layout_root)
+	void_edges.lay_piece(number, layout_root, number == EventsScript.FIRST_ROOM)
 	if number != EventsScript.FIRST_ROOM:
 		# A biome's later piece: its walls join the world's; the room's look is the first room's, and
 		# a room naming a mist draws its own where it stands (the owner, 2026-11-19).

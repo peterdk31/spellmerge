@@ -153,7 +153,7 @@ func give_off_in(now: float, pool: MotesScript, seen: ViewBoxesScript, bounds: R
 ## never), or in one of `shown_void`'s rectangles.
 static func is_void(at: Vector2, grid: RoomGrid, shown_void: Array[Rect2], edges: VoidEdgesScript = null) -> bool:
 	var place: int = grid.place_at(at)
-	if place == RoomGrid.NO_PLACE or (edges != null and edges.shows(at, place)):
+	if place == RoomGrid.NO_PLACE or (edges != null and edges.shows(at, place, grid)):
 		return true
 	for rect in shown_void:
 		if rect.has_point(at):

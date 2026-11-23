@@ -38,6 +38,10 @@ const MIRRORINGS: PackedInt32Array = [0, MIRROR_X, MIRROR_Y, MIRROR_X | MIRROR_Y
 ## The meta a laid piece's layout carries for the view, how it is placed (`Vector2i`, x or y 1 where
 ## mirrored): Feel's `GroundShape.MIRROR_META` (connected biomes CB4), which draws its ground so.
 const GROUND_MIRROR_META: StringName = &"ground_mirror"
+## A layout's ground (the scene tools/ground_shape.py writes, instanced as `Floor`) and, in it, the
+## art of the walls it draws (none: its edge is an invisible wall over the dark).
+const GROUND_NODE: NodePath = ^"Floor"
+const GROUND_WALL_ART: NodePath = ^"Walls/WallArt"
 ## A bridge's layout's meta, for the view (the owner, 2026-11-20: a secret room's bridge is hidden
 ## until found): the rooms its sockets 0 and 1 meet and those rooms' sockets' facings
 ## (`PackedInt32Array([room_a, facing_a, room_b, facing_b])`), and where they meet in the biome's
@@ -76,6 +80,20 @@ static func mirror_of(layout_root: Node) -> int:
 ## template's, read so by everyone who mirrors them.
 static func laid_walls(layout_root: Node) -> Array[Rect2]:
 	return _laid(layout_root, RoomPlaces.wall_rects(layout_root))
+
+
+## The edge walls of a laid piece's ground alone, where the world has them, as `laid_walls`: the
+## walls of its `Floor` (a ground drawn from a shape, tools/ground_shape.py) where it draws none (a
+## floating room's edge: an invisible wall over the dark off its slab). None for a piece whose
+## ground draws its walls (`Walls/WallArt`) or that has no such ground.
+static func laid_ground_walls(layout_root: Node) -> Array[Rect2]:
+	var ground := layout_root.get_node_or_null(GROUND_NODE) as Node2D if layout_root != null else null
+	if ground == null or ground.get_node_or_null(GROUND_WALL_ART) != null:
+		return [] as Array[Rect2]
+	var rects: Array[Rect2] = RoomPlaces.wall_rects(ground)
+	for i in rects.size():
+		rects[i] = Rect2(rects[i].position + ground.position, rects[i].size)
+	return _laid(layout_root, rects)
 
 
 ## Its holes (`RoomPlaces.hole_rects`) where the world has them, as `laid_walls`.

@@ -16,12 +16,10 @@ extends RefCounted
 ##   an edge); a view looks where its group is drawn at its own place, at SPLIT_ZOOM, kept to the
 ##   camera's limits. The screen is cut along the bisectors between where the groups are drawn
 ##   (`VoronoiCells.fill`): cells that cover it without overlap, each holding its own group.
-## - **Close foes in view** (the owner, 2026-11-19). A view zooms out from SPLIT_ZOOM, no further
-##   than the party camera's MIN_ZOOM, until the enemies close to its group (`close_foes.gd`) are
-##   drawn inside its cell with FOE_MARGIN to spare (`zoom_for_foes`: the cell as the half-planes
-##   between its group's place and the others' and the screen's edges). It zooms about its group's
-##   place, so its wizards only come nearer it and the cell still holds them; whether to split or
-##   merge is still the wizards' alone. Eased like everything else here.
+## - **Wizards only** (the owner, 2026-11-23). No enemy moves or zooms a view: every view rests at
+##   SPLIT_ZOOM, the one picture's own closest zoom, so nothing changes size as the screen splits
+##   or merges (`view_zoom_in`: closer only in a room smaller than the picture, as the party
+##   camera's). The foes of a fight out of a view get a marker at its edge (`foe_markers.gd`).
 ## - **No jump** (docs/STYLE.md, "Smooth"). Every view eases to its place and zoom (the party
 ##   camera's FOLLOW_SPEED). A new view starts as the picture it splits from (the world camera's, or
 ##   the view that held its seats), so at first both sides of the line show the same picture; and a
@@ -42,7 +40,7 @@ extends RefCounted
 ##   (`blank_count`, `blank_anchor`): a site no view owns, which moves in from past its corner of the
 ##   screen over BLANK_TIME as the screen splits and back out before the last views merge, so it
 ##   grows and shrinks from its corner; `split_screen.gd` shows the void there. Each seat's HUD spot
-##   follows its pane (`corners`, `corners_version`). Close foes are framed inside the pane. View
+##   follows its pane (`corners`, `corners_version`). View
 ##   only, like the rest: the mode is this machine's, never the simulation's.
 ##
 ## A view keeps its slot (0 to VIEWS_MOST - 1) while it lives, so its drawing is the same node
@@ -52,15 +50,13 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const EqualPanesScript := preload("res://gameplay/feel/equal_panes.gd")
 const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
 
 const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
-## A split view's zoom (1: the world at its own size, as one player sees it). The owner's to tune.
-const SPLIT_ZOOM: float = 1.0
-## The room kept between a close foe and its view's cell's edge, in screen pixels.
-const FOE_MARGIN: float = 32.0
+## A split view's zoom: the one picture's closest (the party camera's MAX_ZOOM, the one home of the
+## number), so a wizard is as big in a split view as alone in the one picture.
+const SPLIT_ZOOM: float = PartyCameraScript.MAX_ZOOM
 ## Split views merge again once the box round the wizards fits at the widest zoom this many times
 ## over (each way), so a party at the edge does not split and merge frame by frame.
 const MERGE_ROOM: float = 1.1
@@ -92,8 +88,8 @@ const SHRINK_FROM: float = 1.0
 ## were together, and for good while they walked on or fought). What is left of the gap follows a
 ## smoothstep to none over this time (`merge_pull`), so it sets off from rest and lands even on a
 ## picture that keeps moving; it used to ease at the party camera's pull and go only once within
-## SETTLED, which a moving picture (the wizards walking on, close foes in a fight, the party
-## camera's own easing) never let it reach.
+## SETTLED, which a moving picture (the wizards walking on, the party camera's own easing) never
+## let it reach.
 const MERGE_TIME: float = 0.3
 ## A new view eases in over this many real seconds (its pull rising from none), so it sets off from
 ## the picture it split from gently rather than at the party camera's full pull.
@@ -118,7 +114,7 @@ const UNSET: int = -2
 var views: ScreenViewsScript = ScreenViewsScript.new()
 ## How many times bigger than PictureGrid.SIZE the screen is (`step`): every zoom here is that many
 ## times the one at PictureGrid.SIZE, so a bigger screen draws the same world finer, and so are the
-## places' margins (SITE_MARGIN, SITE_GAP; FOE_MARGIN stays in screen pixels). Read only.
+## places' margins (SITE_MARGIN, SITE_GAP). Read only.
 var grid: float = 1.0
 ## True while the screen is split (it merges once everyone fits again with room to spare).
 var split: bool = false
@@ -181,8 +177,6 @@ var _group_site: PackedVector2Array = PackedVector2Array()
 ## By group (lowest seat): the slot that shows it.
 var _group_slot: PackedInt32Array = PackedInt32Array()
 var _cells: VoronoiCellsScript = VoronoiCellsScript.new()
-## The foes close to this machine's wizards this frame (null: none).
-var _foes: CloseFoesScript = null
 ## The equal split's blank quarter: which quarter it is (-1: none), how far it has moved in
 ## from its rest (0 out to 1 on its quarter's middle), and where its site is drawn now.
 var _blank_quarter: int = -1
@@ -331,12 +325,10 @@ func divider_between(a: int, b: int) -> int:
 ## A drawn frame, `delta` real seconds on: find this machine's wizards in `table` (`seats`, a bit a
 ## seat; none of them in the world: everyone, as the party camera does), and lay the views out on a
 ## screen of `screen` pixels from the world camera `camera` (its place, zoom, limits and shake).
-## With no camera nothing is split. `foes` (null: none): the enemies close to each seat's wizards,
-## which each view zooms out to frame.
-func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2, foes: CloseFoesScript = null) -> void:
+## With no camera nothing is split.
+func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2) -> void:
 	views.screen = screen
 	grid = float(PictureGridScript.scale_of(screen))
-	_foes = foes
 	if camera == null or not is_instance_valid(camera) or table == null or screen.x <= 0.0 or screen.y <= 0.0:
 		reset()
 		return
@@ -598,7 +590,7 @@ func _open_slot(held: int, root_centre: Vector2, root_zoom: float) -> int:
 	return free
 
 
-## Ease every view on: a live one to where its group is drawn at its place (SPLIT_ZOOM), a merging
+## Ease every view on: a live one to where its group is drawn at its place (`view_zoom_in`), a merging
 ## one onto the view now holding its first seat (or the world camera's picture), landing on it by
 ## MERGE_TIME; dividers grow or shrink a pixel; a merging view whose picture is its target's, its
 ## divider gone and its anchor on its target's, goes.
@@ -618,7 +610,7 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
 		_pull[slot] = pull
 		var group: int = _group_holding(slot)
-		var aim_zoom: float = lerpf(_zoom[slot], zoom_for_foes(group, screen, limits) if group >= 0 else SPLIT_ZOOM * grid, pull)
+		var aim_zoom: float = lerpf(_zoom[slot], view_zoom_in(limits, screen, grid), pull)
 		var aim: Vector2 = _centre[slot]
 		if group >= 0:
 			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
@@ -689,57 +681,14 @@ static func _smooth(t: float) -> float:
 	return u * u * (3.0 - 2.0 * u)
 
 
-## The zoom group `group`'s view frames its close foes at: SPLIT_ZOOM while they are drawn inside its
-## cell with FOE_MARGIN to spare, else lower, down to the party camera's MIN_ZOOM. The cell is where
-## the screen is nearer the group's place than any other group's, within the screen; the view zooms
-## about the group's middle drawn at its place. Never wider than `limits` (the world camera's; none:
-## no bound) allow: a picture past them would be pushed off its group's place.
-func zoom_for_foes(group: int, screen: Vector2, limits: Rect2 = Rect2()) -> float:
+## The zoom a live view rests at on a screen of `screen` pixels, `grid` times PictureGrid.SIZE:
+## SPLIT_ZOOM, or closer where `limits` (the world camera's; none: no bound) are smaller than that
+## picture, as the party camera never shows past its room (`PartyCamera._min_zoom`).
+static func view_zoom_in(limits: Rect2, screen: Vector2, grid: float) -> float:
 	var zoom: float = SPLIT_ZOOM * grid
-	if _foes == null or _foes.count == 0:
-		return zoom
-	var site: Vector2 = _group_site[group]
-	var seats: int = _group_seats[group]
-	for i in _foes.count:
-		if _foes.seats_of[i] & seats == 0:
-			continue
-		var way: Vector2 = _foes.at[i] - _group_middle[group]
-		if way.length_squared() < 1.0:
-			continue
-		if equal and split:
-			# Equal panes: the pane's own edges, exact for every layout (a pair's half beside two
-			# quarters included).
-			var pane: Rect2 = _panes.pane(group, screen)
-			zoom = _fit_along(zoom, way, Vector2.LEFT, site.x - pane.position.x)
-			zoom = _fit_along(zoom, way, Vector2.RIGHT, pane.end.x - site.x)
-			zoom = _fit_along(zoom, way, Vector2.UP, site.y - pane.position.y)
-			zoom = _fit_along(zoom, way, Vector2.DOWN, pane.end.y - site.y)
-			continue
-		# The screen's four edges, then the line half way to each other group's place.
-		zoom = _fit_along(zoom, way, Vector2.LEFT, site.x)
-		zoom = _fit_along(zoom, way, Vector2.RIGHT, screen.x - site.x)
-		zoom = _fit_along(zoom, way, Vector2.UP, site.y)
-		zoom = _fit_along(zoom, way, Vector2.DOWN, screen.y - site.y)
-		for other in ActorsScript.SEATS:
-			if other == group or _group_seats[other] == 0:
-				continue
-			var apart: Vector2 = _group_site[other] - site
-			if apart.length_squared() < 1.0:
-				continue
-			zoom = _fit_along(zoom, way, apart.normalized(), apart.length() * 0.5)
-	var widest: float = PartyCameraScript.MIN_ZOOM * grid
 	if limits.has_area() and limits.size.x < PartyCameraScript.LIMIT_UNSET and limits.size.y < PartyCameraScript.LIMIT_UNSET:
-		widest = maxf(widest, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
-	return clampf(zoom, minf(widest, SPLIT_ZOOM * grid), SPLIT_ZOOM * grid)
-
-
-## `zoom`, lowered so a point `way` from the place (drawn `way` × zoom from it) stays FOE_MARGIN
-## inside `room` of it along `normal`.
-static func _fit_along(zoom: float, way: Vector2, normal: Vector2, room: float) -> float:
-	var reach: float = way.dot(normal)
-	if reach <= 0.0:
-		return zoom
-	return minf(zoom, maxf(room - FOE_MARGIN, 0.0) / reach)
+		zoom = maxf(zoom, maxf(screen.x / limits.size.x, screen.y / limits.size.y))
+	return zoom
 
 
 ## The equal split's blank quarter moved on: in from its rest while split with three seats, out while
@@ -869,6 +818,7 @@ func _publish(offset: Vector2, screen: Vector2) -> void:
 			own = screen * 0.5 + (_middle_of(placed) - _centre[slot]) * zoom
 		var anchor: Vector2 = _pane_anchor(slot, own, screen) if on_pane else _anchor_of(slot, own)
 		views.set_view(count, held, transform, anchor)
+		views.ids[count] = slot
 		_slot_of[count] = slot
 		count += 1
 	views.count = count

@@ -10,10 +10,11 @@ extends "res://bench/biome_frames_runner.gd"
 ##    room, the void round it and the rooms not yet entered on screen);
 ##  - **1p start web** and **1p start** (the desktop's): one wizard standing where the run puts it (the start room, the rooms round it
 ##    not yet entered and the void on screen);
-##  - **1p small far web**: one wizard fighting a few foes in the smallest fight room, zoomed out
-##    over the rooms and the void round it;
-##  - **1p far**: one wizard fighting a few foes round it, the camera zoomed out to hold them
-##    (close foes, #872: down to 0.5, four times the area);
+##  - **1p small far web**: one wizard fighting a few foes in the smallest fight room, the rooms
+##    and the void round it on screen;
+##  - **1p far**: one wizard fighting a few foes round it, the camera on the wizard at its own
+##    zoom (the name is from 2026-11-19 to 2026-11-23, when the camera zoomed out to hold close
+##    foes, #872, down to 0.5; the rows keep their names, the shipped benchmark's keys);
 ##  - **Np together** (2 to 4): the party in one fight room among a few foes, one picture;
 ##  - **Np apart dynamic / equal**: each wizard in a fight room of its own with a few foes, the
 ##    split screen in each mode.

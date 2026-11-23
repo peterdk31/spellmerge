@@ -48,7 +48,6 @@ extends Node
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
@@ -74,8 +73,8 @@ const VOID_AWAY: float = 1024.0
 ## A view's box is snapped out to this many screen pixels (`view_box`) at PictureGrid.SIZE, and that
 ## times `PictureGrid.scale_of` in a bigger picture. Once the multiple of the light passes' blocks;
 ## since the one pass (2026-11-22) the light lies on the world's pixels wherever a box is, and the
-## snap is kept as it was (a box a few pixels larger costs little, and lies on whole world pixels at
-## the cameras' zoom 1).
+## snap is kept as it was (a box a few pixels larger costs little; at the default zoom 0.8 it is 10
+## world pixels each way).
 const BOX_SNAP: int = 8
 ## A view's box reaches this many screen pixels past its cell's corners (`view_box`; times
 ## `PictureGrid.scale_of` in a bigger picture). Once room for the light passes' blocks past the edge;
@@ -237,11 +236,11 @@ static func kept_box(current: Rect2i, needed: Rect2i, screen: Vector2) -> Rect2i
 
 ## A drawn frame, `delta` real seconds on: the views for this machine's wizards (`seats`, a bit a
 ## seat) in `table`, split from the world's camera `world_camera`, laid out and drawn.
-func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D, foes: CloseFoesScript = null) -> void:
+func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D) -> void:
 	if _root == null:
 		return
 	var screen: Vector2 = _root.get_visible_rect().size
-	camera.step(delta, table, seats, world_camera, screen, foes)
+	camera.step(delta, table, seats, world_camera, screen)
 	var laid: ScreenViewsScript = camera.views
 	budget.step(delta, laid.count)
 	if laid.count == 0:

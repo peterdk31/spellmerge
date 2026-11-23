@@ -5,13 +5,12 @@ extends "res://tests/support/suite.gd"
 ## and P3 too) or the quarters (the fourth a blank with three groups); each seat's HUD spot inside
 ## its own pane (`corners`); one picture while everyone fits and the
 ## panes once they part, no jump either way (the views start as the one picture, the anchors walk,
-## the blank grows in from its corner and is gone before the merge ends); close foes kept inside
-## the pane; the mode changed while split. With 2 to 4 seats in the rooms of a biome (the hand-made
+## the blank grows in from its corner and is gone before the merge ends); every pane at the
+## default zoom; the mode changed while split. With 2 to 4 seats in the rooms of a biome (the hand-made
 ## twelve-room row, tests/support/biome_maps.gd), as test_split_camera.gd does.
 const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const EqualPanesScript := preload("res://gameplay/feel/equal_panes.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
@@ -78,27 +77,15 @@ func _wizard(seat: int, at: Vector2) -> Node2D:
 	return node
 
 
-func _foe(at: Vector2) -> Node2D:
-	var node := own(Node2D.new()) as Node2D
-	root.add_child(node)
-	node.global_position = at
-	var id: int = _table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-	_table.set_node(id, node)
-	_bodies.append(node)
-	return node
-
-
-func _frame(foes: CloseFoesScript = null) -> void:
-	if foes != null:
-		foes.find(_table, null)
-	_party.look(_table, 0, foes)
+func _frame() -> void:
+	_party.look(_table, 0)
 	_party.step(FRAME)
-	_split.step(FRAME, _table, 0, _camera, SCREEN, foes)
+	_split.step(FRAME, _table, 0, _camera, SCREEN)
 
 
-func _frames(count: int, foes: CloseFoesScript = null) -> void:
+func _frames(count: int) -> void:
 	for i in count:
-		_frame(foes)
+		_frame()
 
 
 func _free_bodies() -> void:
@@ -440,24 +427,18 @@ func test_with_three_the_blank_grows_in_from_its_corner_and_is_gone_before_the_m
 	check_equal(_split.blank_count(), 0, "and no blank")
 
 
-func test_a_pane_frames_its_close_foes_inside_itself() -> void:
+## Every pane rests at the one picture's default zoom (the owner, 2026-11-23: the same zoom
+## everywhere, so nothing changes size as the screen splits or merges).
+func test_every_pane_rests_at_the_default_zoom() -> void:
 	if not _ready_rooms():
 		return
 	_wizard(0, _rooms[0])
 	_wizard(1, _rooms[8])
-	var foe: Node2D = _foe(_rooms[0] + Vector2(200.0, 0.0))
-	var foes := CloseFoesScript.new()
-	_frames(240, foes)
+	_frames(240)
 	var views: ScreenViewsScript = _split.views
 	check_equal(views.count, 2, "split")
-	var near: int = views.view_of_seat(0)
-	var zoom: float = views.to_screen[near].x.x
-	check(zoom < SplitCameraScript.SPLIT_ZOOM - 0.05, "seat 0's pane zoomed out for its foe (%f)" % zoom)
-	check(zoom >= PartyCameraScript.MIN_ZOOM - 0.001, "no further than the widest zoom")
-	var pane: Rect2 = _split.panes().pane(0, SCREEN)
-	var drawn: Vector2 = views.to_screen[near] * foe.global_position
-	check(pane.grow(-SplitCameraScript.FOE_MARGIN + 1.0).has_point(drawn), "the foe is drawn inside its wizard's pane (%s)" % drawn)
-	check(absf(views.to_screen[views.view_of_seat(1)].x.x - SplitCameraScript.SPLIT_ZOOM) < 0.01, "the other pane at the split's zoom")
+	for view in views.count:
+		check(absf(views.to_screen[view].x.x - PartyCameraScript.MAX_ZOOM) < 0.001, "pane %d at the default zoom (%f)" % [view, views.to_screen[view].x.x])
 
 
 func test_the_mode_changed_while_split_eases_over() -> void:

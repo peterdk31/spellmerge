@@ -122,7 +122,7 @@ const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
-const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
+const FoeMarkersScript := preload("res://gameplay/feel/foe_markers.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
@@ -545,9 +545,6 @@ var _fall_motes: Callable = Callable()
 var _spawn_look: SpawnLook = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
-## The enemies close to each seat's wizards, found once a drawn frame for the party camera and the
-## split views to frame (`close_foes.gd`; the owner, 2026-11-19).
-var close_foes: CloseFoesScript = CloseFoesScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
 ## What dead layered bodies leave: their parts flying apart (boss plan OB8, `remnants.gd`).
@@ -557,6 +554,9 @@ var _numbers: DamageNumberDrawerScript = null
 ## The markers at the screen's edge for teammates in none of this machine's views
 ## (`teammate_markers.gd`).
 var _markers: TeammateMarkersScript = null
+## The markers at a view's edge for the foes of a fight out of it (`foe_markers.gd`; the owner,
+## 2026-11-23).
+var _foe_markers: FoeMarkersScript = null
 ## The Voronoi split screen (connected biomes CB6, `split_screen.gd`): this machine's wizards in a
 ## view each group once they no longer fit in one picture. Stepped after the party camera.
 var split_screen: SplitScreenScript = null
@@ -946,12 +946,16 @@ func _ready() -> void:
 	add_child(_numbers)
 	# On a layer of its own over the HUD's, in screen pixels.
 	var marker_layer := CanvasLayer.new()
-	marker_layer.name = "TeammateMarkerLayer"
+	marker_layer.name = "MarkerLayer"
 	marker_layer.layer = TeammateMarkersScript.LAYER
 	add_child(marker_layer)
 	split_screen = SplitScreenScript.new()
 	add_child(split_screen)
 	set_split_mode(split_mode)
+	# The foes' first: a teammate's marker is drawn over a foe's.
+	_foe_markers = FoeMarkersScript.new()
+	_foe_markers.name = "FoeMarkers"
+	marker_layer.add_child(_foe_markers)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	marker_layer.add_child(_markers)
@@ -1170,21 +1174,22 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	party_camera.follow(_live_camera())
 	var seats_here: int = _seats_here()
-	close_foes.find(_actor_table(), projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null)
-	party_camera.look(_actor_table(), seats_here, close_foes)
+	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
+	var grid_now: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
 	if split_screen != null:
 		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
-		var grid_now: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
 		split_screen.void_bounds = projectiles.bounds() if grid_now != null and grid_now.places() > 0 else Rect2()
-		split_screen.step(real_delta, _actor_table(), seats_here, world_camera, close_foes)
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
 		_spectacle.set_void_blank(split_screen.void_rect())
 		_tell_hud_corners()
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	_step_effects(real_delta)
 	_profile_mark(0)
 	if _markers != null:
-		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
+		var views_now: ScreenViewsScript = _views_shown()
+		_markers.step(_actor_table(), seats_here, views_now, _clock)
+		_foe_markers.step(real_delta, _actor_table(), grid_now, seats_here, views_now)
 	if _away_bars != null:
 		_away_bars.step(_actor_table())
 	_intro_wait.settle()
@@ -2770,6 +2775,11 @@ func away_bars() -> AwayBarsScript:
 ## The markers for teammates out of the picture (for tests).
 func teammate_markers() -> TeammateMarkersScript:
 	return _markers
+
+
+## The markers for a fight's foes out of view (for tests).
+func foe_markers() -> FoeMarkersScript:
+	return _foe_markers
 
 
 ## The motes (null with the setting off; for tests and the benchmarks).

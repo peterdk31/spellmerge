@@ -134,6 +134,9 @@ func add_guard(player: int, at: Vector2) -> Node2D:
 ## mend has something to heal).
 func hurt(body: Node2D, amount: int) -> void:
 	combat.hit(ActorSeats.enemy(projectiles.actors), body, amount)
+	# What an Actor's Caster tells Spells whenever its health changes (a `hurt` condition reads it).
+	if body is Guard:
+		spells.sense_health((body as Guard).actor_id, combat.health_of(body) / IMP_HEALTH)
 
 
 ## Health given to wizard bodies by heals, all together (not the imps': a mend heals them too).

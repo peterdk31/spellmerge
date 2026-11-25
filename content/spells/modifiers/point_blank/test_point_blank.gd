@@ -73,6 +73,13 @@ func test_its_blast_goes_off_at_the_tip() -> void:
 	arena.free_all()
 
 
+func test_it_is_wasted_on_a_held_carrier() -> void:
+	# A held carrier that lasts lives as long as it is held, whatever its life.
+	check(_wasted(["point_blank", "hold", "beam"]).has(0), "a held beam")
+	check(_wasted(["hold", "point_blank", "rune"]).has(1), "a held rune")
+	check(not _wasted(["point_blank", "beam"]).has(0), "a beam let go of: it works")
+
+
 func test_an_ai_knows_its_blast_catches_its_caster() -> void:
 	var arena := ArenaScript.new(root)
 	var blast: CompiledCast = arena.install_cards(0, 0, ["point_blank", "blast", "bolt"]).casts[0]

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`, with the title type in `ui/fonts/`), visual effects (`vfx/`) the face layers every living staff wears (`faces/`: the eye and brow sheets of `gameplay/actor/face.gd`) and the intro's own pieces (`story/`: the wizard's Blight hat and the Favourite, for `gameplay/flow/intro.gd`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md) (provisional until M2): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
+Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`, with the title type in `ui/fonts/`), visual effects (`vfx/`) the face layers every living staff wears (`faces/`: the eye and brow sheets of `gameplay/actor/face.gd`) and the intro's own pieces (`story/`: the wizard's Blight hat and the Favourite, for `gameplay/flow/intro.gd`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is pixel art on a 32-unit grid, redrawn at 64×64 per cell (2x detail) since the owner's decision of 2026-11-21 (confirmed 2026-11-25; "Redrawing a sprite at 64x64" below); the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
 
 Palette files, grid templates and the one-page checklist are in [kit/](kit/README.md). The three art direction samples the owner picks from (nothing uses them) are in [samples/](samples/README.md).
 
@@ -10,7 +10,7 @@ Palette files, grid templates and the one-page checklist are in [kit/](kit/READM
 
 - Art depends on nothing. It holds files only, no logic.
 - Every asset has an entry in `art/manifest.json` (see below), or, for the files of one content folder, in an `assets.json` in that folder in the same shape (one list per folder, so two PRs never edit the same list; the validator and `tests/core/test_svg_art.gd` read them all).
-- Sprites and tiles are 32×32 pixels (or a whole multiple for bigger objects).
+- Sprites and tiles cover 32×32 world units (or a whole multiple for bigger objects): 64×64 px at 2x detail, in a file named `<name>@2x.<ext>`; 32×32 px for art not yet redrawn.
 - Names are original. No ripped game assets, no fan art of other IP, no names from other works.
 - Art is CC-BY-SA-4.0 by default. An asset may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).
 
@@ -63,10 +63,25 @@ ci/build/build.sh --quick        # import and smoke test in Godot
 
 Add a screenshot of the asset in the game to the PR.
 
+## Redrawing a sprite at 64x64
+
+The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The picture and the art's detail"): every sprite is redrawn at 64×64 for its 32-unit cell, in this order: players and enemies, spells and effects, rooms and props, HUD and font. ART0 built the picture and the rule and redrew one piece, the curl staff (`content/wizard/staffs/curl/`). One sprite or sheet at a time:
+
+1. **Draw it at twice the size, the same layout.** Every frame twice as wide and tall (a 32×32 frame becomes 64×64, a 48×48 head 96×96, a 16×8 face frame 32×16), every point measured in its art (a grip, an origin, an anchor in a sheet, a mote point) at twice its numbers. The frame counts, columns, rows and their order stay as they are, so the code that picks a frame needs no change. Start from `art/kit/grid_64.svg` (export without it). The palette, the light from the top-left, at most 3 shades a material and the rest of docs/STYLE.md hold; the outline is one art pixel (half as thick as before on screen: finer, which is the point). Keep the old silhouette, so it reads as the same thing.
+2. **Name it `<name>@2x.<ext>`** and delete the old file (with its `.import`; rename the `.import` to the new name and fix its `source_file` to keep the texture's uid, or let Godot make a new one). The name is the whole rule (`ArtDetail`, core/display/art_detail.gd): the game draws it at half size. Point what loaded the old file at the new one (a `.tres`, a `.tscn`, a `preload`); `grep -rn "<old path>"` finds them.
+3. **Check what reads its pixels.** Anything that measures the art in pixels and was written for 1x (a size check in a test, a crop, a script reading pixel positions) multiplies by `ArtDetail.of(texture)`. Sprites, faces (`FaceArt`), the staff's head, `TexturePage` regions and the cover's batches take the rule already. A look that drew the texture another way (a `draw_texture_rect`, a MultiMesh of its own, a shader that sizes its quad from the texture) takes it the same way: its rect `ArtDetail.size_of(texture)`, its quad `ArtDetail.quad_size(texture, frame_px)`, a sprite's scale `ArtDetail.fit(sprite, pose)` (a look's own stretch times the detail; `sprite.scale * ArtDetail.of(texture)` is the stretch back).
+4. **List it** in its folder's `assets.json` (or `art/manifest.json`) with origin, tool and prompt (no living artists or franchises), as before.
+5. **Look at it in the game**, at the resting zoom 1 (every art pixel shows) and zoomed out as the camera holds a spread party (0.8 down to 0.5): a one-pixel line breaks there now and then (one art pixel in five is left out at 0.8), so lines that must read even then are two art pixels. `tests/screenshots/shot_art_detail.gd` shows the curl beside a 1x staff in play, at zoom 1 and at 0.8; copy it for a side by side of your sprite. Add the screenshots to the PR.
+
+**Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
+
+A generator may draw it (palette colours; an SVG of rects, one a run along a row, as `tests/core/test_svg_art.gd` wants, or a PNG when the rects would pass the 1 MB limit: the curl's head sheet): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
+
 ## Review questions
 
 Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it match the style guide: palette, light from the top-left, outline rules, frame counts?
-- Is it readable at 32×32, next to other art and with four players on screen?
+- Is it readable at its size in the world (32 units, at the resting zoom 1 and zoomed out to 0.8), next to other art and with four players on screen?
+- Redrawn at 2x: is it named `@2x`, the same layout at twice the pixels, and does it keep its silhouette?
 - Is the origin recorded honestly in the manifest?

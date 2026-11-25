@@ -119,7 +119,8 @@ func _lit_share(image: Image, room: Rect2) -> float:
 	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
 	var a := Vector2i((on_screen(room.position) * scale_to_image).floor())
 	var b := Vector2i((on_screen(room.end) * scale_to_image).ceil())
-	var top: int = int(70.0 * scale_to_image.y)
+	# Under the HUD's panel: 70 layout pixels, drawn at the picture's scale (PictureGrid).
+	var top: int = int(70.0 * float(sheet_scale()) * scale_to_image.y)
 	var x0: int = clampi(a.x, 0, image.get_width())
 	var x1: int = clampi(b.x, 0, image.get_width())
 	var y0: int = clampi(maxi(a.y, top), 0, image.get_height())

@@ -30,8 +30,11 @@ extends ActorLook
 ## The sheets are art/faces/eyes.svg (one row per style; nine looks, then the blink) and
 ## art/faces/brows.svg (one column per mood; rows two brows and one). A stray's eyes are drawn
 ## white and tinted with `glow`. A face of its own (boss plan OB9) draws its `art`'s sheets instead
-## (`FaceArt`: the same layout at any frame size, in its body's folder), its row `art_row` (a phase
-## may show another, `restyle`); its `style` still sets its habits. Nothing here allocates per step, and the layers are only set when
+## (`FaceArt`: the same layout at any frame size, in its body's folder; a player's staff may have
+## one too, `StaffBase.face`, worn as it is shown, `wear_art`), its row `art_row` (a phase may show
+## another, `restyle`); its `style` still sets its habits. Sheets drawn at 2x detail (`@2x` in their
+## names) are drawn at half their size (`ArtDetail`): their frames and origins are in their own
+## pixels, the anchor and the lags in world units. Nothing here allocates per step, and the layers are only set when
 ## their frame or place changed (every actor wears a face; performance pass, 2026-10-28).
 
 ## Not state, as every look: the shared sheets on one page (`shared_sheets`), made once.
@@ -186,6 +189,8 @@ func wear_sheets(eyes: Texture2D, brows: Texture2D) -> void:
 	if _eyes != null and not _own_art:
 		_eyes.texture = eyes
 		_brows.texture = brows
+		ArtDetail.fit(_eyes)
+		ArtDetail.fit(_brows)
 
 
 ## The textures its eyes and brows are drawn from (for tests; empty before `setup`).
@@ -422,14 +427,38 @@ static func shared_page() -> Image:
 
 func _layer(sheet: Texture2D, origin: Vector2, frame_size: Vector2i) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = sheet
 	sprite.centered = false
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_draw_sheet(sprite, sheet, origin, frame_size)
+	add_child(sprite)
+	return sprite
+
+
+## `sprite` draws `sheet` (frames of `frame_size` and the anchor at `origin`, in the sheet's own art
+## pixels), at its size in the world: a sheet drawn at 2x detail at half its size (`ArtDetail`).
+static func _draw_sheet(sprite: Sprite2D, sheet: Texture2D, origin: Vector2, frame_size: Vector2i) -> void:
+	sprite.texture = sheet
 	sprite.offset = -origin
 	sprite.hframes = maxi(sheet.get_width() / maxi(frame_size.x, 1), 1)
 	sprite.vframes = maxi(sheet.get_height() / maxi(frame_size.y, 1), 1)
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	add_child(sprite)
-	return sprite
+	ArtDetail.fit(sprite)
+
+
+## Wear `new_art`'s sheets from now on (null: the shared ones, or their copies it wears), as a
+## player's staff with a face of its own is shown (`StaffLook`). Before or after `setup`.
+func wear_art(new_art: FaceArt) -> void:
+	if new_art == art:
+		return
+	art = new_art
+	if _eyes == null:
+		return
+	var own: bool = art != null and art.problems().is_empty()
+	var shared: Array[Texture2D] = _worn if _worn.size() == 2 else shared_sheets()
+	_draw_sheet(_eyes, art.eyes if own else shared[0], art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
+	_draw_sheet(_brows, art.brows if own else shared[1], art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
+	_own_art = own
+	_eyes_frame = Vector2i(-1, -1)
+	_brows_frame = Vector2i(-1, -1)
 
 
 static func _lean(value: float) -> int:

@@ -94,29 +94,35 @@ func test_a_new_room_is_jumped_to() -> void:
 	check_equal(_camera.position, Vector2(800.0, 500.0), "no easing across a new room")
 
 
-## The default zoom (the owner, 2026-11-23): one wizard is seen at 0.8, and an enemy body in the
+## The default zoom (the owner, 2026-11-25 on ART0; 0.8 from 2026-11-23): one wizard is seen at 1, and an enemy body in the
 ## table is no wizard: only the seats' own bodies and the actors they drive are held.
 func test_one_wizard_is_seen_at_the_default_zoom_and_an_enemy_is_not_held() -> void:
 	_body(Vector2(100.0, 100.0), 0)
 	_body(Vector2(1400.0, 100.0))
 	_party.look(_table, 0b0001)
 	_party.snap()
-	check(is_equal_approx(PartyCameraScript.MAX_ZOOM, 0.8), "the default zoom is 0.8")
-	check(is_equal_approx(_camera.zoom.x, PartyCameraScript.MAX_ZOOM), "one wizard: the default zoom (%f)" % _camera.zoom.x)
+	check(is_equal_approx(PartyCameraScript.MAX_ZOOM, 1.0), "the default zoom is 1: every art pixel shows")
+	check(is_equal_approx(_zoom(_camera), PartyCameraScript.MAX_ZOOM), "one wizard: the default zoom (%f)" % _zoom(_camera))
 	check_equal(_camera.position, Vector2(100.0, 100.0), "on the wizard, not between it and the enemy")
 	_party.look(_table, 0)
 	check_equal(_party.target_position, Vector2(100.0, 100.0), "nor with no seat here: everyone held is every seat's wizard")
 
 
-## A room smaller than the default picture (800 x 450 at PictureGrid.SIZE) is seen closer: never
+## A room smaller than the default picture (640 x 360 at PictureGrid.SIZE) is seen closer: never
 ## past its edge.
 func test_a_room_smaller_than_the_default_picture_is_seen_closer() -> void:
 	_camera.limit_left = 0
 	_camera.limit_top = 0
-	_camera.limit_right = 640
-	_camera.limit_bottom = 360
+	_camera.limit_right = 512
+	_camera.limit_bottom = 288
 	_body(Vector2(100.0, 100.0), 0)
 	_party.look(_table, 0b0001)
 	_party.snap()
-	check(is_equal_approx(_camera.zoom.x, 1.0), "the smallest room fills the picture (%f)" % _camera.zoom.x)
-	check(Rect2(0.0, 0.0, 640.0, 360.0).grow(0.01).encloses(_party.visible_rect()), "nothing past the room is shown: %s" % _party.visible_rect())
+	check(is_equal_approx(_zoom(_camera), 1.25), "a room 512 x 288 fills the picture (%f)" % _zoom(_camera))
+	check(Rect2(0.0, 0.0, 512.0, 288.0).grow(0.01).encloses(_party.visible_rect()), "nothing past the room is shown: %s" % _party.visible_rect())
+
+
+## The camera's zoom as the cameras count it: the world SIZE of a picture shows at zoom 1
+## (core/display/picture_grid.gd), whatever the picture's size.
+func _zoom(camera: Camera2D) -> float:
+	return camera.zoom.x / float(PictureGrid.scale_in(camera.get_viewport() if camera.is_inside_tree() else null))

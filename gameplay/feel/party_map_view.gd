@@ -23,7 +23,7 @@ extends CanvasLayer
 ## the same on every machine and needs nothing of its own saved: per player, and view only.
 ##
 ## **Where:** a frame round the map, centred on the anchor of the player's view (where its wizards are
-## drawn), as large as fits inside that view's cell EDGE screen pixels in (a convex cell: a rectangle
+## drawn), as large as fits inside that view's cell EDGE layout pixels in (a convex cell: a rectangle
 ## whose corners are inside it is inside it), the map at a whole scale (1 to MAX_SCALE); a cell too
 ## small for it all shows the part round the player's wizard, cut at the frame. With one picture the
 ## cell is the screen.
@@ -201,6 +201,9 @@ func _init() -> void:
 
 
 func bind(events: Node) -> void:
+	# Laid out in layout pixels and drawn at the picture's scale (core/display/picture_grid.gd); Feel
+	# hands it the views in layout pixels.
+	PictureGrid.keep_fitted(self)
 	_events = events
 	if events != null:
 		events.rooms_seen.connect(_on_rooms_seen)
@@ -464,7 +467,10 @@ func _tell_frame(seat: int) -> void:
 	_told_frame[seat] = frame
 	_told_open[seat] = open
 	if _events != null:
-		_events.map_frame_shown.emit(seat, frame, open == 1)
+		# Told in the picture's pixels: the frame is laid out in layout pixels, on a layer drawn at
+		# the picture's scale (PictureGrid).
+		var by: int = roundi(transform.get_scale().x)
+		_events.map_frame_shown.emit(seat, Rect2i(frame.position * by, frame.size * by), open == 1)
 
 
 ## True while an opening still opens or closes, or a piece's look still changes on an open map.

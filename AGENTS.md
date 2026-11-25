@@ -4,7 +4,7 @@ This is the guide for any coding agent working on Spellmerge: the bot's own sess
 
 ## The project
 
-Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. It's made in **Godot 4.7** with **typed GDScript only**, in 32×32 pixel art. Claude, an AI, maintains it: it writes the code and the assets, reviews its own PRs with a fresh session, and ships a build every day. Players shape it through Issues, Discussions and pull requests, which a daily intake reads, answers and schedules; a scheduled pull request is finished by the bot on top of the contributor's commits.
+Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. It's made in **Godot 4.7** with **typed GDScript only**, in pixel art on a 32-unit grid, drawn at 64×64 a cell (2x detail, `<name>@2x`) in a 1280×720 picture (the owner's decision of 2026-11-21, confirmed 2026-11-25; docs/STYLE.md, "The picture and the art's detail"; art not yet redrawn is 32×32). Claude, an AI, maintains it: it writes the code and the assets, reviews its own PRs with a fresh session, and ships a build every day. Players shape it through Issues, Discussions and pull requests, which a daily intake reads, answers and schedules; a scheduled pull request is finished by the bot on top of the contributor's commits.
 
 - Vision and pillars: [docs/DESIGN.md](docs/DESIGN.md). Nothing may contradict it.
 - The full plan: [docs/PLAN.md](docs/PLAN.md). Current milestone: [docs/ROADMAP.md](docs/ROADMAP.md).

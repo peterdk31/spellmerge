@@ -623,7 +623,7 @@ func test_four_quarters_are_laid_out_alike_and_fit_the_view() -> void:
 	_start(4)
 	for player in 4:
 		_open(player)
-	var view := Rect2(Vector2.ZERO, _radial(0).get_viewport_rect().size)
+	var view := Rect2(Vector2.ZERO, PictureGrid.layout_of(_radial(0).get_viewport()))
 	check_equal(view.size, Vector2(640.0, 360.0), "the game's view")
 	var all: Array[Dictionary] = []
 	for player in 4:

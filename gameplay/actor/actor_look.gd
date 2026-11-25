@@ -106,7 +106,8 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool, dir: Vector2 = U
 		var scale_now: Vector2 = pose_scale(dir)
 		if scale_now != Vector2.ONE or _pose_stretched:
 			_pose_stretched = scale_now != Vector2.ONE
-			sprite.scale = scale_now
+			# Times its art's detail: a 2x sprite is drawn at half its size (ArtDetail).
+			sprite.scale = scale_now * ArtDetail.draw_scale(sprite.texture)
 	if sprite != null:
 		_apply_glow(sprite, actor.spells.poses().staff_glow(actor.id) if posing else 0.0)
 	if face != null and posing:

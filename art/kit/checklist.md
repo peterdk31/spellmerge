@@ -4,7 +4,7 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 
 ## The seven rules
 
-1. **32×32 grid.** One art pixel is one screen pixel. Bigger things are whole multiples (64×64, 96×64).
+1. **32-unit grid, art at 2x detail.** A cell is 32 world units: redrawn art is 64×64 px for it (two art pixels a unit, named `<name>@2x.png` or `.svg`, drawn at half size; `grid_64.svg`), art not yet redrawn 32×32. Bigger things are whole multiples (64×64 units, 96×64).
 2. **Light from the top-left.** Highlights on the top and left, shadows on the bottom and right.
 3. **1 px dark outline** (`#14121f`) around every object, closed, no gaps.
 4. **At most 3 shades per material:** shadow, base, light.
@@ -14,11 +14,11 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 
 ## Before you open the PR
 
-- [ ] 32×32 per frame (or a whole multiple); an animation is one horizontal strip with the frame count from the table below.
+- [ ] 64×64 per frame at 2x detail, named `<name>@2x` (32×32 for art not yet redrawn; or a whole multiple); an animation is one horizontal strip with the frame count from the table below (each frame twice as wide at 2x).
 - [ ] Only palette colours (`palette.hex.txt`, or the `.gpl` palette in your editor).
 - [ ] 1 px outline, closed; light from the top-left; at most 3 shades per material.
 - [ ] No baked drop shadow, no glow halo; the background is fully transparent (tiles are fully opaque).
-- [ ] Reads as a black silhouette at 1×, and next to four players.
+- [ ] Reads as a black silhouette at its size in the world, and next to four players; a one-pixel line still reads at the resting zoom 0.8.
 - [ ] Floors are flat; walls and raised props have the lit top-left edge. Tiles repeat without a seam.
 - [ ] Imports with filtering off (nearest neighbour).
 - [ ] Manifest entry in `art/manifest.json` with the honest origin (`human` or `ai`; for AI also tool and prompt).
@@ -26,6 +26,8 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 - [ ] A screenshot of it in the game in the PR.
 
 ## Frame counts
+
+Strip sizes are for 32-unit art; at 2x detail each is twice as wide and tall (an idle 256×64).
 
 | Animation | Frames | Strip size | Loops |
 | --- | --- | --- | --- |
@@ -60,7 +62,7 @@ Outline `#14121f`. Shadow / base / light:
 
 Copy their approach, not their pixels. The list is `art/kit/golden.json`.
 
-- Player character (a living staff): `art/kit/golden_staff.svg`
+- Player character (a living staff, at 2x detail): `art/kit/golden_staff@2x.svg`
 - Enemy (a stray): `art/kit/golden_stray.svg`
 - Raised tile: `art/tilesets/crypt/wall.svg`; flat tile: `art/tilesets/crypt/floor.svg`
 - Projectile: `art/vfx/bolt.svg`; impact: `art/vfx/hit_spark.svg`

@@ -44,6 +44,9 @@ render_mode blend_mix, world_vertex_coords;
 
 uniform vec2 frame_size = vec2(16.0, 16.0);
 uniform vec2 sheet_size = vec2(16.0, 16.0);
+// The sheet's art pixels a world pixel (ArtDetail, core/display/art_detail.gd: 2 for a sheet drawn
+// at 2x detail): its frame is frame_size / art_detail world pixels, its UVs in its own pixels.
+uniform float art_detail = 1.0;
 uniform float view_time = 0.0;
 // The bodies bending it (Cover.BODIES at most) and how many there are.
 uniform vec2 bodies[32];
@@ -127,9 +130,10 @@ void vertex() {
 		if (trampled_frame >= 0.0 && lying > 0.5) {
 			frame = trampled_frame;
 		} else {
-			lower += lying * flatten * frame_size.y;
+			lower += lying * flatten * frame_size.y / art_detail;
 		}
-		VERTEX = foot + vec2((corner.x - 0.5) * frame_size.x * flip + round((wind * sway + lean.x) * tip), (corner.y - 1.0) * frame_size.y + round(lower * tip));
+		vec2 drawn = frame_size / art_detail;
+		VERTEX = foot + vec2((corner.x - 0.5) * drawn.x * flip + round((wind * sway + lean.x) * tip), (corner.y - 1.0) * drawn.y + round(lower * tip));
 	}
 	// Exactly a frame of the sheet's top row, whatever the sheet's size (as the editor draws it).
 	UV = (vec2(frame * frame_size.x, 0.0) + corner * frame_size) / max(sheet_size, vec2(1.0));

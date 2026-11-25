@@ -25,22 +25,22 @@ extends RefCounted
 ## camera, it jumps to the view instead of easing. Shake (Feel) moves only the camera's `offset`, so the two do not clash.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const PictureGridScript := preload("res://core/display/picture_grid.gd")
 
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0
-## The view never zooms in past 0.8 or out past 0.5 (Camera2D zoom: smaller sees more). MAX_ZOOM is
-## the game's default zoom, where one wizard or a party standing together is seen (the owner,
-## 2026-11-23: 0.8, was 1, "zoom a bit more out as the default": 800 x 450 of the world in
-## PictureGrid.SIZE; the game is drawn into that 640 x 360 picture and stretched, project.godot, so
-## the world is resampled into it at 0.8, about one art pixel in five left out, as it was whenever
-## the camera zoomed out for a party; the owner accepted art pixels no longer being whole screen
-## pixels), and the one home of the number: the split's views rest at it too
-## (`SplitCamera.SPLIT_ZOOM`), so nothing changes size as the screen splits or merges. A room
-## smaller than that picture is seen closer, never past its edge (`_min_zoom`). Every zoom and
-## margin here is at PictureGrid.SIZE: a picture `PictureGrid.scale_of` times bigger draws the camera
-## that many times the zoom (`_grid`), the same world, finer.
-const MAX_ZOOM: float = 0.8
+## The view never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more). MAX_ZOOM is
+## the game's default zoom, where one wizard or a party standing together is seen: 1, 640 x 360 of
+## the world (the owner, 2026-11-25, on ART0: "rest the cameras at zoom 1.0", so every art pixel shows,
+## a 64 px art pixel one picture pixel of the 1280 x 720 picture, a 32 px one two; it was 0.8 from
+## 2026-11-23, 800 x 450 of the world, where one art pixel in five was left out), and the one home of
+## the number: the split's views rest at it too (`SplitCamera.SPLIT_ZOOM`), so nothing changes size
+## as the screen splits or merges. It still zooms out to hold this machine's wizards, down to
+## MIN_ZOOM, before the screen splits. A room smaller than the picture is seen closer, never past its
+## edge (`_min_zoom`). Every zoom and margin here is at PictureGrid.SIZE: a picture
+## `PictureGrid.scale_of` times bigger draws the camera that many times the zoom (`_grid`), the same
+## world, finer.
+const MAX_ZOOM: float = 1.0
 const MIN_ZOOM: float = 0.5
 ## How fast the camera eases to its target, per second (higher is snappier).
 const FOLLOW_SPEED: float = 6.0

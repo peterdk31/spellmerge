@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The player's art is wired so the game can use it (living staffs H3): the wizard scene draws a
 ## floating staff (`StaffLook`, with a default head) and wears a `Face`; each starter head
-## (content/wizard/staffs/curl, star, moon, crystal) has a head sheet of 48 px frames, one column
+## (content/wizard/staffs/curl, star, moon, crystal) has a head sheet of 48 world px frames (96 art px
+## for a sheet at 2x detail, `ArtDetail`: the curl's since ART0), one column
 ## per direction and one row per ramp, with the player colour on the head only, so the four rows
 ## differ; and each brings its own personality and tip. The `dev` staff (owner,
 ## 2026-11-01: a head of its own, the cog) has a sheet of the same shape and a tip; its face style
@@ -48,14 +49,14 @@ func test_every_head_is_a_sheet_of_directions_by_ramp() -> void:
 		check(staff != null and staff.head != null, "the staff has a head sheet")
 		if staff == null or staff.head == null:
 			continue
-		check_equal(staff.head.get_width(), StaffLook.FRAME_SIZE * StaffLook.DIRECTIONS, "%s: one column per direction" % staff.id)
-		check_equal(staff.head.get_height(), StaffLook.FRAME_SIZE * StaffLook.RAMPS, "%s: one row per ramp" % staff.id)
+		var frame: int = StaffLook.FRAME_SIZE * ArtDetail.of(staff.head)
+		check_equal(staff.head.get_width(), frame * StaffLook.DIRECTIONS, "%s: one column per direction" % staff.id)
+		check_equal(staff.head.get_height(), frame * StaffLook.RAMPS, "%s: one row per ramp" % staff.id)
 
 
-## The most common colour of a frame (the outline apart).
-func _main_colour(image: Image, column: int, row: int) -> Color:
+## The most common colour of a frame of `size` px (the outline apart).
+func _main_colour(image: Image, column: int, row: int, size: int) -> Color:
 	var counts: Dictionary = {}
-	var size: int = StaffLook.FRAME_SIZE
 	for y in size:
 		for x in size:
 			var pixel: Color = image.get_pixel(column * size + x, row * size + y)
@@ -77,7 +78,7 @@ func test_the_rows_differ_only_on_the_head() -> void:
 		if staff == null or staff.head == null:
 			continue
 		var image: Image = staff.head.get_image()
-		var size: int = StaffLook.FRAME_SIZE
+		var size: int = StaffLook.FRAME_SIZE * ArtDetail.of(staff.head)
 		for row in range(1, StaffLook.RAMPS):
 			var same: int = 0
 			var differ: int = 0
@@ -93,7 +94,7 @@ func test_the_rows_differ_only_on_the_head() -> void:
 						differ += 1
 			check(differ > 0, "%s: ramp %d has its own colour" % [staff.id, row])
 			check(same > differ, "%s: ramp %d shares the shaft with ramp 0" % [staff.id, row])
-		check(_main_colour(image, 0, 0).a > 0.0, "%s: the first frame is drawn" % staff.id)
+		check(_main_colour(image, 0, 0, size).a > 0.0, "%s: the first frame is drawn" % staff.id)
 
 
 func test_the_dev_staff_brings_a_tip() -> void:
@@ -109,3 +110,21 @@ func test_each_head_brings_a_tip_and_its_own_personality() -> void:
 		check(staff.tip > 0.0, "%s: a tip" % staff.id)
 		check(not styles.has(staff.face_style), "%s: a face style of its own" % staff.id)
 		styles.append(staff.face_style)
+
+
+## The pilot of the 64x64 redraw (ART0): the curl is drawn at 2x detail, and its own face sheets
+## (the Optimist's eyes and brows at 2x) are worn with it; the other heads keep the shared face.
+func test_the_curl_is_drawn_at_2x_with_a_face_of_its_own() -> void:
+	var staffs: Array[StaffBase] = _heads()
+	for staff in staffs:
+		if staff == null:
+			continue
+		if staff.id == &"curl":
+			check_equal(ArtDetail.of(staff.head), 2, "curl: its head at 2x detail")
+			check(staff.face != null and staff.face.problems().is_empty(), "curl: a face of its own that can be drawn")
+			if staff.face != null:
+				check_equal(ArtDetail.of(staff.face.eyes), 2, "curl: its eyes at 2x")
+				check_equal(ArtDetail.of(staff.face.brows), 2, "curl: its brows at 2x")
+				check_equal(staff.face.frame, Face.FRAME * 2, "curl: its face's frames twice the shared ones'")
+		else:
+			check(staff.face == null, "%s: the shared face" % staff.id)

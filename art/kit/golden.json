@@ -6,8 +6,8 @@
   "screenshot_alt": "The arena with four players",
   "examples": [
     {
-      "path": "art/kit/golden_staff.svg",
-      "shows": "A player character: a floating staff (the curl, player 1) pointing up and to the right, a Wood shaft with a Spark grip wrap, the player colour on the head only, the Optimist's eyes and neutral brows 8 px above the grip, drawn over the staff. The game draws the head sheet and the two face layers as three pictures; this is the three together",
+      "path": "art/kit/golden_staff@2x.svg",
+      "shows": "A player character redrawn at 2x detail (64x64 art for a 32-unit cell, drawn at half size; the pilot of the redraw): a floating staff (the curl, player 1) pointing up and to the right, a Wood shaft with a Spark grip wrap, a one-art-pixel outline, the player colour on the head only, the Optimist's eyes and neutral brows 8 world px (16 art px) above the grip, drawn over the staff. The game draws the head sheet and the two face layers as three pictures; this is the three together",
       "rules": [
         "outline",
         "three shades",

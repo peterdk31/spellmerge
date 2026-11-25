@@ -1,7 +1,7 @@
 [gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
-[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head.svg" id="2_head"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head@2x.png" id="2_head"]
 [ext_resource type="Script" path="res://gameplay/actor/face.gd" id="3_face"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="10_health"]
 [ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="11_hurtbox"]

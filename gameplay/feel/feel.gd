@@ -577,6 +577,10 @@ var _rung_seen: int = 0
 var _corners_sent: int = 0
 ## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
 var _one_view: ScreenViewsScript = ScreenViewsScript.new()
+## This machine's views in layout pixels, for the markers' layer (`_marker_layer`, drawn at the
+## picture's scale: core/display/picture_grid.gd).
+var _layout_views: ScreenViewsScript = ScreenViewsScript.new()
+var _marker_layer: CanvasLayer = null
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
 ## A biome's gather doors, its gate and the portal home (connected biomes CB7, `gather_door_looks.gd`).
@@ -945,10 +949,13 @@ func _ready() -> void:
 	_numbers.registry = registry
 	add_child(_numbers)
 	# On a layer of its own over the HUD's, in screen pixels.
+	# Laid out in layout pixels and drawn at the picture's scale, as the HUD (PictureGrid).
 	var marker_layer := CanvasLayer.new()
 	marker_layer.name = "MarkerLayer"
 	marker_layer.layer = TeammateMarkersScript.LAYER
 	add_child(marker_layer)
+	PictureGrid.keep_fitted(marker_layer)
+	_marker_layer = marker_layer
 	split_screen = SplitScreenScript.new()
 	add_child(split_screen)
 	set_split_mode(split_mode)
@@ -1187,7 +1194,7 @@ func step(real_delta: float) -> void:
 	_step_effects(real_delta)
 	_profile_mark(0)
 	if _markers != null:
-		var views_now: ScreenViewsScript = _views_shown()
+		var views_now: ScreenViewsScript = _views_shown().scaled_into(_layout_views, 1.0 / _marker_layer.transform.get_scale().x)
 		_markers.step(_actor_table(), seats_here, views_now, _clock)
 		_foe_markers.step(real_delta, _actor_table(), grid_now, seats_here, views_now)
 	if _away_bars != null:
@@ -1301,7 +1308,7 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_tints.step(real_delta, grid, _spectacle.light if _spectacle != null else null)
 	if _party_map != null:
 		_party_map.input = _input_manager()
-		_party_map.step(real_delta, table, seats_here, grid, _views_shown())
+		_party_map.step(real_delta, table, seats_here, grid, _views_shown().scaled_into(_layout_views, 1.0 / _party_map.transform.get_scale().x))
 
 
 ## The looks that draw what lies on a room's floor told where nothing is drawn (the dark's mask).

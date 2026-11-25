@@ -508,7 +508,7 @@ func test_one_player_is_framed_without_zoom() -> void:
 		return
 	# The limits changed, so the target moved: snap again to see the zoom alone.
 	_fit_and_snap()
-	check(is_equal_approx(camera.zoom.x, PartyCameraScript.MAX_ZOOM), "one player: no zoom out, got %f" % camera.zoom.x)
+	check(is_equal_approx(_zoom(camera), PartyCameraScript.MAX_ZOOM), "one player: no zoom out, got %f" % _zoom(camera))
 	check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player: %s vs %s" % [camera.position, _wizard(0).global_position])
 
 
@@ -530,8 +530,8 @@ func _four_spread() -> Array[Vector2]:
 func test_four_spread_players_are_zoomed_out_to_fit() -> void:
 	_four_spread()
 	var camera: Camera2D = party.camera
-	check(camera.zoom.x < PartyCameraScript.MAX_ZOOM, "four spread players: the camera zoomed out, got %f" % camera.zoom.x)
-	check(camera.zoom.x >= PartyCameraScript.MIN_ZOOM, "the zoom stays above the minimum")
+	check(_zoom(camera) < PartyCameraScript.MAX_ZOOM, "four spread players: the camera zoomed out, got %f" % _zoom(camera))
+	check(_zoom(camera) >= PartyCameraScript.MIN_ZOOM, "the zoom stays above the minimum")
 	check(_everyone_in_view(), "four spread players: everyone is in view")
 
 
@@ -539,8 +539,8 @@ func test_spread_players_keep_the_margin_from_the_views_edge() -> void:
 	var corners: Array[Vector2] = _four_spread()
 	var camera: Camera2D = party.camera
 	for slot in 4:
-		var offset: Vector2 = (corners[slot] - camera.position) * camera.zoom.x
-		check(absf(offset.x) <= VIEW.x * 0.5 - PartyCameraScript.CAMERA_MARGIN * camera.zoom.x + 0.01 or absf(offset.y) <= VIEW.y * 0.5 - PartyCameraScript.CAMERA_MARGIN * camera.zoom.x + 0.01, "slot %d keeps the margin from the view's edge on one axis" % slot)
+		var offset: Vector2 = (corners[slot] - camera.position) * _zoom(camera)
+		check(absf(offset.x) <= VIEW.x * 0.5 - PartyCameraScript.CAMERA_MARGIN * _zoom(camera) + 0.01 or absf(offset.y) <= VIEW.y * 0.5 - PartyCameraScript.CAMERA_MARGIN * _zoom(camera) + 0.01, "slot %d keeps the margin from the view's edge on one axis" % slot)
 
 
 func test_players_too_far_apart_stop_the_zoom_at_the_minimum() -> void:
@@ -548,7 +548,7 @@ func test_players_too_far_apart_stop_the_zoom_at_the_minimum() -> void:
 	_wizard(0).global_position = Vector2(-1000.0, 0.0)
 	_wizard(1).global_position = Vector2(2000.0, 0.0)
 	_fit_and_snap()
-	check(is_equal_approx(party.camera.zoom.x, PartyCameraScript.MIN_ZOOM), "far apart: the zoom stops at the minimum")
+	check(is_equal_approx(_zoom(party.camera), PartyCameraScript.MIN_ZOOM), "far apart: the zoom stops at the minimum")
 
 
 func test_players_back_together_zoom_back_in() -> void:
@@ -556,7 +556,7 @@ func test_players_back_together_zoom_back_in() -> void:
 	for slot in 4:
 		_wizard(slot).global_position = Vector2(300.0 + 4.0 * slot, 200.0)
 	_fit_and_snap()
-	check(is_equal_approx(party.camera.zoom.x, PartyCameraScript.MAX_ZOOM), "together again: the zoom is back to the default, got %f" % party.camera.zoom.x)
+	check(is_equal_approx(_zoom(party.camera), PartyCameraScript.MAX_ZOOM), "together again: the zoom is back to the default, got %f" % _zoom(party.camera))
 
 
 func test_a_downed_wizard_stays_in_the_picture() -> void:
@@ -600,7 +600,7 @@ func test_the_camera_arrives_at_its_target() -> void:
 	for i in 200:
 		_frame(0.1)
 	check(camera.position.distance_to(party.target_position) < 0.01, "the camera arrives at its target")
-	check(absf(camera.zoom.x - party.target_zoom) < 0.001, "the zoom arrives at its target")
+	check(absf(_zoom(camera) - party.target_zoom) < 0.001, "the zoom arrives at its target")
 
 
 func test_a_zero_or_negative_step_does_not_move_the_camera() -> void:
@@ -690,7 +690,7 @@ func test_with_one_seat_played_here_the_camera_holds_its_wizard_alone() -> void:
 		return
 	party.look(actors, 0b0001)
 	party.snap()
-	check(camera.position.is_equal_approx(_wizard(0).global_position) and is_equal_approx(camera.zoom.x, PartyCameraScript.MAX_ZOOM), "seat 0 alone plays here: the camera is on its wizard, not zoomed out (%s, %f)" % [camera.position, camera.zoom.x])
+	check(camera.position.is_equal_approx(_wizard(0).global_position) and is_equal_approx(_zoom(camera), PartyCameraScript.MAX_ZOOM), "seat 0 alone plays here: the camera is on its wizard, not zoomed out (%s, %f)" % [camera.position, _zoom(camera)])
 	check(not _in_view(_wizard(1)), "the wizard played on another machine may be out of the picture")
 
 
@@ -738,8 +738,8 @@ func test_feel_marks_the_teammate_out_of_the_picture_at_its_edge() -> void:
 	var markers: Node = feel.call("teammate_markers") as Node
 	check(markers != null and int(markers.get("count")) == 1 and int(markers.call("seat_of", 0)) == 1, "Feel marks the teammate out of the picture, and nobody else")
 	if markers != null and int(markers.get("count")) == 1:
-		var screen: Vector2 = party.visible_rect().size * party.camera.zoom.x
-		check(Rect2(Vector2.ZERO, screen).has_point(markers.call("position_of", 0) as Vector2), "the marker is on the screen (screen pixels)")
+		var screen: Vector2 = party.visible_rect().size * _zoom(party.camera)
+		check(Rect2(Vector2.ZERO, screen).has_point(markers.call("position_of", 0) as Vector2), "the marker is on the screen (layout pixels)")
 
 
 func test_with_no_seat_played_here_feels_camera_holds_whoever_is_left() -> void:
@@ -1138,3 +1138,9 @@ func test_the_pause_menus_stop_stands_apart_from_a_pad_wait() -> void:
 	check(game.is_stopped() and CoopScript.pad_waits(game) == 0, "the gamepad back leaves the pause menu's stop")
 	_command(&"pause_requested", [0, 0])
 	check(not game.is_stopped(), "the menu closing lets the game go")
+
+
+## The camera's zoom as the cameras count it: the world SIZE of a picture shows at zoom 1
+## (core/display/picture_grid.gd), whatever the picture's size.
+func _zoom(camera: Camera2D) -> float:
+	return camera.zoom.x / float(PictureGrid.scale_in(camera.get_viewport() if camera.is_inside_tree() else null))

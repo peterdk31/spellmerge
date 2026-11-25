@@ -43,7 +43,9 @@ extends ActorLook
 ## made the first time they are needed).
 
 
-## The head sheets: 48x48 frames, DIRECTIONS columns, one row per ramp (0-3), the grip at GRIP.
+## The head sheets: 48x48 frames, DIRECTIONS columns, one row per ramp (0-3), the grip at GRIP, in
+## world units; a sheet at 2x detail (ArtDetail, `head@2x.png`) has them twice as many art pixels and
+## is drawn at half its size.
 const FRAME_SIZE: int = 48
 const DIRECTIONS: int = 16
 const RAMPS: int = 4
@@ -151,8 +153,7 @@ func setup(owner_actor: Actor) -> void:
 			break
 	if _sprite != null:
 		_sprite.centered = true
-		# The frame's grip on the node's origin.
-		_sprite.offset = Vector2(FRAME_SIZE, FRAME_SIZE) * 0.5 - GRIP
+		_fit_head()
 	if _shadow == null:
 		_shadow = Node2D.new()
 		_shadow.name = "Shadow"
@@ -285,12 +286,33 @@ func _show_staff(at: int) -> void:
 	var staff: StaffBase = actor.caster.staff_of(at) if actor.caster != null else null
 	var head: Texture2D = staff.head if staff != null and staff.head != null else default_head
 	if _sprite != null and head != null:
+		# The dash's stretch kept; a pose's or a hit's squash is put on again by its own look.
+		var stretch: Vector2 = _dash_scale() if _dash_look else Vector2.ONE
 		_sprite.texture = head
 		_sprite.hframes = DIRECTIONS
 		_sprite.vframes = RAMPS
+		_fit_head(stretch)
+	if _face != null:
+		# A staff with no face of its own (or none on show) wears the shared sheets.
+		_face.wear_art(staff.face if staff != null else null)
 	if _face != null and staff != null:
 		_face.style = staff.face_style as Face.Style
 		_face.resting_mood = staff.resting_mood as Face.Mood
+
+
+## The head's frame on the hand: its grip on the node's origin, measured in the sheet's own art
+## pixels, and the sheet drawn at its size in the world (ArtDetail) times `stretch` (a dash's or an
+## animation's).
+func _fit_head(stretch: Vector2 = Vector2.ONE) -> void:
+	var detail: float = float(ArtDetail.of(_sprite.texture))
+	_sprite.offset = (Vector2(FRAME_SIZE, FRAME_SIZE) * 0.5 - GRIP) * detail
+	ArtDetail.fit(_sprite, stretch)
+
+
+## The sprite's stretch of the look's own (a dash's, an animation's): its scale without its art's
+## detail.
+func _sprite_stretch() -> Vector2:
+	return _sprite.scale * float(ArtDetail.of(_sprite.texture))
 
 
 ## The body on the hand (hovering), or flat on the floor while down, with the frame for the aim;
@@ -319,7 +341,7 @@ func _place_body(time: float) -> void:
 func tip_position() -> Vector2:
 	if _sprite == null:
 		return actor.muzzle_position()
-	return _sprite.global_transform * _tip_from_grip(_sprite.frame_coords.x)
+	return _sprite.global_transform * ArtDetail.to_art(_sprite.texture, _tip_from_grip(_sprite.frame_coords.x))
 
 
 ## The tip from the grip in the sprite's own frame (before its stretch and lean): `reach` along
@@ -349,7 +371,7 @@ func _landed(at: Vector2) -> Vector2:
 func contact_position() -> Vector2:
 	if _sprite == null:
 		return tip_position()
-	var tip: Vector2 = _tip_from_grip(_sprite.frame_coords.x) * _sprite.scale
+	var tip: Vector2 = _tip_from_grip(_sprite.frame_coords.x) * _sprite_stretch()
 	return tip_position() + (_contact_from_grip(tip, _drawn_hammer) - tip).rotated(_sprite.global_rotation)
 
 
@@ -408,7 +430,7 @@ func _place_hammer() -> void:
 	# head smushes by its own rule (`hammer_squash`), not the sprite's squash along a screen axis.
 	_hammer.position = _sprite.position
 	_hammer.rotation = _sprite.rotation
-	var tip: Vector2 = _tip_from_grip(direction()) * _sprite.scale
+	var tip: Vector2 = _tip_from_grip(direction()) * _sprite_stretch()
 	var tint: Color = poses.staff_glow_tint(actor.id)
 	var colour: Color = light_color() if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
 	var material := _hammer.material as ShaderMaterial
@@ -494,7 +516,7 @@ func _dash_lean() -> float:
 func _apply_dash_look(dashing: bool) -> void:
 	_dash_look = dashing
 	if _sprite != null:
-		_sprite.scale = _dash_scale() if dashing else Vector2.ONE
+		ArtDetail.fit(_sprite, _dash_scale() if dashing else Vector2.ONE)
 		_sprite.rotation = _dash_lean() if dashing else 0.0
 	_pose_ghosts()
 

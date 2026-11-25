@@ -163,6 +163,9 @@ static func check_staff(staff: StaffBase) -> Array[Dictionary]:
 		problems.append(_problem("required-field", file, "display_name", "Give it a name for the builder, for example \"Starter staff\"."))
 	for line in staff.range_problems():
 		problems.append(_problem("range", file, line.get_slice(":", 0), "%s. Change it to a value inside the range (documented next to the field)." % line))
+	if staff.face != null:
+		for line in staff.face.problems():
+			problems.append(_problem("face-art", file, "face", "Its face sheets cannot be drawn: %s Fix the sheets or the frame size." % line))
 	return problems
 
 

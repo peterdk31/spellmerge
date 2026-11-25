@@ -561,7 +561,8 @@ func test_a_pairs_half_has_a_straight_edge_beside_its_twin() -> void:
 			if divider:
 				line.append(x)
 		columns.append(line)
-	check_equal(columns[0].size(), SplitCameraScript.DIVIDER_WIDTH, "the line is its width beside the pair's top")
+	# Its width in layout pixels, each the picture's scale in picture pixels (PictureGrid).
+	check_equal(columns[0].size(), SplitCameraScript.DIVIDER_WIDTH * PictureGrid.scale_of(screen), "the line is its width beside the pair's top")
 	check_equal(columns[1], columns[0], "and in the same columns beside its twin")
 
 

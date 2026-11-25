@@ -1,0 +1,16 @@
+{
+	"id": "on_any_cast_echo",
+	"name": "The echo chamber",
+	"does": "A familiar circles the wizard and fires a frost bolt outward every time another staff casts, here three bolts fired away from the imps.",
+	"casts": [
+		{"staff": 0, "cards": ["on_any_cast", "familiar", "frost", "bolt"]},
+		{"staff": 1, "cards": ["atom"], "at": 0.4, "dir": [0, 1]},
+		{"staff": 1, "cards": ["atom"], "at": 0.8, "dir": [0, 1]},
+		{"staff": 1, "cards": ["atom"], "at": 1.2, "dir": [0, 1]}
+	],
+	"imps": [[70, 0], [0, -70], [-70, 0], [50, -50], [-50, -50]],
+	"entities": true,
+	"seconds": 2.5,
+	"needs": "on_any_cast",
+	"checks": [{"kind": "status_count", "status": "chill", "min": 1}]
+}

@@ -186,6 +186,17 @@ func press_at(step: int) -> void:
 	_later(step, func() -> void: brain.presses = [0])
 
 
+## The wizard casts a plain atom from a second staff, aimed behind it, after step `step` (`on any
+## cast`, staff-language L3: a cast of another staff, while its first staff is still busy).
+func cast_other_at(step: int) -> void:
+	_later(step, func() -> void:
+		if not is_instance_valid(wizard):
+			return
+		var cards: Array[StringName] = [&"atom"]
+		spells.install_staff(wizard.id, 1, spells.compile_staff(cards, _staff))
+		spells.cast_staff(wizard.id, 1, wizard.aim_pivot(), Vector2.LEFT, 1000.0))
+
+
 ## The wizard presses its staff once, at the first step an enemy shot is within `distance`
 ## pixels of its hand (so a carrier that touches shots only briefly, a swing, meets one).
 func press_when_shot_within(distance: float) -> void:

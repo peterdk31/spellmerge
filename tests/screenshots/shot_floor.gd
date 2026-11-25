@@ -44,7 +44,16 @@ func take() -> void:
 	await settle(60)
 	await _strip(middle, "floor_ice_strip", [0, 3, 6, 12, 24, 30, 36, 50], func() -> void: _touch(&"frost", middle, 30.0), 24, func() -> void: _touch(&"fire", middle, 18.0))
 	await settle(30)
-	await _strip(middle, "floor_steam_strip", [0, 3, 6, 12, 20, 32], func() -> void: _touch(&"fire", middle + LAKE[1], 18.0))
+	# Fresh water first (the lake has frozen and thawed by now), then fire on it: steam.
+	var steam_at: Vector2 = middle
+	_touch(&"water", steam_at, 24.0)
+	await settle(30)
+	await _strip(steam_at, "floor_steam_strip", [0, 3, 6, 12, 20, 32], func() -> void: _touch(&"fire", steam_at, 24.0))
+	var cover: Node = root.get_node("Cover")
+	var state: CoverState = cover.call("cover_state_at", (cover.get("layout") as CoverLayout).cell_of(steam_at))
+	if state == null or state.state_id != &"dry":
+		fail("fire on the fresh water did not steam it away (%s)" % (state.state_id if state != null else &"no cell"))
+		return
 	# A fresh run for the trail: the lake's lightning may have downed the wizard beside it.
 	flow.call("stop_run")
 	await settle(10)

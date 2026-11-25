@@ -18,7 +18,10 @@ func take() -> void:
 		return
 	var spells: Node = root.get_node("Spells")
 	var projectiles: Node = root.get_node("Projectiles")
-	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
+	# The world is drawn 1:1 in the picture (ART0), the sheet in layout pixels at `sheet_scale`:
+	# every world point below is a layout point times `k`.
+	var k: float = float(sheet_scale())
+	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN * k))
 	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
 	if actors == null:
 		fail("there is no Actors autoload")
@@ -32,7 +35,7 @@ func take() -> void:
 	lay_floor()
 	for at: Vector2 in [Vector2(330.0, 120.0), Vector2(330.0, 240.0), Vector2(420.0, 180.0)]:
 		var dummy := Node2D.new()
-		dummy.position = at
+		dummy.position = at * k
 		root.add_child(dummy)
 		place(DUMMY, 1.0, at)
 		projectiles.call("add_target", dummy, 10.0, 1)
@@ -40,10 +43,10 @@ func take() -> void:
 	label("staff 2: atom, cast three times (down): each cast sets the rune off", Vector2(20.0, 34.0))
 	spells.call("install_staff", wizard, 0, spells.call("compile_staff", RUNE, staff_base))
 	spells.call("install_staff", wizard, 1, spells.call("compile_staff", OTHER, staff_base))
-	projectiles.call("set_anchor", wizard, FROM)
-	spells.call("press_staff", wizard, 0, FROM, Vector2.RIGHT, 100.0)
+	projectiles.call("set_anchor", wizard, FROM * k)
+	spells.call("press_staff", wizard, 0, FROM * k, Vector2.RIGHT, 100.0)
 	for frame in SHOT_AT:
 		if CASTS_AT.has(frame):
-			spells.call("press_staff", wizard, 1, FROM, Vector2.DOWN, 100.0)
+			spells.call("press_staff", wizard, 1, FROM * k, Vector2.DOWN, 100.0)
 		await physics_frame
 	await shot("staff_any_cast_play")

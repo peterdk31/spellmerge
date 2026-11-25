@@ -72,6 +72,10 @@ extends Resource
 ## curl's). None: the shared sheets. Its `face_style` still sets the face's habits.
 @export var face: FaceArt = null
 
+## Drawn only (core/sim/README.md, "Steps"): a staff made in the game is walked with the state, and its
+## face sheets are no part of it (the state hash and snapshots never read them).
+const VIEW: Array[StringName] = [&"face"]
+
 
 ## The name shown: its own, else its id (items I6: a staff lying on the ground).
 func shown_name() -> String:

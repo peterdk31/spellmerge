@@ -130,11 +130,8 @@ func attach() -> void:
 		actor.events.mana_refund_requested.connect(_on_mana_refund)
 	if actor.events != null and not actor.events.mana_spend_requested.is_connected(_on_mana_spend):
 		actor.events.mana_spend_requested.connect(_on_mana_spend)
-	if actor.health != null and not actor.health.changed.is_connected(_on_health_changed):
-		actor.health.changed.connect(_on_health_changed)
 	if number < 0:
 		return
-	_tell_health()
 	own_hurtbox()
 	if not _built:
 		_built = true
@@ -168,24 +165,7 @@ func detach() -> void:
 		actor.events.mana_refund_requested.disconnect(_on_mana_refund)
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_spend_requested.is_connected(_on_mana_spend):
 		actor.events.mana_spend_requested.disconnect(_on_mana_spend)
-	if actor.health != null and is_instance_valid(actor.health) and actor.health.changed.is_connected(_on_health_changed):
-		actor.health.changed.disconnect(_on_health_changed)
 	_close_number()
-
-
-## Spells reads no health: a `hurt` condition (docs/milestones/staff-language.md, L2) reads the share
-## the Caster tells it, whenever the body's health changes.
-func _on_health_changed(_health: float, _max_health: float) -> void:
-	_tell_health()
-
-
-func _tell_health() -> void:
-	if number < 0 or actor.spells == null:
-		return
-	var share: float = 1.0
-	if actor.health != null and actor.health.max_health > 0.0:
-		share = actor.health.health / actor.health.max_health
-	actor.spells.sense_health(number, share)
 
 
 ## Mana back, the anchor and the aim to the systems, then the casts the intent asks for.

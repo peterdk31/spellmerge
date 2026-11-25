@@ -71,7 +71,7 @@ The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The pi
 2. **Name it `<name>@2x.<ext>`** and delete the old file (with its `.import`; rename the `.import` to the new name and fix its `source_file` to keep the texture's uid, or let Godot make a new one). The name is the whole rule (`ArtDetail`, core/display/art_detail.gd): the game draws it at half size. Point what loaded the old file at the new one (a `.tres`, a `.tscn`, a `preload`); `grep -rn "<old path>"` finds them.
 3. **Check what reads its pixels.** Anything that measures the art in pixels and was written for 1x (a size check in a test, a crop, a script reading pixel positions) multiplies by `ArtDetail.of(texture)`. Sprites, faces (`FaceArt`), the staff's head, `TexturePage` regions and the cover's batches take the rule already. A look that drew the texture another way (a `draw_texture_rect`, a MultiMesh of its own, a shader that sizes its quad from the texture) takes it the same way: its rect `ArtDetail.size_of(texture)`, its quad `ArtDetail.quad_size(texture, frame_px)`, a sprite's scale `ArtDetail.fit(sprite, pose)` (a look's own stretch times the detail; `sprite.scale * ArtDetail.of(texture)` is the stretch back).
 4. **List it** in its folder's `assets.json` (or `art/manifest.json`) with origin, tool and prompt (no living artists or franchises), as before.
-5. **Look at it in the game**, at zoom 1 (a small room, like the screenshots' arena) and at the resting zoom 0.8: a one-pixel line breaks at 0.8 now and then (one art pixel in five is left out there), so lines that must always read are two art pixels. `tests/screenshots/shot_art_detail.gd` shows the curl beside a 1x staff in play, at both zooms; copy it for a side by side of your sprite. Add the screenshots to the PR.
+5. **Look at it in the game**, at the resting zoom 1 (every art pixel shows) and zoomed out as the camera holds a spread party (0.8 down to 0.5): a one-pixel line breaks there now and then (one art pixel in five is left out at 0.8), so lines that must read even then are two art pixels. `tests/screenshots/shot_art_detail.gd` shows the curl beside a 1x staff in play, at zoom 1 and at 0.8; copy it for a side by side of your sprite. Add the screenshots to the PR.
 
 **Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
 
@@ -82,6 +82,6 @@ A generator may draw it (palette colours; an SVG of rects, one a run along a row
 Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it match the style guide: palette, light from the top-left, outline rules, frame counts?
-- Is it readable at its size in the world (32 units, at zoom 1 and at the resting 0.8), next to other art and with four players on screen?
+- Is it readable at its size in the world (32 units, at the resting zoom 1 and zoomed out to 0.8), next to other art and with four players on screen?
 - Redrawn at 2x: is it named `@2x`, the same layout at twice the pixels, and does it keep its silhouette?
 - Is the origin recorded honestly in the manifest?

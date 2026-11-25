@@ -2,17 +2,19 @@ extends "res://tests/support/screenshot.gd"
 ## The 1280 x 720 picture and mixed art (ART0, docs/STYLE.md, "The picture and the art's detail"):
 ## the curl, redrawn at 2x detail (its head and the Optimist's face, drawn at half size), beside the
 ## star, still 32-unit art drawn twice as big, in play; the room around them (enemies, props, floor:
-## today's art) with the curl in it; and the same at the cameras' resting zoom, 0.8.
+## today's art) with the curl in it, at the cameras' resting zoom, 1; and zoomed out to 0.8, as the
+## camera holds a spread party.
 ##
 ## Shots: `art_detail_wizards` (two wizards, the curl on seat 1's left and the star on seat 2's
 ## right, both aiming up and right) with a crop of the two at 4x (`art_detail_wizards_crop`) and of
 ## each; `art_detail_mixed_room` (a fight: the curl among the room's enemies and props) and its crop,
-## at zoom 1 (this small room is seen closer: two picture pixels a world pixel, every 32-unit art
-## pixel a 2x2 block, every 2x art pixel one); `art_detail_zoom_08` and its crop, the cameras' resting
-## zoom in a bigger room (1.6 picture pixels a world pixel).
+## at the resting zoom 1 (two picture pixels a world pixel, every 32-unit art pixel a 2x2 block,
+## every 2x art pixel one); `art_detail_zoom_08` and its crop, zoomed out to 0.8 as for a spread party
+## (1.6 picture pixels a world pixel; it was the resting zoom until 2026-11-25).
 
 
-const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+## The zoom shown zoomed out (PartyCamera's, between MIN_ZOOM and MAX_ZOOM).
+const ZOOMED_OUT: float = 0.8
 
 
 func take() -> void:
@@ -58,9 +60,9 @@ func take() -> void:
 	image = await grab()
 	save(image, "art_detail_mixed_room")
 	save_crop(image, on_screen(wizards[0].global_position + Vector2(0.0, -14.0)), "art_detail_mixed_room_crop", Vector2i(80, 45), 4)
-	# The cameras' resting zoom, 0.8 (PartyCamera.MAX_ZOOM; this small room is seen at 1): Feel held
-	# for the frame, as its party camera eases the zoom back every frame. 1.6 picture pixels a world
-	# pixel: every 32-unit art pixel one or two, a 2x art pixel one in five left out.
+	# Zoomed out to 0.8, as the camera holds a spread party (the resting zoom until 2026-11-25): Feel
+	# held for the frame, as its party camera eases the zoom back every frame. 1.6 picture pixels a
+	# world pixel: every 32-unit art pixel one or two, a 2x art pixel one in five left out.
 	var camera: Camera2D = root.get_viewport().get_camera_2d()
 	if camera == null:
 		fail("no camera for art_detail_zoom_08")
@@ -68,7 +70,7 @@ func take() -> void:
 	print("SHOT: the camera rests at zoom %.2f of the picture here" % camera.zoom.x)
 	var feel: Node = root.get_node("Feel")
 	feel.set_process(false)
-	camera.zoom = Vector2.ONE * (PartyCameraScript.MAX_ZOOM * float(PictureGrid.scale_in(root)))
+	camera.zoom = Vector2.ONE * (ZOOMED_OUT * float(PictureGrid.scale_in(root)))
 	camera.position = wizards[0].global_position
 	await settle(2)
 	image = await grab()

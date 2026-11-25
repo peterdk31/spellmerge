@@ -37,8 +37,8 @@ func _soaked(at: Vector2) -> Actor:
 
 
 ## A caster of `siphon · lightning · <carrier>` aiming right, its staff's tip at `muzzle`.
-func _caster(muzzle: Vector2, carrier: StringName) -> Actor:
-	var caster: Actor = _world.actor(muzzle, [&"caster"], Fixture.Scripted.new(), [[&"siphon", &"lightning", carrier]])
+func _caster(muzzle: Vector2, carrier: StringName, kinds: Array[StringName] = [&"caster"]) -> Actor:
+	var caster: Actor = _world.actor(muzzle, kinds, Fixture.Scripted.new(), [[&"siphon", &"lightning", carrier]])
 	caster.aim = Vector2.RIGHT
 	caster.position += muzzle - caster.muzzle_position()
 	return caster
@@ -96,21 +96,20 @@ func test_the_floors_current_pays_its_siphon_too() -> void:
 	check_equal(_refunds.size(), 2, "Siphon paid for the body the floor struck and the one its Current ran to")
 
 
-func test_a_current_running_to_a_friend_pays_nothing() -> void:
+func test_a_current_running_to_its_caster_pays_nothing() -> void:
 	var muzzle := Vector2(100.0, 100.0)
-	var caster: Actor = _caster(muzzle, &"bolt")
+	var caster: Actor = _caster(muzzle, &"bolt", [&"caster", &"health", &"hurtbox"] as Array[StringName])
+	caster.health.max_health = 1000.0
+	caster.health.reset(1000.0)
 	var hit: Actor = _soaked(muzzle + Vector2(60.0, 0.0))
 	check(caster.caster.cast(0), "cast")
 	# The caster itself stands soaked within the Current's reach of the body it hits.
 	_world.combat.apply_status(-1, caster, &"soak", 30.0, 25.0)
 	_world.run(16)
-	var ran: Array = _struck_bodies(caster)
-	var paid_for_self: int = 0
-	for heard: Array in ran:
-		paid_for_self += 1
-	check(paid_for_self <= 1, "the Current may run to its caster")
+	check(not _struck_bodies(caster).is_empty(), "the Current ran to its caster")
+	check(is_instance_valid(hit), "the body hit stands")
 	var paid: int = 0
 	for refund: Array in _refunds:
-		paid += 1
-	check(paid <= 1, "but Siphon pays only for the foe hit, not for its own body (%d refunds)" % paid)
-	check(is_instance_valid(hit), "the body hit stands")
+		if refund[0] == caster.caster_number():
+			paid += 1
+	check_equal(paid, 1, "Siphon paid for the foe hit, not for its caster's own body")

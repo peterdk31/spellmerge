@@ -1572,10 +1572,10 @@ func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow, spell_t
 				# A listener may have changed the registrations.
 				other = _row_of_node(other_node)
 			if other != ActorsScript.NONE:
-				_hit(by, other, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
-				# The body the Current ran to is struck as the hit of the spell that set it off (the
-				# owner, 2026-11-25: its Siphon pays for it, whatever the carrier).
-				if spell_tag != 0 and events != null and is_instance_valid(other_node):
+				var landed: bool = _hit(by, other, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
+				# The body the Current ran to and hurt is struck as the hit of the spell that set it
+				# off (the owner, 2026-11-25: its Siphon pays for it, whatever the carrier).
+				if landed and spell_tag != 0 and events != null and is_instance_valid(other_node):
 					events.reaction_struck.emit(by, reaction.reaction_id, other_node, spell_tag)
 		_give_scratch()
 	if _same(row, node):

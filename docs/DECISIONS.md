@@ -5,7 +5,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-11-25: Siphon pays for the Current (owner decision)
 
 - **The owner:** every foe the Current hits, spread from a live lake, a bolt or any other carrier's Current, pays the caster's Siphon, as the caster's hit.
-- **Where reactions now credit their source:** Combat's Current (`ReactionRow.Effect.CONDUCT`, `_conduct`) sends `reaction_struck(caster, reaction, target, tag)` for each body it runs to, with the tag of the spell whose hit set it off; Spells pays that spell's Siphon for a foe struck so (`_siphon_struck`, the same rule as the floor's strike: a foe, never the caster's own body). The other reactions (bursts, spreads, the static discharge) credit no spell, as before; their kills stay no spell's own, but for the floor's Current (floor.md).
+- **Where reactions now credit their source:** Combat's Current (`ReactionRow.Effect.CONDUCT`, `_conduct`) sends `reaction_struck(caster, reaction, target, tag)` for each body it runs to and hurts (a barrier that takes it pays nothing), with the tag of the spell whose hit set it off; Spells pays that spell's Siphon for a foe struck so (`_siphon_struck`, the same rule as the floor's strike: a foe, never the caster's own body). The other reactions (bursts, spreads, the static discharge) credit no spell, as before; their kills stay no spell's own, but for the floor's Current (floor.md).
 - Tests: `tests/core/test_siphon_current.gd` (a shot, a ray, a sweep and the floor).
 
 ## 2026-11-25: everything touches the floor as it passes, and a cell remembers who lit it (owner decisions; the floor's first slice)

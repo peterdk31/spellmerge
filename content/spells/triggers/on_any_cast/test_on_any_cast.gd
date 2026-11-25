@@ -4,6 +4,7 @@ extends "res://tests/support/suite.gd"
 ## the carrier is. Never for the cast that made it, never for another actor's casts, and never for a
 ## payload (no cast), so two of them cannot set each other off.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 
 func _card() -> TriggerBase:
@@ -60,6 +61,44 @@ func test_another_actor_s_cast_does_not() -> void:
 func test_it_fires_every_time() -> void:
 	var counts: PackedInt32Array = _counts([[0, 1, 0.1], [0, 1, 0.5]])
 	check(counts[2] >= counts[1] + 2, "a second cast fires it again: %s" % [counts])
+
+
+func test_its_own_staff_s_next_cast_sets_it_off() -> void:
+	var counts: PackedInt32Array = _counts([[0, 0, 0.5]])
+	check(counts[1] >= counts[0] + 2, "the staff's own next rune and the first rune's answer: %s" % [counts])
+
+
+func test_a_payload_is_no_cast() -> void:
+	# Two runes that answer with a payload of their own On Any Cast rune never set each other off.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["on_any_cast", "rune", "on_any_cast", "rune", "bolt"])
+	arena.install_cards(0, 1, ["atom"])
+	check(arena.cast(0, 0), "the first rune")
+	arena.run(0.1)
+	check(arena.cast(0, 1, Vector2.LEFT), "another staff casts")
+	arena.run(0.05)
+	var after_one: int = arena.projectiles.get_count()
+	arena.run(0.5)
+	check(arena.projectiles.get_count() <= after_one, "the answering rune fires nothing by itself: %d then %d" % [after_one, arena.projectiles.get_count()])
+	arena.free_all()
+
+
+func test_a_cast_that_never_leaves_sets_nothing_off() -> void:
+	# Every shot of staff 1 would start inside a wall: no cast left, no mana paid, so no answer.
+	var arena := ArenaScript.new(root)
+	arena.add_wall(Rect2(-200.0, 20.0, 400.0, 200.0))
+	arena.install_cards(0, 0, ["on_any_cast", "rune", "bolt"])
+	arena.install_cards(0, 1, ["atom"])
+	check(arena.cast(0, 0), "the rune is laid ahead, clear of the wall")
+	arena.run(0.1)
+	var before: int = arena.projectiles.get_count()
+	var origin := Vector2(0.0, 60.0)
+	arena.projectiles.set_anchor(0, origin)
+	var spent: float = arena.spells.cast_staff(0, 1, origin, Vector2.DOWN, 100.0)
+	arena.run(0.02)
+	check_equal(spent, SpellsScript.REFUSED, "the cast in the wall is refused")
+	check_equal(arena.projectiles.get_count(), before, "and the rune does not answer it")
+	arena.free_all()
 
 
 func test_it_works_on_a_carrier_that_lasts() -> void:

@@ -1417,13 +1417,15 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		_leaving = cast
 		events.cast_left.emit(actor, staff)
 		_leaving = outer
-	# `on any cast` (L3): every live carrier of this caster with it fires, before this cast's shots
-	# start, so none hears the cast that made it.
-	_any_cast(actor)
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
+	# The live carriers listed before this cast's own join: only they hear it (L3).
+	var heard: int = _lc_count
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
+	# `on any cast` (L3): a cast that left (one whose every shot started in a wall is no cast) sets
+	# off every live carrier of this caster with it, listed before it, so none hears the cast that made it.
+	_any_cast(actor, heard)
 	_cast_count[index] += 1
 	_pour_until[index] = _clock + cast.delay + POUR_GRACE if _carrier_of(cast.group.spells[0]).pours_held() else -1.0
 	_after_cast(index, compiled, cast)
@@ -3585,9 +3587,9 @@ func recast_staff(actor: int, staff: int) -> int:
 ## leaving (`_leave`). Every live carrier that caster cast with that trigger fires its payload from
 ## where it is now, as `on recast` does on a press. Payloads may list more such carriers; they sit
 ## past the count taken first and wait for the next cast. Returns how many fired.
-func _any_cast(actor: int) -> int:
+func _any_cast(actor: int, heard: int) -> int:
 	var fired: int = 0
-	var count: int = _lc_count
+	var count: int = mini(heard, _lc_count)
 	for i in count:
 		var tag: int = _lc_tag[i]
 		if SpellTag.caster_of(tag) != actor:

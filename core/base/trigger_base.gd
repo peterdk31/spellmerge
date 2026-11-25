@@ -38,8 +38,9 @@ enum Event {
 	NEAR,
 	## While the carrier lives, any staff of its caster casts (its own staff too; a cast leaving,
 	## `Spells._leave`, where `cast_left` is sent): the payload fires from where the carrier is then
-	## (docs/milestones/staff-language.md, L3). Heard before the leaving cast's shots start, so a
-	## carrier never hears the cast that made it; a payload is no cast, so two of them never set each
+	## (docs/milestones/staff-language.md, L3). Heard once the cast's shots started (a cast whose
+	## every shot starts in a wall is no cast), by the carriers listed before it, so a carrier never
+	## hears the cast that made it; a payload is no cast, so two of them never set each
 	## other off. The echo chamber: `on any cast · familiar · bolt`.
 	ANY_CAST,
 }

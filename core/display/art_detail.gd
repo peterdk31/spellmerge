@@ -23,7 +23,9 @@ extends RefCounted
 ## rounds a place to whole pixels rounds it to its art's pixels (`snap`): a 2x sprite moves by half
 ## world units, which are whole pixels of the 1280 picture.
 
-## The end of a file's base name that says its art has 2 art pixels a world unit.
+## Art pixels a world unit of redrawn art (d; the owner's choice of 2026-11-25: 64 px a 32-unit
+## cell), and the end of a file's base name that says a texture has them.
+const DETAIL: int = 2
 const SUFFIX_2X: String = "@2x"
 ## The metadata a texture made in the game carries its detail under (`mark`).
 const META: StringName = &"art_detail"
@@ -37,7 +39,7 @@ static func of(texture: Texture2D) -> int:
 	if texture.has_meta(META):
 		return maxi(int(texture.get_meta(META)), 1)
 	if texture.resource_path.get_file().get_basename().ends_with(SUFFIX_2X):
-		return 2
+		return DETAIL
 	var atlas := texture as AtlasTexture
 	if atlas != null and atlas.atlas != null:
 		return of(atlas.atlas)

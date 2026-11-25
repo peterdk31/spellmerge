@@ -23,6 +23,11 @@ extends RefCounted
 ## The picture's size at which the cameras' zoom is 1, and the layout's size (px; a view's share of
 ## it).
 const SIZE: Vector2i = Vector2i(640, 360)
+## How many times SIZE the shipped picture is each way (k; the owner's choice of 2026-11-25: 2, a
+## 1280 x 720 picture). project.godot's viewport is SIZE times it (`tests/core/test_picture_grid.gd`
+## holds the two together); everything else reads the picture's own size (`scale_of`), so a
+## benchmark's other picture works too.
+const PICTURE_SCALE: int = 2
 
 
 ## How many picture pixels each way one pixel of SIZE is in a picture of `picture` px: the largest

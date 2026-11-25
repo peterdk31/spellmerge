@@ -66,3 +66,22 @@ func test_the_action_toggles() -> void:
 	press.pressed = true
 	display._unhandled_input(press)
 	check(display.is_fullscreen(), "F11 fills the screen")
+
+
+## The owner's decision of 2026-11-25: whole numbers where they fill the screen, a fraction (aspect
+## kept, hard pixels) where they would leave it mostly empty: 1080p shows the 1280 x 720 picture 1.5
+## times; 720p, 1440p and 4K stay whole; a 1366 x 768 laptop keeps its thin borders; a window smaller
+## than the picture shrinks it.
+func test_the_picture_is_stretched_by_whole_numbers_unless_they_leave_the_screen_empty() -> void:
+	var picture := Vector2(1280.0, 720.0)
+	var whole: int = Window.CONTENT_SCALE_STRETCH_INTEGER
+	var fraction: int = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
+	check_equal(int(DisplayScript.stretch_for(Vector2(1280.0, 720.0), picture)), whole, "720p: once")
+	check_equal(int(DisplayScript.stretch_for(Vector2(1920.0, 1080.0), picture)), fraction, "1080p: 1.5 times, not once in a frame")
+	check_equal(int(DisplayScript.stretch_for(Vector2(2560.0, 1440.0), picture)), whole, "1440p: twice")
+	check_equal(int(DisplayScript.stretch_for(Vector2(3840.0, 2160.0), picture)), whole, "4K: three times")
+	check_equal(int(DisplayScript.stretch_for(Vector2(1366.0, 768.0), picture)), whole, "1366 x 768: once, nearly full")
+	check_equal(int(DisplayScript.stretch_for(Vector2(1920.0, 1200.0), picture)), fraction, "1920 x 1200: a fraction")
+	check_equal(int(DisplayScript.stretch_for(Vector2(1000.0, 600.0), picture)), fraction, "a small window: shrunk")
+	var root_window: Window = root
+	check_equal(int(root_window.content_scale_stretch), int(DisplayScript.stretch_for(Vector2(root_window.size), Vector2(root_window.content_scale_size))), "the game's window follows the rule")

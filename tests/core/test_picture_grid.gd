@@ -8,8 +8,10 @@ extends "res://tests/support/suite.gd"
 func test_the_project_draws_1280_by_720_at_whole_numbers() -> void:
 	check_equal(int(ProjectSettings.get_setting("display/window/size/viewport_width")), 1280, "1280 wide")
 	check_equal(int(ProjectSettings.get_setting("display/window/size/viewport_height")), 720, "720 tall")
+	check_equal(Vector2i(int(ProjectSettings.get_setting("display/window/size/viewport_width")), int(ProjectSettings.get_setting("display/window/size/viewport_height"))), PictureGrid.SIZE * PictureGrid.PICTURE_SCALE, "the layout times PICTURE_SCALE")
+	check_equal(ArtDetail.DETAIL, PictureGrid.PICTURE_SCALE, "redrawn art has a picture pixel an art pixel at zoom 1")
 	check_equal(str(ProjectSettings.get_setting("display/window/stretch/mode")), "viewport", "drawn into a picture of its own")
-	check_equal(str(ProjectSettings.get_setting("display/window/stretch/scale_mode")), "integer", "stretched by whole numbers")
+	check_equal(str(ProjectSettings.get_setting("display/window/stretch/scale_mode")), "integer", "stretched by whole numbers (Display stretches by a fraction where they would leave the screen mostly empty)")
 	check(bool(ProjectSettings.get_setting("rendering/2d/snap/snap_2d_transforms_to_pixel")), "every place on the picture's whole pixels")
 	check_equal(PictureGrid.scale_of(Vector2(1280.0, 720.0)), 2, "twice the layout")
 	check_equal(PictureGrid.scale_of(Vector2(640.0, 360.0)), 1, "a 640 x 360 picture (a benchmark's) once")

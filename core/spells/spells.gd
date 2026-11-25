@@ -788,6 +788,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.caster_move_finished.disconnect(_moves.finished)
 		events.room_left.disconnect(_on_room_left)
 		events.floor_strike_requested.disconnect(_on_floor_strike)
+		events.reaction_struck.disconnect(_on_reaction_struck)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -795,6 +796,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		projectiles.wall_met.connect(_on_wall_met)
 	if events != null:
 		events.floor_strike_requested.connect(_on_floor_strike)
+		events.reaction_struck.connect(_on_reaction_struck)
 		events.projectile_hit.connect(_on_hit)
 		events.projectile_expired.connect(_on_expired)
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -4059,11 +4061,23 @@ func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
 ## a Siphon on that spell refunds `caster` as for its carrier's hit (the kill is Combat's
 ## `kill_landed`, heard as any).
 func _on_floor_strike(caster: int, target: Node, _element: StringName, _damage: float, tag: int) -> void:
+	_siphon_struck(caster, target, tag)
+
+
+## A reaction the hit of `caster`'s spell of `tag` set off ran on to `target` (`reaction_struck`:
+## Current, from any carrier's hit or the floor's): a Siphon on that spell pays, as for its own hit
+## (the owner, 2026-11-25).
+func _on_reaction_struck(caster: int, _reaction_id: StringName, target: Node, tag: int) -> void:
+	_siphon_struck(caster, target, tag)
+
+
+## A Siphon on the spell of `tag` pays `caster` for `target`, struck as that spell's: only a foe
+## (as a carrier's hits find foes), never the caster's own body or a friend's.
+func _siphon_struck(caster: int, target: Node, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag) if SpellTag.is_spell_tag(tag) else null
 	if spell == null:
 		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
-	# Only a foe struck pays (as a carrier's hits find foes): never the caster's own body or a friend's.
 	var struck := target as Actor
 	if refund > 0.0 and actors != null and struck != null and is_instance_valid(struck) and struck.caster_number() != caster and ActorsScript.is_foe(actors.team_of(caster), actors.team_of(struck.caster_number())):
 		_refund(caster, SpellTag.staff_of(tag), refund)

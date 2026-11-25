@@ -388,9 +388,8 @@ func _apply_touches() -> void:
 	if passes > 0:
 		# Each passing touch's room first (one look-up each), then each room's in one loop.
 		_pass_room.resize(passes)
-		var any: PackedByteArray = _pass_any
-		any.resize(_rooms.size())
-		any.fill(0)
+		_pass_any.resize(_rooms.size())
+		_pass_any.fill(0)
 		# `room_at`'s rule, its look-ups hoisted (a tick may bring a touch for every shot): the grid's
 		# place where the world has places, else the room that holds it, the last one first.
 		var grid: RoomGrid = projectiles.grid() if projectiles != null else null
@@ -415,11 +414,10 @@ func _apply_touches() -> void:
 						break
 			_pass_room[t] = number
 			if number >= 0:
-				any[number] = 1
+				_pass_any[number] = 1
 		for number in _rooms.size():
-			if any[number] != 0:
+			if _pass_any[number] != 0:
 				_rooms[number].touch_cells(_pass_elements, _pass_at, _pass_actor, _pass_tag, _pass_room, number, 0, passes)
-		_pass_any = any
 	_clear_touches()
 
 

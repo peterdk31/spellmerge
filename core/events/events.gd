@@ -543,8 +543,9 @@ signal room_built(room_id: StringName, room: int, layout_root: Node)
 ## and secret rocks (Flow) and their looks. Spells knows nothing of cover.
 signal floor_touched(caster: int, element: StringName, at: Vector2, radius: float, tag: int)
 ## Sender: core/spells (the floor's first slice, docs/milestones/floor.md; the owner, 2026-11-25:
-## everything touches the floor as it passes). What passed over the floor this tick, once a tick
-## after Spells' step when anything did: entry n is the element `elements[n]` over the one cell under
+## everything touches the floor as it passes). What passed over the floor since the last, at the end
+## of Spells' step when anything did (a beam or a swing launched later in a tick touches as it starts
+## and is sent with the next tick's): entry n is the element `elements[n]` over the one cell under
 ## `at[n]`, by the actor `casters[n]` with the spell of `tags[n]`: every live shot of an element as it
 ## enters a new cell (`Projectiles.trail_slot`, in slot order), then a beam's end, a dash's way and
 ## a swing's tip, in their steps' order. One entry an element. The arrays are Spells' own, written in

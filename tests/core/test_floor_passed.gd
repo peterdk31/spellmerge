@@ -135,3 +135,31 @@ func test_a_swing_touches_along_its_tip() -> void:
 	_world.run(40)
 	check(_cells_of(&"fire").size() >= 2, "the cells its tip swept (%d)" % _cells_of(&"fire").size())
 	check(_passed.size() >= 3, "along its sweep, not only at its end (%d)" % _passed.size())
+
+
+## Regression (the floor slice's review): a beam launched after Spells' step (a body's press) touched
+## the floor as it started into a scratch kept out of the state, so a snapshot then lost it.
+func test_what_passed_waits_for_its_send_as_state() -> void:
+	for member: StringName in [&"_pass_casters", &"_pass_tags", &"_pass_elements", &"_pass_at"]:
+		check(not SpellRuntime.DERIVED.has(member), "%s is state" % member)
+	_cast([&"water", &"beam"])
+	check(_world.spells.get("_pass_elements").size() > 0, "a beam pressed between two steps touches as it starts")
+	_world.run(1)
+	check(_sent == 1 and _passed.size() >= 2, "sent with the next tick's (%d entries)" % _passed.size())
+
+
+## Regression (the floor slice's review): a Siphon on the spell that lit live water refunded for every
+## body it struck, its caster's own too.
+func test_a_floor_strike_refunds_a_siphon_for_another_body_only() -> void:
+	var caster: Actor = _cast([&"siphon", &"lightning", &"bolt"])
+	var tag: int = -1
+	for s in _world.projectiles.get_cap():
+		if _world.projectiles.is_alive(s) and _world.projectiles.get_actor_of(s) == caster.caster_number():
+			tag = _world.projectiles.get_tag_of(s)
+	check(tag > 0, "the bolt flies")
+	caster.caster.set_mana(0, 0.0)
+	_world.bus.floor_strike_requested.emit(caster.caster_number(), caster, &"lightning", 4.0, tag)
+	check_equal(caster.caster.mana_of(0), 0.0, "its own body struck: nothing")
+	var other: Actor = _world.actor(Vector2(300.0, 300.0), [&"health", &"hurtbox"], Fixture.Scripted.new())
+	_world.bus.floor_strike_requested.emit(caster.caster_number(), other, &"lightning", 4.0, tag)
+	check(caster.caster.mana_of(0) > 0.0, "another body struck: refunded (%s)" % caster.caster.mana_of(0))

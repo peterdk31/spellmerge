@@ -243,7 +243,7 @@ func touch(element_name: StringName, at: Vector2, radius: float, actor: int = Ev
 
 ## The passing touches `first` to `last` - 1 of `elements`, `at`, `actors`, `tags` whose room is this
 ## one (`rooms[n]` == `number`; the cover area's queue, `floor_passed`): each on the one cell under it,
-## in order, as `touch_cell`. The loop of a tick with every shot touching: its tables read here.
+## in order, as a touch of no radius on it. The loop of a tick with every shot touching: its tables read here.
 func touch_cells(elements: Array[StringName], at: PackedVector2Array, actors: PackedInt32Array, tags: PackedInt64Array, rooms: PackedInt32Array, number: int, first: int, last: int) -> void:
 	var cells: PackedByteArray = layout.cells
 	var to_table: PackedInt32Array = _moves.to_table
@@ -278,24 +278,6 @@ func touch_cells(elements: Array[StringName], at: PackedVector2Array, actors: Pa
 			_enter(cell, to, actors[t], tags[t])
 		elif renew_table[index] != 0:
 			_renew(cell, actors[t], tags[t])
-
-
-## `element` passed over the cell under `at` (world pixels; `floor_passed`): that one cell, as a touch
-## of no radius.
-func touch_cell(element_name: StringName, at: Vector2, actor: int, tag: int) -> void:
-	var cell: int = layout.cell_of(at)
-	if cell < 0:
-		return
-	var kind: int = layout.cells[cell] - 1
-	var element: int = _moves.element(element_name)
-	if kind < 0 or element < 0:
-		return
-	var index: int = (kind * _moves.width + _state[cell]) * _moves.elements.size() + element
-	var to: int = _moves.to_table[index]
-	if to >= 0:
-		_enter(cell, to, actor, tag)
-	elif _moves.renew_table[index] != 0:
-		_renew(cell, actor, tag)
 
 
 ## The cells not at rest count on (README, "The step", 2), rolling with `game` keyed by the room's

@@ -203,7 +203,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_leaving", &"_pass_casters", &"_pass_tags", &"_pass_elements", &"_pass_at"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_leaving"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -300,8 +300,10 @@ var _fires_used: PackedInt32Array = PackedInt32Array()
 ## `CoverLayout.CELL`), at most PASS_MOST times a step (a blink's way is touched at its end).
 const PASS_SPACING: float = 16.0
 const PASS_MOST: int = 64
-## Scratch: what passed over the floor this tick (`floor_passed`, the floor's first slice), sent once
-## at the step's end and emptied: each entry's caster, its spell's tag, its element and where.
+## What passed over the floor since the last send (`floor_passed`, the floor's first slice), sent at
+## Spells' step's end and emptied: each entry's caster, its spell's tag, its element and where.
+## State, not scratch: a beam or a swing launched after Spells' step (a body's press, a payload in
+## Combat) touches as it starts, and that entry waits for the next tick's send, through a snapshot.
 var _pass_casters: PackedInt32Array = PackedInt32Array()
 var _pass_tags: PackedInt64Array = PackedInt64Array()
 var _pass_elements: Array[StringName] = []
@@ -2085,8 +2087,8 @@ func _touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float, 
 
 ## The shots the projectile manager's last step handed back as entering a new floor cell
 ## (`Projectiles.trail_slot`, in slot order): each element of what each hits with (a relay's, an
-## infusion's) passes over the floor along its step's way (a fast shot crosses more than a cell a
-## step: every cell it crossed is touched).
+## infusion's) passes over the floor along its step's way, every 16 px (a fast shot crosses more than a
+## cell a step: no gap is left along its line).
 func _trail_shots() -> void:
 	if projectiles == null:
 		return
@@ -4006,7 +4008,9 @@ func _on_floor_strike(caster: int, target: Node, _element: StringName, _damage: 
 	if spell == null:
 		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
-	if refund > 0.0:
+	# Only a foe struck pays (as a carrier's hits find foes): never the caster's own body or a friend's.
+	var struck := target as Actor
+	if refund > 0.0 and actors != null and struck != null and is_instance_valid(struck) and struck.caster_number() != caster and ActorsScript.is_foe(actors.team_of(caster), actors.team_of(struck.caster_number())):
 		_refund(caster, SpellTag.staff_of(tag), refund)
 		var body := target as Node2D
 		if body != null and is_instance_valid(body):

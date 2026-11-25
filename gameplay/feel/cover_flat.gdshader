@@ -15,10 +15,11 @@ shader_type canvas_item;
 //
 // A state's motion (`motions` .x; CoverState.FlatMotion), played from when the cell began to show
 // it over .y frames at .z a second (.w above 0.5: looping): STILL; GROW, its shape inset from its
-// outer sides by INSET_MOST * (frames - 1 - frame) / frames px, so it grows in by steps; SHRINK, inset
+// sides by INSET_MOST * (frames - 1 - frame) / frames px (all four while it plays: a cell of its
+// own), so it grows in by steps; SHRINK, inset
 // by INSET_MOST * (frame + 1) / frames, so it ends gone; CRACKLE, sparks of `sparks` on pixels a hash
 // of the pixel and the frame picks. While a state grows or shrinks, `unders` (alpha above 0) is
-// drawn whole where it is not: ice over the water it freezes, growing from its own material's edge.
+// drawn whole (joined to its neighbours) where it is not: ice over the water it freezes.
 
 const float CELL = 16.0;
 const int INSET_MOST = 8;
@@ -100,19 +101,10 @@ void fragment() {
 	} else if (kind == 2) {
 		inset = (INSET_MOST * (frame + 1)) / frames;
 	}
-	// A state drawn over another (`unders`: ice over water) grows or shrinks from its own material's
-	// edge, so ice spreads over a lake by steps too, not only from the lake's shore.
-	int at = 0;
-	if (inset > 0 && unders[s].a > 0.0) {
-		vec4 own = fills[s];
-		int ml = (open_l && fills[state_of(cell + ivec2(-1, 0), size)] == own) ? 99 : f.x;
-		int mr = (open_r && fills[state_of(cell + ivec2(1, 0), size)] == own) ? 99 : 15 - f.x;
-		int mu = (open_u && fills[state_of(cell + ivec2(0, -1), size)] == own) ? 99 : f.y;
-		int md = (open_d && fills[state_of(cell + ivec2(0, 1), size)] == own) ? 99 : 15 - f.y;
-		at = shape(ml, mr, mu, md, inset);
-	} else {
-		at = shape(dl, dr, du, dd, inset);
-	}
+	// While a cell grows or shrinks it is a shape of its own, inset from all four sides (a whole
+	// puddle drying, freezing or steaming at once shrinks or grows cell by cell, never in one jump);
+	// still, it joins its drawn neighbours.
+	int at = inset > 0 ? shape(f.x, 15 - f.x, f.y, 15 - f.y, inset) : shape(dl, dr, du, dd, 0);
 	if (at == 0) {
 		if (unders[s].a > 0.0) {
 			int under = shape(dl, dr, du, dd, 0);

@@ -20,9 +20,10 @@ const FLOOR: CoverKind = preload("res://content/cover/floor/floor.tres")
 const SHOTS: int = 2048
 const DT: float = 1.0 / 60.0
 const STEPS: int = 30
-## The budgets, generous for a shared CI machine (measured on it: see the BUDGET lines).
+## The budgets, generous for a shared CI machine running the suite in parallel (alone, the cover's
+## tick measured 1.3 to 1.8 ms; under the full parallel suite up to 4.4 ms: see the BUDGET lines).
 const TRAIL_BUDGET_US: int = 400
-const COVER_BUDGET_US: int = 4000
+const COVER_BUDGET_US: int = 12000
 
 
 func _manager(native: bool) -> ManagerScript:

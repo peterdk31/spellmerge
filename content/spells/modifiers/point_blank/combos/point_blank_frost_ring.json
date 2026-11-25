@@ -1,0 +1,10 @@
+{
+	"id": "point_blank_frost_ring",
+	"name": "Frost ring from the hand",
+	"does": "A bolt that ends at once fires its On Expire payload, a frost nova, from the staff's tip: it chills the imp behind the wizard.",
+	"needs": "point_blank",
+	"casts": [{"staff": 0, "cards": ["on_expire", "point_blank", "bolt", "frost", "nova", "atom"]}],
+	"imps": [[-60, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

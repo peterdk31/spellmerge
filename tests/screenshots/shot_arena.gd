@@ -139,10 +139,11 @@ func take() -> void:
 	_crop_round(protected_image, wizard1, "protected_invulnerable")
 	await settle()
 	var camera: Camera2D = _party_camera().get("camera") as Camera2D
-	if camera == null or camera.zoom.x > 0.51:
+	# Its zoom as the cameras count it (PictureGrid: times the picture's scale).
+	if camera == null or camera.zoom.x / float(sheet_scale()) > 0.51:
 		fail("the party camera is not at zoom 0.5 in coop_camera_zoom_half")
 		return
-	print("SHOT: camera zoom %.2f" % camera.zoom.x)
+	print("SHOT: camera zoom %.2f" % (camera.zoom.x / float(sheet_scale())))
 	await shot("staged_zoom_half_wizards_placed_outside_room")
 	flow.call("stop_run")
 	await create_timer(0.3).timeout

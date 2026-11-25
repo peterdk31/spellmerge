@@ -177,3 +177,23 @@ func test_every_change_of_look_plays_four_frames() -> void:
 				if row.when == CoverTrigger.When.AFTER:
 					after = row.seconds
 			check(after > 0.0 and seconds <= after + 0.001, "%s plays out within its time (%s s in %s s)" % [state.state_id, seconds, after])
+
+
+## The owner, 2026-11-25: only fully wet floor carries lightning; a puddle still spreading in, drying,
+## freezing or thawing does not (nor dry floor).
+func test_only_wet_floor_carries_lightning() -> void:
+	var spreading: int = _kit.cell(2, 2)
+	_kit.touch(&"water", _kit.middle(spreading))
+	_kit.steps(1)
+	check_equal(_kit.state_of(spreading), &"wetting", "still spreading in")
+	_kit.touch(&"lightning", _kit.middle(spreading))
+	_kit.steps(1)
+	check_equal(_kit.state_of(spreading), &"wetting", "lightning on a wetting cell: nothing")
+	var dry: int = _kit.cell(8, 2)
+	_kit.touch(&"lightning", _kit.middle(dry))
+	_kit.steps(1)
+	check_equal(_kit.state_of(dry), &"dry", "nor on dry floor")
+	for state: CoverState in FLOOR.states:
+		var carries: bool = state.on_element(&"lightning") != &""
+		check_equal(carries, state.state_id == &"wet", "%s carries lightning only if it is wet" % state.state_id)
+

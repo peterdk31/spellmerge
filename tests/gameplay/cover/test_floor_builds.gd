@@ -164,3 +164,26 @@ func test_build_4_the_ice_bridge() -> void:
 	_tick(4)
 	check_equal(_state_at(Vector2(MIDDLE.x, lane)), &"wet", "water again, for the lake")
 
+
+
+## The owner, 2026-11-25: a foe killed by the Current of a live lake is its lighter's kill
+## (`kill_landed` with its tag: on kill), though a reaction's kills are no spell's own elsewhere. The
+## zap (4) leaves the soaked body half a point; the Current it sets off on that body (5) kills it.
+func test_a_kill_by_the_lakes_current_is_the_lighters() -> void:
+	for x in range(0, 4):
+		_kit.world.bus.floor_touched.emit(-1, &"water", MIDDLE + Vector2(16.0 * float(x), 0.0), 0.0, 0)
+	var weak: Actor = _dummy(MIDDLE + Vector2(32.0, 0.0), 4.5)
+	_tick(8)
+	check(_kit.has_status(weak, &"soak"), "it stands soaked in the lake")
+	var tag: int = SpellTag.make(3, 1, 0, 0)
+	_kit.world.bus.floor_touched.emit(3, &"lightning", MIDDLE, 0.0, tag)
+	_tick(12)
+	var current: bool = false
+	for heard: Array in _reactions:
+		current = current or heard[0] == &"current"
+	check(current, "the zap set off Current")
+	check_equal(_kills.size(), 1, "one kill heard (%s)" % [_kills])
+	if _kills.size() == 1:
+		check(_kills[0][1] == weak, "its")
+		check_equal(_kills[0][0], 3, "the lighter's kill")
+		check_equal(_kills[0][2], tag, "with its spell's tag (on kill hears it)")

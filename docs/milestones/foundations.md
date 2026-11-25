@@ -211,7 +211,7 @@ Each is a milestone doc of its own before it is built, with its numbers, its tes
 
 ## Open points for the owner
 
-**The owner's answers (2026-11-25):** 1. yes, bare floor is cover everywhere. 2. **The other way:** everything touches the floor as it passes, every shot, dash and swing, not only what pours; its cost designed and measured (the projectile manager's passes and its native kernel, a budget test, the stress run and play frames before and after). 3. **The other way:** a cell remembers who lit it, so `on kill` and Siphon count (simulation state: hashed, snapshotted, determinism tests). 4. yes, a field serves enemies' shots too, one rule (for Part 3). 5. ice chills, no slipping. So Spill's point changes: with everything touching already, Spill is left for Part 2's own doc to weigh again.
+**The owner's answers (2026-11-25):** 1. yes, bare floor is cover everywhere. 2. **The other way:** everything touches the floor as it passes, every shot, dash and swing, not only what pours; its cost designed and measured (the projectile manager's passes and its native kernel, a budget test, the stress run and play frames before and after). 3. **The other way:** a cell remembers who lit it, so `on kill` and Siphon count (simulation state: hashed, snapshotted, determinism tests). 4. yes, a field serves enemies' shots too, one rule (for Part 3). 5. ice chills, no slipping. So Spill's point changes, and the owner set it (2026-11-25): **Spill makes a shot touch a wide area where it lands** (a bigger splash), for Part 2's own doc.
 
 The points as they were put:
 

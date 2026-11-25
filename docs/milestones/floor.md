@@ -40,6 +40,7 @@ The transitional states take no element (0.25 to 0.5 s): water or lightning on a
 - **`CoverState.harmless`**: gives its status, but the AI's look (`cover_danger_looked`) does not mark it. The count of cells that give something (`_harming`, which decides whether bodies are looked at) and the count of cells that are danger (`_danger`, for the look) are kept apart.
 - **A row naming its own state renews it**: an element row whose `then` is the state the cell is in puts its seconds back to 0 (water on a wet cell keeps it wet), but moves nothing and costs no roll in a spread. No kind there is has such a row, so grass and cobwebs play as they did.
 - **Who lit it** (state, hashed and snapshotted): beside the active cells (`_active`), each one's lighter, its actor and its spell's tag (`_active_actor`, `_active_tag`): set by the touch that moved it (or renewed it), handed on by a spread, kept by an `after` move, dropped when it comes to rest. A cell at rest costs nothing; a room at rest hashes as today. The cover's statuses and strikes are sent as the lighter's (`status_requested`'s caster; the strike's actor and tag); a cell lit by a prop (a fountain) or by nobody is NO_PLAYER's, as today.
+- **The lake's Current is the lighter's** (the owner, 2026-11-25): a reaction set off by the floor's strike keeps its tag, so its kills are the lighter's too.
 - **`floor_touched` carries the spell's tag** (`floor_touched(caster, element, at, radius, tag)`; 0 for none: a prop's touch, a test's).
 
 ### What passes touches (core/projectiles, core/spells; the owner's answer 2)
@@ -85,3 +86,6 @@ A `FLAT` kind is drawn by one sprite a room (`cover_flat.gdshader`, warmed by `S
 
 - **Ice and fire:** fire thaws ice (ice to water; fire on that water is then steam), as built. "Fire cannot cross it" because the fire is spent on the thaw; a shot that stops at ice would be new work.
 - **Steam does nothing to bodies yet:** it is a look for now (hiding or scalding can be a later card).
+- **Only fully wet floor carries lightning:** the states between (wetting, drying, freezing, thawing, steam, spent) do not; `test_floor.gd` holds it.
+- **The lake's Current kills are the lighter's:** a foe killed by the Current a live lake sets off is its lighter's kill (`kill_landed` with the spell's tag, so `on kill` fires), unlike a bolt's reaction elsewhere (Combat's `_floor_striking`; `test_floor_builds.gd`). Siphon follows the floor's one rule: it pays its lighter for each foe the floor strikes (never the lighter's own body).
+- **Spill (Part 2), the owner's direction:** everything touching the floor as it passes already, Spill becomes "a shot touches a wide area where it lands": a bigger splash.

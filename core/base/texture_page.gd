@@ -7,7 +7,8 @@ extends RefCounted
 ## in a file of its own, are a call each. `regions_of(textures)` copies their pixels side by side
 ## onto one page (a row, GAP clear pixels apart) and hands back an `AtlasTexture` on it for each, the
 ## same size: drawn as the texture was (nearest filtering, into the same rect), it puts the same
-## pixels on screen. An `AtlasTexture` given is copied by its region (a strip's frame).
+## pixels on screen. Each region keeps its texture's detail (`ArtDetail.mark`): a 2x sprite and a 1x
+## sheet may share a page, each drawn at its own size in the world. An `AtlasTexture` given is copied by its region (a strip's frame).
 ##
 ## Made once for each list of textures (a kind's body and face, a decal's art) and kept: every enemy
 ## of a kind, every candle, shares its page, so neighbours of one kind batch as well. A region given
@@ -89,6 +90,8 @@ static func _page(sources: Array[Texture2D]) -> Array[Texture2D]:
 			var region := AtlasTexture.new()
 			region.atlas = page_texture
 			region.region = Rect2(Vector2(at[texture], 0.0), texture.get_size())
+			# Drawn as finely as its source (a 2x sprite stays at half size: ArtDetail).
+			ArtDetail.mark(region, ArtDetail.of(texture))
 			regions[texture] = region
 		made.append(regions[texture])
 	return made

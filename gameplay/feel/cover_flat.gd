@@ -12,6 +12,10 @@ extends Sprite2D
 const SHADER: Shader = preload("res://gameplay/feel/cover_flat.gdshader")
 ## The most states a flat kind's look holds (the shader's STATES).
 const STATES: int = 16
+## Art pixels a world pixel of the look (ArtDetail, core/display/art_detail.gd): the shader works its
+## shapes out at this detail. 1 while the floor states are 32-unit art (drawn as 2x2 blocks of the
+## 1280 x 720 picture at zoom 1); `ArtDetail.DETAIL` once they are redrawn at 64 px a cell.
+const DETAIL: int = 1
 
 ## The kind drawn and its index + 1 in the layout's cells.
 var kind: CoverKind = null
@@ -37,6 +41,7 @@ func lay(laid: CoverLayout, kind_index: int, now: float) -> void:
 	made.shader = SHADER
 	_set_looks(made)
 	made.set_shader_parameter(&"cells", texture)
+	made.set_shader_parameter(&"art_detail", DETAIL)
 	material = made
 
 

@@ -246,6 +246,8 @@ var _cheat_code: CheatCode = null
 
 
 func _ready() -> void:
+	# Laid out in layout pixels (640 x 360) and drawn at the picture's scale (core/display/picture_grid.gd).
+	PictureGrid.keep_fitted(self, get_node("Root") as Control)
 	# Every glyph the HUD draws rasterized now, never in play (core/base/glyph_warmup.gd: safe with
 	# a separate render thread).
 	GlyphWarmup.warm_game()

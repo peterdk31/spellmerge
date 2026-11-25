@@ -2,6 +2,32 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-25: ART0: the 1280×720 picture, one rule for art at 2x detail, the curl redrawn
+
+The owner's decision of 2026-11-21, confirmed 2026-11-25 (docs/DECISIONS.md): 64×64 art a 32-unit cell at the same size on screen in a 1280×720 picture; on 1080p a fractional ×1.5 stretch with hard pixels (the owner's choice after seeing 960×540 and 640×360 laid out). The foundation, not the redraw (docs/STYLE.md, "The picture and the art's detail"):
+
+- **The picture:** project.godot 1280×720, integer scaling, places snapped to the picture's pixels; `Display.stretch_for` stretches by a fraction where whole numbers would leave the screen mostly empty (1080p). `PictureGrid` moved to core/display: the cameras show the same world; the HUD (its layer and `Root`), the main menu, the intro, Feel's markers and Y map and the split's dividers are laid out at 640×360 and drawn twice as big. The light, the mist and the air keep their own resolution.
+- **Mixed art:** `ArtDetail` (core/display): a texture named `<name>@2x.<ext>` has two art pixels a world unit and is drawn at half size. Sprites, faces (a staff's own `FaceArt`, `StaffBase.face`), the staff's head, enemy bodies, the elite ring, `TexturePage` regions, the cover's batches and the floor bake (baked at the picture's scale, on a sprite of its own) take it.
+- **The pilot:** the curl staff's head (16 directions × 4 ramps, 96×96 frames) and the Optimist's eyes and brows at 2x, drawn by `tools/staff_art.py`; the golden player is `art/kit/golden_staff@2x.svg`, the kit has `grid_64.svg`; art/README.md says how to redraw a sprite at 64×64.
+- **The owner's answers on #940:** the cameras rest at **zoom 1** (0.8 since 2026-11-23): 640×360 of the world at rest instead of 800×450 (64% of the area), so every art pixel shows; the party camera still zooms out to hold a spread party down to 0.5 before the screen splits, and the split's views rest at the same 1. `snap_2d_transforms_to_pixel` stays on; the intro keeps the shared face until the face redraw; a last Auto rung for the web (a 640×360 picture) waits for the owner's benchmark numbers. The measurements below were taken at the resting zoom 0.8.
+- **The same game:** the state hash every tick equal to main's (tick_hash.gd, 1p and 4p, seed 11); the determinism, snapshot and content-determinism tests green. Tests that read the cameras' zoom or a body sprite's scale read them through the picture's scale and the art's detail.
+- **Measured** (play_frames.gd on the fixed clock, xvfb on llvmpipe, 4 cores; avg / p95 / GPU ms a frame; 640 = main, 1280 = this branch; "web" rows Compatibility at the web's caps, desktop rows the Mobile renderer on lavapipe, a software Vulkan, so no GPU light and the render thread the main thread's; one run each, main's medium and low rows have outliers):
+
+  | scenario | 640 main | 1280 this | × |
+  | --- | --- | --- | --- |
+  | 1p near web low / medium / high | 26.0 / 33.0 / 17.5; 39.2 / 38.6 / 29.7; 27.9 / 36.1 / 19.3 | 49.8 / 62.8 / 57.7; 49.8 / 59.9 / 42.8; 51.5 / 63.8 / 44.0 | 1.9, 1.3, 1.8 |
+  | 1p far web low / medium / high | 41.0 / 48.1 / 27.6; 37.5 / 47.9 / 24.1; 39.8 / 50.4 / 25.7 | 53.7 / 64.8 / 44.0; 54.2 / 64.6 / 44.6; 57.4 / 72.2 / 47.3 | 1.3, 1.4, 1.4 |
+  | 2p apart dynamic web low / medium / high | 56.4 / 66.9 / 38.9; 50.4 / 62.9 / 34.2; 51.1 / 64.0 / 34.8 | 80.1 / 96.3 / 67.6; 76.7 / 88.6 / 65.3; 80.6 / 95.2 / 67.2 | 1.4, 1.5, 1.6 |
+  | 4p apart equal web low / medium / high | 108.3 / 370.6 / 83.5; 83.7 / 101.0 / 54.6; 81.1 / 101.7 / 54.2 | 111.1 / 129.2 / 91.5; 121.9 / 147.3 / 101.3; 118.8 / 140.1 / 99.0 | 1.0, 1.5, 1.5 |
+  | 1p near low / medium / high | 31.6 / 36.9 / 20.6; 27.4 / 35.2 / 18.0; 29.7 / 37.3 / 19.1 | 59.9 / 74.3 / 47.5; 58.2 / 69.7 / 46.0; 66.3 / 79.9 / 53.2 | 1.9, 2.1, 2.2 |
+  | 1p far low / medium / high | 42.3 / 54.4 / 27.0; 42.3 / 54.8 / 26.6; 47.8 / 59.6 / 30.1 | 69.1 / 86.1 / 53.0; 67.9 / 83.0 / 52.0; 69.7 / 85.1 / 53.4 | 1.6, 1.6, 1.5 |
+  | 2p apart dynamic low / medium / high | 68.5 / 85.1 / 46.9; 62.2 / 79.4 / 42.3; 60.4 / 75.7 / 41.5 | 105.8 / 129.6 / 85.5; 101.5 / 124.9 / 81.7; 106.3 / 131.8 / 85.9 | 1.5, 1.6, 1.8 |
+  | 4p apart equal low / medium / high | 103.7 / 130.5 / 72.8; 98.7 / 120.1 / 68.6; 94.9 / 116.3 / 66.0 | 161.0 / 195.4 / 128.9; 165.2 / 201.1 / 131.9; 153.0 / 184.0 / 121.8 | 1.6, 1.7, 1.6 |
+
+  The draw calls do not change with the picture; what grows is the GPU's fill (four times the pixels), which llvmpipe, a CPU drawing, pays in full. The effects' rows barely move it at 1280 (low saves a few ms at most): their light cells, mist layers and air are not where the fill goes. A real GPU pays fill far more cheaply; the owner's GPU and web numbers decide (the shipped benchmark).
+- **Found on the way:** the motes' region chunks creep up by one every few rounds of flipping the atmosphere's settings, on main too (`test_atmosphere_settings.gd`: about one in six rounds at 640, sooner with more of the world in view); the test now shows the world as the cameras do. Not fixed here.
+- Screenshots: branch `shots/art/foundation-1280` (the curl old against new, a mixed room, zoom 1 and 0.8, the 1080p and 1440p windows, the whole gallery at 1280×720).
+
 ## 2026-11-25: The connected biomes' open questions answered; a foe's keys drop by chance
 
 The owner answered the eight questions the connected biomes plan still held open (docs/milestones/connected-biomes.md, "Answered by the owner (2026-11-25)"; docs/DECISIONS.md). Six are "keep as built". Built: the keys a foe carries are laid where it dies by a chance of their own, a half (`EnemyBase.key_drop_chance`, `Rewards._drop_keys`; lost with it before), a boss's always, an add's by its roll; the coins' roll is unchanged. The room reroll questions were marked moot (room rerolls were removed on 2026-11-19), and the floor mist stays out of the one pass. Nothing of the plan is open.

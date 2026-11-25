@@ -107,6 +107,25 @@ func set_view(view: int, held: int, transform: Transform2D, at: Vector2) -> void
 	anchor[view] = at
 
 
+## `out` made these views measured `by` times smaller (or bigger): the screen, the cells' corners,
+## the anchors and what each view draws the world to, all times `by`; the seats and ids as they are.
+## A screen's layer laid out in layout pixels (PictureGrid, core/display/picture_grid.gd: Feel's
+## markers) reads the views in its own pixels this way. Allocates nothing; returns `out`.
+func scaled_into(out: ScreenViews, by: float) -> ScreenViews:
+	var scale := Transform2D.IDENTITY.scaled(Vector2(by, by))
+	out.count = count
+	out.screen = screen * by
+	for view in VIEWS_MOST:
+		out.seats[view] = seats[view]
+		out.to_screen[view] = scale * to_screen[view]
+		out.anchor[view] = anchor[view] * by
+		out.ids[view] = ids[view]
+		out.cell_counts[view] = cell_counts[view]
+	for at in cell_points.size():
+		out.cell_points[at] = cell_points[at] * by
+	return out
+
+
 ## Corner `at` of view `view`'s cell (screen pixels).
 func corner(view: int, at: int) -> Vector2:
 	return cell_points[view * CORNERS_MOST + at]

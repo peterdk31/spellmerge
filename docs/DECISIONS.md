@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-25: more detailed art: 64x64 a cell in a 1280x720 picture (owner; ART0)
+
+- **The owner** (2026-11-21, confirmed 2026-11-25): "more detailed art, 64×64 sprites at the same on-screen size, in a 1280×720 picture." The world keeps its 32-unit tiles and the simulation is untouched; 64×64 art is drawn at half size. The HUD and the font are redrawn at 2x detail at the same size on screen. Everything is redrawn in this order: players and enemies, spells and effects, rooms and props, HUD and font. The lights were made ready first (#902, #907/#926, #911, #913).
+- **How (ART0):** project.godot draws 1280×720, integer scaling kept; the cameras show the same world (`PictureGrid`, core/display); every screen's layer is laid out at 640×360 and drawn at the picture's scale; one rule says a texture is at 2x (`<name>@2x.<ext>`, `ArtDetail`, core/display); the curl staff was redrawn as the pilot. docs/STYLE.md, "The picture and the art's detail"; art/README.md, "Redrawing a sprite at 64x64".
+- **1080p** (the owner, 2026-11-25, after 960×540 with 48 px art and 640×360 were laid out beside 1280×720): a 1920×1080 screen holds the picture once, two thirds of it, by whole numbers, so there the picture is stretched by a fraction (1.5, aspect kept, hard pixels; `Display.stretch_for`), its 64 px art in uneven rows of 1 or 2 screen pixels, which the owner accepts; 720p, 1440p and 4K stay whole. The constants stay one each: the picture is the layout times `PictureGrid.PICTURE_SCALE` (k = 2), redrawn art `ArtDetail.DETAIL` (d = 2).
+- **The cameras rest at zoom 1** (the owner's answer on #940; 0.8 since 2026-11-23): 640×360 of the world, so every art pixel shows (at 0.8 one 2x art pixel in five was left out). They still zoom out to hold a spread party, down to 0.5, before the screen splits. `snap_2d_transforms_to_pixel` stays on; the intro keeps the shared face until the face redraw; a last Auto rung for the web drawing a 640×360 picture waits for the owner's benchmark numbers.
+
 ## 2026-11-25: Siphon pays for the Current (owner decision)
 
 - **The owner:** every foe the Current hits, spread from a live lake, a bolt or any other carrier's Current, pays the caster's Siphon, as the caster's hit.

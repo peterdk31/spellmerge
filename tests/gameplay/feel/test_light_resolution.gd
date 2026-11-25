@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## cameras draw the same world twice as fine. How it looks is checked
 ## by eye (tests/screenshots/shot_light_resolution.gd): headless runs draw nothing.
 
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const PictureGridScript := preload("res://core/display/picture_grid.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const MistScript := preload("res://gameplay/feel/mist.gd")
 const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")

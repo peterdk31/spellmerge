@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the view changes of 2026-11-19 and 2026-11-23 (gameplay/feel/README.md): on the
-## split test map (tests/support/biome_maps.gd), a sealed fight at the default zoom 0.8, the camera
+## split test map (tests/support/biome_maps.gd), a sealed fight at the default zoom (1 since 2026-11-25; 0.8 before), the camera
 ## on the wizard alone and a marker at the picture's edge for an imp out of it
 ## (`framing_sealed_fight`, and the marker four times bigger, `framing_foe_marker`; split in two
 ## views, the marker in its seat's own cell, `framing_split_marker`; the owner,

@@ -405,12 +405,12 @@ func test_three_views_where_one_merges_into_another_without_a_jump() -> void:
 
 # --- The default zoom (the owner, 2026-11-23) -------------------------------------------------------
 
-## The same zoom everywhere (the owner, 2026-11-23): a split view rests at the one picture's
-## default zoom, 0.8, and closer only where the camera's limits are smaller than that picture.
+## The same zoom everywhere (the owner, 2026-11-23; 1 since 2026-11-25): a split view rests at the one
+## picture's default zoom, 1, and closer only where the camera's limits are smaller than that picture.
 func test_a_split_view_rests_at_the_one_pictures_default_zoom() -> void:
 	check_equal(SplitCameraScript.SPLIT_ZOOM, PartyCameraScript.MAX_ZOOM, "one number for both")
-	check(is_equal_approx(SplitCameraScript.SPLIT_ZOOM, 0.8), "0.8")
-	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(), SCREEN, 1.0), 0.8), "no limits: 0.8")
-	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 2000.0), SCREEN, 1.0), 0.8), "a big biome: 0.8")
-	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 2000.0), SCREEN * 2.0, 2.0), 1.6), "a picture twice as big: twice the zoom")
-	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 400.0), SCREEN, 1.0), 0.9), "limits 400 px tall: no picture taller than them (0.9)")
+	check(is_equal_approx(SplitCameraScript.SPLIT_ZOOM, 1.0), "1")
+	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(), SCREEN, 1.0), 1.0), "no limits: 1")
+	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 2000.0), SCREEN, 1.0), 1.0), "a big biome: 1")
+	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 2000.0), SCREEN * 2.0, 2.0), 2.0), "a picture twice as big: twice the zoom")
+	check(is_equal_approx(SplitCameraScript.view_zoom_in(Rect2(0.0, 0.0, 4000.0, 300.0), SCREEN, 1.0), 1.2), "limits 300 px tall: no picture taller than them (1.2)")

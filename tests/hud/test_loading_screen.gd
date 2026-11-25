@@ -37,7 +37,7 @@ func test_a_departure_brings_it_down_and_the_runs_start_takes_it_up() -> void:
 	_bus.run_departure_changed.emit(true)
 	check(_screen.visible and _screen.is_up(), "a departure shows it")
 	check(not _screen.is_down(), "but it is not down yet")
-	var height: float = _screen.get_viewport_rect().size.y
+	var height: float = PictureGrid.layout_of(_screen.get_viewport()).y
 	check_equal(_screen.position.y, -height, "it starts just above the screen")
 	var down: Array[float] = _tops(ScreenScript.COVER_FRAMES)
 	check(_screen.is_down(), "down after COVER_FRAMES frames")
@@ -75,7 +75,7 @@ func test_it_turns_round_where_it_is() -> void:
 	var down: Array[float] = _tops(2)
 	_bus.run_departure_changed.emit(false)
 	var up: Array[float] = _tops(1)
-	check(up[0] < down[1] and up[0] > -_screen.get_viewport_rect().size.y, "wanted no more half way down: it goes up from where it was")
+	check(up[0] < down[1] and up[0] > -PictureGrid.layout_of(_screen.get_viewport()).y, "wanted no more half way down: it goes up from where it was")
 	_bus.run_departure_changed.emit(true)
 	check_equal(_tops(1)[0], down[1], "wanted again: down from there")
 

@@ -138,6 +138,7 @@ func _want_changed() -> void:
 
 ## Where it stands for `_frame`: eased, by whole pixels, from just above the screen to over it.
 func _place() -> void:
-	var height: float = get_viewport_rect().size.y if is_inside_tree() else size.y
+	# In layout pixels: the HUD is laid out at 640 x 360 and drawn at the picture's scale (PictureGrid).
+	var height: float = PictureGrid.layout_of(get_viewport()).y if is_inside_tree() else size.y
 	var down: float = smoothstep(0.0, 1.0, float(_frame) / float(COVER_FRAMES))
 	position.y = roundf(-height * (1.0 - down))

@@ -27,7 +27,7 @@ signal finished(skipped: bool)
 const WIZARD_IDLE: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
 const WIZARD_HAT: Texture2D = preload("res://art/story/wizard_hat.svg")
 const FAVOURITE: Texture2D = preload("res://art/story/favourite.svg")
-const STAFF_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head.svg")
+const STAFF_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.png")
 const EYES: Texture2D = preload("res://art/faces/eyes.svg")
 const BROWS: Texture2D = preload("res://art/faces/brows.svg")
 
@@ -133,6 +133,8 @@ func setup(seats: Array[int], input_manager: Node = null) -> void:
 
 
 func _ready() -> void:
+	# Laid out on SCREEN (layout pixels) and drawn at the picture's scale (core/display/picture_grid.gd).
+	scale = Vector2.ONE * float(PictureGrid.scale_in(get_viewport()))
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput")
 		_count_presses()
@@ -291,6 +293,9 @@ func _sprite(texture: Texture2D, columns: int, rows: int) -> Sprite2D:
 	sprite.hframes = columns
 	sprite.vframes = rows
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# At its art's size in the world (a sheet at 2x detail at half: ArtDetail); placed by its frame's
+	# top left, so a frame's points (a grip) are world units from it either way.
+	ArtDetail.fit(sprite)
 	_world.add_child(sprite)
 	return sprite
 

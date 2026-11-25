@@ -39,14 +39,14 @@ extends Node2D
 ##   stays, else the older slot's), and a foe gets a marker only where it would sit APART from every
 ##   other of its view (a boss's only from other bosses').
 ##
-## Feel puts it on the teammate markers' canvas layer, under them, in screen pixels, so it is the
+## Feel puts it on the teammate markers' canvas layer, under them, in layout pixels (core/display/picture_grid.gd), so it is the
 ## same size whatever a view's zoom. View only, on Feel's real clock: nothing in the game reads it,
 ## and nothing is allocated after it is made.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 
-## How far inside its view's edge a marker sits, in screen pixels.
+## How far inside its view's edge a marker sits, in layout pixels (core/display/picture_grid.gd).
 const INSET: float = 10.0
 ## A foe gets a marker once it is this far outside its view's cell, and keeps it until it is this
 ## far inside (screen pixels).
@@ -67,7 +67,7 @@ const STAGE_SECONDS: float = 0.04
 ## makes (the one there shrinks out, one grows in at the new place).
 const REACH_SPEED: float = 1200.0
 const REACH_LEAST: float = 16.0
-## A marker's size a stage, in screen pixels: its length (tip to back) and half its width; a boss's.
+## A marker's size a stage, in layout pixels (core/display/picture_grid.gd): its length (tip to back) and half its width; a boss's.
 const LENGTH_STEP: float = 4.0
 const HALF_WIDTH_STEP: float = 1.0
 const BOSS_LENGTH_STEP: float = 5.0

@@ -12,7 +12,7 @@ extends Node2D
 ## seat here the camera holds everyone, so nobody does. It marks a seat's own body, where a revive
 ## happens, not an actor the seat drives. It sits right at the screen's edge, corners too, and is
 ## drawn over the HUD's panels (owner, 2026-11-13: "should not take player huds into account"): Feel
-## puts it on its own canvas layer over the HUD's (`LAYER`), in screen pixels, so it is the same size
+## puts it on its own canvas layer over the HUD's (`LAYER`), in layout pixels (core/display/picture_grid.gd), so it is the same size
 ## whatever a view's zoom. View only, on Feel's real clock: nothing in the game reads it, and nothing
 ## is allocated after it is made.
 
@@ -23,12 +23,12 @@ const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 ## The canvas layer Feel puts it on: over the HUD's (`hud/panels/panels.tscn`, layer 10), so a
 ## marker shows over a player's panel. Feel knows nothing of the HUD but this number.
 const LAYER: int = 11
-## How far inside the screen's edge a marker sits, in screen pixels.
+## How far inside the screen's edge a marker sits, in layout pixels (core/display/picture_grid.gd).
 const INSET: float = 18.0
 ## A wizard this far inside its view's cell (screen pixels) needs no marker yet.
 const SHOWN_MARGIN: float = 4.0
 ## The arrowhead: from its tip back to its two barbs, half the width between them, and how far its
-## back is cut in between them (so it reads as a way, not a triangle), in screen pixels.
+## back is cut in between them (so it reads as a way, not a triangle), in layout pixels (core/display/picture_grid.gd).
 const LENGTH: float = 15.0
 const HALF_WIDTH: float = 4.5
 const NOTCH: float = 3.0

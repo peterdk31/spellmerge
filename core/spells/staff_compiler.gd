@@ -95,6 +95,9 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_in_payload = false
 	_cast.group = _read_group(staff.draw if staff != null else 1, false)
 	_cast.ends_cycle = _reached_end or not _has_card_from(_pos)
+	# A carrier's wind-down may be below 0 (`ModifierBase.wind_down_add`); the floor is the cast's
+	# (docs/milestones/staff-language.md, L1).
+	_cast.wind_down = maxf(_cast.wind_down, 0.0)
 	_cast.wind_up = _cast.group.wind_up + (staff.wind_up if staff != null else 0.0)
 	_cast.delay = _cast.wind_down
 	if _cast.ends_cycle and staff != null:
@@ -368,6 +371,15 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 		any = true
 		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
 			return true
+	if modifier.lifetime_most > 0.0:
+		any = true
+		# A move's time is its distance over its speed, not its life (a dash; `MoveCurve`).
+		if (on.has(Carrier.SPEED) or on.has(Carrier.LASTS)) and not on.has(Carrier.MOVES_CASTER):
+			return true
+	if modifier.wind_down_add < 0.0:
+		any = true
+		if not payload:
+			return true
 	if modifier.shot_mult != 1:
 		any = true
 		if on.has(Carrier.SHOTS):
@@ -452,8 +464,15 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	# A card's `lifetime_base` replaces the carrier card's life before any factor (the longest counts), so
 	# the factors below act on it whatever the slot order.
 	var life_base: float = 0.0
+	# The shortest `lifetime_most`, applied after every other life card (0: none).
+	var life_most: float = 0.0
+	# Every `wind_down_add`, added after every `wind_down_mult`.
+	var wind_down_add: float = 0.0
 	for modifier in modifiers:
 		life_base = maxf(life_base, modifier.lifetime_base)
+		wind_down_add += modifier.wind_down_add
+		if modifier.lifetime_most > 0.0:
+			life_most = modifier.lifetime_most if life_most <= 0.0 else minf(life_most, modifier.lifetime_most)
 	if life_base > 0.0:
 		spell.lifetime = life_base
 	for modifier in modifiers:
@@ -498,10 +517,13 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 					spell.homing_curve = minf(spell.homing_curve, modifier.behaviour_strength) / SpellLimits.HOMING_STACK
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
+	if life_most > 0.0:
+		spell.lifetime = minf(spell.lifetime, life_most)
 	spell.look = _look_of(elements, modifiers)
 	spell.damage = maxf(damage, SpellLimits.MIN_DAMAGE)
 	spell.mana_cost = mana
-	spell.wind_down = maxf(wind_down, 0.0)
+	# Below 0 allowed: the cast floors its sum (`_read_cast`).
+	spell.wind_down = maxf(wind_down, 0.0) + wind_down_add
 	spell.wind_up *= wind_up_mult
 	spell.pose_wind_up *= wind_up_mult
 	spell.speed = speed

@@ -139,7 +139,9 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	# so it is no harm (owner 2026-11-12: a heal does nothing else).
 	if spell.hit == null or spell.hit.heal <= 0:
 		blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
-		if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0 and spell.has_trait(CarrierTraits.AOE):
+		# Round its cast point, or ending nearer than its own blast (Point Blank): it catches its caster.
+		var blast_of: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
+		if blast_of > 0.0 and (spell.has_trait(CarrierTraits.AOE) or (spell_reach > 0.0 and spell_reach < blast_of)):
 			blast_on_caster = true
 	if spell.homing_range > 0.0:
 		homing = true

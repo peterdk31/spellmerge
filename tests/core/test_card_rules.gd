@@ -717,7 +717,7 @@ func _plain_of(card: SpellComponent) -> StringName:
 	var modifier := card as ModifierBase
 	if modifier == null or modifier.behaviour == ModifierBase.Behaviour.NONE:
 		return &""
-	if is_equal_approx(modifier.damage_mult, 1.0) and is_equal_approx(modifier.speed_mult, 1.0) and is_equal_approx(modifier.radius_mult, 1.0) and modifier.shot_mult == 1 and modifier.extra_pierce == 0 and is_equal_approx(modifier.spread_mult, 1.0) and is_equal_approx(modifier.lifetime_mult, 1.0) and modifier.lifetime_base <= 0.0:
+	if is_equal_approx(modifier.damage_mult, 1.0) and is_equal_approx(modifier.speed_mult, 1.0) and is_equal_approx(modifier.radius_mult, 1.0) and modifier.shot_mult == 1 and modifier.extra_pierce == 0 and is_equal_approx(modifier.spread_mult, 1.0) and is_equal_approx(modifier.lifetime_mult, 1.0) and modifier.lifetime_base <= 0.0 and modifier.lifetime_most <= 0.0 and is_zero_approx(modifier.wind_down_add):
 		return &""
 	var id: StringName = StringName("%s~plain" % modifier.id)
 	if not _shelf.extra.has(id):
@@ -746,6 +746,8 @@ func _costs_of(card: SpellComponent) -> StringName:
 		costs.speed_mult = 1.0
 		costs.radius_mult = 1.0
 		costs.lifetime_mult = 1.0
+		costs.lifetime_most = 0.0
+		costs.wind_down_add = maxf(modifier.wind_down_add, 0.0)
 		costs.spread_mult = 1.0
 		costs.shot_mult = 1
 		costs.extra_pierce = 0

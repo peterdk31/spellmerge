@@ -1,0 +1,13 @@
+{
+	"id": "quick_hand_lumber",
+	"name": "The quick hand",
+	"does": "A Lumber bolt's long wind-down is cut by a quarter second, so the second heavy bolt at 0.25 s leaves too and the imp takes both.",
+	"needs": "quick_hand",
+	"casts": [
+		{"staff": 0, "cards": ["quick_hand", "lumber", "bolt"]},
+		{"staff": 0, "cards": ["quick_hand", "lumber", "bolt"], "at": 0.25}
+	],
+	"imps": [[120, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 25}]
+}

@@ -229,6 +229,11 @@ static func stacks(behaviour: int) -> Stack:
 @export var radius_mult: float = 1.0
 ## Factor on the carrier's wind-down (`CarrierCard.wind_down`).
 @export var wind_down_mult: float = 1.0
+## Seconds added to the carrier's wind-down after every `wind_down_mult` (below 0 takes away: Quick
+## Hand; docs/milestones/staff-language.md, L1). A carrier's wind-down may end below 0; the floor at
+## 0 is its cast's (its carriers' and multicast cards' added up), and the staff's own cooldown after
+## a cycle is out of any card's reach. Several add.
+@export var wind_down_add: float = 0.0
 ## Seconds added to the carrier's wind-up (`CarrierCard.wind_up`): a charge; a cost, never an effect
 ## of its own (docs/milestones/cast-timing.md).
 @export var wind_up_add: float = 0.0
@@ -283,6 +288,10 @@ var look_layer: int:
 ## it first and then applies every `lifetime_mult` and `reach_mult`, so slot order does not matter;
 ## with several cards that set one, the longest counts (Orbit: 3 s, whatever it carries).
 @export var lifetime_base: float = 0.0
+## The longest the carrier may live, in seconds, after every other life card (`lifetime_base`,
+## `lifetime_mult`, `reach_mult`), so none lengthens it again (Point Blank; docs/milestones/
+## staff-language.md, L1). 0 for none; with several cards that set one, the shortest counts.
+@export var lifetime_most: float = 0.0
 
 # --- Range (reach) ----------------------------------------------------------------------
 
@@ -330,6 +339,7 @@ func ranges() -> Dictionary:
 		"speed_mult": Vector2(0.1, 4.0),
 		"radius_mult": Vector2(0.25, 4.0),
 		"wind_down_mult": Vector2(0.1, 4.0),
+		"wind_down_add": Vector2(-1.0, 1.0),
 		"wind_up_add": Vector2(0.0, 5.0),
 		"wind_up_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
@@ -340,6 +350,7 @@ func ranges() -> Dictionary:
 		"spread_mult": Vector2(0.0, 4.0),
 		"lifetime_mult": Vector2(0.1, 4.0),
 		"lifetime_base": Vector2(0.0, 30.0),
+		"lifetime_most": Vector2(0.0, 30.0),
 		"reach_mult": Vector2(0.1, 4.0),
 		"speed_start": Vector2(0.1, 4.0),
 		"speed_end": Vector2(0.0, 4.0),

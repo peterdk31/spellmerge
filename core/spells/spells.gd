@@ -956,6 +956,10 @@ func component_stats(id: StringName) -> PackedStringArray:
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
 				out.append("%s x%s" % [pair[0], _short(float(pair[1]))])
+		if not is_zero_approx(modifier.wind_down_add):
+			out.append("Delay %s%ss" % ["+" if modifier.wind_down_add > 0.0 else "", _short(modifier.wind_down_add)])
+		if modifier.lifetime_most > 0.0:
+			out.append("Life %ss at most" % _short(modifier.lifetime_most))
 		if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
 			out.append("Speed x%s to x%s" % [_short(modifier.speed_start), _short(modifier.speed_end)])
 		if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0):

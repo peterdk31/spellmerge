@@ -16,7 +16,7 @@ const ROWS: Array = [
 	[CLOSE, 2, 1.0, Vector2(380.0, 90.0), Vector2(590.0, 90.0), "foe far: when close is skipped"],
 	[CLOSE, 3, 1.0, Vector2(380.0, 260.0), Vector2(440.0, 260.0), "foe close: it leaves"],
 ]
-const SHOT_AT: int = 14
+const SHOT_AT: int = 6
 
 
 func take() -> void:

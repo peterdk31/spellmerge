@@ -26,6 +26,10 @@ const int INSET_MOST = 8;
 const int STATES = 16;
 
 uniform float view_time = 0.0;
+// Art pixels a world pixel (ArtDetail, core/display/art_detail.gd: 2 once the floor states are drawn
+// at 2x detail): a cell is 16 world px, 16 * art_detail art px; its edges, corners, insets and glints
+// are whole art pixels.
+uniform int art_detail = 1;
 // The room's cover grid (the sprite's own texture, handed again whenever it is).
 uniform sampler2D cells : filter_nearest;
 uniform vec4 fills[STATES];
@@ -74,9 +78,11 @@ uint pixel_hash(ivec2 p, int salt) {
 
 void fragment() {
 	ivec2 size = max(textureSize(cells, 0), ivec2(1));
-	ivec2 px = ivec2(floor(UV * vec2(size) * CELL));
-	ivec2 cell = clamp(px / ivec2(16), ivec2(0), size - ivec2(1));
-	ivec2 f = px - cell * ivec2(16);
+	int side = 16 * max(art_detail, 1);
+	int last = side - 1;
+	ivec2 px = ivec2(floor(UV * vec2(size) * CELL * float(max(art_detail, 1))));
+	ivec2 cell = clamp(px / ivec2(side), ivec2(0), size - ivec2(1));
+	ivec2 f = px - cell * ivec2(side);
 	vec4 here = texelFetch(cells, cell, 0);
 	int s = int(here.r + 0.5);
 	if (!drawn(s)) {
@@ -87,9 +93,9 @@ void fragment() {
 	bool open_u = drawn(state_of(cell + ivec2(0, -1), size));
 	bool open_d = drawn(state_of(cell + ivec2(0, 1), size));
 	int dl = open_l ? 99 : f.x;
-	int dr = open_r ? 99 : 15 - f.x;
+	int dr = open_r ? 99 : last - f.x;
 	int du = open_u ? 99 : f.y;
-	int dd = open_d ? 99 : 15 - f.y;
+	int dd = open_d ? 99 : last - f.y;
 	vec4 motion = motions[s];
 	int kind = int(motion.x + 0.5);
 	int frames = max(int(motion.y + 0.5), 1);
@@ -97,14 +103,14 @@ void fragment() {
 	frame = motion.w > 0.5 ? frame % frames : min(frame, frames - 1);
 	int inset = 0;
 	if (kind == 1) {
-		inset = (INSET_MOST * (frames - 1 - frame)) / frames;
+		inset = (INSET_MOST * max(art_detail, 1) * (frames - 1 - frame)) / frames;
 	} else if (kind == 2) {
-		inset = (INSET_MOST * (frame + 1)) / frames;
+		inset = (INSET_MOST * max(art_detail, 1) * (frame + 1)) / frames;
 	}
 	// While a cell grows or shrinks it is a shape of its own, inset from all four sides (a whole
 	// puddle drying, freezing or steaming at once shrinks or grows cell by cell, never in one jump);
 	// still, it joins its drawn neighbours.
-	int at = inset > 0 ? shape(f.x, 15 - f.x, f.y, 15 - f.y, inset) : shape(dl, dr, du, dd, 0);
+	int at = inset > 0 ? shape(f.x, last - f.x, f.y, last - f.y, inset) : shape(dl, dr, du, dd, 0);
 	if (at == 0) {
 		if (unders[s].a > 0.0) {
 			int under = shape(dl, dr, du, dd, 0);

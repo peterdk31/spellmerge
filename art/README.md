@@ -73,6 +73,8 @@ The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The pi
 4. **List it** in its folder's `assets.json` (or `art/manifest.json`) with origin, tool and prompt (no living artists or franchises), as before.
 5. **Look at it in the game**, at zoom 1 (a small room, like the screenshots' arena) and at the resting zoom 0.8: a one-pixel line breaks at 0.8 now and then (one art pixel in five is left out there), so lines that must always read are two art pixels. `tests/screenshots/shot_art_detail.gd` shows the curl beside a 1x staff in play, at both zooms; copy it for a side by side of your sprite. Add the screenshots to the PR.
 
+**Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
+
 A generator may draw it (rects only, palette colours, as `tests/core/test_svg_art.gd` wants): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
 
 ## Review questions

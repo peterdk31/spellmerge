@@ -36,6 +36,13 @@ enum Event {
 	## toward that foe, and again after its wind-up while one is near (props W9b, owner 2026-11-12):
 	## a proximity fuse on a bolt, a mine on a rune.
 	NEAR,
+	## While the carrier lives, any staff of its caster casts (its own staff too; a cast leaving,
+	## `Spells._leave`, where `cast_left` is sent): the payload fires from where the carrier is then
+	## (docs/milestones/staff-language.md, L3). Heard once the cast's shots started (a cast whose
+	## every shot starts in a wall is no cast), by the carriers listed before it, so a carrier never
+	## hears the cast that made it; a payload is no cast, so two of them never set each
+	## other off. The echo chamber: `on any cast · familiar · bolt`.
+	ANY_CAST,
 }
 
 ## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
@@ -50,6 +57,7 @@ const NEEDS: Dictionary = {
 	Event.HURT: {"any": CarrierTraits.LASTS},
 	Event.RECAST: {"any": CarrierTraits.LASTS},
 	Event.NEAR: {"any": CarrierTraits.LASTS},
+	Event.ANY_CAST: {"any": CarrierTraits.LASTS},
 	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
 	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
 	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},
@@ -57,8 +65,8 @@ const NEEDS: Dictionary = {
 }
 
 ## The events a carrier that lasts is listed for while it lives, and fires from where it is then
-## (`Spells._lc_join`): a timer's tick, a hurt, a recast, a foe near. The one list of them.
-const LIVE: Array[Event] = [Event.TIMER, Event.HURT, Event.RECAST, Event.NEAR]
+## (`Spells._lc_join`): a timer's tick, a hurt, a recast, a foe near, any cast of its caster. The one list of them.
+const LIVE: Array[Event] = [Event.TIMER, Event.HURT, Event.RECAST, Event.NEAR, Event.ANY_CAST]
 
 @export var event: Event = Event.HIT
 ## Seconds its payload winds up where it fired, before the payload's own cards' wind-up (every

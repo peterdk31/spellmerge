@@ -25,7 +25,10 @@ func take() -> void:
 		return
 	var spells: Node = root.get_node("Spells")
 	var projectiles: Node = root.get_node("Projectiles")
-	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
+	# The world is drawn 1:1 in the picture (ART0), the sheet in layout pixels at `sheet_scale`:
+	# every world point below is a layout point times `k`.
+	var k: float = float(sheet_scale())
+	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN * k))
 	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
 	if actors == null:
 		fail("there is no Actors autoload")
@@ -40,7 +43,7 @@ func take() -> void:
 	for row: Array in CASTS:
 		for at: Vector2 in row[2]:
 			var dummy := Node2D.new()
-			dummy.position = at
+			dummy.position = at * k
 			root.add_child(dummy)
 			place(DUMMY, 1.0, at)
 			projectiles.call("add_target", dummy, 10.0, 1)
@@ -56,6 +59,6 @@ func take() -> void:
 			var every: int = int(row[3])
 			var pressed: bool = frame == ONCE_AT if every == 0 else (frame < PRESSING and frame % every == 0)
 			if pressed:
-				spells.call("press_staff", wizards[0], i, row[1], Vector2.RIGHT, 100.0)
+				spells.call("press_staff", wizards[0], i, (row[1] as Vector2) * k, Vector2.RIGHT, 100.0)
 		await physics_frame
 	await shot("staff_language_play")

@@ -51,7 +51,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const VoidBackdropScript := preload("res://gameplay/feel/void_backdrop.gd")
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const PictureGridScript := preload("res://core/display/picture_grid.gd")
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
 

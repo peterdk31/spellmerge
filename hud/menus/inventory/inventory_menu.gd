@@ -811,7 +811,8 @@ func move_quarter(at: Vector2) -> void:
 # --- Layout and drawing -----------------------------------------------------------------
 
 func _place() -> void:
-	var view: Vector2 = get_viewport_rect().size
+	# In layout pixels: the HUD is laid out at 640 x 360 and drawn at the picture's scale (PictureGrid).
+	var view: Vector2 = PictureGrid.layout_of(get_viewport())
 	var half: Vector2 = (view * 0.5).floor()
 	var right: bool = index % 2 == 1
 	var bottom: bool = index >= 2

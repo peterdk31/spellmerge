@@ -51,7 +51,7 @@ const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const EqualPanesScript := preload("res://gameplay/feel/equal_panes.gd")
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const PictureGridScript := preload("res://core/display/picture_grid.gd")
 
 const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
 ## A split view's zoom: the one picture's closest (the party camera's MAX_ZOOM, the one home of the
@@ -313,13 +313,14 @@ func stage_of(view: int) -> int:
 ## The divider's width between views `a` and `b` (whole pixels): the narrower of theirs where one
 ## is the other's kin (split from it, or merging into it) or neither has kin (both split from or
 ## merging into the one picture), so a line grows in with the newer view and shrinks out with the
-## one merging; any other line was there already, at its full width.
+## one merging; any other line was there already, at its full width. A stage is a layout pixel, `grid`
+## picture pixels (PictureGrid), so the line looks the same in any picture.
 func divider_between(a: int, b: int) -> int:
 	var slot_a: int = _slot_of[a]
 	var slot_b: int = _slot_of[b]
 	if _kin[slot_a] == slot_b or _kin[slot_b] == slot_a or (_kin[slot_a] < 0 and _kin[slot_b] < 0):
-		return mini(_stage[slot_a], _stage[slot_b])
-	return DIVIDER_WIDTH
+		return mini(_stage[slot_a], _stage[slot_b]) * int(grid)
+	return DIVIDER_WIDTH * int(grid)
 
 
 ## A drawn frame, `delta` real seconds on: find this machine's wizards in `table` (`seats`, a bit a

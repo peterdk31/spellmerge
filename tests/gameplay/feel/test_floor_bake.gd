@@ -22,9 +22,10 @@ func _room() -> RoomBase:
 	return (root.get_node("/root/Registry") as RegistryScript).get_resource(&"rooms", ROOM) as RoomBase
 
 
-func _bake() -> BakeScript:
+func _bake(picture_scale: int = 1) -> BakeScript:
 	var bake := BakeScript.new()
 	bake.enabled = true
+	bake.picture_scale = picture_scale
 	return bake
 
 
@@ -88,6 +89,33 @@ func test_the_bake_holds_the_floor_s_layers_in_order_where_they_lie() -> void:
 			check(copy.transform.is_equal_approx(to_bake * _in(shades[i], layout)), "shade %d where it lies on the floor" % i)
 	check_equal(_stack_shown(layout), 3 + shades.size(), "until it is drawn the layers show")
 	check(_bake().bake(layout) == null, "baked once a layout")
+
+
+## At the picture's scale (the shipped 1280 x 720 picture: 2, ART0): the viewport is that many
+## times the floor's size and the layers are drawn into it that much bigger; shown, the floor stands
+## where it stood (its world rect the same), its texture marked at that detail; unshown, as it was.
+func test_the_bake_is_drawn_at_the_picture_s_scale_and_stands_where_the_floor_stood() -> void:
+	var layout: Node = own(_room().build())
+	var ground := layout.get_node("Floor") as Sprite2D
+	var world_rect: Rect2 = ground.transform * ground.get_rect()
+	var offset: Vector2 = ground.offset
+	var scale_before: Vector2 = ground.scale
+	var bake: BakeScript = _bake(2)
+	bake.keep_layers = true
+	var viewport: SubViewport = bake.bake(layout)
+	check(viewport != null, "baked")
+	if viewport == null:
+		return
+	check_equal(viewport.size, Vector2i(ground.texture.get_size() * 2.0), "twice the floor's size each way")
+	var base := Transform2D(0.0, Vector2(2.0, 2.0), 0.0, -ground.get_rect().position * 2.0)
+	check((viewport.get_child(0) as Sprite2D).transform.is_equal_approx(base), "the floor drawn twice as big from the viewport's corner")
+	check((viewport.get_child(2) as Sprite2D).transform.is_equal_approx(base * _in(ground, layout).affine_inverse() * _in(ground.get_node("Glow"), layout)), "the glow twice as big where it lies")
+	bake.show_bake(viewport)
+	check_equal(ArtDetail.of(ground.texture), 2, "the bake's texture is marked at the picture's detail")
+	check((ground.transform * ground.get_rect()).is_equal_approx(world_rect), "the baked floor stands where the floor stood")
+	check(BakeScript.unshow(layout), "unshown")
+	check(ground.offset.is_equal_approx(offset) and ground.scale.is_equal_approx(scale_before), "its offset and scale as they were")
+	check((ground.transform * ground.get_rect()).is_equal_approx(world_rect), "and where it stood")
 
 
 func test_drawn_the_floor_shows_the_bake_and_its_stack_is_one_item() -> void:

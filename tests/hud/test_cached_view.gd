@@ -293,7 +293,9 @@ func test_the_content_is_drawn_where_the_panel_is() -> void:
 	await process_frame
 	var cache: CachedViewScript = _cache()
 	var content: Control = cache.content()
-	check_equal(content.position, cache.get_global_transform_with_canvas().origin, "the content is drawn at the panel's own place on the screen")
+	var on_screen: Transform2D = cache.get_global_transform_with_canvas()
+	check_equal(content.position * on_screen.get_scale(), on_screen.origin, "the content is drawn at the panel's own place on the screen (in its layer's pixels)")
+	check_equal(cache.view().canvas_transform.get_scale(), on_screen.get_scale(), "as finely as the picture draws it live")
 	check_equal(content.size, cache.size, "the content takes the panel's room")
 	check_equal(cache.view().size, Vector2i(cache.get_viewport().get_visible_rect().size), "in a picture the screen's size, so it lands where it did drawn live")
 	check_equal(cache.get_combined_minimum_size(), content.get_combined_minimum_size(), "the panel is as big as its content asks")

@@ -347,6 +347,18 @@ func test_feel_with_interaction_off_pushes_nothing_and_its_lights_rest() -> void
 # --- Nothing left over ----------------------------------------------------------------------------
 
 func test_flipping_every_switch_leaves_nothing_over() -> void:
+	# The world as the game's cameras show it at zoom 1: PictureGrid.SIZE of it in any picture (no
+	# camera here; at the 1280 x 720 picture an identity transform would show four times the world,
+	# and the motes' region chunks, which creep up by one every few rounds of flips whatever the
+	# picture, would creep sooner: ART0's note in docs/LOG.md).
+	var shown_as: Transform2D = root.canvas_transform
+	var by: float = float(PictureGrid.scale_in(root))
+	root.canvas_transform = Transform2D(0.0, Vector2(by, by), 0.0, Vector2.ZERO)
+	await _flip_every_switch()
+	root.canvas_transform = shown_as
+
+
+func _flip_every_switch() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]

@@ -102,7 +102,7 @@ func test_one_wizard_is_seen_at_the_default_zoom_and_an_enemy_is_not_held() -> v
 	_party.look(_table, 0b0001)
 	_party.snap()
 	check(is_equal_approx(PartyCameraScript.MAX_ZOOM, 0.8), "the default zoom is 0.8")
-	check(is_equal_approx(_camera.zoom.x, PartyCameraScript.MAX_ZOOM), "one wizard: the default zoom (%f)" % _camera.zoom.x)
+	check(is_equal_approx(_zoom(_camera), PartyCameraScript.MAX_ZOOM), "one wizard: the default zoom (%f)" % _zoom(_camera))
 	check_equal(_camera.position, Vector2(100.0, 100.0), "on the wizard, not between it and the enemy")
 	_party.look(_table, 0)
 	check_equal(_party.target_position, Vector2(100.0, 100.0), "nor with no seat here: everyone held is every seat's wizard")
@@ -118,5 +118,11 @@ func test_a_room_smaller_than_the_default_picture_is_seen_closer() -> void:
 	_body(Vector2(100.0, 100.0), 0)
 	_party.look(_table, 0b0001)
 	_party.snap()
-	check(is_equal_approx(_camera.zoom.x, 1.0), "the smallest room fills the picture (%f)" % _camera.zoom.x)
+	check(is_equal_approx(_zoom(_camera), 1.0), "the smallest room fills the picture (%f)" % _zoom(_camera))
 	check(Rect2(0.0, 0.0, 640.0, 360.0).grow(0.01).encloses(_party.visible_rect()), "nothing past the room is shown: %s" % _party.visible_rect())
+
+
+## The camera's zoom as the cameras count it: the world SIZE of a picture shows at zoom 1
+## (core/display/picture_grid.gd), whatever the picture's size.
+func _zoom(camera: Camera2D) -> float:
+	return camera.zoom.x / float(PictureGrid.scale_in(camera.get_viewport() if camera.is_inside_tree() else null))

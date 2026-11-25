@@ -25,7 +25,7 @@ extends RefCounted
 ## camera, it jumps to the view instead of easing. Shake (Feel) moves only the camera's `offset`, so the two do not clash.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
-const PictureGridScript := preload("res://gameplay/feel/picture_grid.gd")
+const PictureGridScript := preload("res://core/display/picture_grid.gd")
 
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0

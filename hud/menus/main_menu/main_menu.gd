@@ -139,6 +139,8 @@ func _ready() -> void:
 	# Over the world's layer, whatever draws there (a run left for the menu: its last motes fading,
 	# the spell light's multiply at its z), as a screen that covers it should be.
 	z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	# Laid out in layout pixels (640 x 360) and drawn at the picture's scale (core/display/picture_grid.gd).
+	PictureGrid.fit_control(self)
 	_version.text = BuildInfo.describe()
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript

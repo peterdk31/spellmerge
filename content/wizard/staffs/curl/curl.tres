@@ -1,7 +1,18 @@
-[gd_resource type="Resource" script_class="StaffBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="StaffBase" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="1_base"]
-[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head.svg" id="2_head"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head@2x.svg" id="2_head"]
+[ext_resource type="Script" path="res://core/base/face_art.gd" id="3_face"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/eyes@2x.svg" id="4_eyes"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/brows@2x.svg" id="5_brows"]
+
+[sub_resource type="Resource" id="Resource_face"]
+script = ExtResource("3_face")
+eyes = ExtResource("4_eyes")
+brows = ExtResource("5_brows")
+frame = Vector2i(32, 16)
+eyes_origin = Vector2(2, 2)
+brows_origin = Vector2(2, 10)
 
 [resource]
 script = ExtResource("1_base")
@@ -17,3 +28,4 @@ head = ExtResource("2_head")
 tip = 14.0
 face_style = 0
 resting_mood = 0
+face = SubResource("Resource_face")

@@ -1,13 +1,31 @@
 {
 	"assets": [
 		{
-			"path": "content/wizard/staffs/curl/head.svg",
+			"path": "content/wizard/staffs/curl/brows@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
-			"tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
-			"prompt": "A sheet of 48x48 frames of a floating living staff for a top-down 32x32 pixel game, the curl head: a big spiral a turn and three quarters round a gem in the player colour, with a gold collar; the curl stays on top of the shaft whichever way it points. A Wood shaft with a gold grip wrap, the grip at (24, 27) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the same staff with the head in each player colour ramp (blue, rose, green, purple). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tool": "Claude (SVG rects drawn by tools/staff_art.py from shape rules, ART0's pilot of the 64x64 redraw, 2026-11-25)",
+			"prompt": "The Optimist's floating eyebrows at 2x detail for a 32x32-unit living staff drawn in 64x64 pixel art, 32x16 frames: five columns of moods (neutral, raised, angry, furious, worried) as dark strokes two pixels thick with one-pixel ends, eight pixels long, stepping between rows 0 and 7 above the eyes, the right brow mirrored. Only non-overlapping rect elements, whole-number coordinates, the outline colour from docs/STYLE.md."
+		},
+		{
+			"path": "content/wizard/staffs/curl/eyes@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (SVG rects drawn by tools/staff_art.py from shape rules, ART0's pilot of the 64x64 redraw, 2026-11-25)",
+			"prompt": "The Optimist's cartoon eye pair at 2x detail for a 32x32-unit living staff drawn in 64x64 pixel art, 32x16 frames: two round 10x14 eyes with a one-pixel dark rim, Bone light whites shaded Bone base toward the bottom right, a round dark pupil with a Bone light glint at its top left, looking in nine directions (two pixels a step), then a blink drawn as a closed, smiling lid. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		},
+		{
+			"path": "content/wizard/staffs/curl/head@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (SVG rects drawn by tools/staff_art.py from shape rules, ART0's pilot of the 64x64 redraw, 2026-11-25)",
+			"prompt": "A sheet of 96x96 frames of a floating living staff at 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, the curl head redrawn from its 48x48 sheet: a Wood shaft bowing gently between the grip and the head, gold Spark grip wrap and band, a spiral a turn and three quarters round a bright round gem in the player colour with a Bone light glint; the curl stays on top of the shaft whichever way it points. The grip at (48, 54) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps, each drawn, never rotated; 4 rows, the same staff with the gem in each player colour ramp (blue, rose, green, purple). Light from the top-left, a one-pixel dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
 		}
 	]
 }

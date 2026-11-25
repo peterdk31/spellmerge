@@ -253,13 +253,13 @@
       "prompt": "The golden example of a player character, style N: frame 1 of content/wizard/base/wizard_idle.svg (eyes open) with content/wizard/base/wizard_hat_p1.svg over it, as one 32x32 picture for the Style Guide page and the starter kit. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/kit/golden_staff.svg",
+      "path": "art/kit/golden_staff@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "good",
-      "tool": "Claude (SVG rects composited by a small script from the game's own sheets)",
-      "prompt": "The golden example of a player character, a living staff: frame 15 (pointing up and to the right) of the player 1 row of content/wizard/staffs/curl/head.svg, with the cheer eyes looking up-right from art/faces/eyes.svg and the neutral brows from art/faces/brows.svg over it, the eyes' top-left 8 px above the grip, as one 48x48 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (SVG rects drawn by tools/staff_art.py, which composites the game's own sheets, ART0, 2026-11-25)",
+      "prompt": "The golden example of a player character at 2x detail, a living staff: frame 14 (pointing up and to the right) of the player 1 row of content/wizard/staffs/curl/head@2x.svg, with the Optimist's eyes looking up-right from content/wizard/staffs/curl/eyes@2x.svg and the neutral brows from brows@2x.svg over it, the eyes' top-left 16 art px (8 world px) above the grip, as one 96x96 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/kit/golden_stray.svg",

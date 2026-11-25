@@ -48,6 +48,9 @@ var _asked_frame: int = -1
 var _premultiplied: CanvasItemMaterial = null
 ## This control's place on its screen, where the content is drawn in the picture (`_fit`).
 var _origin: Vector2 = Vector2.ZERO
+## Picture pixels a pixel of this control's own (its canvas's scale: the HUD's layer is drawn at the
+## picture's, core/display/picture_grid.gd), so the content is drawn in the picture as finely as live.
+var _scale: Vector2 = Vector2.ONE
 
 
 func _init() -> void:
@@ -156,11 +159,14 @@ func _get_minimum_size() -> Vector2:
 
 func _draw() -> void:
 	if _view != null and not is_live():
+		# The picture's pixels under this control, drawn 1:1 through its scale (a layer drawn at the
+		# picture's scale, PictureGrid: `_scale` picture pixels a layout pixel).
 		var room := Rect2(Vector2(-PAD, -PAD), size + Vector2(PAD * 2, PAD * 2))
-		draw_texture_rect_region(_view.get_texture(), room, Rect2(_origin + room.position, room.size))
+		draw_texture_rect_region(_view.get_texture(), room, Rect2(_origin + room.position * _scale, room.size * _scale))
 
 
-## Where this control is on its screen: where the content is drawn in the picture.
+## Where this control is on its screen: where the content is drawn in the picture (picture pixels;
+## the content's own position is that in its canvas's pixels, the picture's divided by its scale).
 func screen_origin() -> Vector2:
 	return _origin
 
@@ -178,10 +184,15 @@ func _fit() -> void:
 	var screen := Vector2i(get_viewport().get_visible_rect().size)
 	if _view.size != screen:
 		_view.size = screen
-	var origin: Vector2 = get_global_transform_with_canvas().origin
-	if origin != _origin or _content.position != origin:
+	var on_screen: Transform2D = get_global_transform_with_canvas()
+	var origin: Vector2 = on_screen.origin
+	var by: Vector2 = on_screen.get_scale()
+	if by != _scale:
+		_scale = by
+		_view.canvas_transform = Transform2D(0.0, by, 0.0, Vector2.ZERO)
+	if origin != _origin or _content.position != origin / by:
 		_origin = origin
-		_content.position = origin
+		_content.position = origin / by
 	queue_redraw()
 	mark()
 

@@ -68,3 +68,5 @@ func _copy(to: Sprite2D, from: Sprite2D) -> void:
 	to.position = from.position
 	to.offset = from.offset
 	to.centered = from.centered
+	# At its art's size in the world (a 2x head at half: ArtDetail), not the body's stretch of the moment.
+	ArtDetail.fit(to)

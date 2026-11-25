@@ -401,7 +401,7 @@ func test_the_dash_look_is_on_while_dashing() -> void:
 
 
 func test_the_sprite_stretches_during_a_dash() -> void:
-	check_equal(_sprite(_dashing_wizard(&"move_right")).scale, StaffLook.DASH_STRETCH, "the sprite stretches during the dash")
+	check_equal(_stretch(_sprite(_dashing_wizard(&"move_right"))), StaffLook.DASH_STRETCH, "the sprite stretches during the dash")
 
 
 func test_the_sprite_leans_into_a_dash_to_the_right() -> void:
@@ -414,13 +414,13 @@ func test_the_dash_look_goes_off_when_the_dash_ends() -> void:
 
 func test_the_sprite_is_back_to_normal_after_the_dash() -> void:
 	var sprite: Sprite2D = _sprite(_dashed_wizard())
-	check(sprite.scale == Vector2.ONE and sprite.rotation == 0.0, "the sprite is back to normal after the dash: %s, %s" % [sprite.scale, sprite.rotation])
+	check(_stretch(sprite) == Vector2.ONE and sprite.rotation == 0.0, "the sprite is back to normal after the dash: %s, %s" % [_stretch(sprite), sprite.rotation])
 
 
 ## The stretch follows the dash axis and the lean follows its side, also for a sprite that faces
 ## left.
 func test_a_dash_to_the_left_stretches_sideways() -> void:
-	check_equal(_sprite(_dashing_wizard(&"move_left")).scale, StaffLook.DASH_STRETCH, "a dash to the left stretches sideways")
+	check_equal(_stretch(_sprite(_dashing_wizard(&"move_left"))), StaffLook.DASH_STRETCH, "a dash to the left stretches sideways")
 
 
 func test_a_dash_to_the_left_leans_left() -> void:
@@ -428,7 +428,7 @@ func test_a_dash_to_the_left_leans_left() -> void:
 
 
 func test_a_dash_up_stretches_upright() -> void:
-	check_equal(_sprite(_dashing_wizard(&"move_up")).scale, _vertical_stretch(), "a dash up stretches upright")
+	check_equal(_stretch(_sprite(_dashing_wizard(&"move_up"))), _vertical_stretch(), "a dash up stretches upright")
 
 
 func test_a_dash_straight_up_does_not_lean() -> void:
@@ -436,7 +436,7 @@ func test_a_dash_straight_up_does_not_lean() -> void:
 
 
 func test_a_dash_down_stretches_upright() -> void:
-	check_equal(_sprite(_dashing_wizard(&"move_down")).scale, _vertical_stretch(), "a dash down stretches upright")
+	check_equal(_stretch(_sprite(_dashing_wizard(&"move_down"))), _vertical_stretch(), "a dash down stretches upright")
 
 
 func test_a_staff_aimed_left_dashing_right_still_leans_right() -> void:
@@ -503,3 +503,8 @@ func test_the_dash_ghosts_hide_when_the_dash_ends() -> void:
 	var ghosts: Array[Sprite2D] = _ghosts(wizard)
 	WizardFixture.look(wizard)._apply_dash_look(false)
 	check(ghosts.size() > 0 and not ghosts[0].visible, "hidden when the dash ends")
+
+
+## The sprite's stretch: its scale without its art's detail (a 2x head is drawn at half, ArtDetail).
+func _stretch(sprite: Sprite2D) -> Vector2:
+	return sprite.scale * float(ArtDetail.of(sprite.texture))

@@ -53,7 +53,9 @@ extends Resource
 
 ## The body while this staff is shown (a player's floating staff): a sheet of 48x48 frames, one
 ## column per direction (16, clockwise from pointing right), one row per ramp (the player
-## colour, 0-3), the grip at (24, 27) of each frame. None: the body keeps its own look.
+## colour, 0-3), the grip at (24, 27) of each frame. A sheet drawn at 2x detail (`head@2x.svg`,
+## ArtDetail) has 96x96 frames, the grip at (48, 54), and is drawn at half its size. None: the body
+## keeps its own look.
 @export var head: Texture2D = null
 ## Pixels from the grip to where shots leave, along the aim; 0 keeps the actor's own reach.
 @export var tip: float = 0.0
@@ -65,6 +67,10 @@ extends Resource
 ## Face.Mood, in that order).
 @export_enum("cheer", "eager", "sleepy", "stern", "stray", "stray_one") var face_style: int = 0
 @export_enum("neutral", "raised", "angry", "furious", "worried") var resting_mood: int = 0
+## Face sheets of its own (`FaceArt`, in its folder), worn while it is shown, in place of the shared
+## eyes' `face_style` row and brows (a head redrawn at 2x detail wears eyes drawn as finely: the
+## curl's). None: the shared sheets. Its `face_style` still sets the face's habits.
+@export var face: FaceArt = null
 
 
 ## The name shown: its own, else its id (items I6: a staff lying on the ground).

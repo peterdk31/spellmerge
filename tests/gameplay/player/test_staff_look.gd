@@ -86,13 +86,17 @@ func test_the_shot_leaves_from_the_tip_of_the_head_on_show_in_every_direction() 
 ## `butt_position` is that far behind the hand, against the aim, for the staff on show.
 func test_the_butt_is_where_the_staffs_art_ends_behind_the_grip() -> void:
 	for staff: StaffBase in _heads:
+		# Measured in world pixels: a sheet at 2x detail (ArtDetail) has two art pixels a world pixel.
 		var image: Image = staff.head.get_image()
-		var left: int = 48
-		for x in 48:
-			for y in 48:
+		var detail: int = ArtDetail.of(staff.head)
+		var frame: int = StaffLook.FRAME_SIZE * detail
+		var left: int = frame
+		for x in frame:
+			for y in frame:
 				if image.get_pixel(x, y).a > 0.1:
 					left = mini(left, x)
-		check(absf(StaffLook.GRIP.x - float(left) - staff.butt) <= 1.0, "%s: its art ends %d px behind the grip, its butt says %.0f" % [staff.id, int(StaffLook.GRIP.x) - left, staff.butt])
+		var behind: float = StaffLook.GRIP.x - float(left) / float(detail)
+		check(absf(behind - staff.butt) <= 1.0, "%s: its art ends %.1f px behind the grip, its butt says %.0f" % [staff.id, behind, staff.butt])
 	var body := _wizard()
 	for at in _heads.size():
 		_press(at)
@@ -251,7 +255,7 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.25, &"", Color.WHITE, 1.0, Vector2(20.0, 0.0), 1.0, 1.0]
 	_world.run(1, false)
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_squash") as float, 0.25), "and smushed as the staff is squashed, landing")
-	var drawn: Vector2 = sprite.global_transform * (Vector2.RIGHT * body.reach())
+	var drawn: Vector2 = sprite.global_transform * ArtDetail.to_art(sprite.texture, Vector2.RIGHT * body.reach())
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, (drawn - sprite.global_position).length()), "still on the drawn tip of the squashed staff")
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.3, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
 	_world.run(1, false)
@@ -326,7 +330,9 @@ func test_a_pose_stretches_the_body_and_shows_its_mood() -> void:
 	_world.run(1, false)
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.25, &"angry"]
 	_world.run(1, false)
-	check(sprite.scale.x > 1.2 and sprite.scale.y < 0.85, "longer along the aim, thinner across: %s" % sprite.scale)
+	# The stretch is the sprite's scale without its art's detail (a 2x head is drawn at half: ArtDetail).
+	var stretch: Vector2 = sprite.scale * float(ArtDetail.of(sprite.texture))
+	check(stretch.x > 1.2 and stretch.y < 0.85, "longer along the aim, thinner across: %s" % stretch)
 	var face: Face = null
 	for child in body.get_children():
 		if child is Face:
@@ -334,7 +340,7 @@ func test_a_pose_stretches_the_body_and_shows_its_mood() -> void:
 	check(face != null and face.mood() == Face.Mood.ANGRY, "the face shows the pose's mood")
 	_world.fake.staff_poses.erase(body.id)
 	_world.run(1, false)
-	check_equal(sprite.scale, Vector2.ONE, "its scale back after")
+	check_equal(sprite.scale, ArtDetail.draw_scale(sprite.texture), "its scale back after")
 
 
 func test_an_infused_glow_takes_the_infusions_colour() -> void:

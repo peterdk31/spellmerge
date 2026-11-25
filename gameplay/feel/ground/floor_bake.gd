@@ -16,8 +16,15 @@ extends RefCounted
 ## no renderer (a headless run, whose viewports are never drawn) nothing is baked (`enabled`), and a
 ## layout whose layers it cannot copy exactly is left as it is drawn (`bakeable`). A fade of the
 ## layout (its modulate's alpha) scales the premultiplied texture whole, as it would the layers.
-## Memory: one RGBA8 texture of the floor's size a piece (a 704×448 crypt room 1.2 MB), in place of
-## the floor's, the rock face's and the glow's (a drawn room's 2.25 times that). View only: it
+## **At the picture's scale** (the owner's answer on #904, done with the 1280 x 720 picture of
+## 2026-11-25): the viewport is `picture_scale` times the floor's size each way and the layers are
+## drawn into it that much bigger, so the glow and the shades keep the smoothness the picture can show;
+## the floor then shows it at its size in the world (the texture marked at that detail, `ArtDetail`:
+## its sprite's scale divided and offset multiplied by it, put back by `unshow`). The art itself is
+## sampled nearest, so its pixels are the same.
+## Memory: one RGBA8 texture of the floor's size times `picture_scale` squared a piece (a 704×448
+## crypt room 1.2 MB at 1, 4.8 MB at 2, the shipped picture), in place of the floor's, the rock
+## face's and the glow's. View only: it
 ## changes no node the simulation reads (the walls, holes and places stay the layout's).
 
 const SHADER: Shader = preload("res://gameplay/feel/ground/floor_bake.gdshader")
@@ -32,9 +39,14 @@ const SHADE: StringName = &"Shade"
 const BAKE: StringName = &"FloorBake"
 ## The floor's own texture, kept on it while `keep_layers` is on.
 const KEPT_META: StringName = &"floor_bake_kept"
+## The bake pixels a world pixel of a bake's viewport (`picture_scale` as it was baked).
+const SCALE_META: StringName = &"floor_bake_scale"
 
 ## Whether floors are baked (off without a renderer; a test may set it).
 var enabled: bool = DisplayServer.get_name() != "headless"
+## How many bake pixels a world pixel each way: the picture's scale (PictureGrid; 2 in the shipped
+## 1280 x 720 picture), read as a floor is baked; a test may set it.
+var picture_scale: int = 0
 ## The bakes laid and not yet shown, and the frame each was first seen in the tree (-1: not yet).
 var _pending: Array[SubViewport] = []
 var _seen_at: PackedInt64Array = PackedInt64Array()
@@ -62,15 +74,18 @@ func bake(root: Node) -> SubViewport:
 	if ground == null or not bakeable(root):
 		return null
 	var rect: Rect2 = ground.get_rect()
+	var tree := Engine.get_main_loop() as SceneTree
+	var by: int = picture_scale if picture_scale > 0 else PictureGrid.scale_in(tree.root if tree != null else null)
 	var viewport := SubViewport.new()
 	viewport.name = BAKE
-	viewport.size = Vector2i(rect.size)
+	viewport.size = Vector2i(rect.size * float(by))
+	viewport.set_meta(SCALE_META, by)
 	viewport.transparent_bg = true
 	viewport.disable_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
-	# The floor's own pixels at the viewport's (0, 0).
-	var base := Transform2D(0.0, -rect.position)
+	# The floor's own pixels at the viewport's (0, 0), `by` bake pixels each.
+	var base := Transform2D(0.0, Vector2(by, by), 0.0, -rect.position * float(by))
 	var to_floor: Transform2D = _in(ground, root).affine_inverse()
 	viewport.add_child(_sprite_copy(ground, base))
 	for layer: Sprite2D in layers(root):
@@ -127,7 +142,13 @@ func show_bake(viewport: SubViewport) -> void:
 	var holder := root.get_node_or_null(NodePath(SHADE)) as CanvasItem
 	if holder != null:
 		holder.visible = false
-	ground.texture = viewport.get_texture()
+	# The bake at its size in the world: `by` times finer than the floor's art (ArtDetail).
+	var by: int = int(viewport.get_meta(SCALE_META, 1))
+	var baked: ViewportTexture = viewport.get_texture()
+	ArtDetail.mark(baked, by)
+	ground.texture = baked
+	ground.offset *= float(by)
+	ground.scale /= float(by)
 	ground.material = shown_material()
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	for copy: Node in viewport.get_children():
@@ -142,7 +163,10 @@ static func unshow(root: Node) -> bool:
 	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D if root != null else null
 	if ground == null or not ground.has_meta(KEPT_META):
 		return false
+	var by: float = float(ArtDetail.of(ground.texture))
 	ground.texture = ground.get_meta(KEPT_META)
+	ground.offset /= by
+	ground.scale *= by
 	ground.material = null
 	ground.remove_meta(KEPT_META)
 	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D

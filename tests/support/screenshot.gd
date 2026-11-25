@@ -26,7 +26,8 @@ extends SceneTree
 
 const WarmUp := preload("res://tests/support/warm_up.gd")
 const SHOTS_DIR := "user://screenshots"
-## The game's screen, which every sheet is laid out on.
+## The game's screen, which every sheet is laid out on: its layout pixels (PictureGrid.SIZE), drawn
+## at the picture's scale (`sheet_scale`: 2 in the 1280 x 720 picture).
 const SCREEN := Vector2(640.0, 360.0)
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const PinnedRun := preload("res://bench/pinned_run.gd")
@@ -138,10 +139,12 @@ func save_crop(image: Image, at: Vector2, shot_name: String, half: Vector2i = Ve
 	save(crop, shot_name)
 
 
-## The `half` × 2 pixels of `image` round the screen point `at` (kept inside the image), at the
-## screen's scale.
+## The `half` × 2 layout pixels of `image` round the screen point `at` (kept inside the image), at the
+## screen's scale: `half` times the picture's scale in picture pixels, so a crop shows as much of the
+## game in any picture, as finely as it is drawn.
 func crop_round(image: Image, at: Vector2, half: Vector2i = Vector2i(48, 48)) -> Image:
 	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
+	half *= sheet_scale()
 	var middle := Vector2i(at * scale_to_image)
 	var corner: Vector2i = (middle - half).clamp(Vector2i.ZERO, image.get_size() - half * 2)
 	return image.get_region(Rect2i(corner, half * 2))
@@ -159,6 +162,11 @@ func tap(player: int, action: StringName) -> void:
 	input.call("send_virtual", player, action, 0.0)
 
 
+## Picture pixels a layout pixel (PictureGrid): what a sheet laid out on SCREEN is drawn at.
+func sheet_scale() -> int:
+	return PictureGrid.scale_in(root)
+
+
 ## The crypt floor tiled over the whole screen, behind everything a sheet adds.
 func lay_floor() -> void:
 	var floor_sprite := Sprite2D.new()
@@ -167,18 +175,20 @@ func lay_floor() -> void:
 	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	floor_sprite.region_enabled = true
 	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN)
+	floor_sprite.scale = Vector2.ONE * float(sheet_scale())
 	floor_sprite.z_index = -10
 	root.add_child(floor_sprite)
 
 
-## `texture` with its top left corner at `at`, `scale` times its size, unfiltered.
+## `texture` with its top left corner at `at` (layout pixels), `scale` times its size in the world
+## (ArtDetail: a 2x texture's at half), unfiltered, at the picture's scale.
 func place(texture: Texture2D, scale: float, at: Vector2, tint: Color = Color.WHITE) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.texture = texture
 	sprite.centered = false
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.scale = Vector2(scale, scale)
-	sprite.position = at
+	sprite.scale = Vector2(scale, scale) * float(sheet_scale()) * ArtDetail.draw_scale(texture)
+	sprite.position = at * float(sheet_scale())
 	sprite.modulate = tint
 	root.add_child(sprite)
 	return sprite
@@ -187,6 +197,7 @@ func place(texture: Texture2D, scale: float, at: Vector2, tint: Color = Color.WH
 func label(text: String, at: Vector2, font_size: int = 10) -> void:
 	var line := Label.new()
 	line.text = text
-	line.position = at
+	line.position = at * float(sheet_scale())
+	line.scale = Vector2.ONE * float(sheet_scale())
 	line.add_theme_font_size_override("font_size", font_size)
 	root.add_child(line)

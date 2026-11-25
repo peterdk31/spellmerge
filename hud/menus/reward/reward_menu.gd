@@ -350,7 +350,7 @@ func move_room(next: Rect2) -> void:
 func _lay_out() -> void:
 	var space: Rect2 = room
 	if not space.has_area():
-		space = get_viewport_rect() if is_inside_tree() else Rect2(Vector2.ZERO, Vector2(640.0, 360.0))
+		space = Rect2(Vector2.ZERO, PictureGrid.layout_of(get_viewport() if is_inside_tree() else null))
 	# Too tall for the room: fewer cards in view, each wider, so their words take fewer lines.
 	var most: int = _cards.size()
 	var card_height: float = 0.0

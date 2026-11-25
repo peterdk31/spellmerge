@@ -701,6 +701,8 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	var material := batch.material as ShaderMaterial
 	material.set_shader_parameter(&"frame_size", Vector2(kind.frame_size))
 	material.set_shader_parameter(&"sheet_size", Vector2(kind.sheet.get_size()))
+	# A sheet drawn at 2x detail stands at half its size in the world (ArtDetail).
+	material.set_shader_parameter(&"art_detail", float(ArtDetail.of(kind.sheet)))
 	material.set_shader_parameter(&"cell_times", _times_texture)
 	# Its view grid's texels are cells from the grid's corner in the world (connected biomes CB3b).
 	material.set_shader_parameter(&"cell_origin", layout.origin)

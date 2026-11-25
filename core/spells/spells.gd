@@ -1339,7 +1339,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	# A cast the staff cannot pay is skipped (docs/milestones/cast-timing.md, T3): the press fires
 	# the first one after it that it can, up to the cycle's end. With none, the cycle ends there:
 	# its cooldown runs, nothing leaves and nothing is paid.
-	var firing: int = _firing_cast(index, mana)
+	var firing: int = _firing_cast(index, mana, true)
 	if firing < 0:
 		_cursor[index] = 0
 		_cooldown[index] = compiled.staff.cooldown if compiled.staff != null else 0.0
@@ -3828,7 +3828,7 @@ func close_caster(actor: int) -> void:
 ## T3): the one at the cursor, or the first after it the mana pays, up to the cycle's end (the
 ## ones before it are skipped); -1 when the mana pays none of them, or the staff has no build.
 ## INF mana: the one at the cursor.
-func _firing_cast(index: int, mana: float) -> int:
+func _firing_cast(index: int, mana: float, live: bool = false) -> int:
 	var compiled: CompiledStaff = _installed[index]
 	if compiled == null or compiled.is_empty():
 		return -1
@@ -3837,16 +3837,19 @@ func _firing_cast(index: int, mana: float) -> int:
 	for at in range(mini(_cursor[index], count - 1), count):
 		var cast: CompiledCast = compiled.casts[at]
 		# A cast whose conditions do not hold is skipped as one the mana does not pay (L2).
-		if mana >= cast.mana and (cast.when_ids.is_empty() or _when_holds(actor, cast)):
+		if mana >= cast.mana and (cast.when_ids.is_empty() or _when_holds(actor, cast, live)):
 			return at
 	return -1
 
 
 ## True when every condition of `cast` holds for `actor` now (docs/milestones/staff-language.md,
 ## L2): `hurt`, its health below the amount's share of its most (`sense_health`); `close`, a foe of
-## its team within the amount's pixels of its body (the projectile manager's anchor for it). Read
-## from the simulation only, so the same on every machine.
-func _when_holds(actor: int, cast: CompiledCast) -> bool:
+## its team whose hit shape is within the amount's pixels of its body (the projectile manager's
+## anchor for it). Read from the simulation only, so the same on every machine. `live`: the press,
+## in the tick, which may bring the target grid up to date (`nearest_target`); every other ask (the
+## corner panel every frame, an AI's look) is a pure read of the grid as it stands
+## (`has_foe_near`), so a frame drawn between ticks changes no state.
+func _when_holds(actor: int, cast: CompiledCast, live: bool = false) -> bool:
 	for i in cast.when_ids.size():
 		var amount: float = cast.when_amounts[i]
 		match cast.when_ids[i]:
@@ -3855,7 +3858,12 @@ func _when_holds(actor: int, cast: CompiledCast) -> bool:
 					return false
 			&"close":
 				var body: Vector2 = projectiles.get_anchor(actor) if projectiles != null else Vector2.INF
-				if not body.is_finite() or projectiles.nearest_target(body, amount, HITS, null, null, _team(actor)) == null:
+				var team: int = _team(actor)
+				if not body.is_finite() or team == ActorsScript.NONE:
+					return false
+				if live and projectiles.nearest_target(body, amount, HITS, null, null, team) == null:
+					return false
+				if not live and not projectiles.has_foe_near(body, amount, HITS, team):
 					return false
 			_:
 				return false

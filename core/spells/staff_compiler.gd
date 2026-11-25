@@ -663,8 +663,6 @@ static func _look_of(elements: Array, modifiers: Array) -> int:
 	return ProjectilesScript.pack_look(kinds)
 
 
-## The next card slot to read, or -1 when the group must end: no card is left, or the next
-## card was already read in this cast (which is what keeps wrap-around finite).
 ## Adds the conditions (`WHEN` cards) of `modifiers` to the cast being read, each name once with the
 ## strictest amount, the smallest (both must hold: below the lower share, within the nearer reach).
 func _take_conditions(modifiers: Array[ModifierBase]) -> void:
@@ -689,6 +687,8 @@ static func when_text(when_ids: Array[StringName]) -> String:
 	return "only when " + " and ".join(words)
 
 
+## The next card slot to read, or -1 when the group must end: no card is left, or the next
+## card was already read in this cast (which is what keeps wrap-around finite).
 func _next_slot() -> int:
 	var steps: int = 0
 	var crossed: bool = false

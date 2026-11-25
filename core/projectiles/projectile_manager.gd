@@ -6637,6 +6637,26 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	return _targets[best]
 
 
+## True when a target on `layers` that is a foe of `team` (not of `team`, Actors.NONE for none, and
+## never the world's) has a hit shape overlapping the circle (`point`, `radius`): a staff-language
+## condition's `close` (docs/milestones/staff-language.md, L2). A pure read: it writes nothing, not
+## `nearest_point` and not the grid (it does not refresh a stale one, so between ticks it answers from
+## the grid as the simulation last left it), so the HUD may ask it every frame without changing the
+## state a tick hashes. Allocation-free.
+func has_foe_near(point: Vector2, radius: float, layers: int, team: int) -> bool:
+	if not point.is_finite() or not is_finite(radius) or _cell_head.size() < _grid_w * _grid_h:
+		return false
+	var cells: Vector4i = _query_cells(point, radius)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if _query_match(t, point, radius, layers, -1) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team):
+					return true
+				t = _target_next[t]
+	return false
+
+
 ## `nearest_target`'s search in GDScript: the reference `ShotKernel.nearest_target` mirrors, and the
 ## fallback. The row of the nearest target (by distance to its centre) or -1.
 func _gd_nearest_row(point: Vector2, radius: float, layers: int, skip: int, skip_also: int, team: int) -> int:

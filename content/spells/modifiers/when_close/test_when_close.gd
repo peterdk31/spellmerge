@@ -50,3 +50,22 @@ func test_the_builder_says_it() -> void:
 	var lines: PackedStringArray = arena.spells.component_stats(&"when_close")
 	arena.free_all()
 	check(lines.has("Only when close"), "its numbers line: %s" % [lines])
+
+
+func test_asking_changes_no_state() -> void:
+	# The corner panel asks `firing_cast` every drawn frame, between ticks: a `close` cast must be
+	# a pure read there, or a frame drawn on one machine and not another parts their state hashes.
+	var arena := ArenaScript.new(root)
+	arena.add_imp(Vector2(60.0, 0.0))
+	arena.install_cards(0, 0, ["when_close", "slam", "bolt"])
+	arena.projectiles.set_anchor(0, Vector2.ZERO)
+	arena.run(0.05)
+	arena.projectiles.nearest_point = Vector2(-7.0, -7.0)
+	var fill: Variant = arena.projectiles.get(&"_grid_fill")
+	var stale: Variant = arena.projectiles.get(&"_grid_stale")
+	check_equal(arena.spells.firing_cast(0, 0, 100.0), 0, "the foe is close")
+	check(arena.spells.cast_ready(0, 0, 1.0, 100.0), "ready")
+	check_equal(arena.projectiles.nearest_point, Vector2(-7.0, -7.0), "nearest_point is not written")
+	check_equal(arena.projectiles.get(&"_grid_fill"), fill, "the grid is not refilled")
+	check_equal(arena.projectiles.get(&"_grid_stale"), stale, "nor marked")
+	arena.free_all()

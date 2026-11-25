@@ -67,7 +67,7 @@ X is read from the simulation at the press, the same on every machine:
 | `close` | **When Close**: "This cast leaves only while a foe is close to you." | a foe of the caster (`Actors.is_foe`) stands within `behaviour_strength` px of its body | 96 px |
 
 - **Health:** Spells is in `core/` and does not read Combat's health. The Caster tells it, as it hands the mana: when it attaches and whenever the body's `Health.changed` fires, `Spells.sense_health(actor, share)` sets a per-actor share (state in Spells, so a snapshot keeps it and the hash covers it; 1 for an actor that never told, and again when its id is closed). A body with no health counts as whole.
-- **Close:** Spells asks the projectile manager for the nearest target of the caster's team's foes within the reach, from the caster's anchor (`nearest_target`, as `on near` does). The HUD and the AI ask it as often as they ask whether a staff is ready; it is one look in the target grid.
+- **Close:** a foe's hit shape within the reach of the caster's anchor, by the caster's team. At the press (in the tick) Spells asks `nearest_target`, as `on near` does. Every other ask (the corner panel every drawn frame, an AI's look) goes through `ProjectileManager.has_foe_near`, a pure read of the target grid as the simulation left it, so a frame drawn between ticks changes no state (`test_when_close.gd` checks it).
 - A new X is a name in `ModifierBase.WHEN_IDS` and a line in `Spells._when_holds`, never a card's script.
 
 ### Enemy staffs

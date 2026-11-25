@@ -129,8 +129,8 @@ enum Behaviour {
 }
 
 ## What a `WHEN` card may ask, by name (`when_id`), and what its strength means: `hurt`, the caster's
-## health is below that share of its most (0.5: below half); `close`, a foe of the caster stands
-## within that many pixels of its body. A new condition is a name here and a line in
+## health is below that share of its most (0.5: below half); `close`, the hit shape of a foe of the
+## caster is within that many pixels of its body. A new condition is a name here and a line in
 ## `Spells._when_holds`, never a card's script.
 const WHEN_IDS: Array[StringName] = [&"hurt", &"close"]
 

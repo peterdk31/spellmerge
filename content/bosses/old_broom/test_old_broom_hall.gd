@@ -35,7 +35,8 @@ func before_each() -> void:
 	registry.scan()
 	kinds.clear()
 	for item: Resource in registry.get_all(&"cover"):
-		if item is CoverKind:
+		# The kinds that grow: the floor's own cover lies on every open cell (floor.md).
+		if item is CoverKind and not (item as CoverKind).fills_floor:
 			kinds.append(item as CoverKind)
 	halls.clear()
 	halls.append(HallData as RoomBase)

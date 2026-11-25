@@ -67,6 +67,8 @@ public:
 	int64_t nearest_target(Object *manager, const Vector2 &point, double radius, int64_t layers, int64_t skip, int64_t skip_also, int64_t team);
 	// `shot_places`: which places hold a shot, from the room grid's whole squares (asks handed back).
 	int64_t shot_places(Object *manager, int64_t from);
+	// `_pass_trail`: the shots that trail and entered a new floor cell, handed back in `_trail_out`.
+	int64_t trail_pass(Object *manager, int64_t top);
 	// The draw regions' hand-out (`DrawRegions`: `_count`, `_write`): each region's rows counted, and
 	// each row copied into its region's buffer, by the place its square lies in.
 	void region_counts(Object *regions, const PackedFloat32Array &rows, int64_t count);

@@ -538,8 +538,26 @@ signal room_built(room_id: StringName, room: int, layout_root: Node)
 ## (`SpellLimits.POOL_TICK`), and where a shot ends (a hit that spends it, its life, a wall); never
 ## by a shot in flight (decision 1). One event per element of the spell, in its infusions' order.
 ## Heard by the cover area, which queues it and fires the `element` triggers of the cells inside the
-## circle at its next step. Spells knows nothing of cover.
-signal floor_touched(caster: int, element: StringName, at: Vector2, radius: float)
+## circle at its next step (the cells it moves remember who lit them: `caster` and `tag`, the
+## spell's, 0 for none: the floor's first slice, docs/milestones/floor.md), and by the element locks
+## and secret rocks (Flow) and their looks. Spells knows nothing of cover.
+signal floor_touched(caster: int, element: StringName, at: Vector2, radius: float, tag: int)
+## Sender: core/spells (the floor's first slice, docs/milestones/floor.md; the owner, 2026-11-25:
+## everything touches the floor as it passes). What passed over the floor since the last, at the end
+## of Spells' step when anything did (a beam or a swing launched later in a tick touches as it starts
+## and is sent with the next tick's): entry n is the element `elements[n]` over the one cell under
+## `at[n]`, by the actor `casters[n]` with the spell of `tags[n]`: every live shot of an element as it
+## enters a new cell (`Projectiles.trail_slot`, in slot order), then a beam's end, a dash's way and
+## a swing's tip, in their steps' order. One entry an element. The arrays are Spells' own, written in
+## place: read them while it is sent. Heard by the cover area only (a lock or a secret rock opens to
+## `floor_touched`, never to a shot passing).
+signal floor_passed(casters: PackedInt32Array, tags: PackedInt64Array, elements: Array[StringName], at: PackedVector2Array)
+## Sender: the cover area (the floor's first slice). A body standing in cover whose state strikes
+## (`CoverState.strike_element`: live water) is struck by `element` for `damage`, as the hit of the
+## actor `caster` with the spell of `tag` that lit the cell (NO_PLAYER and 0 for none). Heard by
+## Combat, which strikes it as a spell's hit of that element (its reactions: Current on a soaked
+## body; its kills `kill_landed` with `tag`), and core/spells (a Siphon on that spell refunds).
+signal floor_strike_requested(caster: int, target: Node, element: StringName, damage: float, tag: int)
 ## Sender: the cover area (ground cover GC5, rule 6). The cells `cells` of the cover of room `room`
 ## (the piece's number, as `room_built` gave it: connected biomes CB3b; its `CoverLayout`'s cell
 ## indices) are now in the states `states` (each an index in its kind's

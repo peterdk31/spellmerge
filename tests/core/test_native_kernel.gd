@@ -307,6 +307,56 @@ func test_several_threads_step_like_the_gdscript() -> void:
 	_check_the_kernel_merged()
 
 
+## The trail pass (the floor's first slice, docs/milestones/floor.md): the shots that trail and
+## entered a new floor cell, handed back alike, straight, circling, homing and falling ones (a falling
+## shot in the air touches nothing, then touches as it comes into its band).
+func test_the_trail_pass_hands_back_like_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	var pair: Array[ManagerScript] = []
+	for side in 2:
+		var m := ManagerScript.new()
+		m.native = side == 1
+		m.set_cap(256)
+		m.set_bounds(Rect2(Vector2(-200.0, -200.0), ROOM + Vector2(400.0, 400.0)))
+		root.add_child(m)
+		pair.append(m)
+	check(pair[1].is_native(), "the kernel runs one side")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	var handed: int = 0
+	var falling: int = 0
+	for step in 120:
+		if step % 4 == 0:
+			var from := Vector2(rng.randf_range(0.0, ROOM.x), rng.randf_range(0.0, ROOM.y))
+			var velocity := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(20.0, 900.0)
+			var kind: int = rng.randi() % 4
+			for m in pair:
+				var slot: int = m.spawn(0, from, velocity, 1.5, 4.0, ManagerScript.LAYER_ENEMY)
+				if slot < 0:
+					continue
+				if kind != 3:
+					m.set_trail(slot, true)
+				if kind == 1:
+					m.set_homing(slot, 3.0, 150.0)
+				if kind == 2:
+					m.set_floor(slot, from.y + 80.0)
+		for m in pair:
+			m.step(DT)
+		check_equal(pair[1].trail_count(), pair[0].trail_count(), "step %d: as many handed back" % step)
+		for n in mini(pair[0].trail_count(), pair[1].trail_count()):
+			check_equal(pair[1].trail_slot(n), pair[0].trail_slot(n), "step %d: the same shot %d" % [step, n])
+			if (pair[0]._flags[pair[0].trail_slot(n)] & ManagerScript.F_FALLING) != 0:
+				falling += 1
+		check_equal(var_to_bytes(pair[1]._trail_x), var_to_bytes(pair[0]._trail_x), "step %d: the cells kept" % step)
+		check_equal(var_to_bytes(pair[1]._trail_y), var_to_bytes(pair[0]._trail_y), "step %d: the cells kept" % step)
+		handed += pair[0].trail_count()
+	check(handed > 100, "shots entered cells (%d)" % handed)
+	check(falling > 0, "falling shots touched in their band (%d)" % falling)
+	for m in pair:
+		m.free()
+
+
 ## The merged scene reached the kernel's own merging: shots whose hits it merged itself, among the
 ## ones handed back to GDScript.
 func _check_the_kernel_merged() -> void:
@@ -662,6 +712,9 @@ func _drive(side: int, step: int) -> void:
 		if prop >= 0:
 			# Cast from the prop's own box: spared while on it, or coming back across it.
 			m.exclude(slot, _prop_nodes[side][prop])
+		if slot % 3 != 2:
+			# Most touch the floor as they pass (the floor's first slice): the trail pass, compared.
+			m.set_trail(slot, true)
 		if slot % 4 == 1:
 			# A card's light (card-looks phase 1b): written into the row's free floats on both sides.
 			m.set_light(slot, 0.25 + 0.25 * float(slot % 7), 0.5 + 0.25 * float(slot % 5))

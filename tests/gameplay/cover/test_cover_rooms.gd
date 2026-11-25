@@ -67,7 +67,7 @@ func _light(steps: int) -> int:
 		if cover.layout.cells[near] != 0:
 			cell = near
 			break
-	events.emit_signal("floor_touched", -1, &"fire", cover.layout.cell_rect(cell).get_center(), 0.0)
+	events.emit_signal("floor_touched", -1, &"fire", cover.layout.cell_rect(cell).get_center(), 0.0, 0)
 	for i in steps:
 		cover.step(DT)
 	return cell

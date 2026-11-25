@@ -54,7 +54,7 @@ func _begin(map: BiomeMap) -> bool:
 func _touch(room: int, at: Vector2) -> void:
 	var flow: Node = root.get_node("Flow")
 	var element: StringName = (flow.get("locks") as LockDoors).element_of(room)
-	root.get_node("Events").floor_touched.emit(0, element, at, 8.0)
+	root.get_node("Events").floor_touched.emit(0, element, at, 8.0, 0)
 
 
 func _bridge() -> bool:

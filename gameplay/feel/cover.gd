@@ -59,6 +59,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const CoverMotesScript := preload("res://gameplay/feel/cover_motes.gd")
+const CoverFlatScript := preload("res://gameplay/feel/cover_flat.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 
@@ -108,6 +109,9 @@ var layout: CoverLayout = null
 var motes: CoverMotesScript = CoverMotesScript.new()
 ## Each laid kind's batch, in the layout's kinds' order (a kind with no sheet has none: null).
 var _batches: Array[MultiMeshInstance2D] = []
+## Each kind's flat look (`CoverKind.Look.FLAT`: the floor's water and ice, `cover_flat.gd`), by its
+## index; null for a kind drawn in tufts.
+var _flats: Array[CoverFlatScript] = []
 ## Each laid kind's rows (STRIDE floats a tuft), the copy every change is written to, and whether
 ## they changed since they were last handed to their batch (`step` hands them over).
 var _rows: Array[PackedFloat32Array] = []
@@ -180,6 +184,7 @@ func _init(z: int) -> void:
 
 func _ready() -> void:
 	ShaderWarmupScript.want(SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(CoverFlatScript.SHADER, ShaderWarmupScript.RECT)
 	if not visibility_changed.is_connected(_on_visibility_changed):
 		visibility_changed.connect(_on_visibility_changed)
 	if events != null and not events.room_built.is_connected(_on_room_built):
@@ -252,6 +257,10 @@ func lay(laid: CoverLayout) -> void:
 			spare_material.set_shader_parameter(&"cell_times", null)
 			_spare.append(batch)
 	_batches.clear()
+	for flat in _flats:
+		if flat != null:
+			flat.queue_free()
+	_flats.clear()
 	_rows.clear()
 	_slot_row.clear()
 	_slot_rolls.clear()
@@ -273,7 +282,8 @@ func lay(laid: CoverLayout) -> void:
 		_rows.append(PackedFloat32Array())
 		_slot_row.append(PackedInt32Array())
 		_slot_rolls.append(PackedInt64Array())
-		_batches.append(_lay_kind(index))
+		_flats.append(_lay_flat(index))
+		_batches.append(_lay_kind(index) if _flats[index] == null else null)
 	motes.lay(laid)
 
 
@@ -459,6 +469,9 @@ func _draw_idle(now: float, pool: MotesScript, view: Rect2, stirs_version: int, 
 ## The frame's look once the bodies are found (`step`).
 func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int, hand_stirs: Callable) -> void:
 	_now = now
+	for flat in _flats:
+		if flat != null:
+			flat.hand(now)
 	if layout != null:
 		_walk_bodies(_near_at, _near_count, now)
 	if _times_dirty:
@@ -618,6 +631,10 @@ func show_state(cell: int, state: int) -> void:
 	if state < 0 or state >= kind.states.size() or kind.states[state] == null:
 		return
 	motes.show(cell, state)
+	if _flats[index] != null:
+		_shown[cell] = state
+		_flats[index].show_cell(cell, layout.columns, state, _now)
+		return
 	if _first_slot[cell] < 0:
 		return
 	_shown[cell] = state
@@ -639,6 +656,30 @@ func show_state(cell: int, state: int) -> void:
 		_write_look(rows, slot_row[first + tuft] * STRIDE, kind, look, slot_rolls[first + tuft])
 	_rows[index] = rows
 	_dirty[index] = 1
+
+
+## The flat look of the layout's kind `index` (`CoverKind.Look.FLAT`), laid at rest; null for a kind
+## drawn in tufts. Drawn before the tufts (its child first).
+func _lay_flat(index: int) -> CoverFlatScript:
+	var kind: CoverKind = layout.kinds[index]
+	if kind.look != CoverKind.Look.FLAT or kind.states.is_empty():
+		return null
+	var flat := CoverFlatScript.new()
+	flat.name = "Flat%d" % index
+	flat.lay(layout, index, _now)
+	add_child(flat)
+	move_child(flat, 0)
+	return flat
+
+
+## The flat look of the kind `kind_id` in the room laid (null for none, or a kind drawn in tufts).
+func flat_of(kind_id: StringName) -> CoverFlatScript:
+	if layout == null:
+		return null
+	for index in layout.kinds.size():
+		if layout.kinds[index].id == kind_id:
+			return _flats[index]
+	return null
 
 
 ## The batch of the layout's kind `index`, its rows the tufts of its cells at rest; null for a kind

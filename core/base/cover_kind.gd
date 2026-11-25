@@ -30,8 +30,18 @@ extends Resource
 ## How many cells it keeps from a door, a spawn or a placement when it fills (0: up to their own cell,
 ## never on it).
 @export_range(0, 8) var keep_gap: int = 1
+## True: it is the floor's own cover (the floor's first slice, docs/milestones/floor.md): the layout's
+## last pass gives it every cell no other source took that is not under a wall or a hole, a door's, a
+## spawn's and a placement's cell too, in every room, filled or not (`CoverLayout._lay_floor`; the
+## first such kind in id order). Its rest is bare floor.
+@export var fills_floor: bool = false
 
 @export_group("Look")
+## How it is drawn: in tufts from its `sheet` (grass, cobwebs), or flat, one joined surface a room
+## drawn from its states' `flat_*` looks with no sheet (the floor's water and ice; Feel's
+## `cover_flat.gdshader`).
+enum Look { TUFTS, FLAT }
+@export var look: Look = Look.TUFTS
 ## Its tuft frames, side by side (Feel's batch, GC3; the editor's preview).
 @export var sheet: Texture2D
 ## The size of one tuft frame in the sheet, in pixels.
@@ -117,6 +127,17 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 			for frame in state.trampled_frames:
 				if frame < 0 or frame >= frames:
 					found.append("%s draws frame %d trampled, which its sheet (%d frames) lacks." % [named, frame, frames])
+		if look == Look.FLAT:
+			if state.flat_material != &"" and not Palette.has(state.flat_material):
+				found.append("%s is drawn in '%s', which is no material of the palette." % [named, state.flat_material])
+			if state.flat_under != &"" and not Palette.has(state.flat_under):
+				found.append("%s is drawn over '%s', which is no material of the palette." % [named, state.flat_under])
+			if state.flat_spark != &"" and not Palette.has(state.flat_spark):
+				found.append("%s sparks in '%s', which is no material of the palette." % [named, state.flat_spark])
+		if state.strike_element != &"" and state.strike_damage <= 0.0:
+			found.append("%s strikes %s for no damage (strike_damage)." % [named, state.strike_element])
+		if state.strike_element != &"" and not elements.is_empty() and not elements.has(String(state.strike_element)):
+			found.append("%s strikes with '%s', which is no element the game knows." % [named, state.strike_element])
 		if state.status != &"":
 			if state.status_every <= 0.0:
 				found.append("%s gives %s with no time between two (status_every)." % [named, state.status])

@@ -312,6 +312,10 @@ const PROF_PARTS: int = 8
 ## examined by the native hit pass (about 0.13 us); a hit's listeners cost about 400 of them (about
 ## 50 us; shot scale H2, measured with H0's crowd, docs/DECISIONS.md 2026-11-05).
 const HIT_WORK: int = 400
+## The side of a floor cell the trail pass counts in, px (the cover's cell, `CoverLayout.CELL`).
+const TRAIL_CELL: float = 16.0
+## A trail's cell before its first: no cell is this.
+const TRAIL_NONE: int = -2147483648
 ## How far above its floor line a falling shot (`set_floor`) is an ordinary shot: above it, it is in
 ## the air and touches nothing; within it, it hits what stands close to the line (owner,
 ## 2026-11-09: "only hit, if they stand close to the fake floor wall").
@@ -676,7 +680,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_trail_out", &"_trail_count"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -858,6 +862,16 @@ var _growth: PackedFloat32Array = PackedFloat32Array()
 var _curve_from: PackedFloat32Array = PackedFloat32Array()
 ## A falling shot's floor line, its y (`set_floor`; read only with F_FALLING).
 var _floor: PackedFloat32Array = PackedFloat32Array()
+## Whether the shot touches the floor as it passes (`set_trail`, 1; the floor's first slice,
+## docs/milestones/floor.md), and the floor cell it last touched (TRAIL_CELL px, world; TRAIL_NONE
+## for none yet): the trail pass hands it back each time it enters another.
+var _trail: PackedByteArray = PackedByteArray()
+var _trail_x: PackedInt32Array = PackedInt32Array()
+var _trail_y: PackedInt32Array = PackedInt32Array()
+## Scratch: the trail pass's shots that entered a new cell this step, in slot order (`trail_slot`),
+## and how many (`trail_count`). Written in place; the pass sizes it to the cap once.
+var _trail_out: PackedInt32Array = PackedInt32Array()
+var _trail_count: int = 0
 var _curve_to: PackedFloat32Array = PackedFloat32Array()
 var _curve_ease: PackedFloat32Array = PackedFloat32Array()
 var _curve_speed: PackedFloat32Array = PackedFloat32Array()
@@ -1819,6 +1833,10 @@ func set_cap(value: int) -> void:
 	_growth.resize(_cap)
 	_curve_from.resize(_cap)
 	_floor.resize(_cap)
+	_trail.resize(_cap)
+	_trail_x.resize(_cap)
+	_trail_y.resize(_cap)
+	_trail_out.resize(_cap)
 	_curve_to.resize(_cap)
 	_curve_ease.resize(_cap)
 	_curve_speed.resize(_cap)
@@ -2280,6 +2298,7 @@ func clear() -> void:
 	_free_count = _cap
 	_count = 0
 	_high = 0
+	_trail_count = 0
 	_owned.fill(0)
 	_own_head.fill(-1)
 	_own_tail.fill(-1)
@@ -3597,6 +3616,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_tail_from[slot] = origin
 	_tail_carry[slot] = TAIL_SPACING * tail_hash(_seq[slot], -1)
 	_tail_n[slot] = 0
+	_trail[slot] = 0
 	_join_group(slot, group_of(caster, tag))
 	_skip_on[slot] = 0.0
 	_skip_near[slot] = 0.0
@@ -3689,6 +3709,14 @@ func step(delta: float) -> void:
 	for kind in range(AFTER_HITS, BEHAVIOURS):
 		if _member_count[kind] > 0:
 			_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
+	# The shots that touch the floor as they pass, once every move of the step is made (timed with
+	# the passes after the hits).
+	if _kernel != null:
+		_trail_count = _kernel.call(&"trail_pass", self, _high)
+		if _trail_count < 0:
+			_trail_count = _pass_trail(_high)
+	else:
+		_trail_count = _pass_trail(_high)
 	_step_index += 1
 	_stepping = false
 	_profiled(PROF_AFTER, at)
@@ -3736,6 +3764,63 @@ func _pass_common(top: int, delta: float) -> void:
 		_state[slot] = S_MOVING
 		if _motion[slot] == MOTION_STRAIGHT:
 			_pos[slot] = at + _vel[slot] * delta
+
+
+## The trail pass (the floor's first slice, docs/milestones/floor.md): every live shot that trails
+## (`set_trail`) and is not in the air (a falling shot above its band) whose position is in another
+## floor cell (TRAIL_CELL px, from the world's origin) than the one it last touched takes that cell and
+## is handed back in `_trail_out`, in slot order. Returns how many. The native kernel's
+## `trail_pass` is this, to the bit.
+func _pass_trail(top: int) -> int:
+	var count: int = 0
+	for slot in top:
+		if _alive[slot] == 0 or _trail[slot] == 0:
+			continue
+		var at: Vector2 = _pos[slot]
+		if (_flags[slot] & F_FALLING) != 0 and at.y < _floor[slot] - FALL_BAND:
+			continue
+		var x: int = floori(at.x / TRAIL_CELL)
+		var y: int = floori(at.y / TRAIL_CELL)
+		if x == _trail_x[slot] and y == _trail_y[slot]:
+			continue
+		_trail_x[slot] = x
+		_trail_y[slot] = y
+		_trail_out[count] = slot
+		count += 1
+	return count
+
+
+## The shot in `slot` touches the floor as it passes (`on`; the floor's first slice): the trail pass
+## hands it back each time it enters a new floor cell, its first cell too. False for a dead slot.
+func set_trail(slot: int, on: bool) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	if on and _trail[slot] == 0:
+		_trail_x[slot] = TRAIL_NONE
+		_trail_y[slot] = TRAIL_NONE
+	_trail[slot] = 1 if on else 0
+	return true
+
+
+## True when the shot in `slot` touches the floor as it passes (`set_trail`).
+func trails(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _trail[slot] != 0
+
+
+## Where the shot in `slot` was before the last step moved it (its position for a dead slot).
+func get_prev_of(slot: int) -> Vector2:
+	return _prev[slot]
+
+
+## How many shots the last step's trail pass handed back (each entered a new floor cell).
+func trail_count() -> int:
+	return _trail_count
+
+
+## The `n`th shot the last step's trail pass handed back (its slot; in slot order). Its position is
+## where it touches.
+func trail_slot(n: int) -> int:
+	return _trail_out[n]
 
 
 ## Pass 3: every shot in turn (from `_resume`, see WORK_PER_STEP): its end if a pass marked one,

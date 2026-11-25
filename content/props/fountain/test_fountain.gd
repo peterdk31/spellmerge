@@ -29,7 +29,7 @@ func before_each() -> void:
 	_left.clear()
 	_touched.clear()
 	_world.bus.cast_left.connect(func(caster: int, staff: int) -> void: _left.append([caster, staff]))
-	_world.bus.floor_touched.connect(func(_caster: int, element: StringName, _at: Vector2, radius: float) -> void: _touched.append([element, radius]))
+	_world.bus.floor_touched.connect(func(_caster: int, element: StringName, _at: Vector2, radius: float, _tag: int) -> void: _touched.append([element, radius]))
 
 
 func after_each() -> void:

@@ -85,7 +85,7 @@ func middle(at_cell: int) -> Vector2:
 
 ## `element` touches the floor at `at` within `radius` (as Spells tells it).
 func touch(element: StringName, at: Vector2, radius: float = 0.0) -> void:
-	world.bus.floor_touched.emit(0, element, at, radius)
+	world.bus.floor_touched.emit(0, element, at, radius, 0)
 
 
 ## `count` ticks of the area and Combat (which applies the statuses it asks for).

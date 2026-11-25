@@ -381,8 +381,14 @@ func blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 
 ## Each element of `spell` touches the floor within `radius` of `at` (`floor_touched`, ground cover
 ## GC5): a pool as it lies and on its ticks, a pulse's ring where it goes off.
-func touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float) -> void:
-	_rt._touch_floor(spell, actor, at, radius)
+func touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float, tag: int) -> void:
+	_rt._touch_floor(spell, actor, at, radius, tag)
+
+
+## Each element of `spell` passes over the floor along `from` to `to` (`floor_passed`, the floor's
+## first slice, docs/milestones/floor.md): a dash's way, a swing's tip, a beam's end, each step.
+func pass_floor(spell: CompiledSpell, tag: int, actor: int, from: Vector2, to: Vector2) -> void:
+	_rt._pass_floor(spell, tag, actor, from, to)
 
 
 ## Fires the payload of every trigger of `spell` on `event` (a `TriggerBase.Event`) from `at`

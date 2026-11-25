@@ -16,6 +16,9 @@ extends RefCounted
 ## 2. **The room's fields** (`CoverField`, its data a `CoverPatch`), in the tree's order, each
 ##    deciding the cells whose middles lie in its rectangle: its kind with the chance of its
 ##    `density`, else none (a field of no kind clears them).
+## 3. **The floor** (the floor's first slice, docs/milestones/floor.md): the first kind in id order
+##    that `fills_floor` takes every cell left, in every room, a door's, a spawn's and a placement's
+##    cell too (never one under a wall or a hole).
 ##
 ## **At its place** (connected biomes CB3b): a biome lays a room's piece somewhere in the world and maybe
 ## mirrored (decision 6). `of_piece` reads that from the laid layout (its position and
@@ -25,7 +28,7 @@ extends RefCounted
 ## (the row run, the editor) has its origin at (0, 0), so world and room pixels are one.
 ##
 ## No source ever covers a cell under a wall or a hole (one a wall's or a hole's rectangle overlaps;
-## a hole is blocked as a wall, `BLOCKED_WALL`, hub rework HR-H2) or
+## a hole is blocked as a wall, `BLOCKED_WALL`, hub rework HR-H2) or, but for the floor's,
 ## the cell of a door, a spawn or a placement. The chances come from `hash4`, keyed by the room's id,
 ## the kind's id, the cell and what the roll is for (`ROLL_*`); never `sim.chance`.
 
@@ -90,6 +93,7 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 	if room != null and room.cover_fill and room.biome != &"":
 		made._fill(made.room_key, room.biome)
 	made._lay_fields(made.room_key, places)
+	made._lay_floor()
 	return made
 
 
@@ -289,6 +293,21 @@ func _fill(room: int, biome: StringName) -> void:
 					var cell: int = y * columns + x
 					if cells[cell] == 0 and _keeps(kind, cell, from_wall, from_point):
 						cells[cell] = mark
+
+
+## The floor's pass (source 3): the first kind that `fills_floor` gets every cell no source took
+## that is not under a wall or a hole.
+func _lay_floor() -> void:
+	var mark: int = 0
+	for index in kinds.size():
+		if kinds[index].fills_floor:
+			mark = index + 1
+			break
+	if mark == 0:
+		return
+	for cell in cells.size():
+		if cells[cell] == 0 and blocked[cell] != BLOCKED_WALL:
+			cells[cell] = mark
 
 
 ## True when `kind`'s fill may cover `cell`: open floor, far enough from a wall and from a door, a

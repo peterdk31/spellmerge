@@ -6,6 +6,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 The owner answered the eight questions the connected biomes plan still held open (docs/milestones/connected-biomes.md, "Answered by the owner (2026-11-25)"; docs/DECISIONS.md). Six are "keep as built". Built: the keys a foe carries are laid where it dies by a chance of their own, a half (`EnemyBase.key_drop_chance`, `Rewards._drop_keys`; lost with it before), a boss's always, an add's by its roll; the coins' roll is unchanged. The room reroll questions were marked moot (room rerolls were removed on 2026-11-19), and the floor mist stays out of the one pass. Nothing of the plan is open.
 
+Rune zones: all 27 crypt room templates mark a `rune` zone (a 24 px square, toward a corner where the room has the space), where a secret rune then lies; `tests/content/rooms/test_rune_zones.gd` checks each. The grounds were drawn again with no change to their art. The places were looked at on a plan sheet of the rooms (walls, props, spawns, doorways), not in the game: the owner's playtest decides whether any should move.
+
 ## 2026-11-23: A steady camera: zoom 0.8, no framing of foes, foe markers
 
 The owner's decision: "I think the dynamic camera, where it tries to fit nearby enemies into view, should be discarded again. It makes the cameras jump around. Maybe zoom a bit more out as the default instead. And then maybe we can have edge markers, that points to enemies out of view in the room." Their answers: default zoom 0.8 everywhere, the close-foes zoom removed entirely, markers in sealed fights only (docs/milestones/connected-biomes.md, "A steady camera"; docs/DECISIONS.md). This reverses the entry of 2026-11-19 below ("The camera holds close foes").

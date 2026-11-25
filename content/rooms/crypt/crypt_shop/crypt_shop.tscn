@@ -106,6 +106,17 @@ border_color = Color(0.95, 0.76, 0.19, 1)
 border_width = 2.0
 zone_name = &"shelf"
 
+[node name="Rune" type="ReferenceRect" parent="Zones"]
+script = ExtResource("4_zone")
+offset_left = 300.0
+offset_top = 60.0
+offset_right = 324.0
+offset_bottom = 84.0
+mouse_filter = 2
+border_color = Color(0.95, 0.76, 0.19, 1)
+border_width = 2.0
+zone_name = &"rune"
+
 [node name="SocketWest1" type="Node2D" parent="."]
 position = Vector2(32, 160)
 script = ExtResource("cb_socket")

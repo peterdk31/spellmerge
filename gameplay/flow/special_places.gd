@@ -35,8 +35,9 @@ const SIGN_SPOT: Vector2 = Vector2(0.0, 40.0)
 const REWARD_ZONE: StringName = &"reward"
 const REWARD_SPOTS: Array[Vector2] = [Vector2(-60.0, 48.0), Vector2(-36.0, 48.0), Vector2(36.0, 48.0), Vector2(60.0, 48.0)]
 ## The zone a secret rune lies in (the hidden rune of a room, or the one leading back in its secret
-## room), and with none, the spots round the room's middle it tries in order for the first clear of
-## what the room holds (`rune_spot`'s `keep_off`): off the middle, where the keys, the portal and the
+## room; every crypt template marks one, tests/content/rooms/test_rune_zones.gd), and with none, or
+## for a second rune of one room, the spots round the room's middle it tries in order for the first
+## clear of what the room holds (`rune_spot`'s `keep_off`): off the middle, where the keys, the portal and the
 ## rewards lie, toward the room's corners.
 const RUNE_ZONE: StringName = &"rune"
 const RUNE_SPOTS: Array[Vector2] = [
@@ -77,20 +78,25 @@ static func reward_spots(places: RoomPlaces, middle: Vector2) -> PackedVector2Ar
 
 
 ## Where a secret rune lies in a room (world pixels, before it is put on clear ground): its `rune`
-## zone's middle, else the first of RUNE_SPOTS round `middle` outside every rectangle of `keep_off`
-## (`taken_by`), else the first of them.
+## zone's middle (the place its template chose; the owner, 2026-11-25: every template marks one)
+## unless a rectangle of `keep_off` (`taken_by`) holds it (another rune of the room lying there
+## already), else the first of RUNE_SPOTS round `middle` outside every rectangle of `keep_off`, else
+## the first of them.
 static func rune_spot(places: RoomPlaces, middle: Vector2, keep_off: Array[Rect2] = []) -> Vector2:
 	var zone: Rect2 = places.zone(RUNE_ZONE) if places != null else Rect2()
-	if zone.has_area():
+	if zone.has_area() and _clear_of(zone.get_center(), keep_off):
 		return zone.get_center().floor()
 	for offset: Vector2 in RUNE_SPOTS:
-		var spot: Vector2 = middle + offset
-		var clear: bool = true
-		for rect: Rect2 in keep_off:
-			clear = clear and not rect.has_point(spot)
-		if clear:
-			return spot.floor()
+		if _clear_of(middle + offset, keep_off):
+			return (middle + offset).floor()
 	return (middle + RUNE_SPOTS[0]).floor()
+
+
+static func _clear_of(spot: Vector2, keep_off: Array[Rect2]) -> bool:
+	for rect: Rect2 in keep_off:
+		if rect.has_point(spot):
+			return false
+	return true
 
 
 ## The fountain's pool of a room (world pixels).

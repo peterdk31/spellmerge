@@ -72,15 +72,27 @@ func lay(map: BiomeMap, world: BiomeWorld, kind_of: Callable, on_ground: Callabl
 			var places: RoomPlaces = world.room_places(room) if world != null else null
 			var middle: Vector2 = world.room_rect(room).get_center() if world != null else Vector2.ZERO
 			var kind: RoomKind = kind_of.call(room) as RoomKind if kind_of.is_valid() else null
-			var keep_off: Array[Rect2] = SpecialPlaces.taken_by(kind, places, middle)
-			for spot: Vector2 in SpecialPlaces.reward_spots(places, middle):
-				keep_off.append(Rect2(spot, Vector2.ZERO).grow(SpecialPlaces.KEY_OFF_ITEM))
-			if places != null:
-				for prop: Vector2 in places.placed_at:
-					keep_off.append(Rect2(prop, Vector2.ZERO).grow(PROP_CLEAR))
+			var keep_off: Array[Rect2] = keep_off_of(kind, places, middle)
+			# The runes already laid in this room (two secret rooms off one host): never one on another.
+			for at in spots.size():
+				if map.rune_room(at / 2, at % 2) == room:
+					keep_off.append(Rect2(spots[at], Vector2.ZERO).grow(PROP_CLEAR))
 			var spot: Vector2 = _put(SpecialPlaces.rune_spot(places, middle, keep_off), on_ground)
 			spots.append(spot)
 			arrivals.append(_arrival(spot, on_ground))
+
+
+## What a rune keeps off in a room of `kind` (a `RoomKind`, or null) whose places are `places` and
+## whose middle is `middle`: what the room holds (`SpecialPlaces.taken_by`), where its rewards lie
+## and PROP_CLEAR round each of its props.
+static func keep_off_of(kind: RoomKind, places: RoomPlaces, middle: Vector2) -> Array[Rect2]:
+	var keep_off: Array[Rect2] = SpecialPlaces.taken_by(kind, places, middle)
+	for spot: Vector2 in SpecialPlaces.reward_spots(places, middle):
+		keep_off.append(Rect2(spot, Vector2.ZERO).grow(SpecialPlaces.KEY_OFF_ITEM))
+	if places != null:
+		for prop: Vector2 in places.placed_at:
+			keep_off.append(Rect2(prop, Vector2.ZERO).grow(PROP_CLEAR))
+	return keep_off
 
 
 ## No biome: no rune (the view told every one is forgotten, when there was one); every seat rested.

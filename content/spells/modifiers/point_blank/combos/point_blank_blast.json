@@ -1,0 +1,10 @@
+{
+	"id": "point_blank_blast",
+	"name": "Point-blank blast",
+	"does": "A blast bolt that ends at the staff's tip bursts there and hurts the imp at the wizard's shoulder, which a flying bolt passes by.",
+	"needs": "point_blank",
+	"casts": [{"staff": 0, "cards": ["point_blank", "blast", "bolt"]}],
+	"imps": [[30, 30]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

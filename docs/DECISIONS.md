@@ -9,6 +9,12 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **1080p** (the owner, 2026-11-25, after 960×540 with 48 px art and 640×360 were laid out beside 1280×720): a 1920×1080 screen holds the picture once, two thirds of it, by whole numbers, so there the picture is stretched by a fraction (1.5, aspect kept, hard pixels; `Display.stretch_for`), its 64 px art in uneven rows of 1 or 2 screen pixels, which the owner accepts; 720p, 1440p and 4K stay whole. The constants stay one each: the picture is the layout times `PictureGrid.PICTURE_SCALE` (k = 2), redrawn art `ArtDetail.DETAIL` (d = 2).
 - **Open on ART0's PR:** at the resting zoom 0.8 a 2x art pixel is 0.8 of a picture pixel, so one in five is left out, as today's art was in the 640×360 picture.
 
+## 2026-11-25: Siphon pays for the Current (owner decision)
+
+- **The owner:** every foe the Current hits, spread from a live lake, a bolt or any other carrier's Current, pays the caster's Siphon, as the caster's hit.
+- **Where reactions now credit their source:** Combat's Current (`ReactionRow.Effect.CONDUCT`, `_conduct`) sends `reaction_struck(caster, reaction, target, tag)` for each body it runs to and hurts (a barrier that takes it pays nothing), with the tag of the spell whose hit set it off; Spells pays that spell's Siphon for a foe struck so (`_siphon_struck`, the same rule as the floor's strike: a foe, never the caster's own body). The other reactions (bursts, spreads, the static discharge) credit no spell, as before; their kills stay no spell's own, but for the floor's Current (floor.md).
+- Tests: `tests/core/test_siphon_current.gd` (a shot, a ray, a sweep and the floor).
+
 ## 2026-11-25: everything touches the floor as it passes, and a cell remembers who lit it (owner decisions; the floor's first slice)
 
 - **The owner** (answers to docs/milestones/foundations.md's open points 2 and 3): every shot, dash and swing touches the floor as it passes, not only what pours, its cost designed and measured; and the floor's harm is whoever lit it, so `on kill` and Siphon count.

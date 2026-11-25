@@ -150,6 +150,7 @@ const EVENTS: Dictionary = {
 	&"floor_passed": [["casters", TYPE_PACKED_INT32_ARRAY], ["tags", TYPE_PACKED_INT64_ARRAY], ["elements", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"kill_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"actor_hurt": [["actor", TYPE_INT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],
+	&"reaction_struck": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["tag", TYPE_INT]],
 	&"reaction_landed": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"wizard_shield_requested": [["caster", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"pull_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["strength", TYPE_FLOAT], ["tag", TYPE_INT], ["to", TYPE_VECTOR2]],

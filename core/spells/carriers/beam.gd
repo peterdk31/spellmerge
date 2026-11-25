@@ -491,6 +491,9 @@ func _beam_step(at: int, delta: float) -> void:
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at], id())
+	# Its end pours onto the floor every step (the floor's first slice).
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+		kit.pass_floor(spell, tag, _bm_actor[at], _bm_end[at], _bm_end[at])
 
 
 ## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its

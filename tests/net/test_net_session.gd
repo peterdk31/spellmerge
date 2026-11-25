@@ -234,7 +234,9 @@ func test_a_disturbed_world_is_caught_by_the_checks_with_its_areas() -> void:
 	check(pair.host.parted_tick >= disturbed_at, "the host sees it (tick %d)" % pair.host.parted_tick)
 	check(pair.host.parted_tick <= disturbed_at + 2 * NetChecks.EVERY, "within two checks of the tick it happened (%d after %d)" % [pair.host.parted_tick, disturbed_at])
 	check(not pair.host.parted_areas.is_empty(), "with the areas that differ: %s" % ", ".join(pair.host.parted_areas))
-	check(pair.host.parted_areas.has(SimHash.BODY_PREFIX + str(moved.id)), "the moved wizard's body among them")
+	# Its body, or an area its move spread to first within the check (NetChecks: each area is hashed
+	# at its own tick of the check): the floor its shots now pass over (the floor's first slice).
+	check(pair.host.parted_areas.has(SimHash.BODY_PREFIX + str(moved.id)) or pair.host.parted_areas.has("cover"), "the moved wizard's body, or the floor it touched, among them (%s)" % [pair.host.parted_areas])
 	check_equal(pair.client.parted_tick, pair.host.parted_tick, "and the client is told the tick")
 	check_equal(pair.client.parted_areas, pair.host.parted_areas.slice(0, NetMessage.MAX_PARTED), "and the areas")
 	check(pair.first_parting() >= disturbed_at, "the harness agrees: they part from that tick (%d)" % pair.first_parting())

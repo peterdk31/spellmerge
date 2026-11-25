@@ -1,6 +1,6 @@
 # Foundations: a floor that answers, fields, and the staff as a language
 
-**Status: design, for the owner to read (2026-11-25). Nothing is built.** The owner parked the nine new cards ([new-cards.md](new-cards.md)): "I'm not sure that these new cards will actually enable builds I really want in the game. I think the fundamental building blocks needs more work", and asked for a design of three foundations: (1) a floor of materials, (2) field carriers, (3) staff-logic cards and wider numbers. This doc starts from the builds they should make possible, then gives each part's mechanism, what it does to the cards there are, and the decisions that are the owner's. Tuning numbers are left for each part's own milestone doc. A review against the code (2026-11-25) corrected the first draft; each part now says what is there today and what is new engine work. The owner continues it later.
+**Status (2026-11-25): the owner decided to build it, Part 1 first** (its first slice: [floor.md](floor.md)), Part 4 beside it in another session; the owner's answers to the open points are below. **Before that: design, for the owner to read (2026-11-25).** The owner parked the nine new cards ([new-cards.md](new-cards.md)): "I'm not sure that these new cards will actually enable builds I really want in the game. I think the fundamental building blocks needs more work", and asked for a design of three foundations: (1) a floor of materials, (2) field carriers, (3) staff-logic cards and wider numbers. This doc starts from the builds they should make possible, then gives each part's mechanism, what it does to the cards there are, and the decisions that are the owner's. Tuning numbers are left for each part's own milestone doc. A review against the code (2026-11-25) corrected the first draft; each part now says what is there today and what is new engine work. The owner continues it later.
 
 **The owner's answers (2026-11-25):** the order can turn: Part 4, the language (builds 9 to 12), is built now, beside Part 1, the floor; its own doc is [staff-language.md](staff-language.md). **Open point 6, a card that stands for another card, stays not proposed.**
 
@@ -210,6 +210,11 @@ A card that was "hard to understand" was cut once (Quicken). So each mechanism h
 Each is a milestone doc of its own before it is built, with its numbers, its tests and its measures.
 
 ## Open points for the owner
+
+**The owner's answers (2026-11-25):** 1. yes, bare floor is cover everywhere. 2. **The other way:** everything touches the floor as it passes, every shot, dash and swing, not only what pours; its cost designed and measured (the projectile manager's passes and its native kernel, a budget test, the stress run and play frames before and after). 3. **The other way:** a cell remembers who lit it, so `on kill` and Siphon count (simulation state: hashed, snapshotted, determinism tests). 4. yes, a field serves enemies' shots too, one rule (for Part 3). 5. ice chills, no slipping. So Spill's point changes, and the owner set it (2026-11-25): **Spill makes a shot touch a wide area where it lands** (a bigger splash), for Part 2's own doc.
+
+The points as they were put:
+
 
 1. **Bare floor as cover everywhere.** Proposed: yes; it is what makes the floor answer with no new state. The other way is cover only where a spell has laid it, which needs the cell's kind kept as state.
 2. **Who touches the floor along the way.** Proposed: only what pours (Spray, a Beam's end), and everything else with the Spill card. The other way is every shot, dash and swing touching as it goes: more chaos with no card, less control, and a cost for every shot in flight.

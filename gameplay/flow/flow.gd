@@ -1860,7 +1860,7 @@ func _kind_of(room: int) -> RoomKind:
 
 ## An element touched the floor (`floor_touched`, connected biomes CB11): a secret rock of that
 ## element near it breaks open at Flow's next step (`LockDoors.queue_touch`).
-func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
+func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float, _tag: int) -> void:
 	if mode != MODE_RUN or state != State.RUNNING or locks.doors() == 0 or world == null:
 		return
 	locks.queue_touch(element, world.to_local(at), radius)

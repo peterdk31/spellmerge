@@ -183,7 +183,7 @@ func _pulse_step(at: int, delta: float) -> void:
 				# It goes off where it is widest: its elements touch the floor (ground cover GC5), but
 				# for a ring with a blast, which touches as its blast does.
 				if spell.behaviour(ModifierBase.Behaviour.BLAST) <= 0.0:
-					kit.touch_floor(spell, _pu_actor[at], _pu_centre[at], _pu_radius[at])
+					kit.touch_floor(spell, _pu_actor[at], _pu_centre[at], _pu_radius[at], _pu_tag[at])
 				_pu_struck[at].clear()
 				_set_segments(at, spell, _pu_centre[at])
 		else:
@@ -372,7 +372,7 @@ func _end_pulse(at: int, finished: bool) -> void:
 		# A ring that turned home went off where it turned (`_pulse_step`); any other, here; one
 		# with a blast touches as its blast does (`kit.blast`), not twice.
 		if _pu_home[at] <= 0.0 and spell.behaviour(ModifierBase.Behaviour.BLAST) <= 0.0:
-			kit.touch_floor(spell, actor, centre, _pu_radius[at])
+			kit.touch_floor(spell, actor, centre, _pu_radius[at], tag)
 		kit.blast(spell, tag, actor, centre)
 		if spell.fires_on(TriggerBase.Event.EXPIRE):
 			kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, centre, way, null)

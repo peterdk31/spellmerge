@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## the baked floor take it; strips and frame counts are as they were.
 
 const CURL_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.png")
-const STAR_HEAD: Texture2D = preload("res://content/wizard/staffs/star/head.svg")
+const DOOR: Texture2D = preload("res://art/tilesets/crypt/door.svg")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 
 
@@ -18,11 +18,11 @@ func _art(size: Vector2i) -> Texture2D:
 
 func test_a_texture_says_its_detail_by_its_file_s_name() -> void:
 	check_equal(ArtDetail.of(CURL_HEAD), 2, "head@2x.png: two art pixels a world pixel")
-	check_equal(ArtDetail.of(STAR_HEAD), 1, "head.svg: one")
+	check_equal(ArtDetail.of(DOOR), 1, "door.svg: one")
 	check_equal(ArtDetail.of(null), 1, "none: one")
 	check_equal(ArtDetail.of(_art(Vector2i(8, 8))), 1, "a texture made in the game, unmarked: one")
 	check_equal(ArtDetail.size_of(CURL_HEAD), CURL_HEAD.get_size() * 0.5, "its size in the world: half its pixels")
-	check_equal(ArtDetail.size_of(STAR_HEAD), STAR_HEAD.get_size(), "a 1x texture's: its pixels")
+	check_equal(ArtDetail.size_of(DOOR), DOOR.get_size(), "a 1x texture's: its pixels")
 	check_equal(ArtDetail.draw_scale(CURL_HEAD), Vector2(0.5, 0.5), "drawn at half")
 	check_equal(ArtDetail.quad_size(CURL_HEAD, Vector2(96.0, 96.0)), Vector2(48.0, 48.0), "a batch's quad: its frame in world units")
 	check_equal(ArtDetail.to_art(CURL_HEAD, Vector2(24.0, 27.0)), Vector2(48.0, 54.0), "a grip in its art's pixels")
@@ -40,10 +40,10 @@ func test_a_made_texture_and_a_region_carry_their_detail() -> void:
 
 
 func test_a_page_keeps_each_texture_s_detail() -> void:
-	var regions: Array[Texture2D] = TexturePage.regions_of([CURL_HEAD, STAR_HEAD] as Array[Texture2D])
+	var regions: Array[Texture2D] = TexturePage.regions_of([CURL_HEAD, DOOR] as Array[Texture2D])
 	check(regions[0] is AtlasTexture and regions[1] is AtlasTexture, "both on a page")
 	check_equal(ArtDetail.of(regions[0]), 2, "the 2x head's copy is drawn at half")
-	check_equal(ArtDetail.of(regions[1]), 1, "the 1x head's copy as it was")
+	check_equal(ArtDetail.of(regions[1]), 1, "the 1x door's copy as it was")
 
 
 func test_a_sprite_is_fitted_with_its_pose_and_snapped_to_its_art_s_pixels() -> void:
@@ -51,7 +51,7 @@ func test_a_sprite_is_fitted_with_its_pose_and_snapped_to_its_art_s_pixels() -> 
 	sprite.texture = CURL_HEAD
 	ArtDetail.fit(sprite, Vector2(1.2, 0.85))
 	check(sprite.scale.is_equal_approx(Vector2(0.6, 0.425)), "a 2x sheet at half, times its pose (%s)" % sprite.scale)
-	sprite.texture = STAR_HEAD
+	sprite.texture = DOOR
 	ArtDetail.fit(sprite)
 	check_equal(sprite.scale, Vector2.ONE, "a 1x sheet at its size")
 	check_equal(ArtDetail.snap(Vector2(10.3, 4.8), 2), Vector2(10.5, 5.0), "2x art on half world pixels")

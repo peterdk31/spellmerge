@@ -96,6 +96,16 @@ func test_a_faces_two_layers_are_drawn_from_one_page_of_the_sheets_own_pixels() 
 		check(page.get_region(Rect2i(region.region)).get_data() == sheet.get_data(), "the region its sheet's own pixels")
 
 
+## The shared sheets are drawn at 2x detail (ART1): frames of 32x16 art pixels, 16x8 world units,
+## ten eye columns and a row a style, five brow columns and two rows.
+func test_the_shared_sheets_are_drawn_at_2x() -> void:
+	for sheet: Texture2D in [Face.EYES_SHEET, Face.BROWS_SHEET]:
+		check_equal(ArtDetail.of(sheet), 2, "%s: at 2x detail" % sheet.resource_path)
+	check_equal(Vector2(Face.FRAME) / float(ArtDetail.DETAIL), Vector2(16.0, 8.0), "a frame is 16x8 world units")
+	check_equal(Face.EYES_SHEET.get_size(), Vector2(Face.FRAME.x * 10, Face.FRAME.y * Face.Style.size()), "ten eye columns, a row a style")
+	check_equal(Face.BROWS_SHEET.get_size(), Vector2(Face.FRAME.x * Face.Mood.size(), Face.FRAME.y * 2), "a brow column a mood, two rows")
+
+
 func test_the_resting_mood_shows_and_neutral_is_the_personalitys() -> void:
 	var sergeant := _wearer(Face.Style.STERN, Face.Mood.ANGRY)
 	var optimist := _wearer(Face.Style.CHEER)

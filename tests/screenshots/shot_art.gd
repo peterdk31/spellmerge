@@ -9,16 +9,16 @@ const SCALE := 2.0
 const FRAME := 32.0
 
 const WALL := preload("res://art/tilesets/crypt/wall.svg")
-const IDLE := preload("res://content/wizard/base/wizard_idle.svg")
-const WALK := preload("res://content/wizard/base/wizard_walk.svg")
-const DASH_STRIP := preload("res://content/wizard/base/wizard_dash.svg")
+const IDLE := preload("res://content/wizard/base/wizard_idle@2x.svg")
+const WALK := preload("res://content/wizard/base/wizard_walk@2x.svg")
+const DASH_STRIP := preload("res://content/wizard/base/wizard_dash@2x.svg")
 const HATS: Array[Texture2D] = [
-	preload("res://content/wizard/base/wizard_hat_p1.svg"),
-	preload("res://content/wizard/base/wizard_hat_p2.svg"),
-	preload("res://content/wizard/base/wizard_hat_p3.svg"),
-	preload("res://content/wizard/base/wizard_hat_p4.svg"),
+	preload("res://content/wizard/base/wizard_hat_p1@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p2@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p3@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p4@2x.svg"),
 ]
-const STAFF := preload("res://content/wizard/base/staff.svg")
+const STAFF := preload("res://content/wizard/base/staff@2x.svg")
 const IMP := preload("res://content/enemies/ember_imp/idle.svg")
 const SPLINTER := preload("res://content/enemies/splinter/idle.svg")
 const FORK := preload("res://content/enemies/storm_fork/idle.svg")
@@ -73,7 +73,7 @@ func take() -> void:
 
 ## Every frame of a strip, left to right from `x`. Returns the x after the strip.
 func _strip(texture: Texture2D, x: float, y: float, hat: Texture2D = null) -> float:
-	var frames: int = int(texture.get_width() / FRAME)
+	var frames: int = int(ArtDetail.size_of(texture).x / FRAME)
 	for i in frames:
 		_frame(texture, i, x, y)
 		if hat != null:
@@ -84,5 +84,5 @@ func _strip(texture: Texture2D, x: float, y: float, hat: Texture2D = null) -> fl
 
 func _frame(texture: Texture2D, frame: int, x: float, y: float) -> void:
 	var sprite: Sprite2D = place(texture, SCALE, Vector2(x, y))
-	sprite.hframes = maxi(int(texture.get_width() / FRAME), 1)
+	sprite.hframes = maxi(int(ArtDetail.size_of(texture).x / FRAME), 1)
 	sprite.frame = frame

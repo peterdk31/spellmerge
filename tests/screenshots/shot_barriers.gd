@@ -8,7 +8,7 @@ extends "res://tests/support/screenshot.gd"
 ## a wall of five stones (a capsule round its row), in a player's ramp. `barriers` is the sheet, `barriers_4x` its first four columns enlarged. Mote
 ## throws are random, so two runs differ in their motes.
 
-const WIZARD: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
+const WIZARD: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
 const COLUMN: float = 56.0
 const TOP: float = 70.0
 ## A wizard's hurt circle (content/wizard/base/wizard.tscn) and its middle above the feet.

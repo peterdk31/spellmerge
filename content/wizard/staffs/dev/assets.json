@@ -1,13 +1,13 @@
 {
 	"assets": [
 		{
-			"path": "content/wizard/staffs/dev/head.svg",
+			"path": "content/wizard/staffs/dev/head@2x.png",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
-			"tool": "Claude (SVG rects written by a small generator, following the pixel rules of the starter heads, 2026-11-01)",
-			"prompt": "A sheet of 48x48 frames of a floating living staff for a top-down 32x32 pixel game, the cog head of the sandbox staff: an upright eight-tooth cog in the player colour with a dark axle hole round a gold hub, on a straight Wood shaft with a gold cap at its butt, the grip at (24, 27) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the same staff with the head in each player colour ramp (blue, rose, green, purple). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tool": "Claude (redrawn at 2x detail by tools/redraw_2x.py from its 48x48 sheet, itself written by a small generator from the pixel rules of the owner's living-staffs mockup; ART1, 2026-11-25)",
+			"prompt": "A sheet of 96x96 frames of a floating living staff at 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, the cog head: an upright eight-tooth cog in the player colour round a gold hub, redrawn from its 48x48 sheet with the same layout and silhouette: diagonals smoothed to one-pixel steps and the outside outline one art pixel thick. The grip at (48, 54) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the head in each player colour ramp (blue, rose, green, purple). Light from the top-left. An indexed PNG of palette colours from docs/STYLE.md, every pixel fully clear or fully opaque. The 48x48 sheet's prompt: A sheet of 48x48 frames of a floating living staff for a top-down 32x32 pixel game, the cog head of the sandbox staff: an upright eight-tooth cog in the player colour with a dark axle hole round a gold hub, on a straight Wood shaft with a gold cap at its butt, the grip at (24, 27) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the same staff with the head in each player colour ramp (blue, rose, green, purple). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
 		}
 	]
 }

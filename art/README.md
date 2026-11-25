@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`, with the title type in `ui/fonts/`), visual effects (`vfx/`) the face layers every living staff wears (`faces/`: the eye and brow sheets of `gameplay/actor/face.gd`) and the intro's own pieces (`story/`: the wizard's Blight hat and the Favourite, for `gameplay/flow/intro.gd`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is pixel art on a 32-unit grid, redrawn at 64×64 per cell (2x detail) since the owner's decision of 2026-11-21 (confirmed 2026-11-25; "Redrawing a sprite at 64x64" below); the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
+Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`, with the title type in `ui/fonts/`), visual effects (`vfx/`) the face layers every living staff wears (`faces/`: the eye and brow sheets of `gameplay/actor/face.gd`, at 2x detail, drawn by `tools/face_art.py`) and the intro's own pieces (`story/`: the wizard's Blight hat and the Favourite, for `gameplay/flow/intro.gd`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is pixel art on a 32-unit grid, redrawn at 64×64 per cell (2x detail) since the owner's decision of 2026-11-21 (confirmed 2026-11-25; "Redrawing a sprite at 64x64" below); the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
 
 Palette files, grid templates and the one-page checklist are in [kit/](kit/README.md). The three art direction samples the owner picks from (nothing uses them) are in [samples/](samples/README.md).
 
@@ -75,7 +75,7 @@ The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The pi
 
 **Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
 
-A generator may draw it (palette colours; an SVG of rects, one a run along a row, as `tests/core/test_svg_art.gd` wants, or a PNG when the rects would pass the 1 MB limit: the curl's head sheet): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
+A generator may draw it (palette colours; an SVG of rects, one a run along a row, as `tests/core/test_svg_art.gd` wants, or a PNG when the rects would pass the 1 MB limit: the curl's head sheet): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/face_art.py` the shared face sheets, `tools/redraw_2x.py` redraws a 1x sheet of rects at 2x once (its diagonals smoothed, its outside outline one art pixel; the other staff heads), to touch up by hand after, `tools/pixel_grid.py` draws from a grid of characters at any size.
 
 ## Review questions
 

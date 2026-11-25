@@ -27,8 +27,8 @@ extends ActorLook
 ## seconds. How often each comes is the style's (BLINK_EVERY and the rest): the Dozer blinks slowly and never
 ## raises a brow, the Show-off fidgets, a stray only blinks.
 ##
-## The sheets are art/faces/eyes.svg (one row per style; nine looks, then the blink) and
-## art/faces/brows.svg (one column per mood; rows two brows and one). A stray's eyes are drawn
+## The sheets are art/faces/eyes@2x.svg (one row per style; nine looks, then the blink) and
+## art/faces/brows@2x.svg (one column per mood; rows two brows and one). A stray's eyes are drawn
 ## white and tinted with `glow`. A face of its own (boss plan OB9) draws its `art`'s sheets instead
 ## (`FaceArt`: the same layout at any frame size, in its body's folder; a player's staff may have
 ## one too, `StaffBase.face`, worn as it is shown, `wear_art`), its row `art_row` (a phase may show
@@ -44,15 +44,16 @@ static var _shared_page: Image = null
 enum Style { CHEER, EAGER, SLEEPY, STERN, STRAY, STRAY_ONE }
 enum Mood { NEUTRAL, RAISED, ANGRY, FURIOUS, WORRIED }
 
-const EYES_SHEET: Texture2D = preload("res://art/faces/eyes.svg")
-const BROWS_SHEET: Texture2D = preload("res://art/faces/brows.svg")
-## Every frame of both sheets.
-const FRAME: Vector2i = Vector2i(16, 8)
+const EYES_SHEET: Texture2D = preload("res://art/faces/eyes@2x.svg")
+const BROWS_SHEET: Texture2D = preload("res://art/faces/brows@2x.svg")
+## Every frame of both sheets, in their own art pixels (drawn at 2x detail since ART1: 16x8 world
+## units; tools/face_art.py).
+const FRAME: Vector2i = Vector2i(32, 16)
 ## The eye sheet's columns: nine looks ((y + 1) × 3 + x + 1), then the blink.
 const BLINK_COLUMN: int = 9
 ## Where, in a frame, the left eye's top-left pixel (the face's `anchor`) is: eyes and brows.
-const EYES_ORIGIN: Vector2 = Vector2(1.0, 1.0)
-const BROWS_ORIGIN: Vector2 = Vector2(1.0, 5.0)
+const EYES_ORIGIN: Vector2 = Vector2(2.0, 2.0)
+const BROWS_ORIGIN: Vector2 = Vector2(2.0, 10.0)
 ## How far the aim must lean (per axis, of unit length) to move the pupils that way.
 const LOOK_LEAN: float = 0.38
 

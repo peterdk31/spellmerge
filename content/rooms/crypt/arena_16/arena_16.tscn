@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_16/arena_16_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
 [ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
 [ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
+[ext_resource type="Script" path="res://core/base/room_zone.gd" id="rz_zone"]
 
 [node name="Arena16" type="Node2D"]
 
@@ -199,6 +200,19 @@ density = 0.5
 
 [node name="CoverPreview" type="Node2D" parent="."]
 script = ExtResource("gc_preview")
+
+[node name="Zones" type="Node2D" parent="."]
+
+[node name="Rune" type="ReferenceRect" parent="Zones"]
+script = ExtResource("rz_zone")
+offset_left = 756.0
+offset_top = 284.0
+offset_right = 780.0
+offset_bottom = 308.0
+mouse_filter = 2
+border_color = Color(0.95, 0.76, 0.19, 1)
+border_width = 2.0
+zone_name = &"rune"
 
 [node name="SocketWest" type="Node2D" parent="."]
 position = Vector2(32, 192)

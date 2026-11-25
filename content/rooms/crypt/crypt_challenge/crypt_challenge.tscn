@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/crypt_challenge/crypt_challenge_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
 [ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
 [ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
+[ext_resource type="Script" path="res://core/base/room_zone.gd" id="rz_zone"]
 
 [node name="CryptChallenge" type="Node2D"]
 
@@ -89,6 +90,19 @@ position = Vector2(320, 96)
 
 [node name="Enemy6" type="Marker2D" parent="EnemySpawns"]
 position = Vector2(320, 352)
+
+[node name="Zones" type="Node2D" parent="."]
+
+[node name="Rune" type="ReferenceRect" parent="Zones"]
+script = ExtResource("rz_zone")
+offset_left = 52.0
+offset_top = 364.0
+offset_right = 76.0
+offset_bottom = 388.0
+mouse_filter = 2
+border_color = Color(0.95, 0.76, 0.19, 1)
+border_width = 2.0
+zone_name = &"rune"
 
 [node name="SocketWest1" type="Node2D" parent="."]
 position = Vector2(32, 224)

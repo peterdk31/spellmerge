@@ -85,6 +85,10 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 ## biomes decision 18). A boss's go straight to every player instead (decision 25), always:
 ## a boss ignores this chance (the owner, 2026-11-19); an add's never drop. 1: always; 0: never.
 @export_range(0.0, 1.0) var coin_drop_chance: float = 1.0
+## The chance that the keys it carries (taken while a seat possessed it) are laid where it dies, as
+## items (a roll of its own, `Rewards.KEY_DROP_PURPOSE`; the owner, 2026-11-25: "Drop by chance", a
+## half); lost with it otherwise. An add rolls as any foe; a boss's are always laid.
+@export_range(0.0, 1.0) var key_drop_chance: float = 0.5
 
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4

@@ -853,6 +853,95 @@ func test_a_possessed_foe_never_shares_a_coin_it_took_later() -> void:
 	check_equal(dropped, [[ItemKinds.COIN, 1], [ItemKinds.COIN, 1], [ItemKinds.COIN, 1], [ItemKinds.COIN, 1]], "the four it took drop as plain coins, one at a time")
 
 
+## A foe of `data` holding `keys` keys (taken while a seat possessed it), laid by `chance`.
+func _key_holder(data: EnemyBase, keys: int, chance: float, is_add: bool = false) -> Actor:
+	data.key_drop_chance = chance
+	var foe: Actor = _foe(data, RoomGrid.NO_PLACE, is_add)
+	check(foe.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, keys)), "it holds %d keys" % [keys])
+	return foe
+
+
+## What every death from now on lays as items (each row a kind and a count), heard off the bus.
+func _hear_laid() -> Array:
+	var laid: Array = []
+	_world.bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: laid.append([stack.kind, stack.count]))
+	return laid
+
+
+## The owner, 2026-11-25 ("Drop by chance", a half): the keys a foe carries are laid by a roll of
+## their own, one copy at a time as the items they are; they were lost with it before.
+func test_a_foes_keys_drop_by_their_own_chance() -> void:
+	check_equal(IMP.key_drop_chance, 0.5, "a half, the owner's number")
+	var laid: Array = _hear_laid()
+	_kill(_key_holder(_carrying(2, 0.0), 2, 1.0), Vector2(50, 0))
+	check_equal(laid, [[ItemKinds.KEY, 1], [ItemKinds.KEY, 1]], "a chance of 1: both keys laid, one each")
+	check(_rewards.coins_lying().is_empty(), "whatever its coins do (their chance 0: none)")
+	check_equal([_rewards._key_drops, _rewards._drops], [1, 1], "one roll for its keys, one for its coins")
+	laid.clear()
+	_kill(_key_holder(_carrying(2, 1.0), 1, 0.0), Vector2(90, 0))
+	check(laid.is_empty(), "a chance of 0: its key is lost with it")
+	check_equal(_rewards.coins_lying().size(), 2, "though its coins drop")
+	_kill(_foe(_carrying(2, 1.0)), Vector2(90, 0))
+	check_equal([_rewards._key_drops, _rewards._drops], [2, 3], "a foe with no key makes no key roll, and the coins' rolls are as they were")
+
+
+func test_a_foe_with_keys_and_no_coins_still_rolls_for_them() -> void:
+	var laid: Array = _hear_laid()
+	_kill(_key_holder(_carrying(0, 1.0), 1, 1.0), Vector2(50, 0))
+	check_equal(laid, [[ItemKinds.KEY, 1]], "its key is laid")
+	check_equal([_rewards._key_drops, _rewards._drops], [1, 0], "by its keys' roll alone")
+
+
+func test_an_adds_keys_roll_as_any_foes_and_a_bosss_are_always_laid() -> void:
+	_wizard(0)
+	var laid: Array = _hear_laid()
+	_kill(_key_holder(_carrying(0, 1.0), 1, 1.0, true), Vector2(50, 0))
+	check_equal(laid, [[ItemKinds.KEY, 1]], "an add's key is laid by its roll (the key was never its wave's)")
+	check(_rewards.coins_lying().is_empty(), "and still no coin")
+	laid.clear()
+	_kill(_key_holder(_carrying(0, 1.0), 1, 0.0, true), Vector2(50, 0))
+	check(laid.is_empty(), "nor at a chance of 0")
+	var rolls: int = _rewards._key_drops
+	for coins: int in [3, 0]:
+		laid.clear()
+		var data: EnemyBase = _carrying(coins, 0.0)
+		data.boss = true
+		_kill(_key_holder(data, 1, 0.0), Vector2(300, 0))
+		check_equal(laid, [[ItemKinds.KEY, 1]], "a boss's key is laid whatever its chance (carrying %d coins)" % [coins])
+	check_equal([_rewards.coins_of(0), _rewards._key_drops, _rewards._drops], [3, rolls, 0], "its coins paid as before, no roll made")
+
+
+## Whether each of `count` foes holding a key laid it (1) or not (0), at a chance of a half; `laid`
+## is `_hear_laid`'s.
+func _key_drops_of(count: int, laid: Array) -> Array:
+	var out: Array = []
+	for i in count:
+		laid.clear()
+		_kill(_key_holder(_carrying(0), 1, 0.5), Vector2(50, 0))
+		out.append(laid.size())
+	return out
+
+
+func test_the_key_drops_are_the_same_for_the_same_seed_and_through_a_snapshot() -> void:
+	_rewards.free()
+	_rewards = _make(11)
+	var laid: Array = _hear_laid()
+	var first: Array = _key_drops_of(30, laid)
+	_rewards.free()
+	_rewards = _make(11)
+	_world.table.begin_run()
+	check_equal(_key_drops_of(30, laid), first, "the same seed lays the same keys")
+	var areas: Dictionary = {"Rewards": _rewards, "Actors": _world.table}
+	var snapshot: Snapshot = Snapshot.take(areas)
+	var on: Array = _key_drops_of(30, laid)
+	check(on.has(0) and on.has(1), "some are laid and some lost (%s)" % [on])
+	var problems: PackedStringArray = snapshot.restore(areas)
+	check(problems.is_empty(), "restored: %s" % [problems])
+	_rewards.rebuild_derived()
+	check_equal(_rewards._key_drops, 30, "the key rolls counted are state")
+	check_equal(_key_drops_of(30, laid), on, "and the same after the restore")
+
+
 func test_a_boss_shares_only_the_coins_it_came_with() -> void:
 	_wizard(0)
 	_wizard(1, Vector2(200, 0))

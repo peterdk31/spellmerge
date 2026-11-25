@@ -546,6 +546,7 @@ func test_a_possessed_foe_that_took_coins_dies_and_drops_them_as_plain_coins() -
 	data.coins = 2
 	data.coins_most = 0
 	data.coin_drop_chance = 1.0
+	data.key_drop_chance = 1.0
 	var imp := IMP.scene.instantiate() as Actor
 	imp.data = data
 	imp.position = Vector2(200, 100)
@@ -557,12 +558,15 @@ func test_a_possessed_foe_that_took_coins_dies_and_drops_them_as_plain_coins() -
 	check(imp.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)), "and a key")
 	_world.bus.enemy_died.emit(0, imp, imp.global_position, -1)
 	var plain: int = 0
+	var keys: int = 0
 	for row: GroundItem in _items.lying():
-		check_equal([row.stack.kind, row.stack.count], [ItemKinds.COIN, 1], "only coins lie there, one each")
-		plain += 1
+		check_equal(row.stack.count, 1, "one copy each")
+		plain += 1 if row.stack.kind == ItemKinds.COIN else 0
+		keys += 1 if row.stack.kind == ItemKinds.KEY else 0
 	check_equal(plain, 3, "the three it took drop as plain coins")
 	check_equal(rewards.coins_lying().size(), 2, "its own two as shared coins, as before")
-	check_equal(imp.inventory.count_of(CURRENCY, KeyBase.ID), 1, "its key is not laid: it goes with the body")
+	check_equal([keys, _items.lying().size()], [1, 4], "its key is laid by its keys' roll (the owner, 2026-11-25), and nothing else")
+	check_equal(imp.inventory.count_of(CURRENCY, KeyBase.ID), 0, "the key left the body")
 	check_equal(imp.inventory.count_of(CURRENCY, CoinBase.ID), 2, "nothing more left the body")
 	imp.free()
 	body.position = _items.lying()[0].at

@@ -32,7 +32,7 @@ Each slice is its own PR, with its cards (one folder each: the `.tres` with its 
 `content/spells/modifiers/point_blank/`: "Next carrier ends almost at once, at the staff's tip."
 
 - **New number:** `ModifierBase.lifetime_most`, seconds: the longest the carrier may live, after every other life card (`lifetime_base`, `lifetime_mult`, `reach_mult`), so Slow cannot lengthen it again. 0 is none; with several, the shortest counts. Range 0 to 30 s. The card: 0.05 s (the shortest life a carrier card may have), no other number.
-- A bolt with it flies about 24 px and ends: its blast, its `on expire` and its `on hit` (if it touched a body on the way) go off at the staff's tip. Any payload becomes a melee strike (build 11). Its blast strikes its caster too, as every blast does.
+- A bolt with it flies about 24 px and ends: its blast, its `on expire` and its `on hit` (if it touched a body on the way) go off at the staff's tip. Any payload becomes a melee strike (build 11). Its blast strikes its caster too, as every blast does. So an enemy's AI reads such a cast as a blast on its caster (`CastSense.blast_on_caster`: a carrier that ends nearer than its own blast) and never casts it at a foe.
 - It counts where the carrier has a life that matters (`Carrier.SPEED` or `LASTS`, as `lifetime_mult`): a rune, a pool, a familiar end almost as they are made, and a swing sweeps in a blink. A dash and a teleport are wasted: a move's time is its distance over its speed, not its life.
 - **With Hold** a carrier is kept on for as long as it is held, whatever its life (`HOLD_LIFETIME`), so Point Blank does nothing on a held carrier, as Slow does nothing there. The builder does not mark it yet, since a card's waste is judged on its carrier alone; a rule between two cards is for later.
 
@@ -41,7 +41,7 @@ Each slice is its own PR, with its cards (one folder each: the `.tres` with its 
 - `test_quick_hand.gd`: the cast's wind-down is the bolt's less 0.25; two cards make it 0, never below; on a multicast cast the card takes from the cast; wasted on a payload's carrier.
 - `test_point_blank.gd`: the life is 0.05 s whatever Slow, Reach or Orbit's base say, in any slot order; `point blank · blast · bolt` hurts an imp at the wizard's shoulder.
 - `test_card_rules` (every card on every carrier) and `test_content_determinism` pick them up by folder.
-- Combos (each fails without its card): `quick_hand_lumber` (the quick hand, build 12: a second Lumber bolt at 0.25 s leaves too), `quick_hand_stream` (two Quick Hands: a bolt every tenth of a second); `point_blank_blast` (build 11: a blast at the tip hurts an imp at the shoulder), `point_blank_frost_ring` (`on expire · point blank · bolt · frost · nova · atom`: a frost nova from the hand chills the imp behind).
+- Combos (each fails without its card): `quick_hand_lumber` (the quick hand, build 12: a second Lumber bolt at 0.25 s leaves too), `quick_hand_stream` (two Quick Hands: a bolt every tenth of a second); `point_blank_spark_ring` (build 11: a lightning nova from the hand strikes the imps beside and behind), `point_blank_frost_ring` (`on expire · point blank · bolt · frost · nova · atom`: a frost nova from the hand chills the imp behind).
 
 ## L2: conditions
 

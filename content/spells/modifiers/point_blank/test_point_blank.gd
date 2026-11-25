@@ -73,6 +73,15 @@ func test_its_blast_goes_off_at_the_tip() -> void:
 	arena.free_all()
 
 
+func test_an_ai_knows_its_blast_catches_its_caster() -> void:
+	var arena := ArenaScript.new(root)
+	var blast: CompiledCast = arena.install_cards(0, 0, ["point_blank", "blast", "bolt"]).casts[0]
+	var far: CompiledCast = arena.install_cards(0, 1, ["blast", "bolt"]).casts[0]
+	arena.free_all()
+	check(blast.sense.blast_on_caster, "a blast at the staff's tip is on its caster")
+	check(not far.sense.blast_on_caster, "a flying blast bolt's is not")
+
+
 func test_the_builder_says_it() -> void:
 	var arena := ArenaScript.new(root)
 	var lines: PackedStringArray = arena.spells.component_stats(&"point_blank")

@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## TexturePage region); an atlas region has its atlas's. Sprites, faces, the staff's head, a page and
 ## the baked floor take it; strips and frame counts are as they were.
 
-const CURL_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.svg")
+const CURL_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.png")
 const STAR_HEAD: Texture2D = preload("res://content/wizard/staffs/star/head.svg")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 
@@ -17,7 +17,7 @@ func _art(size: Vector2i) -> Texture2D:
 
 
 func test_a_texture_says_its_detail_by_its_file_s_name() -> void:
-	check_equal(ArtDetail.of(CURL_HEAD), 2, "head@2x.svg: two art pixels a world pixel")
+	check_equal(ArtDetail.of(CURL_HEAD), 2, "head@2x.png: two art pixels a world pixel")
 	check_equal(ArtDetail.of(STAR_HEAD), 1, "head.svg: one")
 	check_equal(ArtDetail.of(null), 1, "none: one")
 	check_equal(ArtDetail.of(_art(Vector2i(8, 8))), 1, "a texture made in the game, unmarked: one")

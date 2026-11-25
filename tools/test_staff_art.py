@@ -29,6 +29,8 @@ class StaffArtTest(unittest.TestCase):
     def test_only_palette_colours_and_one_rect_a_run(self) -> None:
         palette = pixel_grid.palette()
         for path in staff_art.FILES:
+            if path.suffix != ".svg":
+                continue
             text = path.read_text(encoding="utf-8")
             self.assertIn('shape-rendering="crispEdges"', text)
             rows: dict[int, list[tuple[int, int, str]]] = {}
@@ -41,6 +43,13 @@ class StaffArtTest(unittest.TestCase):
                     self.assertLessEqual(x + width, next_x, f"{path.name}: rects on row {y} do not overlap")
                     if x + width == next_x:
                         self.assertNotEqual(colour, next_colour, f"{path.name}: one rect a run on row {y}")
+
+    def test_the_head_sheet_is_a_small_png_of_palette_colours(self) -> None:
+        path = staff_art.FOLDER / "head@2x.png"
+        self.assertLess(path.stat().st_size, 1024 * 1024, "under the 1 MB limit")
+        palette = pixel_grid.palette()
+        used = {c for row in staff_art.curl_head().pixels for c in row if c is not None}
+        self.assertTrue(used <= palette, f"palette colours only: {sorted(used - palette)}")
 
     def test_the_rows_differ_only_on_the_gem(self) -> None:
         head = staff_art.curl_head()

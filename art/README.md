@@ -75,7 +75,7 @@ The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The pi
 
 **Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
 
-A generator may draw it (rects only, palette colours, as `tests/core/test_svg_art.gd` wants): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
+A generator may draw it (palette colours; an SVG of rects, one a run along a row, as `tests/core/test_svg_art.gd` wants, or a PNG when the rects would pass the 1 MB limit: the curl's head sheet): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
 
 ## Review questions
 

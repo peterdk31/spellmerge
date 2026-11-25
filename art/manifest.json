@@ -259,7 +259,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "good",
       "tool": "Claude (SVG rects drawn by tools/staff_art.py, which composites the game's own sheets, ART0, 2026-11-25)",
-      "prompt": "The golden example of a player character at 2x detail, a living staff: frame 14 (pointing up and to the right) of the player 1 row of content/wizard/staffs/curl/head@2x.svg, with the Optimist's eyes looking up-right from content/wizard/staffs/curl/eyes@2x.svg and the neutral brows from brows@2x.svg over it, the eyes' top-left 16 art px (8 world px) above the grip, as one 96x96 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "The golden example of a player character at 2x detail, a living staff: frame 14 (pointing up and to the right) of the player 1 row of content/wizard/staffs/curl/head@2x.png, with the Optimist's eyes looking up-right from content/wizard/staffs/curl/eyes@2x.svg and the neutral brows from brows@2x.svg over it, the eyes' top-left 16 art px (8 world px) above the grip, as one 96x96 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/kit/golden_stray.svg",

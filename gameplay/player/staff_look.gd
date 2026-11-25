@@ -44,7 +44,7 @@ extends ActorLook
 
 
 ## The head sheets: 48x48 frames, DIRECTIONS columns, one row per ramp (0-3), the grip at GRIP, in
-## world units; a sheet at 2x detail (ArtDetail, `head@2x.svg`) has them twice as many art pixels and
+## world units; a sheet at 2x detail (ArtDetail, `head@2x.png`) has them twice as many art pixels and
 ## is drawn at half its size.
 const FRAME_SIZE: int = 48
 const DIRECTIONS: int = 16

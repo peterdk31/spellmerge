@@ -4,10 +4,11 @@
 """The curl staff drawn at 2x detail (ART0, the pilot of the 64x64 redraw; docs/STYLE.md, "The
 picture and the art's detail"; art/README.md, "Redrawing a sprite at 64x64").
 
-It draws, from shape rules, the files the game reads (rects only, one a run of a colour along a row,
-palette colours: what tests/core/test_svg_art.gd checks):
+It draws, from shape rules, the files the game reads (palette colours only; the SVGs rects only, one a
+run of a colour along a row, as tests/core/test_svg_art.gd checks; the head sheet a PNG, as an SVG of
+its rects would be over the 1 MB limit):
 
-- `content/wizard/staffs/curl/head@2x.svg`: the curl's head sheet, 16 directions (clockwise from
+- `content/wizard/staffs/curl/head@2x.png`: the curl's head sheet, 16 directions (clockwise from
   pointing right, each drawn, never rotated, so the light stays top-left and the curl stays on top)
   by 4 player ramps, 96x96 frames, the grip at (48, 54): the 48x48 sheet's layout at two art
   pixels a world pixel.
@@ -28,7 +29,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -115,6 +118,32 @@ class Canvas:
                 lines.append(f'  <rect x="{start}" y="{y}" width="{x - start}" height="1" fill="{colour}"/>')
         lines.append("</svg>")
         return "\n".join(lines) + "\n"
+
+    def png(self) -> bytes:
+        """An indexed PNG of the picture (its few palette colours and the clear one), written by hand
+        as tools/ground_shape.py writes its: a sheet too big for an SVG of rects under 1 MB."""
+        colours: dict[str | None, int] = {None: 0}
+        rows = bytearray()
+        for row in self.pixels:
+            rows.append(0)
+            for colour in row:
+                if colour not in colours:
+                    colours[colour] = len(colours)
+                rows.append(colours[colour])
+        palette = b"".join(b"\x00\x00\x00" if c is None else bytes.fromhex(c[1:]) for c in colours)
+        alpha = bytes(0 if c is None else 255 for c in colours)
+        chunks = [
+            (b"IHDR", struct.pack(">IIBBBBB", self.width, self.height, 8, 3, 0, 0, 0)),
+            (b"PLTE", palette),
+            (b"tRNS", alpha),
+            (b"IDAT", zlib.compress(bytes(rows), 9)),
+            (b"IEND", b""),
+        ]
+        out = bytearray(b"\x89PNG\r\n\x1a\n")
+        for kind, data in chunks:
+            out += struct.pack(">I", len(data)) + kind + data
+            out += struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+        return bytes(out)
 
 
 def _shade(parts: list[list[int]], x: int, y: int, size: tuple[int, int]) -> int:
@@ -385,7 +414,7 @@ def golden() -> Canvas:
 
 
 FILES = {
-    FOLDER / "head@2x.svg": curl_head,
+    FOLDER / "head@2x.png": curl_head,
     FOLDER / "eyes@2x.svg": cheer_eyes,
     FOLDER / "brows@2x.svg": brows,
     ROOT / "art/kit/golden_staff@2x.svg": golden,
@@ -399,13 +428,14 @@ def main(argv: list[str] | None = None) -> int:
     _palette_check()
     status = 0
     for path, draw in FILES.items():
-        text = draw().svg()
+        picture = draw()
+        data = picture.png() if path.suffix == ".png" else picture.svg().encode("utf-8")
         if args.check:
-            if not path.exists() or path.read_text(encoding="utf-8") != text:
+            if not path.exists() or path.read_bytes() != data:
                 print(f"{path.relative_to(ROOT)} differs from what tools/staff_art.py draws", file=sys.stderr)
                 status = 1
         else:
-            path.write_text(text, encoding="utf-8")
+            path.write_bytes(data)
             print(f"wrote {path.relative_to(ROOT)}")
     return status
 

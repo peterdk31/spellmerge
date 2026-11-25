@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="StaffBase" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="1_base"]
-[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head@2x.svg" id="2_head"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head@2x.png" id="2_head"]
 [ext_resource type="Script" path="res://core/base/face_art.gd" id="3_face"]
 [ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/eyes@2x.svg" id="4_eyes"]
 [ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/brows@2x.svg" id="5_brows"]

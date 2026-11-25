@@ -53,7 +53,7 @@ extends Resource
 
 ## The body while this staff is shown (a player's floating staff): a sheet of 48x48 frames, one
 ## column per direction (16, clockwise from pointing right), one row per ramp (the player
-## colour, 0-3), the grip at (24, 27) of each frame. A sheet drawn at 2x detail (`head@2x.svg`,
+## colour, 0-3), the grip at (24, 27) of each frame. A sheet drawn at 2x detail (`head@2x.png`,
 ## ArtDetail) has 96x96 frames, the grip at (48, 54), and is drawn at half its size. None: the body
 ## keeps its own look.
 @export var head: Texture2D = null

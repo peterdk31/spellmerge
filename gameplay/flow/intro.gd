@@ -27,7 +27,7 @@ signal finished(skipped: bool)
 const WIZARD_IDLE: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
 const WIZARD_HAT: Texture2D = preload("res://art/story/wizard_hat.svg")
 const FAVOURITE: Texture2D = preload("res://art/story/favourite.svg")
-const STAFF_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.svg")
+const STAFF_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.png")
 const EYES: Texture2D = preload("res://art/faces/eyes.svg")
 const BROWS: Texture2D = preload("res://art/faces/brows.svg")
 

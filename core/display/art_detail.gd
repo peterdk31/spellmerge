@@ -12,7 +12,7 @@ extends RefCounted
 ## grips) measures it in its own art pixels; everything that places it in the world, in world units.
 ##
 ## **How a texture says it:** its file's name ends in `@2x` before the extension
-## (`head@2x.svg`, `eyes@2x.png`). Nothing else is needed: no import option, no list. A texture made
+## (`head@2x.png`, `eyes@2x.png`). Nothing else is needed: no import option, no list. A texture made
 ## in the game from art (a `TexturePage` region, a page of copied sheets) carries its source's
 ## detail with `mark`; a region of an atlas (an `AtlasTexture`) has its atlas's unless marked.
 ##

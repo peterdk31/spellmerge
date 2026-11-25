@@ -39,7 +39,7 @@ func take() -> void:
 		var feet := Vector2(40.0 + c * COLUMN, TOP)
 		var sprite: Sprite2D = place(WIZARD, 1.0, feet - Vector2(16.0, 28.0))
 		sprite.region_enabled = true
-		sprite.region_rect = Rect2(0.0, 0.0, 32.0, 32.0)
+		sprite.region_rect = Rect2(Vector2.ZERO, ArtDetail.to_art(WIZARD, Vector2(32.0, 32.0)))
 		projectiles.call("set_anchor", c, feet + BODY)
 		events.emit_signal(&"barrier_changed", c, COLUMNS[c][0] as int, 30.0, 0, Vector2.ZERO, HURT)
 	# The size follows the body: a small thing's and a boss's, below.

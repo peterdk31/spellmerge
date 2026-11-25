@@ -60,7 +60,7 @@ func test_a_sprite_is_fitted_with_its_pose_and_snapped_to_its_art_s_pixels() -> 
 
 ## The curl drawn at half size, its frames and grip where the 48 px sheet's were: the shot leaves its
 ## tip whichever sheet is on show, and the face wears the staff's own sheets at half.
-func test_the_wizard_draws_a_2x_head_and_face_where_a_1x_one_stands() -> void:
+func test_the_wizard_draws_a_2x_head_and_face() -> void:
 	var wizard: Node2D = own(WizardScene.instantiate()) as Node2D
 	root.add_child(wizard)
 	var sprite := wizard.get_node(^"Sprite") as Sprite2D
@@ -86,5 +86,5 @@ func test_the_wizard_draws_a_2x_head_and_face_where_a_1x_one_stands() -> void:
 	for child: Node in face.get_children():
 		var layer := child as Sprite2D
 		if layer != null:
-			check_equal(layer.scale, Vector2.ONE, "a 1x face layer at its size")
+			check_equal(layer.scale, Vector2(0.5, 0.5), "the shared face layer at half too (2x since ART1)")
 	wizard.get_parent().remove_child(wizard)

@@ -70,6 +70,18 @@ class Redraw2xTest(unittest.TestCase):
         out = redraw_2x.redraw(redraw_2x.read_svg(_svg(rows)), smooth=False)
         self.assertEqual([out.pixels[y][x] for y in (4, 5) for x in (4, 5)], [OUTLINE] * 4, "a dark middle stays 2x2")
 
+    def test_the_blocky_outline_is_thinned_toward_the_clear_side(self) -> None:
+        out = redraw_2x.redraw(redraw_2x.read_svg(_svg(["###", "#f#", "###"])), smooth=False)
+        self.assertEqual(out.pixels[2][0], OUTLINE, "the outer half of the left outline stays")
+        self.assertEqual(out.pixels[2][1], FILL, "its inner half takes the fill beside it")
+        self.assertEqual(out.pixels[0][0], OUTLINE, "a corner stays outline")
+
+    def test_only_the_source_colours_and_a_rect_it_cannot_read_is_refused(self) -> None:
+        out = redraw_2x.redraw(redraw_2x.read_svg(_svg(DIAMOND)))
+        self.assertEqual({c for row in out.pixels for c in row} - {None}, {OUTLINE, FILL})
+        with self.assertRaises(ValueError):
+            redraw_2x.read_svg('<svg width="2" height="2"><rect x="0" y="0" width="1" height="1" fill="#14121f" opacity="0.5"/></svg>')
+
     def test_a_target_not_named_at_2x_is_refused(self) -> None:
         with self.assertRaises(SystemExit):
             redraw_2x.main(["in.svg", "out.svg"])

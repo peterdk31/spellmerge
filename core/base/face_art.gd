@@ -2,7 +2,7 @@ class_name FaceArt
 extends Resource
 ## A face of its own (boss plan OB9, docs/milestones/boss-old-broom.md, "The broom's data", Look):
 ## the eye and brow sheets a `Face` draws in place of the shared ones (art/faces/eyes@2x.svg and
-## brows.svg), for a body that should not wear a player's or a stray's eyes (a boss). The sheets
+## brows@2x.svg), for a body that should not wear a player's or a stray's eyes (a boss). The sheets
 ## keep the shared layout, at any frame size: the eyes sheet has ten columns (nine looks,
 ## (y + 1) × 3 + x + 1, then the blink) and a row a look of the face (`Face.art_row`: a phase may
 ## show another, `PhaseLook.face_row`); the brows sheet a column a mood (`Face.Mood`) and the same

@@ -416,6 +416,9 @@ static func shared_sheets() -> Array[Texture2D]:
 		var brows_region := AtlasTexture.new()
 		brows_region.atlas = texture
 		brows_region.region = Rect2(Vector2(0, eyes.get_height()), brows.get_size())
+		# A copy keeps its sheet's detail (the page has no `@2x` name of its own): ArtDetail.
+		ArtDetail.mark(eyes_region, ArtDetail.of(EYES_SHEET))
+		ArtDetail.mark(brows_region, ArtDetail.of(BROWS_SHEET))
 		_shared = [eyes_region, brows_region] as Array[Texture2D]
 	return _shared
 

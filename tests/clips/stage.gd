@@ -260,7 +260,6 @@ func _wizard(player: int, at: Vector2) -> Node2D:
 	ArtDetail.fit(body)
 	var hat := Sprite2D.new()
 	hat.texture = HATS[player % HATS.size()]
-	hat.hframes = 4
 	hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	body.add_child(hat)
 	wizard.add_child(body)

@@ -19,8 +19,9 @@ its palette colours and its silhouette, and is drawn finer in two ways:
     tools/redraw_2x.py IN.svg OUT@2x.png   # an indexed PNG, for a sheet whose rects would pass 1 MB
     tools/redraw_2x.py --blocky IN OUT     # no smoothing: small round shapes (the face sheets)
 
-Standard library only. The 1x file is deleted after (its `.import` renamed), so the 2x file is the
-art from then on: redraw it by hand or with a generator, not by running this again.
+Standard library only. Delete the 1x file after by hand (renaming its `.import`, art/README.md step
+2), so the 2x file is the art from then on: redraw it by hand or with a generator, not by running
+this again.
 """
 
 from __future__ import annotations
@@ -136,7 +137,7 @@ def double(src: Canvas) -> Canvas:
             if colour != OUTLINE:
                 continue
             sides = {(dx, dy): _at(p, x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))}
-            if None not in sides.values() and all(0 <= x + dx < src.width and 0 <= y + dy < src.height for dx, dy in sides):
+            if None not in sides.values():
                 continue
             for qy in (0, 1):
                 for qx in (0, 1):

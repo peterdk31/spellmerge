@@ -106,6 +106,19 @@ func test_the_shared_sheets_are_drawn_at_2x() -> void:
 	check_equal(Face.BROWS_SHEET.get_size(), Vector2(Face.FRAME.x * Face.Mood.size(), Face.FRAME.y * 2), "a brow column a mood, two rows")
 
 
+## Regression (ART1's review): the shared page is a texture of its own, with no `@2x` name, so its
+## regions are marked with their sheets' detail and a face on it is drawn at half size, 16x8 a frame.
+func test_a_face_on_the_shared_page_is_drawn_at_its_sheets_detail() -> void:
+	var shared: Array[Texture2D] = Face.shared_sheets()
+	check_equal(ArtDetail.of(shared[0]), ArtDetail.of(Face.EYES_SHEET), "the eyes' region keeps their detail")
+	check_equal(ArtDetail.of(shared[1]), ArtDetail.of(Face.BROWS_SHEET), "the brows' region keeps theirs")
+	var face := _face(_wearer(Face.Style.STERN))
+	for child in face.get_children():
+		if child is Sprite2D:
+			var layer := child as Sprite2D
+			check_equal(layer.scale, Vector2(0.5, 0.5), "%s drawn at half its art's pixels" % layer.name)
+
+
 func test_the_resting_mood_shows_and_neutral_is_the_personalitys() -> void:
 	var sergeant := _wearer(Face.Style.STERN, Face.Mood.ANGRY)
 	var optimist := _wearer(Face.Style.CHEER)

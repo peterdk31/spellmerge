@@ -426,7 +426,7 @@ Two changes the owner decided on 2026-11-19.
 ### Open questions for the owner
 
 1. *Answered by the owner, 2026-11-19: "Everything is droppable" ("Everything is droppable", below).* ~~Keys are never dropped (like coins): should a key be droppable from the inventory (X)?~~
-2. **A downed wizard's keys** stay in its bag; a key taken by a possessed foe stays in the foe's bag when the possession ends (and is lost when it dies). Should a foe drop the keys it carries as it dies, as it drops its coins by chance?
+2. *Answered by the owner, 2026-11-25: by chance, as its coins ("Answered by the owner (2026-11-25)", below).* **A downed wizard's keys** stay in its bag; a key taken by a possessed foe stays in the foe's bag when the possession ends (and is lost when it dies). Should a foe drop the keys it carries as it dies, as it drops its coins by chance?
 
 ## A reward room's type (2026-11-19)
 
@@ -493,6 +493,8 @@ The owner's two follow-ups of 2026-11-19, as built:
 
 ### Open questions for the owner
 
+*None of the three is open any more: room rerolls were removed on 2026-11-19 ("No room rerolls", below).*
+
 1. **The crypt's kinds still rarely change:** every crypt kind but the fight has one template, and a template stands once a biome, so a crypt room can only turn into a kind the map does not hold yet whose one template fits the room's bridges (a fountain, rarely); a fight cannot become a second shop or reward room until the content has more of their templates (CB13). Should a reroll be allowed to use a template the biome already holds (two rooms of the same template), or wait for more templates?
 2. **The weighting:** a kind's line `weight` over one more than the rooms of it the biome holds (so a fight among four fights is a quarter as likely as a kind the biome has none of). Is that the feel wanted, or should the fixed kinds (shop, reward) be weighed down so a second shop stays rare?
 3. **Items a template places** (`ItemStandIn`; only the hub has one today) are still not laid again for a rerolled room; a biome room that places items would keep the old one's.
@@ -546,6 +548,8 @@ Six changes the owner asked for on 2026-11-19, as built:
 - **Tests:** `tests/gameplay/flow/test_map_teleport.gd` (told the cleared rooms; the teleport alone, materializing, nobody else moved; nowhere uncleared, in a fight or possessing; the same after a snapshot's restore), `tests/hud/test_map_picker.gd`, `tests/gameplay/feel/test_party_map_view.gd` (the held map never closes while moving, a split change still reopens; the pick's outline in stages), `tests/gameplay/feel/test_teleport_looks.gd`, `tests/gameplay/flow/test_rejoin.gd` (a join held once the start room was left, a returning player too, kept by a snapshot, let in at the run's end; a held seat that leaves), `tests/hud/test_panels.gd`, `tests/gameplay/run/test_biome_generator.gd`, `tests/gameplay/rewards/test_rerolls.gd`, `tests/hud/test_reward_menu.gd`, `tests/core/test_item_kinds.gd`, `test_events.gd`. Screenshots: `tests/screenshots/shot_map_teleport.gd`.
 
 ### Open questions for the owner
+
+*All three answered by the owner on 2026-11-25: kept as built ("Answered by the owner (2026-11-25)", below).*
 
 1. **The pick moves with the walking stick:** a flick of the left stick (or the D-pad, which also walks) moves the pick while the wizard keeps walking, since the map is held while moving. Should the right stick pick instead, or the wizard stand still while the map is held?
 2. **The camera follows a teleport at once:** with one player the camera goes with the wizard (as it does for the teleport spell); the vanish column is seen by the players whose views still show where it left. Should the camera pan in stages instead?
@@ -778,6 +782,8 @@ The owner decided on 2026-11-20 that **secret rooms can be reached in three ways
 
 ### Open questions for the owner
 
+*All three answered by the owner on 2026-11-25 ("Answered by the owner (2026-11-25)", below).*
+
 1. **The seam's 64 px:** each crypt room keeps 32 px of dark round its slab, so two rooms standing wall to wall still show a short doorway of floor between their slabs (the seam). Should the slabs truly touch (the rooms' rectangles overlapping by their margins, which the places, the dark and the grid would have to allow), or is a short doorway right?
 2. **A rune is stepped on, not pressed:** a found rune teleports a wizard whose feet reach it (no button), resting 1 s after. Should it ask for A, as the shop does?
 3. **The rune's place:** a room's `rune` zone, else a spot toward a corner round its middle. Should the templates mark a `rune` zone each, so the rune stands somewhere chosen?
@@ -888,7 +894,7 @@ The owner's second step after grid lighting: one renderer-neutral pass (Vulkan/D
 
 - **Measured first** (1280 x 720, llvmpipe, the fixed clock, main 3a54119, frame / GPU ms, median of 2): everything on, 1p near 63.2 / 60.7, 2p apart Dynamic 104.4 / 86.1; with the light off (which takes the mist and the shadows with it) 30.4 / 22.1 and 66.3 / 50.0; with the fog off 50.4 and 95.6; shadows off 61.7 and 101.0; air off 58.0 and 86.8. With the light and the mist worked out at each pixel of the 1280 x 720 picture (no passes): 60.2, 74.7 (1p far) and 95.6, as fast or faster than with #902's passes (63.2, 75.8, 104.4). Once the light was a grid, the passes cost more than they saved.
 - **The passes are gone:** `light_passes.gd`, `light_factor.gdshader`, `mist_pass.gdshader`, `light_passes.gdshaderinc`, `light_pack.gdshaderinc`, the mist's twin and `ViewReaders.set_view_uniform`. The apply rect (`light_apply.gdshader`) is the one full-screen pass over the world: it reads the screen once and works the light, the ambient and the rooms' tints out at each pixel, a world pixel at a time (`floor(world) + 0.5`: whole-pixel bands at any size of picture, as the mist and the tints). Each room's mist works out how thick it is at each world pixel it covers.
-- **Why the mist is not in that pass:** it lies under the bodies and the light multiplies over them. A ground mask in the screen's alpha (a multiply rect zeroing it over the floor, the bodies writing 1, one pass applying the mist where it is 0) works on gl_compatibility with transparent targets, but on Vulkan (lavapipe, the mobile renderer) the screen's copy reads alpha 1 everywhere. So it is not renderer-neutral; the mist stays a draw of its own under the bodies, the shadows a disc a body under them, and the air its particles over the light: none of them is screen-wide. Open with the owner.
+- **Why the mist is not in that pass:** it lies under the bodies and the light multiplies over them. A ground mask in the screen's alpha (a multiply rect zeroing it over the floor, the bodies writing 1, one pass applying the mist where it is 0) works on gl_compatibility with transparent targets, but on Vulkan (lavapipe, the mobile renderer) the screen's copy reads alpha 1 everywhere. So it is not renderer-neutral; the mist stays a draw of its own under the bodies, the shadows a disc a body under them, and the air its particles over the light: none of them is screen-wide. *The owner, 2026-11-25: leave it as it is.*
 - **How much the effects cost, one table** (`gameplay/feel/effects_quality.gd`, `EffectsQuality`): a row a level (LOW, HIGH; HIGH the look as it was): the light's cell (8 or 16 px) and smoothing, the mists' layers of billows (3 or 1: `Mist.set_billows`, the shader's `billows`, three adding up in the order they did), the air's share (the rooms', the kinds' and the void's: 1 or 0.5). `Spectacle.set_effects_quality(level)` hands each number to its effect, again to a light or a mist made anew; whether each is drawn at all stays its own setting. Taken in one frame (answered by the owner on 2026-11-22: an exception to "Smooth", as for the split's cells; "The Effects setting" below).
 - **Both renderers:** the shaders touched compile on gl_compatibility and on the mobile renderer (Vulkan, lavapipe); no varyings added; `room_tint`'s loop no longer returns from inside (a flag and a break, D1's note). The motes' shader's 33 varyings on Vulkan are main's too (D1's #908).
 - **Measured, main against this** (`play_frames.gd` on the fixed clock, xvfb on llvmpipe, 4 cores, frame ms). At 1280 x 720, four rounds taken in turn: 1p far web 71.9 → 76.3, 2p apart Dynamic 101.3 → 98.3, 4p apart Equal 151.8 → 154.5; with the low row (`--quality=low`, three rounds) 74.3, 95.7 and 145.4. At 640 x 360 (two rounds; nothing was drawn in a pass there before either) 1p start 25.9 → 25.4, near 34.2 → 31.0, far 38 → 38, 2p 63.4 → 57.8, 4p 103 → 95.5 (main's runs had outliers; the branch's agreed). So at 1280 the splits come out even, and one view pays about 4 ms on llvmpipe for the mist worked out at each of the picture's pixels (four a world pixel) where its pass worked it out once a block: work a CPU drawing for the GPU feels and a GPU barely does (three layers of noise a pixel), and what the low row and "Fog" turn down. Screenshots: branch `shots/perf/one-pass`, folder `shots/perf-one-pass/`.
@@ -938,6 +944,8 @@ The owner reported on 2026-11-21: "Sometimes when local players go back near eac
 - **The camera on the benchmark's fixed clock** (the owner's ask on #901: runs seemed to frame differently, one picture in one run and split in another): the camera and the split code read no real clock once Feel is on `fixed_view_delta`, and their frames match across processes. The runs that differed had **no current camera at all**: a run's world camera is made current when it is ready, which is inside a processing pass (the runner's `_process`; the tick's physics pass in the game). Through a pass or a group call Godot skips the nodes that left a group during it, by their address; a new camera made at the address of a node freed earlier in the pass is skipped by its own `make_current` (a group call), which then does nothing. The run then drew with no camera: the party camera and the split framed nothing, in whichever run the allocator happened to reuse the address. Flow now makes the camera current again when the frame's deferred calls run, before it is drawn, when that did not take (`Flow._make_current`; guarded: not if it left or another camera was made current meanwhile; the game's runs too, not only the benchmark's). Tests: `tests/gameplay/flow/test_camera_current.gd` (the swap inside a group call: the plain `make_current` is skipped in 7 of 8 tries there, the camera current by the frame's end every time); `tests/benchmark/test_fixed_split_frames.gd` (two players apart, Dynamic then Equal, each played twice in one process, the frame's hash with the split's views mixed in the same in both runs; it failed about one process in three before the fix).
 
 ### Open questions for the owner
+
+*Answered by the owner on 2026-11-25: keep 0.3 s.*
 
 - `MERGE_TIME` is 0.3 s and `MERGE_ANCHOR_STEP` 12 px a frame (the aim was under about 0.5 s once the players stand within `JOIN_REACH`): a longer merge is softer, a shorter one snappier.
 
@@ -1036,3 +1044,18 @@ The owner, after playing with the close-foes framing of 2026-11-19 ("The view: c
 - **The benchmark's rows keep their names:** `1p far` and `1p small far web` (bench/play_frames_runner.gd) were the camera zoomed out over close foes; they now fight at the default zoom. Every scenario draws 1.56 times the world area at rest; the frame times were not measured again in this change.
 
 Tests: `tests/gameplay/feel/test_foe_markers.gd` (none outside a sealed fight, in view, in another room or with no seat here; the edge and the way; the seat's own cell while split; the looks in and out; the cap, a boss, no pile; nothing allocated a frame), `test_foe_markers_split.gd` (a real split, merge and three-seat regroup, frame by frame: every wanted marker in its own view's cell, never more in a view than foes), `test_party_camera.gd`, `test_split_camera.gd`, `test_split_equal.gd` (0.8 everywhere; an enemy not held; a small room seen closer), `test_split_merge_time.gd` (its fight cases are plain cases now: a fight no longer moves a camera), `tests/core/test_screen_views.gd` (`reach_inside`, a view found by its id), `test_biome_sound_and_look.gd` (a foe spawning in gets its marker, and Feel's own step marks a foe out of the picture without its camera moving, in the game), `tests/gameplay/coop/test_coop.gd`. Screenshots: `tests/screenshots/shot_view_framing.gd` (`framing_sealed_fight`, `framing_foe_marker`, and split in two views `framing_split_marker`; two seats played here, the keyboard and a gamepad). Looked at on 2026-11-23: the first marker, 9 × 6, was missed by a reviewer looking for it, so it is 12 × 6.
+
+## Answered by the owner (2026-11-25)
+
+The questions this plan still held open, asked together and answered on 2026-11-25:
+
+1. **A foe's keys** ("A downed wizard's keys", above): **drop by chance, a half.** The keys a foe carries (taken while a seat possessed it) are laid where it dies, as the items they are, each its taker's own, by `EnemyBase.key_drop_chance` (0.5 on every enemy; the owner chose a number of their own over sharing the coins' chance, which is 1 today): one roll a foe holding any (the Rewards area's `key_drop`, counted by `_key_drops`, state), all its keys or none; lost with it otherwise. The coins' roll is untouched, so a run with no key taken rolls as before. An add's keys roll as any foe's (a key was never its wave's), a boss's are always laid ("a boss always pays"). A key lost this way is gone: a party short of keys opens fewer treasure rooms. Tests: `tests/gameplay/rewards/test_rewards.gd` (chance 1 and 0 apart from the coins', with no coins, an add, a boss, the same twice and through a snapshot), `tests/gameplay/items/test_items.gd`.
+2. **The map's pick** moves with the walking stick: kept as built.
+3. **The camera follows a teleport at once:** kept (the cut).
+4. **"Left the start room"** is a room past it entered; a bridge does not count: kept.
+5. **The seam's 64 px:** the short doorway is right; the slabs do not truly touch.
+6. **A rune is stepped on,** not pressed: kept.
+7. **The rune's place:** every crypt template marks a `rune` zone (a PR of its own).
+8. **The merge:** `MERGE_TIME` stays 0.3 s.
+
+9. **The floor mist and the one pass** ("One pass", above): left as it is, a draw of its own under the bodies. Nothing of this plan is open.

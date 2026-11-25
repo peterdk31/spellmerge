@@ -65,7 +65,7 @@ extends Node
 ##   content/coins). A foe carries its coins in its own currency bag (its data's, `Actor._carry_coins`);
 ##   as it dies (`enemy_died`, possessed or not), by its `EnemyBase.coin_drop_chance` (DROP_PURPOSE),
 ##   what it still carries of those (`Inventory.carried_kept`: a coin it took later, a player's
-##   dropped one, drops as a plain coin for whoever walks over it, `Inventory.drop_taken`, so a drop never makes or loses coins) drops where it fell (an add another body called, `Actor.is_add`, drops
+##   dropped one, drops as a plain coin for whoever walks over it, `Inventory.drop_taken`, so a drop never makes or loses coins) drops where it fell, and by a roll of their own (`EnemyBase.key_drop_chance`, `_drop_keys`) the keys it carries are laid as items (the owner, 2026-11-25; else they are lost with it; an add's keys roll too, a boss's are always laid) (of its coins, an add another body called, `Actor.is_add`, drops
 ##   none; a boss's go to every player at once, decision 25), each one coin anyone may take: the
 ##   first wizard (seat order) whose feet come within `COIN_REACH` takes it, and every player's coin
 ##   stack gains one. As a seat's wizard first comes in a run its stack gains its player's
@@ -118,7 +118,9 @@ const COIN_SPREAD: Array[Vector2] = [
 ## The room a coin takes: it lies clear of walls this far round.
 const COIN_RADIUS: float = 2.0
 ## The run's chance's purpose for whether a dying foe's coins drop (`EnemyBase.coin_drop_chance`),
-## keyed by its actor key, counted by `_drops`.
+## keyed by its actor key, counted by `_drops`; and for whether the keys it carries do
+## (`EnemyBase.key_drop_chance`), counted by `_key_drops`.
+const KEY_DROP_PURPOSE: StringName = &"key_drop"
 const DROP_PURPOSE: StringName = &"coin_drop"
 ## The chance's purposes of a reward reroll (its lines and its cards of any card), apart from a clear's
 ## so a reroll never shifts the seat's later offers.
@@ -206,6 +208,8 @@ var _reward_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _funded: int = 0
 ## The drop rolls made this run (`DROP_PURPOSE`'s counter).
 var _drops: int = 0
+## How many key drop rolls were made (`KEY_DROP_PURPOSE`'s counter): state.
+var _key_drops: int = 0
 ## The coins on the floor: each one's number and where it lies, by the same index, in the order laid.
 var _coin_numbers: PackedInt32Array = PackedInt32Array()
 var _coin_at: PackedVector2Array = PackedVector2Array()
@@ -643,7 +647,8 @@ func _on_special_room_opened(room: int, fill: StringName, table: StringName, are
 ## A foe died at `position` (possessed or not): by its `EnemyBase.coin_drop_chance` (the run's
 ## chance, `DROP_PURPOSE`, keyed by its actor key and counted), the coins in its own currency bag land
 ## there, spread round it (the owner, 2026-11-19: what it carries, less what a seat possessing it
-## spent).
+## spent). The keys it carries (taken while a seat possessed it) are laid by a roll of their own
+## (`_drop_keys`; the owner, 2026-11-25), whatever becomes of its coins.
 func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) -> void:
 	var body := enemy as Actor
 	if body == null:
@@ -651,8 +656,9 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 	if body.inventory != null:
 		# The coins it took later (a player's dropped one, taken while possessed) drop where it fell as
 		# plain coins, one's own to whoever walks over them (the owner, 2026-11-19), never shared and
-		# never lost; only what it came carrying follows the shared rule below. Its keys go with it.
+		# never lost; only what it came carrying follows the shared rule below.
 		body.inventory.drop_taken(ItemKinds.COIN)
+		_drop_keys(body)
 	if body.data == null or body.is_add:
 		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill coin stacks.
 		return
@@ -670,8 +676,7 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 			if actors != null and actors.home_of_seat(seat) != ActorsScript.NONE:
 				_add_coins(seat, carried)
 		return
-	var key: int = actors.key_of(body.id) if actors != null and body.id != ActorsScript.NONE else 0
-	var roll: float = _sim().chance(DROP_PURPOSE, key, _drops)
+	var roll: float = _sim().chance(DROP_PURPOSE, _key_of(body), _drops)
 	_drops += 1
 	if roll >= body.data.coin_drop_chance:
 		return
@@ -680,6 +685,29 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 		if projectiles != null and (projectiles.grid().circle_blocked(spot, COIN_RADIUS) or not projectiles.grid().line_clear(position, spot)):
 			spot = position
 		lay_coin(spot)
+
+
+## The keys the dying `body` carries (taken while a seat possessed it; it has an inventory) are laid
+## where it fell, as the items they are (`Inventory.drop_taken`: each its taker's own, by A), by its
+## `EnemyBase.key_drop_chance` (the owner, 2026-11-25: "Drop by chance", a half): one roll a foe
+## holding any (the run's chance, `KEY_DROP_PURPOSE`, keyed by its actor key, counted by
+## `_key_drops`), all its keys or none; lost with it otherwise. An add rolls as any foe (a key was
+## never made by its wave); a boss's are always laid, with no roll (a boss always pays), as a body's
+## with no data.
+func _drop_keys(body: Actor) -> void:
+	if body.inventory.count_of(ItemKinds.bag_of(ItemKinds.KEY), KeyBase.ID) <= 0:
+		return
+	if body.data != null and not body.data.boss:
+		var roll: float = _sim().chance(KEY_DROP_PURPOSE, _key_of(body), _key_drops)
+		_key_drops += 1
+		if roll >= body.data.key_drop_chance:
+			return
+	body.inventory.drop_taken(ItemKinds.KEY)
+
+
+## The actor key `body`'s rolls are keyed by (0 with no table or id).
+func _key_of(body: Actor) -> int:
+	return actors.key_of(body.id) if actors != null and body.id != ActorsScript.NONE else 0
 
 
 ## The run's own changes of the run stats (the Run area's, as a run of rooms begins).

@@ -13,3 +13,4 @@ icon = ExtResource("2_icon")
 behaviour_id = &"when"
 when_id = &"hurt"
 behaviour_strength = 0.5
+look_id = &"ripple"

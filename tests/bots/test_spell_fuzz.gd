@@ -107,8 +107,9 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 		var fresh := ArenaScript.new(root)
 		_populate(fresh)
 		fresh.install_cards(0, 0, cards)
-		# A cast that costs more mana than the arena gives (ArenaScript.MANA) is refused, rightly.
-		check(fresh.cast(0, 0) or staff.casts[0].group.is_empty() or staff.casts[0].mana > ArenaScript.MANA, "%s: the first cast was refused" % label)
+		# A cast that costs more mana than the arena gives (ArenaScript.MANA) is refused, rightly, and so
+		# is a staff whose casts are all conditioned (staff-language L2): a whole wizard with no foe near.
+		check(fresh.cast(0, 0) or staff.casts[0].group.is_empty() or staff.casts[0].mana > ArenaScript.MANA or _all_conditioned(staff), "%s: the first cast was refused" % label)
 		var total: float = 0.0
 		var steps: int = int(ceilf(SECONDS / ArenaScript.STEP))
 		for i in steps:
@@ -247,3 +248,11 @@ func test_report_ranking() -> void:
 	check(top.size() == REPORT_TOP, "the report names %d staffs" % REPORT_TOP)
 	check(top[0]["label"] == "2" and top[1]["label"] == "5", "ties keep the staff order")
 	check(int(top[REPORT_TOP - 1]["kills"]) >= 1, "the smallest are left out")
+
+
+## True when every cast of `staff` has a condition (`CompiledCast.when_ids`), so a press may be refused.
+static func _all_conditioned(staff: CompiledStaff) -> bool:
+	for cast: CompiledCast in staff.casts:
+		if cast.when_ids.is_empty():
+			return false
+	return true

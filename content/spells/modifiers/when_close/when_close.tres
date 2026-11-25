@@ -13,3 +13,4 @@ icon = ExtResource("2_icon")
 behaviour_id = &"when"
 when_id = &"close"
 behaviour_strength = 96.0
+look_id = &"converge"

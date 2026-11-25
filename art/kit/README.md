@@ -17,6 +17,7 @@ The source files of the art starter kit (docs/PLAN.md, "Art and music"): what an
 | `spellmerge.gpl.txt` | The 52 colours as a GIMP palette (`.gpl` files can't be added to the repository, so it carries a `.txt` ending: the kit zip ships it as `spellmerge.gpl`; if you use it from the repository, rename it). Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape. |
 | `palette.hex.txt` | The same colours, one lower-case hex value per line, no `#`, outline first. Imports in Lospec-style palette loaders and Photoshop-like tools that read hex lists. |
 | `grid_32.svg` | A 32×32 grid template shown at 16×. Guide lines: Outline-coloured border = the cell; Spark-yellow lines = the centre; Fire-orange line = where a character's feet stand (about 2–3 px above the bottom); light-blue square = the 1 px empty border to leave where you can (blue is only a guide colour here, not a player marker). |
+| `grid_64.svg` | The 64×64 grid for art at 2x detail (one 32-unit cell, two art pixels a world unit; docs/STYLE.md, "The picture and the art's detail"), shown at 8×: the art pixels' lines, the world's pixels every 2 of them, and the same guides as `grid_32.svg` (the feet line 4–6 art px above the bottom). Export as `<name>@2x.png` or `.svg`. |
 | `sheet_template.svg` | Animation strip layouts at 4× for all 11 animations of the frame-count table (idle, walk, hurt, dodge, cast, downed, death, enemy attack, projectile 2–4, impact, animated tile), with the unused cells darkened. The orange line is the feet line in character rows. |
 | `golden.json` | The golden example candidates, by path, with what each one shows. |
 | `checklist.md` | The one-page checklist: the seven rules, the before-you-open-the-PR list, the frame counts, the palette and the golden examples. Generated from docs/STYLE.md by hand for now: keep it in step. |
@@ -37,7 +38,7 @@ Not here: Aseprite `.ase`, Photoshop `.aco`/`.act` and Krita `.kpl` palette file
 
 ## Example to copy
 
-`spellmerge.gpl.txt` for a palette; `grid_32.svg` for a template.
+`spellmerge.gpl.txt` for a palette; `grid_64.svg` (art at 2x detail) or `grid_32.svg` for a template. The golden player, `golden_staff@2x.svg`, is drawn by `tools/staff_art.py` from the curl's sheets.
 
 ## Validate
 

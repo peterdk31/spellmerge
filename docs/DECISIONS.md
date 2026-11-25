@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-25: more detailed art: 64x64 a cell in a 1280x720 picture (owner; ART0)
+
+- **The owner** (2026-11-21, confirmed 2026-11-25): "more detailed art, 64×64 sprites at the same on-screen size, in a 1280×720 picture." The world keeps its 32-unit tiles and the simulation is untouched; 64×64 art is drawn at half size. The HUD and the font are redrawn at 2x detail at the same size on screen. Everything is redrawn in this order: players and enemies, spells and effects, rooms and props, HUD and font. The lights were made ready first (#902, #907/#926, #911, #913).
+- **How (ART0):** project.godot draws 1280×720, integer scaling kept; the cameras show the same world (`PictureGrid`, core/display); every screen's layer is laid out at 640×360 and drawn at the picture's scale; one rule says a texture is at 2x (`<name>@2x.<ext>`, `ArtDetail`, core/display); the curl staff was redrawn as the pilot. docs/STYLE.md, "The picture and the art's detail"; art/README.md, "Redrawing a sprite at 64x64".
+- **Not decided here** (open with the owner on ART0's PR): a 1920×1080 screen holds the 1280×720 picture once, not one and a half times, so integer scaling leaves it in a frame with black borders (640×360 filled it three times); at the resting zoom 0.8 a 2x art pixel is 0.8 of a picture pixel, so one in five is left out, as today's art was in the 640×360 picture.
+
 ## 2026-11-19: a loading screen when a run starts from the stone, and on the way back (owner)
 
 - **The owner:** "Add a loading screen when starting a run." Then, the same day: "Add a loading screen for returning."

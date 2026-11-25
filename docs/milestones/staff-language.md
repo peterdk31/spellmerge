@@ -1,6 +1,6 @@
 # The staff as a language: two numbers, conditions, On Any Cast
 
-**Status (2026-11-25): design and first build.** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
+**Status (2026-11-25): approved by the owner, being built (L1).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
 
 ## What it keeps
 
@@ -115,7 +115,14 @@ A card once cut for being "hard to understand" (Quicken) sets the bar: each new 
 - **Determinism:** no new clock or dice. The health share is state; everything else is compiled.
 - **Builds 9 to 12 work** as combos in `test_combos.gd` (casting in the test arena with the real runtime), each with `needs` set to its card so the combo fails without it.
 
-## Open points for the owner
+## The owner's answers (2026-11-25)
+
+- **L1 as proposed:** Quick Hand −0.25 s wind-down at 1.5× mana; Point Blank's 0.05 s life cap with no damage bonus. Tuned later from play.
+- **L2's conditions:** When Hurt (below half) and When Close (a foe within 96 px), nothing else yet.
+- **No enemy or boss gets a condition now.**
+- **Conditions in payloads:** wasted, as proposed.
+
+## The open points as they were put
 
 1. **Quick Hand's price.** Proposed: −0.25 s for 1.5× mana. Cheaper makes Faster Casting obsolete on slow casts; dearer makes it a card for big pools only.
 2. **Point Blank's numbers.** Proposed: 0.05 s and nothing else. A damage bonus (a melee strike deserves one) would make it a damage card; left out, its point is placing a payload.

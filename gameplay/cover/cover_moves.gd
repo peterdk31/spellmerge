@@ -8,7 +8,8 @@ extends RefCounted
 ## `CoverTrigger` rows, with the area's rules (gameplay/cover/README.md, "The step"):
 ##
 ## - an element moves a cell on through its state's first `element` row naming it, to the state that
-##   row names, unless its kind has no such state or it is the state the cell is in;
+##   row names, unless its kind has no such state or it is the state the cell is in (that row renews
+##   the cell instead: its seconds from 0, in a touch only, never a spread);
 ## - a cell moves on after a while through its state's first `after` row whose seconds have passed,
 ##   among the rows that would move it (to a state its kind has, other than its own);
 ## - a state spreads its `spreads` element when it names one and its `spread_chance` is above 0.
@@ -37,9 +38,15 @@ var after_first: PackedInt32Array = PackedInt32Array()
 var after_count: PackedInt32Array = PackedInt32Array()
 var after_seconds: PackedFloat64Array = PackedFloat64Array()
 var after_to: PackedInt32Array = PackedInt32Array()
-## For each kind and state: 1 when a body standing in it is given a status (GC7: what the AI's look
-## marks, and what the area counts as harming).
+## For each kind and state: 1 when a body standing in it is given something, a status or a strike
+## (`CoverState.gives`: what the area counts as harming, and so looks at bodies for).
 var harms_table: PackedByteArray = PackedByteArray()
+## For each kind and state: 1 when it is danger (`CoverState.is_danger`, GC7: what the AI's look
+## marks; a `harmless` state's soak or chill is not).
+var danger_table: PackedByteArray = PackedByteArray()
+## For each kind, state and element (as `to_table`): 1 when that element's row names the state itself,
+## which renews it (its seconds from 0, nothing moved; the floor's first slice: water on a wet cell).
+var renew_table: PackedByteArray = PackedByteArray()
 
 
 ## The tables of `kinds` (a layout's, in its order).
@@ -71,6 +78,10 @@ func _build(kinds: Array[CoverKind]) -> void:
 	after_count.fill(0)
 	harms_table.resize(rows)
 	harms_table.fill(0)
+	danger_table.resize(rows)
+	danger_table.fill(0)
+	renew_table.resize(rows * elements.size())
+	renew_table.fill(0)
 	for k in kinds.size():
 		var kind: CoverKind = kinds[k]
 		for s in kind.states.size():
@@ -79,11 +90,13 @@ func _build(kinds: Array[CoverKind]) -> void:
 			after_first[row] = after_seconds.size()
 			if state == null:
 				continue
-			harms_table[row] = 1 if state.status != &"" else 0
+			harms_table[row] = 1 if state.gives() else 0
+			danger_table[row] = 1 if state.is_danger() else 0
 			for e in elements.size():
 				var then: StringName = state.on_element(elements[e])
 				var to: int = kind.state_at(then) if then != &"" else -1
 				to_table[row * elements.size() + e] = to if to != s else -1
+				renew_table[row * elements.size() + e] = 1 if to == s else 0
 			if state.spreads != &"" and state.spread_chance > 0.0:
 				spread_table[row] = elements.find(state.spreads)
 				chance_table[row] = state.spread_chance

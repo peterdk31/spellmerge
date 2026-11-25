@@ -60,6 +60,11 @@ constexpr double WALL_CELL = 8.0;
 // The room grid's place squares and the code of a square `place_at` must be asked about (`PLACE_CELL`,
 // `PLACE_ASK`: RoomGrid's PLACE_CELL and WHOLE_ASK, on the manager).
 constexpr double PLACE_CELL = 32.0;
+// The trail pass's floor cell and a trail's cell before its first (the manager's TRAIL_CELL,
+// TRAIL_NONE), and how far above its floor line a falling shot is in the air (FALL_BAND).
+constexpr double TRAIL_CELL = 16.0;
+constexpr int64_t TRAIL_NONE = -2147483648LL;
+constexpr double FALL_BAND = 12.0;
 constexpr int64_t PLACE_ASK = 255;
 // The draw regions' (`DrawRegions`, core/projectiles/draw_regions.gd): a row whose transform has a
 // part past this is a crosser (the performance pass, 2026-11-20).
@@ -209,6 +214,11 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
 	X(room_grid, "_room_grid", OBJECT) \
 	X(places_found, "_places_found", PACKED_BYTE_ARRAY) \
+	X(trail, "_trail", PACKED_BYTE_ARRAY) \
+	X(trail_x, "_trail_x", PACKED_INT32_ARRAY) \
+	X(trail_y, "_trail_y", PACKED_INT32_ARRAY) \
+	X(trail_out, "_trail_out", PACKED_INT32_ARRAY) \
+	X(floor_y, "_floor", PACKED_FLOAT32_ARRAY) \
 	X(draw_regions, "_draw_regions", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
 	X(grid_x, "_grid_x", FLOAT) \
@@ -1364,6 +1374,9 @@ const Constant CONSTANTS[] = {
 	{ "GRID_CELL", (double)GRID_CELL },
 	{ "WALL_CELL", (double)WALL_CELL },
 	{ "PLACE_CELL", (double)PLACE_CELL },
+	{ "TRAIL_CELL", (double)TRAIL_CELL },
+	{ "TRAIL_NONE", (double)TRAIL_NONE },
+	{ "FALL_BAND", (double)FALL_BAND },
 	{ "PLACE_ASK", (double)PLACE_ASK },
 	{ "REGION_SPAN_MOST", (double)REGION_SPAN_MOST },
 	{ "REGION_MOST", (double)REGION_MOST },
@@ -2712,6 +2725,47 @@ int64_t ShotKernel::shot_places(Object *m, int64_t from) {
 	return -1;
 }
 
+// The trail pass (`_pass_trail`, the floor's first slice): every live shot that trails and is not in
+// the air whose position lies in another TRAIL_CELL square than the one it last touched takes it and
+// is written to `_trail_out`, in slot order. Returns how many, or -1 on bad sizes (GDScript then runs
+// the pass itself).
+int64_t ShotKernel::trail_pass(Object *m, int64_t top) {
+	const Names &k = *names;
+	Arr<PackedByteArray> alive, trail;
+	Arr<PackedVector2Array> pos;
+	Arr<PackedInt32Array> flags, tx, ty, out;
+	Arr<PackedFloat32Array> floor_y;
+	alive.load(m, k.alive);
+	trail.load(m, k.trail);
+	pos.load(m, k.pos);
+	flags.load(m, k.flags);
+	tx.load(m, k.trail_x);
+	ty.load(m, k.trail_y);
+	out.load(m, k.trail_out);
+	floor_y.load(m, k.floor_y);
+	ERR_FAIL_COND_V(top < 0 || top > alive.n || top > trail.n || top > pos.n || top > flags.n || top > tx.n || top > ty.n || top > out.n || top > floor_y.n, -1);
+	int64_t count = 0;
+	for (int64_t s = 0; s < top; s++) {
+		if (alive[s] == 0 || trail[s] == 0) {
+			continue;
+		}
+		const Vector2 at = pos[s];
+		if ((flags[s] & F_FALLING) != 0 && (double)at.y < (double)floor_y[s] - FALL_BAND) {
+			continue;
+		}
+		const int64_t x = floori((double)at.x / TRAIL_CELL);
+		const int64_t y = floori((double)at.y / TRAIL_CELL);
+		if (x == (int64_t)tx[s] && y == (int64_t)ty[s]) {
+			continue;
+		}
+		tx[s] = (int32_t)x;
+		ty[s] = (int32_t)y;
+		out[count] = (int32_t)s;
+		count++;
+	}
+	return count;
+}
+
 // --- The draw regions --------------------------------------------------------------------------
 
 namespace {
@@ -2824,6 +2878,7 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("threat_fill", "manager", "horizon"), &ShotKernel::threat_fill);
 	ClassDB::bind_method(D_METHOD("threat_query", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_query);
 	ClassDB::bind_method(D_METHOD("shot_places", "manager", "from"), &ShotKernel::shot_places);
+	ClassDB::bind_method(D_METHOD("trail_pass", "manager", "top"), &ShotKernel::trail_pass);
 	ClassDB::bind_method(D_METHOD("region_counts", "regions", "rows", "count"), &ShotKernel::region_counts);
 	ClassDB::bind_method(D_METHOD("region_rows", "regions", "rows", "count"), &ShotKernel::region_rows);
 }

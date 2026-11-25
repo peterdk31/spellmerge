@@ -225,6 +225,8 @@ func carry_reach(spell: CompiledSpell, actor: int, _slot: int) -> float:
 func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	var spell: CompiledSpell = dash.spell
 	var reach: float = dash.reach
+	# It touches the floor all along its way (the floor's first slice).
+	kit.pass_floor(spell, dash.tag, dash.actor, from, to)
 	# It turns with its mover only while that goes on ahead (FACES_LEAST px or more, not back or aside).
 	var went: Vector2 = to - from
 	if went.length_squared() >= FACES_LEAST * FACES_LEAST and went.dot(dash.way) > 0.0:

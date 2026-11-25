@@ -114,6 +114,7 @@ const EVENTS: Dictionary = {
 	&"prop_state_changed": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
 	&"prop_state_requested": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
 	&"status_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME], ["duration", TYPE_FLOAT], ["strength", TYPE_FLOAT]],
+	&"floor_strike_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["element", TYPE_STRING_NAME], ["damage", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
 	&"body_fell": [["actor", TYPE_INT]],
 	&"body_returned": [["actor", TYPE_INT], ["at", TYPE_VECTOR2]],
@@ -146,6 +147,7 @@ const EVENTS: Dictionary = {
 	&"shot_deflected": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"shield_blocked": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"barrier_changed": [["actor", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT], ["way", TYPE_VECTOR2], ["radius", TYPE_FLOAT]],
+	&"floor_passed": [["casters", TYPE_PACKED_INT32_ARRAY], ["tags", TYPE_PACKED_INT64_ARRAY], ["elements", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"kill_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"actor_hurt": [["actor", TYPE_INT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],
 	&"reaction_landed": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
@@ -177,7 +179,7 @@ const EVENTS: Dictionary = {
 	&"room_left": [["room", TYPE_INT]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"room_built": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT], ["layout_root", TYPE_OBJECT]],
-	&"floor_touched": [["caster", TYPE_INT], ["element", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT]],
+	&"floor_touched": [["caster", TYPE_INT], ["element", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"cover_changed": [["room", TYPE_INT], ["cells", TYPE_PACKED_INT32_ARRAY], ["states", TYPE_PACKED_INT32_ARRAY]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
 	&"room_rewards_due": [["room", TYPE_INT], ["table", TYPE_STRING_NAME], ["type", TYPE_PACKED_STRING_ARRAY], ["spots", TYPE_PACKED_VECTOR2_ARRAY]],
@@ -226,6 +228,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
+	&"floor_passed",
 	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_room_leveled", &"run_stats_ruled", &"coin_changed", &"shelf_changed", &"fountain_changed", &"key_shown", &"room_rewards_due", &"special_room_opened", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"secret_rune_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"rooms_cleared", &"rooms_opened", &"rooms_rewards_left", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"run_departure_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",

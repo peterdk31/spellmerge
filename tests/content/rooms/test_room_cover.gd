@@ -20,10 +20,12 @@ func before_each() -> void:
 	_registry.scan()
 
 
+## The kinds that grow (the floor's own cover, `fills_floor`, lies on every open cell and is checked by
+## content/cover/floor/test_floor.gd and tests/core/test_cover_layout.gd, not here).
 func _kinds() -> Array[CoverKind]:
 	var kinds: Array[CoverKind] = []
 	for item: Resource in _registry.get_all(&"cover"):
-		if item is CoverKind:
+		if item is CoverKind and not (item as CoverKind).fills_floor:
 			kinds.append(item as CoverKind)
 	return kinds
 

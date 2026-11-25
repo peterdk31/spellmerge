@@ -97,7 +97,7 @@ func _middle(cell: int) -> Vector2:
 
 
 func _touch(element: StringName, at: Vector2, radius: float = 0.0) -> void:
-	_world.bus.floor_touched.emit(0, element, at, radius)
+	_world.bus.floor_touched.emit(0, element, at, radius, 0)
 
 
 func _steps(count: int, cover: CoverScript = _cover) -> void:
@@ -210,7 +210,7 @@ func test_fire_spreads_by_the_runs_chance_the_same_seed_the_same_fire() -> void:
 ## Fire at the field's middle and 90 ticks of `cover`: each tick's states.
 func _fire_from(cover: CoverScript) -> Array[PackedByteArray]:
 	var seen: Array[PackedByteArray] = []
-	_world.bus.floor_touched.emit(0, &"fire", cover.layout.cell_rect(_cell(9, 4)).get_center(), 0.0)
+	_world.bus.floor_touched.emit(0, &"fire", cover.layout.cell_rect(_cell(9, 4)).get_center(), 0.0, 0)
 	for i in 90:
 		cover.step(DT)
 		var states := PackedByteArray()
@@ -498,7 +498,7 @@ func test_only_cover_in_the_room_counts_as_harmful_at_rest() -> void:
 	check(_cover.room().get(&"_rest_harms"), "cover in the room harmful at rest counts")
 
 
-## A look passes over the rows of its window with no harming cell (`_harming_rows`, kept with each
+## A look passes over the rows of its window with no harming cell (`_danger_rows`, kept with each
 ## cell's change): the counts kept as fires spread and burn out are always a recount's, and each look
 ## marks what a look after a recount marks (each step starts from the last step's recount, so every
 ## step's own changes are checked).
@@ -510,7 +510,7 @@ func test_the_harming_rows_kept_are_a_recounts_and_looks_see_every_fire() -> voi
 	var saw_fire: bool = false
 	for i in 240:
 		_steps(1)
-		var kept: PackedInt32Array = (_cover.room().get("_harming_rows") as PackedInt32Array).duplicate()
+		var kept: PackedInt32Array = (_cover.room().get("_danger_rows") as PackedInt32Array).duplicate()
 		var total: int = int(_cover.room().get("_harming"))
 		for at: Vector2 in [_middle(_cell(3, 2)), _middle(_cell(9, 7)), _middle(_cell(6, 5))]:
 			_cover.look(at, 64.0, sight)
@@ -518,7 +518,7 @@ func test_the_harming_rows_kept_are_a_recounts_and_looks_see_every_fire() -> voi
 			_cover.look(at, 64.0, fresh)
 			check_equal(sight.count, fresh.count, "step %d: the look at %s marks what a recount's does" % [i, at])
 			saw_fire = saw_fire or sight.count > 0
-		check_equal(_cover.room().get("_harming_rows"), kept, "step %d: the rows kept are a recount's" % i)
+		check_equal(_cover.room().get("_danger_rows"), kept, "step %d: the rows kept are a recount's" % i)
 		check_equal(int(_cover.room().get("_harming")), total, "step %d: and so is the total" % i)
 	check(saw_fire, "the looks saw the fires")
 

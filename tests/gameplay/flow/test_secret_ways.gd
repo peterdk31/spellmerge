@@ -107,7 +107,7 @@ func _put(seat: int, at: Vector2) -> void:
 
 ## The secret room's element touching the floor at `at`, then a step to apply it.
 func _touch(element: StringName, at: Vector2) -> void:
-	events.emit_signal("floor_touched", 0, element, at, 8.0)
+	events.emit_signal("floor_touched", 0, element, at, 8.0, 0)
 	_ticks(1)
 
 

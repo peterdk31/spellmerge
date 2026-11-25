@@ -405,3 +405,27 @@ func test_no_cover_grows_over_a_hole() -> void:
 			check(cover.kind_at(cell) == null, "and uncovered: %d" % cell)
 	check(cover.kind_at(cover.cell_of(Vector2(280, 100))) == null, "a cell from its lip is kept clear (wall_gap 1)")
 	check(cover.kind_at(cover.cell_of(Vector2(200, 100))) != null, "farther off, grass")
+
+
+## The floor's own cover (the floor's first slice, docs/milestones/floor.md): the layout's last pass
+## gives a kind that `fills_floor` every cell no other source took, a spawn's, a door's and a
+## placement's too, in a room filled or not, and never a cell under a wall.
+func test_the_floor_takes_every_open_cell_left() -> void:
+	var layout: Node2D = _layout()
+	var floor_kind := CoverKind.new()
+	floor_kind.id = &"a_floor"
+	floor_kind.fills_floor = true
+	floor_kind.states = [CoverState.make(&"dry")] as Array[CoverState]
+	var grass: CoverKind = _grass(&"test_meadow", 0.08, 2)
+	for fill in [true, false]:
+		var cover: CoverLayout = CoverLayout.of(layout, _room(&"floored", &"test_meadow", fill), [grass, floor_kind] as Array[CoverKind])
+		var where: String = "filled" if fill else "not filled"
+		check(cover.count(&"a_floor") > 0, "%s: the floor is laid" % where)
+		check_equal(cover.count(&"test_grass") > 0, fill, "%s: grass where the fill put it" % where)
+		for cell in cover.cells.size():
+			if cover.blocked[cell] == CoverLayout.BLOCKED_WALL:
+				check_equal(cover.cells[cell], 0, "%s: no floor under a wall (cell %d)" % [where, cell])
+			else:
+				check(cover.cells[cell] != 0, "%s: open cell %d has a kind" % [where, cell])
+		for at: Vector2 in [Vector2(100, 100), Vector2(40, 176), Vector2(500, 250)]:
+			check_equal(cover.kind_at(cover.cell_of(at)), floor_kind, "%s: the floor at the spawn, door or placement %s" % [where, at])

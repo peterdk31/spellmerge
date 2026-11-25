@@ -218,7 +218,11 @@ func _swing_step(at: int, delta: float) -> void:
 	var turned: float = lerpf(-lean, lean, swing_ease(clampf(into / sweep, 0.0, 1.0)))
 	var from: float = maxf(_sw_turned[at], -half)
 	var to: float = minf(turned, half)
+	var tip_was: Vector2 = swing_tip(at)
 	_sw_turned[at] = turned
+	# Its tip touches the floor along its way while it sweeps (the floor's first slice).
+	if to >= from:
+		kit.pass_floor(spell, tag, _sw_actor[at], tip_was, swing_tip(at))
 	# Its guard is a parry: every step of its sweep (the blade leans past its arc at both ends, so it
 	# is in it only a step or so), its whole arc meets shots, a step ahead too, so a small fast shot
 	# (an atom crosses its reach in a step or two) is met whenever it comes in while the swing

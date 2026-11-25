@@ -62,7 +62,7 @@ const SPREAD: StringName = CoverRoom.SPREAD
 ## step (core/sim/README.md).
 const DERIVED: Array[StringName] = [
 	&"events", &"actors", &"registry", &"projectiles", &"sim", &"layout", &"_layouts", &"_given", &"_use_given",
-	&"_ids", &"_next_ids", &"_next_keys", &"_next_left",
+	&"_ids", &"_next_ids", &"_next_keys", &"_next_left", &"_pass_room", &"_pass_any",
 ]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads (and the
@@ -90,13 +90,25 @@ var _ids: PackedInt32Array = PackedInt32Array()
 var _next_ids: PackedInt32Array = PackedInt32Array()
 var _next_keys: PackedInt64Array = PackedInt64Array()
 var _next_left: PackedFloat32Array = PackedFloat32Array()
+## Scratch of a step's passing touches: each one's room (-1: none), and which rooms any lies in.
+var _pass_room: PackedInt32Array = PackedInt32Array()
+var _pass_any: PackedByteArray = PackedByteArray()
 
 ## Each piece's cover in play, by its number (README, "State").
 var _rooms: Array[CoverRoom] = []
-## The touches heard since the last step: each element, where and how far.
+## The touches heard since the last step: each element, where and how far, and who lit it (the
+## actor and its spell's tag).
 var _touch_elements: Array[StringName] = []
 var _touch_at: PackedVector2Array = PackedVector2Array()
 var _touch_radius: PackedFloat32Array = PackedFloat32Array()
+var _touch_actor: PackedInt32Array = PackedInt32Array()
+var _touch_tag: PackedInt64Array = PackedInt64Array()
+## The passing touches heard since the last step (`floor_passed`: what flies, dashes or swings over
+## the floor), each one cell's: its element, where, and who.
+var _pass_elements: Array[StringName] = []
+var _pass_at: PackedVector2Array = PackedVector2Array()
+var _pass_actor: PackedInt32Array = PackedInt32Array()
+var _pass_tag: PackedInt64Array = PackedInt64Array()
 ## The bodies standing in harmful cover, in actor id order: each id, its key (`Actors.key_of`) and
 ## the seconds to its next status.
 var _harm_ids: PackedInt32Array = PackedInt32Array()
@@ -125,6 +137,7 @@ func _ready() -> void:
 	events.room_built.connect(_on_room_built)
 	events.room_entered.connect(_on_room_entered)
 	events.floor_touched.connect(_on_floor_touched)
+	events.floor_passed.connect(_on_floor_passed)
 	events.cover_danger_looked.connect(_on_cover_danger_looked)
 
 
@@ -287,12 +300,28 @@ func _on_room_entered(_room_id: StringName, number: int) -> void:
 
 
 ## An element touched the floor: queued for the next step (nothing in a world with no cover).
-func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
+func _on_floor_touched(caster: int, element: StringName, at: Vector2, radius: float, tag: int) -> void:
 	if _rooms.is_empty() or element == &"" or not at.is_finite():
 		return
 	_touch_elements.append(element)
 	_touch_at.append(at)
 	_touch_radius.append(radius)
+	_touch_actor.append(caster)
+	_touch_tag.append(tag)
+
+
+## A tick's passing touches (`floor_passed`): queued for the next step, each one cell's.
+func _on_floor_passed(casters: PackedInt32Array, tags: PackedInt64Array, elements: Array[StringName], at: PackedVector2Array) -> void:
+	if _rooms.is_empty():
+		return
+	var count: int = mini(mini(casters.size(), tags.size()), mini(elements.size(), at.size()))
+	for n in count:
+		if elements[n] == &"" or not at[n].is_finite():
+			continue
+		_pass_elements.append(elements[n])
+		_pass_at.append(at[n])
+		_pass_actor.append(casters[n])
+		_pass_tag.append(tags[n])
 
 
 ## An actor looked at the floor round it (`cover_danger_looked`, rule 8): its sight is filled at once.
@@ -345,7 +374,8 @@ func step(delta: float) -> void:
 
 
 ## Every queued touch, in the order heard, in every room whose cover its circle reaches (rooms in
-## number order; each room's cells in cell order).
+## number order; each room's cells in cell order); then every passing touch, in the order heard, on
+## the one cell under it (its room `room_at`'s).
 func _apply_touches() -> void:
 	for t in _touch_elements.size():
 		var at: Vector2 = _touch_at[t]
@@ -353,7 +383,43 @@ func _apply_touches() -> void:
 		var reach := Rect2(at - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
 		for room in _rooms:
 			if room.plays() and room.layout.rect().intersects(reach, true):
-				room.touch(_touch_elements[t], at, radius)
+				room.touch(_touch_elements[t], at, radius, _touch_actor[t], _touch_tag[t])
+	var passes: int = _pass_elements.size()
+	if passes > 0:
+		# Each passing touch's room first (one look-up each), then each room's in one loop.
+		_pass_room.resize(passes)
+		var any: PackedByteArray = _pass_any
+		any.resize(_rooms.size())
+		any.fill(0)
+		# `room_at`'s rule, its look-ups hoisted (a tick may bring a touch for every shot): the grid's
+		# place where the world has places, else the room that holds it, the last one first.
+		var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+		var placed: bool = grid != null and grid.places() > 0
+		var last: int = -1
+		var last_rect: Rect2 = Rect2()
+		for t in passes:
+			var at: Vector2 = _pass_at[t]
+			var number: int = -1
+			if placed:
+				number = grid.place_at(at)
+				if number < 0 or number >= _rooms.size() or not _rooms[number].plays() or not _rooms[number].layout.rect().has_point(at):
+					number = -1
+			elif last >= 0 and last_rect.has_point(at):
+				number = last
+			else:
+				for n in _rooms.size():
+					if _rooms[n].plays() and _rooms[n].layout.rect().has_point(at):
+						number = n
+						last = n
+						last_rect = _rooms[n].layout.rect()
+						break
+			_pass_room[t] = number
+			if number >= 0:
+				any[number] = 1
+		for number in _rooms.size():
+			if any[number] != 0:
+				_rooms[number].touch_cells(_pass_elements, _pass_at, _pass_actor, _pass_tag, _pass_room, number, 0, passes)
+		_pass_any = any
 	_clear_touches()
 
 
@@ -392,8 +458,9 @@ func _affect_bodies(delta: float) -> void:
 		var at: Vector2 = body.global_position
 		var number: int = room_at(at)
 		# A room none of whose cells harms now gives nothing, whatever cell it stands in.
-		var state: CoverState = _rooms[number].cover_state_at(_rooms[number].layout.cell_of(at)) if number >= 0 and not _rooms[number].harms_nobody() else null
-		if state == null or state.status == &"":
+		var cell: int = _rooms[number].layout.cell_of(at) if number >= 0 and not _rooms[number].harms_nobody() else -1
+		var state: CoverState = _rooms[number].cover_state_at(cell) if cell >= 0 else null
+		if state == null or not state.gives():
 			# Out of harmful cover: its time runs on, and it is dropped once it is out.
 			if left > 0.0:
 				_next_ids[harmed] = id
@@ -404,7 +471,12 @@ func _affect_bodies(delta: float) -> void:
 		if left <= 0.0:
 			left = maxf(state.status_every, delta)
 			if events != null:
-				events.status_requested.emit(EventsScript.NO_PLAYER, body, state.status, state.status_duration, state.status_strength)
+				# As the cell's lighter's (the floor's first slice): its kills and its Siphon count.
+				var by: int = _rooms[number].actor_at(cell)
+				if state.status != &"":
+					events.status_requested.emit(by, body, state.status, state.status_duration, state.status_strength)
+				if state.strike_element != &"" and is_instance_valid(body) and body.is_inside_tree():
+					events.floor_strike_requested.emit(by, body, state.strike_element, state.strike_damage, _rooms[number].tag_at(cell))
 		_next_ids[harmed] = id
 		_next_keys[harmed] = key
 		_next_left[harmed] = left
@@ -422,11 +494,17 @@ func _affect_bodies(delta: float) -> void:
 # --- Upkeep ----------------------------------------------------------------------------
 
 func _clear_touches() -> void:
-	if _touch_elements.is_empty():
-		return
-	_touch_elements.clear()
-	_touch_at.resize(0)
-	_touch_radius.resize(0)
+	if not _touch_elements.is_empty():
+		_touch_elements.clear()
+		_touch_at.resize(0)
+		_touch_radius.resize(0)
+		_touch_actor.resize(0)
+		_touch_tag.resize(0)
+	if not _pass_elements.is_empty():
+		_pass_elements.clear()
+		_pass_at.resize(0)
+		_pass_actor.resize(0)
+		_pass_tag.resize(0)
 
 
 ## Each room's changes told since the last, sent as one `cover_changed` a room.

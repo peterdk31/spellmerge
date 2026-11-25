@@ -81,7 +81,7 @@ A `FLAT` kind is drawn by one sprite a room (`cover_flat.gdshader`, warmed by `S
 - **The cost of every shot touching** (measured 2026-11-25, docs/DECISIONS.md): the trail pass natively 8 to 10 us a step at 2048 shots (GDScript 357 us); the cover applying 2048 passing touches in one tick 1.3 to 1.8 ms (a burst; a stress tick's share is far less). `stress.gd` (web, 1000 shots): Cover 0.57 → 0.75 ms a tick, Spells 0.63 → 0.72. `play_frames.gd` ("1p far"): the tick 2.07 → 2.14 ms, the frame 7.11 → 7.22 ms. Budgets (`test_floor_budget.gd`): the native pass under 0.4 ms, a 2048-touch tick under 4 ms on a CI machine.
 - **The cost of every room having cover:** a crypt biome's start (`test_cover_biome.gd` prints the work-out and draw of a room) and `tests/benchmark/cover_cost.gd`.
 
-## Open questions for the owner
+## The owner's answers (2026-11-25)
 
-- **Ice and fire.** Fire thaws ice to water (as foundations.md says): "fire cannot cross it" is so because the fire is spent on the thaw, not because ice stops a fire shot. A shot that stops at ice would be new work in the projectile manager.
-- **Steam does nothing to bodies.** It could hide (a smoke screen) or scald; left for a later card.
+- **Ice and fire:** fire thaws ice (ice to water; fire on that water is then steam), as built. "Fire cannot cross it" because the fire is spent on the thaw; a shot that stops at ice would be new work.
+- **Steam does nothing to bodies yet:** it is a look for now (hiding or scalding can be a later card).

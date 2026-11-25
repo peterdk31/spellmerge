@@ -992,7 +992,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		if trigger.event == TriggerBase.Event.TIMER:
 			out.append("Every %ss" % _short(trigger.wind_up))
 		else:
-			out.append("On " + String(TriggerBase.Event.keys()[trigger.event]).to_lower())
+			out.append("On " + String(TriggerBase.Event.keys()[trigger.event]).to_lower().replace("_", " "))
 	elif component is MulticastBase:
 		var multicast: MulticastBase = component
 		if multicast.extra_draws > 0:
@@ -1417,6 +1417,9 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		_leaving = cast
 		events.cast_left.emit(actor, staff)
 		_leaving = outer
+	# `on any cast` (L3): every live carrier of this caster with it fires, before this cast's shots
+	# start, so none hears the cast that made it.
+	_any_cast(actor)
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
@@ -3572,6 +3575,26 @@ func recast_staff(actor: int, staff: int) -> int:
 		var spell: CompiledSpell = _profiles.get(tag)
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
 		if trigger == null or trigger.event != TriggerBase.Event.RECAST or not _lc_follow(i):
+			continue
+		_lc_fire(i, trigger.payload, _lc_at[i])
+		fired += 1
+	return fired
+
+
+## `on any cast` (docs/milestones/staff-language.md, L3): a cast of any staff of `actor` is
+## leaving (`_leave`). Every live carrier that caster cast with that trigger fires its payload from
+## where it is now, as `on recast` does on a press. Payloads may list more such carriers; they sit
+## past the count taken first and wait for the next cast. Returns how many fired.
+func _any_cast(actor: int) -> int:
+	var fired: int = 0
+	var count: int = _lc_count
+	for i in count:
+		var tag: int = _lc_tag[i]
+		if SpellTag.caster_of(tag) != actor:
+			continue
+		var spell: CompiledSpell = _profiles.get(tag)
+		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
+		if trigger == null or trigger.event != TriggerBase.Event.ANY_CAST or not _lc_follow(i):
 			continue
 		_lc_fire(i, trigger.payload, _lc_at[i])
 		fired += 1

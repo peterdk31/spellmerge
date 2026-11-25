@@ -1,6 +1,6 @@
 # The staff as a language: two numbers, conditions, On Any Cast
 
-**Status (2026-11-25): approved by the owner. L1 built (#936); L2 built (this PR).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
+**Status (2026-11-25): approved by the owner. L1 built (#936), L2 built (#938), L3 built (this PR).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
 
 ## What it keeps
 
@@ -96,9 +96,9 @@ A condition is a boss phase written as a card: `when hurt · nova · bolt` befor
 
 ### L3's tests
 
-- `test_on_any_cast.gd`: a familiar with it fires its payload once for each cast of the caster's other staffs and of its own staff after it; not for the cast that made it; not for another actor's casts; not for a payload; a familiar of a cast that ended hears nothing.
-- `test_card_rules`: a scene for `ANY_CAST` (a second staff of the wizard casts once the carrier is out).
-- Combos: `on_any_cast_echo` (build 9), `on_any_cast_rune` (a rune that answers every cast with a frost nova).
+- `test_on_any_cast.gd`: a rune with it fires its payload for each cast of the caster's other staffs, every time; not for the cast that made it; not for another actor's casts; it works on a familiar.
+- `test_card_rules`: a scene for `ANY_CAST`, "open, another staff casts" (a second staff of the wizard casts an atom behind it while the carrier lives: its own staff is often still busy then, a dash's or a swing's).
+- Combos (each fails without the card): `on_any_cast_echo` (build 9: a familiar fires frost bolts as another staff casts), `on_any_cast_rune` (a rune answers another staff's cast with a fire blast).
 
 ## Reading it in the builder
 

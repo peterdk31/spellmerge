@@ -1485,7 +1485,7 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 			_freeze(by, row, reaction.duration)
 		ReactionRow.Effect.CONDUCT:
 			_remove_status(row, reaction.status_id)
-			_conduct(by, row, centre, reaction)
+			_conduct(by, row, centre, reaction, spell_tag)
 	_tag = spell_tag
 	_tell_reacted(by, node, reaction.reaction_id)
 
@@ -1551,7 +1551,7 @@ func _freeze(by: int, row: int, seconds: float) -> void:
 ## each losing its soak, with an arc from the struck body to each (Feel draws a discharge's).
 ## Reaction damage, so it sets off no reaction (a charged body it strikes still discharges, static's
 ## rule, as a burst's strike does); the soaked bodies of every team, as a hit's.
-func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
+func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow, spell_tag: int = 0) -> void:
 	var node: Node2D = _nodes[row]
 	if projectiles != null:
 		var near: Array[Node2D] = _take_scratch()
@@ -1573,6 +1573,10 @@ func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void
 				other = _row_of_node(other_node)
 			if other != ActorsScript.NONE:
 				_hit(by, other, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
+				# The body the Current ran to is struck as the hit of the spell that set it off (the
+				# owner, 2026-11-25: its Siphon pays for it, whatever the carrier).
+				if spell_tag != 0 and events != null and is_instance_valid(other_node):
+					events.reaction_struck.emit(by, reaction.reaction_id, other_node, spell_tag)
 		_give_scratch()
 	if _same(row, node):
 		_hit(by, row, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)

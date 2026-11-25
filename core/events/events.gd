@@ -430,6 +430,11 @@ signal kill_landed(caster: int, target: Node, position: Vector2, tag: int, shot:
 signal actor_hurt(actor: int, amount: float, position: Vector2, tag: int, kind: StringName)
 ## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int, shot: int)
+## Sender: combat. A reaction that runs from the body a hit of the actor `caster` with `tag` set it
+## off to another body (Current: CONDUCT) struck `target` as that hit's (the owner, 2026-11-25),
+## whatever carrier the hit was (a shot, a beam, a swing, the floor's strike). Heard by core/spells:
+## a Siphon on that spell pays for a foe struck so, as for its own hits.
+signal reaction_struck(caster: int, reaction_id: StringName, target: Node, tag: int)
 ## Sender: core/spells. The actor `caster` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
 signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of the line from `position` to `to` toward its nearest point on it at `strength` pixels per second (a shot's: `to` is `position`; a beam's: one piece of its path); the card has `tag`. Heard by combat.

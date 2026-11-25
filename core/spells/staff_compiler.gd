@@ -102,7 +102,8 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_cast.delay = _cast.wind_down
 	if _cast.ends_cycle and staff != null:
 		_cast.delay += staff.cooldown
-	_cast.description = "%s. %s mana, %s%s s%s." % [_group_text(_cast.group), _number(_cast.mana), ("%s s wind-up, " % _number(_cast.wind_up)) if _cast.wind_up > 0.0 else "", _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
+	_cast.when_text = when_text(_cast.when_ids)
+	_cast.description = ("%s. " % (_cast.when_text.left(1).to_upper() + _cast.when_text.substr(1)) if _cast.when_text != "" else "") + "%s. %s mana, %s%s s%s." % [_group_text(_cast.group), _number(_cast.mana), ("%s s wind-up, " % _number(_cast.wind_up)) if _cast.wind_up > 0.0 else "", _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
 	_cast.sense = CastSense.of(_cast)
 	_cast.list_cards()
 	return _cast
@@ -152,6 +153,8 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
 			spell.slot = slot
+			if not payload:
+				_take_conditions(kept_modifiers)
 			_useful[slot] = true
 			_land(spell, kept, kept_modifiers, kept_elements, slot)
 			spell.card_slots.append(slot)
@@ -275,10 +278,18 @@ static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: 
 	for modifier in modifiers:
 		# A charge's wind-up is a cost: it is there when the charge is kept for what else it does.
 		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false))
+	# A held carrier that lasts lives as long as it is held (`SpellLimits.HOLD_LIFETIME`), whatever
+	# its life: a cap on its life does nothing there.
+	var held: bool = false
+	for modifier in modifiers:
+		held = held or (modifier.behaviour == ModifierBase.Behaviour.HOLD and on.works(modifier.behaviour) and not on.has(Carrier.REPEATS_HELD))
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up, held)
+		# A condition is a cast's, and a payload is no cast: it is never skipped.
+		if modifier.behaviour == ModifierBase.Behaviour.WHEN and payload:
+			works = false
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -341,7 +352,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts, a move's curve where it moves its caster along a way,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool, held: bool = false) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
@@ -374,7 +385,8 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 	if modifier.lifetime_most > 0.0:
 		any = true
 		# A move's time is its distance over its speed, not its life (a dash; `MoveCurve`).
-		if (on.has(Carrier.SPEED) or on.has(Carrier.LASTS)) and not on.has(Carrier.MOVES_CASTER):
+		# Nor a carrier kept on while it is held (`held`), which lives as long as that.
+		if (on.has(Carrier.SPEED) or on.has(Carrier.LASTS)) and not on.has(Carrier.MOVES_CASTER) and not held:
 			return true
 	if modifier.wind_down_add < 0.0:
 		any = true
@@ -653,6 +665,30 @@ static func _look_of(elements: Array, modifiers: Array) -> int:
 
 ## The next card slot to read, or -1 when the group must end: no card is left, or the next
 ## card was already read in this cast (which is what keeps wrap-around finite).
+## Adds the conditions (`WHEN` cards) of `modifiers` to the cast being read, each name once with the
+## strictest amount, the smallest (both must hold: below the lower share, within the nearer reach).
+func _take_conditions(modifiers: Array[ModifierBase]) -> void:
+	for modifier in modifiers:
+		if modifier.behaviour != ModifierBase.Behaviour.WHEN or not ModifierBase.WHEN_IDS.has(modifier.when_id):
+			continue
+		var at: int = _cast.when_ids.find(modifier.when_id)
+		if at < 0:
+			_cast.when_ids.append(modifier.when_id)
+			_cast.when_amounts.append(modifier.behaviour_strength)
+		else:
+			_cast.when_amounts[at] = minf(_cast.when_amounts[at], modifier.behaviour_strength)
+
+
+## A cast's conditions in plain words, for the builder: "only when hurt and close"; empty for none.
+static func when_text(when_ids: Array[StringName]) -> String:
+	if when_ids.is_empty():
+		return ""
+	var words := PackedStringArray()
+	for id: StringName in when_ids:
+		words.append(String(id))
+	return "only when " + " and ".join(words)
+
+
 func _next_slot() -> int:
 	var steps: int = 0
 	var crossed: bool = false

@@ -27,6 +27,12 @@ var delay: float = 0.0
 var ends_cycle: bool = false
 ## True when the reading went past the last slot and on from the first.
 var wrapped: bool = false
+## The conditions the cast leaves only while (docs/milestones/staff-language.md, L2): each a
+## `ModifierBase.WHEN_IDS` name and its amount (`when_amounts`, same order); empty for none.
+var when_ids: Array[StringName] = []
+var when_amounts: PackedFloat32Array = PackedFloat32Array()
+## Its conditions in plain words, for the builder ("only when hurt"); empty for none.
+var when_text: String = ""
 ## What each modifier, infusion and trigger read in this cast attached to: card slot -> the
 ## slot of its carrier.
 var targets: Dictionary = {}

@@ -120,7 +120,19 @@ enum Behaviour {
 	## a flying shot it passes more (a battering ram, `SpellLimits.PLOW_MOST`) and never hits a body it carries again.
 	## All of it is `core/spells/plow.gd`; the pin and the shove are Combat's. Strength unused (1).
 	PLOW,
+	## A condition (docs/milestones/staff-language.md, L2): the cast this card is in leaves only while
+	## `when_id` holds for its caster (`WHEN_IDS`), with `behaviour_strength` its amount; otherwise
+	## it is skipped, as a cast its pool cannot pay (`Spells._firing_cast`). It belongs to the whole
+	## cast, whichever of its carriers it lands on; several must all hold. In a payload, which is no
+	## cast and is never skipped, it is wasted. It changes no number of its carrier.
+	WHEN,
 }
+
+## What a `WHEN` card may ask, by name (`when_id`), and what its strength means: `hurt`, the caster's
+## health is below that share of its most (0.5: below half); `close`, a foe of the caster stands
+## within that many pixels of its body. A new condition is a name here and a line in
+## `Spells._when_holds`, never a card's script.
+const WHEN_IDS: Array[StringName] = [&"hurt", &"close"]
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
 ## (bounces, shields, seconds, pixels), factors multiply (two heavy cards are 4 x 4, rule 3,
@@ -186,11 +198,17 @@ const RULES: Dictionary = {
 	# Something that moves along a way carries what it hits: a shot that flies, or a dash's body
 	# (`MOVES_ALONG`: not a teleport, over at once). A blast's hits move nothing (rules R4 F2).
 	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_ALONG}},
+	# A condition is the cast's, not the carrier's: it works on every carrier (but not in a payload,
+	# `StaffCompiler._modifiers_on`).
+	Behaviour.WHEN: {},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.
 ## An unknown name counts as none, and the validator names it (`range_problems`).
 @export var behaviour_id: StringName = &""
+
+## For a `WHEN` card, what it asks (one of `WHEN_IDS`); empty for every other card.
+@export var when_id: StringName = &""
 
 ## `behaviour_id` as a `Behaviour`, for the compiler and the runtime.
 var behaviour: Behaviour:
@@ -367,6 +385,10 @@ func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
 	if behaviour_id != &"" and behaviour_of(behaviour_id) == Behaviour.NONE:
 		problems.append("behaviour_id: %s is not a behaviour (%s)" % [behaviour_id, ", ".join(Behaviour.keys().slice(1)).to_lower()])
+	if behaviour == Behaviour.WHEN and not WHEN_IDS.has(when_id):
+		problems.append("when_id: %s is not a condition (%s)" % [when_id, ", ".join(WHEN_IDS)])
+	if behaviour != Behaviour.WHEN and when_id != &"":
+		problems.append("when_id: only a card with behaviour_id when asks one")
 	if look_id != &"" and LookNames.layer_of(look_id) == 0:
 		problems.append("look_id: %s is not a look (%s)" % [look_id, ", ".join(LookNames.NAMES.slice(1))])
 	return problems

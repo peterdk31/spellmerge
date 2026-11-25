@@ -492,6 +492,10 @@ var _ray_guard_points: PackedVector2Array = PackedVector2Array()
 var _aim_origin: PackedVector2Array = PackedVector2Array()
 var _aim_dir: PackedVector2Array = PackedVector2Array()
 var _aim_seen: PackedByteArray = PackedByteArray()
+## actor -> its health as a share of its most (0 to 1), as its Caster last told (`sense_health`;
+## 1 for one that never told): what a `hurt` condition reads (docs/milestones/staff-language.md, L2).
+## State: a snapshot keeps it, so a restored game skips the same casts.
+var _health_share: PackedFloat32Array = PackedFloat32Array()
 ## actor -> the wizard's hand (`set_aim`'s `pivot`; INF when not given): what a swing turns round.
 var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
@@ -557,6 +561,8 @@ func _init() -> void:
 		_last_infused.append(null)
 	_aim_origin.resize(ACTORS)
 	_aim_origin.fill(Vector2.INF)
+	_health_share.resize(ACTORS)
+	_health_share.fill(1.0)
 	_walk_turn.resize(ACTORS)
 	_caster_live.resize(ACTORS)
 	_aim_dir.resize(ACTORS)
@@ -851,6 +857,9 @@ func cast_tree(cast: CompiledCast) -> Array[Dictionary]:
 	if cast.group != null:
 		_tree_group(cast.group, 0, -1, &"", rows)
 	if not rows.is_empty():
+		# Its conditions on its first row, after the carrier's name (L2): the plan says why it may wait.
+		if cast.when_text != "":
+			rows[0]["name"] = "%s, %s" % [rows[0]["name"], cast.when_text]
 		rows[0]["mana"] = cast.mana
 		rows[0]["damage"] = _cast_damage(cast)
 	return rows
@@ -927,7 +936,11 @@ func component_stats(id: StringName) -> PackedStringArray:
 			ModifierBase.Behaviour.SHIELD: "Blocks %s", ModifierBase.Behaviour.BOUNCE: "Bounces %s",
 			ModifierBase.Behaviour.BARRIER: "Barrier %s",
 		}
-		if words.has(modifier.behaviour):
+		if modifier.behaviour == ModifierBase.Behaviour.WHEN:
+			var asks: Array[StringName] = [modifier.when_id]
+			var only: String = StaffCompiler.when_text(asks)
+			out.append(only.left(1).to_upper() + only.substr(1))
+		elif words.has(modifier.behaviour):
 			var word: String = words[modifier.behaviour]
 			out.append(word % _short(modifier.behaviour_strength) if word.contains("%s") else word)
 		elif modifier.behaviour != ModifierBase.Behaviour.NONE:
@@ -3820,10 +3833,40 @@ func _firing_cast(index: int, mana: float) -> int:
 	if compiled == null or compiled.is_empty():
 		return -1
 	var count: int = compiled.casts.size()
+	var actor: int = floori(float(index) / SpellLimits.STAFFS)
 	for at in range(mini(_cursor[index], count - 1), count):
-		if mana >= compiled.casts[at].mana:
+		var cast: CompiledCast = compiled.casts[at]
+		# A cast whose conditions do not hold is skipped as one the mana does not pay (L2).
+		if mana >= cast.mana and (cast.when_ids.is_empty() or _when_holds(actor, cast)):
 			return at
 	return -1
+
+
+## True when every condition of `cast` holds for `actor` now (docs/milestones/staff-language.md,
+## L2): `hurt`, its health below the amount's share of its most (`sense_health`); `close`, a foe of
+## its team within the amount's pixels of its body (the projectile manager's anchor for it). Read
+## from the simulation only, so the same on every machine.
+func _when_holds(actor: int, cast: CompiledCast) -> bool:
+	for i in cast.when_ids.size():
+		var amount: float = cast.when_amounts[i]
+		match cast.when_ids[i]:
+			&"hurt":
+				if actor < 0 or actor >= ACTORS or _health_share[actor] >= amount:
+					return false
+			&"close":
+				var body: Vector2 = projectiles.get_anchor(actor) if projectiles != null else Vector2.INF
+				if not body.is_finite() or projectiles.nearest_target(body, amount, HITS, null, null, _team(actor)) == null:
+					return false
+			_:
+				return false
+	return true
+
+
+## The Caster tells its actor's health, as a share of its most (0 to 1), whenever it changes: what a
+## `hurt` condition reads (docs/milestones/staff-language.md, L2). Spells reads no health of its own.
+func sense_health(actor: int, share: float) -> void:
+	if actor >= 0 and actor < ACTORS:
+		_health_share[actor] = clampf(share, 0.0, 1.0) if is_finite(share) else 1.0
 
 
 ## Which cast of this actor's staff's cycle a press with `mana` fires (an unaffordable one is
@@ -4007,6 +4050,7 @@ func leave_room() -> void:
 
 ## A caster's own state back to new (its builds are handled by the caller).
 func _reset_caster(caster: int) -> void:
+	_health_share[caster] = 1.0
 	for staff in SpellLimits.STAFFS:
 		var index: int = caster * SpellLimits.STAFFS + staff
 		_cancel_wind(index)

@@ -1,0 +1,9 @@
+{
+	"id": "when_close_slam",
+	"name": "Too close",
+	"does": "An imp at arm's length: the slam that waits for a close foe leaves, and strikes it.",
+	"casts": [{"staff": 0, "cards": ["when_close", "slam", "bolt"]}],
+	"imps": [[34, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

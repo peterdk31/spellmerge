@@ -130,6 +130,8 @@ const KIND_HEAL: StringName = &"heal"
 ## A fall's cost (hub rework HR-H2, `take_fall`), and a pull's mark on who moved a body last (`pull`).
 const KIND_FALL: StringName = &"fall"
 const KIND_PULL: StringName = &"pull"
+## The floor's strike (live water: `floor_strike_requested`, the floor's first slice).
+const KIND_FLOOR: StringName = &"floor"
 
 ## What "downed by your own ..." calls a hit when its spell has no name of its own.
 const KIND_NAMES: Dictionary = {
@@ -141,6 +143,7 @@ const KIND_NAMES: Dictionary = {
 	KIND_STATUS: "Burn",
 	KIND_FALL: "fall",
 	KIND_PULL: "Pull",
+	KIND_FLOOR: "Floor",
 }
 
 ## How many rows there are: one per actor id.
@@ -197,7 +200,7 @@ const OWN_ID_PROPERTIES: Array[StringName] = [&"actor_id", &"caster"]
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `_node_id` and
 ## `_row_by_node`, a lookup from a body's node to its row (by instance id, equality only: a row is
 ## its actor id, and the row's identity is its actor's key, N5).
-const DERIVED: Array[StringName] = [&"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node", &"_reacting_at"]
+const DERIVED: Array[StringName] = [&"_floor_hits", &"_floor_striking", &"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node", &"_reacting_at"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_nodes"]
 ## The session's settings a new run keeps (`begin_run`): the reaction table.
@@ -210,6 +213,10 @@ var projectiles: ProjectileManagerScript = null
 var registry: RegistryScript = null
 ## The spell runtime, which tells what a spell's shot does (`hit_profile`). Same rule.
 var spells: SpellsScript = null
+## The floor's hits by element (`_on_floor_strike_requested`), made once each: a cache.
+var _floor_hits: Dictionary = {}
+## True while the floor's strike is dealt (scratch within it): its reactions' kills are its lighter's.
+var _floor_striking: bool = false
 ## The reaction table. Tests may set another one; null means REACTIONS.
 var reactions: ReactionTable = null
 ## Hit-stop, the game's rule (online-ready N4): which moments hold which bodies, and the game-wide
@@ -438,6 +445,8 @@ func setup() -> void:
 		events.pull_requested.connect(_on_pull_requested)
 	if not events.status_requested.is_connected(_on_status_requested):
 		events.status_requested.connect(_on_status_requested)
+	if not events.floor_strike_requested.is_connected(_on_floor_strike_requested):
+		events.floor_strike_requested.connect(_on_floor_strike_requested)
 	if not events.carry_ended.is_connected(_on_carry_ended):
 		events.carry_ended.connect(_on_carry_ended)
 	if not events.crumble_requested.is_connected(_on_crumble_requested):
@@ -1449,7 +1458,10 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 			_tell_reacted(by, node, reaction.reaction_id)
 			return
 	var spell_tag: int = _tag
-	_tag = 0
+	# A reaction's kills are no spell's own, but for the floor's (the owner, 2026-11-25): a foe killed
+	# by the Current of a live lake is the lighter's kill (`kill_landed` with its tag: on kill).
+	if not _floor_striking:
+		_tag = 0
 	match reaction.effect:
 		ReactionRow.Effect.CONSUME:
 			var amount: float = reaction.damage
@@ -1619,6 +1631,42 @@ func _on_wizard_shield_requested(caster: int, charges: int, seconds: float, tag:
 func _on_status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float) -> void:
 	if status_id != &"" and is_instance_valid(target):
 		apply_status(caster, target, status_id, duration, strength)
+
+
+## The floor strikes `target` (`floor_strike_requested`, the floor's first slice: live water): a
+## spell's hit of `element` for `damage` and no status of its own, as the hit of `caster` with the
+## spell of `tag` (its power, its kills: `kill_landed` with that tag), so a soaked body sets off
+## Current as under a bolt; and the kills of that Current are the lighter's too (the owner,
+## 2026-11-25), unlike a bolt's reaction's.
+func _on_floor_strike_requested(caster: int, target: Node, element: StringName, damage: float, tag: int) -> void:
+	if element == &"" or damage <= 0.0 or target == null or not is_instance_valid(target):
+		return
+	var row: int = _row_of_node(target)
+	if row == ActorsScript.NONE:
+		return
+	var profile: HitProfile = _floor_hits.get(element)
+	if profile == null:
+		profile = HitProfile.new()
+		profile.element_id = element
+		profile.element_ids = [element] as Array[StringName]
+		profile.kind = KIND_FLOOR
+		_floor_hits[element] = profile
+	profile.damage = damage
+	var saved_tag: int = _tag
+	var saved_slot: int = _slot
+	var saved_spell: int = _hit_spell
+	var saved_count: int = _hit_count
+	_tag = tag
+	_slot = -1
+	_hit_spell = tag
+	_hit_count = 1
+	_floor_striking = true
+	_apply_spell(caster, row, _position_of(_nodes[row]), profile, KIND_FLOOR)
+	_floor_striking = false
+	_tag = saved_tag
+	_slot = saved_slot
+	_hit_spell = saved_spell
+	_hit_count = saved_count
 
 
 func _on_pull_requested(caster: int, position: Vector2, radius: float, strength: float, _tag_of_card: int, to: Vector2) -> void:

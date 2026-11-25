@@ -313,7 +313,7 @@ func _measure(scene: String) -> void:
 ## The whole room lit by one touch: the tick it catches and the frame after it, timed alone.
 func _catch() -> void:
 	var size := Vector2(_cover.layout.columns, _cover.layout.rows) * float(CoverLayout.CELL)
-	_events.emit_signal("floor_touched", -1, &"fire", size * 0.5, size.length())
+	_events.emit_signal("floor_touched", -1, &"fire", size * 0.5, size.length(), 0)
 	var took: PackedInt32Array = _one_tick()
 	# Feel's part of it: every lit cell's tufts told their state again, as its listener did.
 	var look: Node = _feel.cover()
@@ -334,7 +334,7 @@ func _front() -> void:
 		if layout.cells[near] != 0:
 			cell = near
 			break
-	_events.emit_signal("floor_touched", -1, &"fire", layout.cell_rect(cell).get_center(), 0.0)
+	_events.emit_signal("floor_touched", -1, &"fire", layout.cell_rect(cell).get_center(), 0.0, 0)
 	var tick_times: Array[int] = []
 	var frame_times: Array[int] = []
 	var most_burning: int = 0

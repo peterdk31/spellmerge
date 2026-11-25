@@ -9,6 +9,13 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **1080p** (the owner, 2026-11-25, after 960×540 with 48 px art and 640×360 were laid out beside 1280×720): a 1920×1080 screen holds the picture once, two thirds of it, by whole numbers, so there the picture is stretched by a fraction (1.5, aspect kept, hard pixels; `Display.stretch_for`), its 64 px art in uneven rows of 1 or 2 screen pixels, which the owner accepts; 720p, 1440p and 4K stay whole. The constants stay one each: the picture is the layout times `PictureGrid.PICTURE_SCALE` (k = 2), redrawn art `ArtDetail.DETAIL` (d = 2).
 - **Open on ART0's PR:** at the resting zoom 0.8 a 2x art pixel is 0.8 of a picture pixel, so one in five is left out, as today's art was in the 640×360 picture.
 
+## 2026-11-25: everything touches the floor as it passes, and a cell remembers who lit it (owner decisions; the floor's first slice)
+
+- **The owner** (answers to docs/milestones/foundations.md's open points 2 and 3): every shot, dash and swing touches the floor as it passes, not only what pours, its cost designed and measured; and the floor's harm is whoever lit it, so `on kill` and Siphon count.
+- **How:** docs/milestones/floor.md. Shots trail through the projectile manager's trail pass (natively `ShotKernel.trail_pass`, mirrored), Spells sends one `floor_passed` a tick, heard by the cover alone (locks and secret rocks keep `floor_touched`); a cover cell keeps its lighter (actor and spell tag) beside the active cells, so a room at rest costs nothing.
+- **Measured** (this 4-core container, 2026-11-25): the trail pass at 2048 shots in flight, 8 to 10 us a step natively (357 us in GDScript); the cover applying 2048 passing touches in one tick (a worst-case burst), 1.3 to 1.8 ms. `stress.gd` (web scenario, 1000 shots): Cover 0.57 to 0.75 ms a tick, Spells 0.63 to 0.72 ms a tick, before and after. `play_frames.gd` ("1p far"): the tick 2.07 to 2.14 ms (Cover 0.20 to 0.24, Spells 0.14 to 0.16), the frame 7.11 to 7.22 ms. Budgets held by `tests/gameplay/cover/test_floor_budget.gd`.
+- **Why not more:** a native cover step would take the 2048-touch burst under 0.2 ms; left until a fight shows it.
+
 ## 2026-11-19: a loading screen when a run starts from the stone, and on the way back (owner)
 
 - **The owner:** "Add a loading screen when starting a run." Then, the same day: "Add a loading screen for returning."

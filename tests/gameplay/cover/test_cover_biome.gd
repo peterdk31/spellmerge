@@ -107,7 +107,7 @@ func _covered(room: int) -> int:
 
 ## A fire touched at the middle of cell `cell` of room `room`, `radius` round it.
 func _light(room: int, cell: int, radius: float = 0.0) -> void:
-	events.emit_signal("floor_touched", -1, &"fire", cover.layout_of(room).cell_rect(cell).get_center(), radius)
+	events.emit_signal("floor_touched", -1, &"fire", cover.layout_of(room).cell_rect(cell).get_center(), radius, 0)
 
 
 ## Room `room`'s cover as its state holds it: each cell's state and seconds, its active cells, its rolls.

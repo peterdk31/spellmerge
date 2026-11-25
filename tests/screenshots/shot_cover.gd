@@ -73,7 +73,7 @@ func _shots(room: RoomBase) -> bool:
 	await snap(spawns[0], "cover_%s_close" % room.id, Vector2i(64, 40))
 	var fire: Vector2 = _burnable_near(layout, spawns[0])
 	if fire.is_finite():
-		_events.emit_signal("floor_touched", 0, &"fire", fire, FIRE_RADIUS)
+		_events.emit_signal("floor_touched", 0, &"fire", fire, FIRE_RADIUS, 0)
 		await _fire_strip(fire, "cover_%s_fire" % room.id)
 	return true
 

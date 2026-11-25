@@ -38,6 +38,21 @@ extends Resource
 ## source: a cell has no art. Empty: none (most states).
 @export var motes: Array[MoteSource] = []
 
+@export_group("Flat look")
+## A flat kind's look (`CoverKind.Look.FLAT`; Feel's `cover_flat.gdshader`): the palette material its
+## cells are drawn in (its base, a 1 px edge of its shadow toward an undrawn cell, glints of its
+## light). Empty: not drawn (dry floor).
+@export var flat_material: StringName = &""
+## How its look plays from when a cell begins to show it, over `animation_frames` at `animation_fps`
+## (docs/STYLE.md, "Smooth"): still; grown in from the shape's edge; shrunk back to its middle; or
+## still with sparks of `flat_spark` that move every frame (a loop).
+enum FlatMotion { STILL, GROW, SHRINK, CRACKLE }
+@export var flat_motion: FlatMotion = FlatMotion.STILL
+## The material shown under it while it grows or shrinks (ice over water: &"water"); empty: nothing.
+@export var flat_under: StringName = &""
+## CRACKLE: the material of its sparks (&"arc").
+@export var flat_spark: StringName = &""
+
 @export_group("On a body standing in it")
 ## The status it gives a body standing in it (&"burn", &"chill"; a `ElementBase.status_id`), asked as
 ## any status is (`Events.status_requested`, GC5). Empty: it does nothing to bodies (most states).
@@ -45,15 +60,25 @@ extends Resource
 ## The status's strength and seconds, as an element gives them.
 @export var status_strength: float = 0.0
 @export var status_duration: float = 0.0
-## Seconds between two of it on the same body standing in it (above 0 when it gives a status).
+## Seconds between two of it on the same body standing in it (above 0 when it gives a status or
+## strikes).
 @export var status_every: float = 0.5
+## True: its status hurts nobody (soak, chill on the floor), so the AI's look does not mark it as
+## danger (`cover_danger_looked`) though it still gives it. False: a body walks out of it.
+@export var harmless: bool = false
+## A body standing in it is struck as by a hit of this element (&"lightning": live water), for
+## `strike_damage`, on the same timer as its status and after it (`floor_strike_requested`; Combat
+## strikes it as a spell's hit of that element, so a soaked body sets off Current). Empty: no strike.
+@export var strike_element: StringName = &""
+@export var strike_damage: float = 0.0
 
 @export_group("Spread")
 ## The element it touches its four neighbours with (&"fire": burning grass lights the grass beside
 ## it). Empty: it spreads nothing.
 @export var spreads: StringName = &""
-## The chance a second that it touches each neighbour (0-1), rolled by the run's chance (GC5).
-@export_range(0.0, 1.0, 0.01) var spread_chance: float = 0.0
+## The chance a second that it touches each neighbour, rolled by the run's chance (GC5): above 1
+## for a spread that runs within a few ticks (live water, 25), at most 60 (one a tick).
+@export_range(0.0, 60.0, 0.01) var spread_chance: float = 0.0
 
 @export_group("")
 ## Its triggers, in order: the first that fires moves the cell on.
@@ -67,6 +92,17 @@ static func make(id: StringName, rows: Array[CoverTrigger] = [], look_frames: Pa
 	made.triggers = rows
 	made.frames = look_frames
 	return made
+
+
+## True when a body standing in it is given something (a status or a strike): what the cover area
+## asks bodies for.
+func gives() -> bool:
+	return status != &"" or strike_element != &""
+
+
+## True when the AI's look marks it as danger: it gives something and is not `harmless`.
+func is_danger() -> bool:
+	return gives() and not harmless
 
 
 ## True when one of its triggers fires on an element touching it: a state the cover area queues

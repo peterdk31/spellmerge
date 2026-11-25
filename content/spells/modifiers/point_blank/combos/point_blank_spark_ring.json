@@ -1,0 +1,10 @@
+{
+	"id": "point_blank_spark_ring",
+	"name": "Spark ring from the hand",
+	"does": "A bolt that ends at once fires its On Expire payload, a lightning nova, from the staff's tip: it charges the imps beside and behind the wizard with static.",
+	"needs": "point_blank",
+	"casts": [{"staff": 0, "cards": ["on_expire", "point_blank", "bolt", "lightning", "nova", "atom"]}],
+	"imps": [[-60, 0], [0, 60]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "static"}]
+}

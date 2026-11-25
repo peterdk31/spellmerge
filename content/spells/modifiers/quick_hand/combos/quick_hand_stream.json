@@ -1,0 +1,15 @@
+{
+	"id": "quick_hand_stream",
+	"name": "Bolt stream",
+	"does": "Two Quick Hands take a bolt's whole wind-down away: a bolt leaves every tenth of a second for as long as the mana lasts.",
+	"needs": "quick_hand",
+	"casts": [
+		{"staff": 0, "cards": ["quick_hand", "quick_hand", "bolt"]},
+		{"staff": 0, "cards": ["quick_hand", "quick_hand", "bolt"], "at": 0.1},
+		{"staff": 0, "cards": ["quick_hand", "quick_hand", "bolt"], "at": 0.2},
+		{"staff": 0, "cards": ["quick_hand", "quick_hand", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 15}]
+}

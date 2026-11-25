@@ -16,7 +16,7 @@ func before_each() -> void:
 	_world = Fixture.new(root)
 	_world.projectiles.set_cap(512)
 	_touched.clear()
-	_world.bus.floor_touched.connect(func(caster: int, element: StringName, at: Vector2, radius: float) -> void: _touched.append([caster, element, at, radius]))
+	_world.bus.floor_touched.connect(func(caster: int, element: StringName, at: Vector2, radius: float, tag: int) -> void: _touched.append([caster, element, at, radius, tag]))
 
 
 func after_each() -> void:

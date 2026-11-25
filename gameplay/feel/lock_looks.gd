@@ -232,7 +232,7 @@ func _on_secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: 
 
 
 ## An element touched the floor: each unbroken rock of that element within NEAR of it brightens.
-func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
+func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float, _tag: int) -> void:
 	for rock in _rock_areas.size():
 		if _rock_broken[rock] != 0 or _rock_elements[rock] != element:
 			continue

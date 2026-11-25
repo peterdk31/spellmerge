@@ -58,11 +58,11 @@ func test_a_rocks_crack_brightens_near_its_element_and_dims_again() -> void:
 	var fire: PackedColorArray = _looks.rock_tint_of(0)
 	var card: ElementBase = root.get_node("Registry").call(&"get_resource", &"spells", &"fire") as ElementBase
 	check(card != null and fire == Palette.shades_of(LooksScript.nearest_material(card.tint)), "in the palette material nearest its element's tint")
-	_bus.floor_touched.emit(0, &"frost", ROCK.get_center(), 16.0)
+	_bus.floor_touched.emit(0, &"frost", ROCK.get_center(), 16.0, 0)
 	check(not _looks.is_moving(), "another element on it: nothing")
-	_bus.floor_touched.emit(0, &"fire", ROCK.get_center() + Vector2(400.0, 0.0), 16.0)
+	_bus.floor_touched.emit(0, &"fire", ROCK.get_center() + Vector2(400.0, 0.0), 16.0, 0)
 	check(not _looks.is_moving(), "its element far away: nothing")
-	_bus.floor_touched.emit(0, &"fire", ROCK.position - Vector2(60.0, 0.0), 16.0)
+	_bus.floor_touched.emit(0, &"fire", ROCK.position - Vector2(60.0, 0.0), 16.0, 0)
 	var glows: Array[int] = []
 	while _looks.is_moving():
 		_looks.advance()

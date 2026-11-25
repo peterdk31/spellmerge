@@ -104,9 +104,10 @@ func step(delta: float) -> void:
 ## The pool in `slot` touches the floor where it lies now (it may creep) with its spell's elements,
 ## within its radius (`CarrierKit.touch_floor`).
 func _touch(slot: int, actor: int) -> void:
-	var spell: CompiledSpell = kit.spell_of(kit.projectiles.get_tag_of(slot))
+	var tag: int = kit.projectiles.get_tag_of(slot)
+	var spell: CompiledSpell = kit.spell_of(tag)
 	if spell != null:
-		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius)
+		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius, tag)
 
 
 ## Takes row `i` off (the last row takes its place).

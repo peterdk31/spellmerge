@@ -296,6 +296,18 @@ var _winding: int = 0
 ## Payloads each actor has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
+## What passes over the floor touches it once every this many pixels of its way (the cover's cell,
+## `CoverLayout.CELL`), at most PASS_MOST times a step (a blink's way is touched at its end).
+const PASS_SPACING: float = 16.0
+const PASS_MOST: int = 64
+## What passed over the floor since the last send (`floor_passed`, the floor's first slice), sent at
+## Spells' step's end and emptied: each entry's caster, its spell's tag, its element and where.
+## State, not scratch: a beam or a swing launched after Spells' step (a body's press, a payload in
+## Combat) touches as it starts, and that entry waits for the next tick's send, through a snapshot.
+var _pass_casters: PackedInt32Array = PackedInt32Array()
+var _pass_tags: PackedInt64Array = PackedInt64Array()
+var _pass_elements: Array[StringName] = []
+var _pass_at: PackedVector2Array = PackedVector2Array()
 var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
 ## The key (`ProjectileManager.key_of`, N5) of the target a chain came from, 0 for none.
@@ -769,12 +781,14 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.entity_ended.disconnect(_on_entity_ended)
 		events.caster_move_finished.disconnect(_moves.finished)
 		events.room_left.disconnect(_on_room_left)
+		events.floor_strike_requested.disconnect(_on_floor_strike)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
 		projectiles.shot_ended.connect(shot_ended)
 		projectiles.wall_met.connect(_on_wall_met)
 	if events != null:
+		events.floor_strike_requested.connect(_on_floor_strike)
 		events.projectile_hit.connect(_on_hit)
 		events.projectile_expired.connect(_on_expired)
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -942,6 +956,10 @@ func component_stats(id: StringName) -> PackedStringArray:
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
 				out.append("%s x%s" % [pair[0], _short(float(pair[1]))])
+		if not is_zero_approx(modifier.wind_down_add):
+			out.append("Delay %s%ss" % ["+" if modifier.wind_down_add > 0.0 else "", _short(modifier.wind_down_add)])
+		if modifier.lifetime_most > 0.0:
+			out.append("Life %ss at most" % _short(modifier.lifetime_most))
 		if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
 			out.append("Speed x%s to x%s" % [_short(modifier.speed_start), _short(modifier.speed_end)])
 		if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0):
@@ -1489,6 +1507,9 @@ func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> voi
 ## between the two (a beam's on-expire spell, an actor's own cast) counts against whichever
 ## window is open.
 func step(delta: float) -> void:
+	# The shots that entered a new floor cell in the manager's step (it steps first), before the
+	# carriers add theirs (the floor's first slice).
+	_trail_shots()
 	for c in _cooldown_rows:
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
 	_fires_used.fill(0)
@@ -1508,6 +1529,7 @@ func step(delta: float) -> void:
 	_step_zaps(delta)
 	_step_magnets()
 	_run_pending()
+	_send_passed()
 
 
 ## The shots made by one launch of `spell`, returned as how many were made (a beam counts
@@ -2042,7 +2064,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 	cue_tag = tag
 	events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 	cue_tag = 0
-	_touch_floor(spell, actor, at, radius)
+	_touch_floor(spell, actor, at, radius, tag)
 	var chain: int = spell.chain_jumps
 	var prev: int = 0
 	if tag == _ray.tag:
@@ -2060,19 +2082,81 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 ## Each element of `spell` touched the floor within `radius` of `at` (`floor_touched`, ground cover
 ## GC5, rule 5: one event an element, in its infusions' order), for whatever lies on the floor (the
 ## cover area). Nothing for a spell of no element.
-func _touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float) -> void:
+func _touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float, tag: int) -> void:
 	if events == null or spell == null or not at.is_finite():
 		return
 	for element: StringName in spell.element_ids:
-		events.floor_touched.emit(actor, element, at, maxf(radius, 0.0))
+		events.floor_touched.emit(actor, element, at, maxf(radius, 0.0), tag)
+
+
+## The shots the projectile manager's last step handed back as entering a new floor cell
+## (`Projectiles.trail_slot`, in slot order): each element of what each hits with (a relay's, an
+## infusion's) passes over the floor along its step's way, every 16 px (a fast shot crosses more than a
+## cell a step: no gap is left along its line).
+func _trail_shots() -> void:
+	if projectiles == null:
+		return
+	for n in projectiles.trail_count():
+		var slot: int = projectiles.trail_slot(n)
+		if not projectiles.is_alive(slot):
+			continue
+		var tag: int = projectiles.get_tag_of(slot)
+		var hit: HitProfile = hit_profile(tag, slot)
+		if hit == null:
+			continue
+		var actor: int = projectiles.get_actor_of(slot)
+		_add_way(actor, tag, hit.element_ids, projectiles.get_prev_of(slot), projectiles.get_position_of(slot))
+
+
+## Each element of `spell` passes over the floor along `from` to `to` (a dash's way, a swing's tip,
+## a beam's end: `CarrierKit.pass_floor`), once every floor cell's side and at `to` (not at `from`,
+## the last step's `to`; a way of no length passes at `to`).
+func _pass_floor(spell: CompiledSpell, tag: int, actor: int, from: Vector2, to: Vector2) -> void:
+	if spell != null:
+		_add_way(actor, tag, spell.element_ids, from, to)
+
+
+## Each of `elements` passes over the floor along `from` to `to`: once every PASS_SPACING px (at
+## most PASS_MOST) and at `to`, never at `from` (the last step's `to`).
+func _add_way(actor: int, tag: int, elements: Array[StringName], from: Vector2, to: Vector2) -> void:
+	if elements.is_empty() or not to.is_finite():
+		return
+	if from.is_finite():
+		var way: Vector2 = to - from
+		var steps: int = mini(ceili(way.length() / PASS_SPACING), PASS_MOST)
+		for n in range(1, steps):
+			var at: Vector2 = from + way * (float(n) / float(steps))
+			for element: StringName in elements:
+				_add_pass(actor, tag, element, at)
+	for element: StringName in elements:
+		_add_pass(actor, tag, element, to)
+
+
+func _add_pass(actor: int, tag: int, element: StringName, at: Vector2) -> void:
+	_pass_casters.append(actor)
+	_pass_tags.append(tag)
+	_pass_elements.append(element)
+	_pass_at.append(at)
+
+
+## The tick's passing touches, sent once (`floor_passed`) and emptied.
+func _send_passed() -> void:
+	if _pass_elements.is_empty():
+		return
+	if events != null:
+		events.floor_passed.emit(_pass_casters, _pass_tags, _pass_elements, _pass_at)
+	_pass_casters.resize(0)
+	_pass_tags.resize(0)
+	_pass_elements.clear()
+	_pass_at.resize(0)
 
 
 ## A shot (or a ray) of `spell` ended at `at`: its elements touch the floor there, within its radius
 ## (rule 5); a shot with a blast touches as its blast does (`_blast`), so not twice.
-func _touch_end(spell: CompiledSpell, actor: int, at: Vector2) -> void:
+func _touch_end(spell: CompiledSpell, actor: int, at: Vector2, tag: int) -> void:
 	if spell == null or spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:
 		return
-	_touch_floor(spell, actor, at, spell.radius)
+	_touch_floor(spell, actor, at, spell.radius, tag)
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
@@ -2285,12 +2369,17 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 	var lifecycle: bool = _lc_rows(spell) > 0
 	var zaps: bool = spell.zap_chance > 0.0 and spell.zap_reach > 0.0
 	var magnet: bool = spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0
+	# A shot of an element touches the floor as it passes (the floor's first slice; a relay's or an
+	# echo's hit is the spell's own elements).
+	var trails: bool = not spell.element_ids.is_empty()
 	var made: int = 0
 	for n in count:
 		var slot: int = slots[n]
 		if slot < 0:
 			continue
 		made += 1
+		if trails:
+			projectiles.set_trail(slot, true)
 		_set_relay(slot, relay)
 		_rec_zap[slot] = zap_relay
 		var seq: int = projectiles.get_seq_of(slot)
@@ -2429,7 +2518,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 		events.carrier_shown.emit(actor, RAY_CARD, origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
-		_touch_end(spell, actor, end)
+		_touch_end(spell, actor, end, tag)
 		_blast(spell, tag, actor, end)
 	if got > 0.0:
 		_fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, end, end_heading, null)
@@ -3242,7 +3331,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 			_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 			# A shot the hit spent ends here: its elements touch the floor (ground cover GC5).
 			if ended:
-				_touch_end(spell, actor, position)
+				_touch_end(spell, actor, position, tag)
 		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
@@ -3261,7 +3350,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 		_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 	# A spent shot's blast goes off where it hit; a pulling one's waits for the arrival.
 	if spent and not pulled:
-		_touch_end(spell, actor, position)
+		_touch_end(spell, actor, position, tag)
 		_blast(spell, tag, actor, position, slot)
 
 
@@ -3330,7 +3419,7 @@ func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	# Every carrier blasts at its end point (rules R1d): a pulling shot that missed, where it ended.
 	if spell != null:
-		_touch_end(spell, actor, position)
+		_touch_end(spell, actor, position, tag)
 		_blast(spell, tag, actor, position, shot)
 	# A shot that ends on a wall meets that wall and ends: its `on wall` and `on expire` both fire.
 	if projectiles.expired_on_wall:
@@ -3550,6 +3639,8 @@ func _infuse_shot(slot: int, donor: HitProfile, tint: Color) -> void:
 	if base.element_id == &"":
 		projectiles.set_core(slot, tint)
 	_set_relay(slot, merged)
+	# Now of an element: it touches the floor as it passes.
+	projectiles.set_trail(slot, true)
 	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
 
 
@@ -3913,6 +4004,23 @@ func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
 
 ## Siphon: mana comes back to staff `staff` of the actor `actor`, whoever it is; its Caster
 ## takes it from `mana_refund_requested`.
+## The floor a spell of `tag` lit strikes `target` (`floor_strike_requested`, the floor's first slice):
+## a Siphon on that spell refunds `caster` as for its carrier's hit (the kill is Combat's
+## `kill_landed`, heard as any).
+func _on_floor_strike(caster: int, target: Node, _element: StringName, _damage: float, tag: int) -> void:
+	var spell: CompiledSpell = _profiles.get(tag) if SpellTag.is_spell_tag(tag) else null
+	if spell == null:
+		return
+	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
+	# Only a foe struck pays (as a carrier's hits find foes): never the caster's own body or a friend's.
+	var struck := target as Actor
+	if refund > 0.0 and actors != null and struck != null and is_instance_valid(struck) and struck.caster_number() != caster and ActorsScript.is_foe(actors.team_of(caster), actors.team_of(struck.caster_number())):
+		_refund(caster, SpellTag.staff_of(tag), refund)
+		var body := target as Node2D
+		if body != null and is_instance_valid(body):
+			_show_siphon(spell, caster, body.global_position)
+
+
 func _refund(actor: int, staff: int, amount: float) -> void:
 	if events != null and actor >= 0 and actor < ACTORS:
 		events.mana_refund_requested.emit(actor, staff, amount)

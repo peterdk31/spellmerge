@@ -84,7 +84,7 @@ func _layout() -> Node2D:
 func _burn(x0: int, x1: int, y0: int, y1: int) -> void:
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
-			_world.bus.floor_touched.emit(0, &"fire", CoverSight.middle(Vector2i(x, y)), 0.0)
+			_world.bus.floor_touched.emit(0, &"fire", CoverSight.middle(Vector2i(x, y)), 0.0, 0)
 	_cover.step(Fixture.STEP)
 
 
@@ -151,7 +151,7 @@ func test_ash_and_a_room_with_no_cover_mark_nothing() -> void:
 	root.add_child(_cover)
 	_world.bus.room_built.emit(ROOM, 0, _layout())
 	_world.bus.room_entered.emit(ROOM, 0)
-	_world.bus.floor_touched.emit(0, &"fire", Vector2(200.0, 100.0), 0.0)
+	_world.bus.floor_touched.emit(0, &"fire", Vector2(200.0, 100.0), 0.0, 0)
 	for i in 30:
 		_cover.step(Fixture.STEP)
 	var sight := CoverSight.new()
@@ -254,7 +254,7 @@ func test_the_count_of_harming_cells_follows_the_state_and_a_restore() -> void:
 	_burn(12, 12, 6, 6)
 	_cover.look(at, 32.0, sight)
 	check_equal(sight.count, 1, "burning: marked")
-	_world.bus.floor_touched.emit(0, &"frost", at, 0.0)
+	_world.bus.floor_touched.emit(0, &"frost", at, 0.0, 0)
 	_cover.step(Fixture.STEP)
 	_cover.look(at, 32.0, sight)
 	check_equal(sight.count, 0, "put out: nothing harms, the look returns at once")

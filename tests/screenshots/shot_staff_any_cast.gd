@@ -10,7 +10,7 @@ const OTHER: Array[StringName] = [&"atom"]
 const FROM := Vector2(200.0, 180.0)
 ## Frames the other staff casts on, and the frame of the shot.
 const CASTS_AT: Array[int] = [20, 40, 60]
-const SHOT_AT: int = 64
+const SHOT_AT: int = 62
 
 
 func take() -> void:

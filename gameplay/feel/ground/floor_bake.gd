@@ -3,7 +3,7 @@ extends RefCounted
 ## each room's floor"), so a room in view draws its floor in one call, not seven: the floor art, the
 ## rock face under it (`Underside`), the edges' glow (`Glow`, added) and the shades its walls cast
 ## (`Shade`'s polygons) are drawn once, in that order (the order the screen draws them in), into a
-## viewport of the floor's size (`bake`), and from the frame after it was drawn (`step`) the `Floor`
+## viewport of the floor's size (`bake`), and from the frame after it was drawn (`step`) a sprite under the `Floor`
 ## sprite shows that viewport's texture and the four layers are hidden, their textures let go.
 ##
 ## The texture is premultiplied (`floor_bake.gdshader`): the layers' colours summed as the screen
@@ -19,9 +19,10 @@ extends RefCounted
 ## **At the picture's scale** (the owner's answer on #904, done with the 1280 x 720 picture of
 ## 2026-11-25): the viewport is `picture_scale` times the floor's size each way and the layers are
 ## drawn into it that much bigger, so the glow and the shades keep the smoothness the picture can show;
-## the floor then shows it at its size in the world (the texture marked at that detail, `ArtDetail`:
-## its sprite's scale divided and offset multiplied by it, put back by `unshow`). The art itself is
-## sampled nearest, so its pixels are the same.
+## a sprite of its own under the floor (`SHOWN`, its first child) shows it at its size in the world
+## (the texture marked at that detail, `ArtDetail`), and the floor draws nothing more: its own
+## transform is never touched, since its children are the room's (holes, mote lines, wall art). The
+## art itself is sampled nearest, so its pixels are the same.
 ## Memory: one RGBA8 texture of the floor's size times `picture_scale` squared a piece (a 704×448
 ## crypt room 1.2 MB at 1, 4.8 MB at 2, the shipped picture), in place of the floor's, the rock
 ## face's and the glow's. View only: it
@@ -39,6 +40,8 @@ const SHADE: StringName = &"Shade"
 const BAKE: StringName = &"FloorBake"
 ## The floor's own texture, kept on it while `keep_layers` is on.
 const KEPT_META: StringName = &"floor_bake_kept"
+## The sprite that shows the bake, the floor's first child.
+const SHOWN: StringName = &"FloorBakeShown"
 ## The bake pixels a world pixel of a bake's viewport (`picture_scale` as it was baked).
 const SCALE_META: StringName = &"floor_bake_scale"
 
@@ -142,14 +145,23 @@ func show_bake(viewport: SubViewport) -> void:
 	var holder := root.get_node_or_null(NodePath(SHADE)) as CanvasItem
 	if holder != null:
 		holder.visible = false
-	# The bake at its size in the world: `by` times finer than the floor's art (ArtDetail).
+	# The bake on a sprite of its own, the floor's first child, at its size in the world: `by` times
+	# finer than the floor's art (ArtDetail), its own scale a 1/by. The floor itself keeps its
+	# transform (its children are the room's holes, mote lines and wall art) and draws nothing more.
 	var by: int = int(viewport.get_meta(SCALE_META, 1))
 	var baked: ViewportTexture = viewport.get_texture()
 	ArtDetail.mark(baked, by)
-	ground.texture = baked
-	ground.offset *= float(by)
-	ground.scale /= float(by)
-	ground.material = shown_material()
+	var shown_sprite := Sprite2D.new()
+	shown_sprite.name = SHOWN
+	shown_sprite.texture = baked
+	shown_sprite.centered = ground.centered
+	shown_sprite.offset = ground.offset * float(by)
+	shown_sprite.texture_filter = ground.texture_filter
+	ArtDetail.fit(shown_sprite)
+	shown_sprite.material = shown_material()
+	ground.add_child(shown_sprite)
+	ground.move_child(shown_sprite, 0)
+	ground.texture = null
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	for copy: Node in viewport.get_children():
 		viewport.remove_child(copy)
@@ -163,11 +175,11 @@ static func unshow(root: Node) -> bool:
 	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D if root != null else null
 	if ground == null or not ground.has_meta(KEPT_META):
 		return false
-	var by: float = float(ArtDetail.of(ground.texture))
+	var shown_sprite := ground.get_node_or_null(NodePath(SHOWN))
+	if shown_sprite != null:
+		ground.remove_child(shown_sprite)
+		shown_sprite.queue_free()
 	ground.texture = ground.get_meta(KEPT_META)
-	ground.offset /= by
-	ground.scale *= by
-	ground.material = null
 	ground.remove_meta(KEPT_META)
 	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D
 	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
@@ -183,7 +195,8 @@ static func unshow(root: Node) -> bool:
 ## True when `root`'s floor shows its bake.
 static func is_baked(root: Node) -> bool:
 	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D if root != null else null
-	return ground != null and ground.texture is ViewportTexture and ground.material == _shown_material and _shown_material != null
+	var shown_sprite := ground.get_node_or_null(NodePath(SHOWN)) as Sprite2D if ground != null else null
+	return shown_sprite != null and shown_sprite.texture is ViewportTexture and shown_sprite.material == _shown_material and _shown_material != null
 
 
 ## True when everything `bake` would hide draws as it copies it, so the bake draws it all: a plain

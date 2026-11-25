@@ -44,7 +44,7 @@ func _in(node: Node, layout: Node) -> Transform2D:
 func _stack_shown(layout: Node) -> int:
 	var shown: int = 0
 	var ground := layout.get_node("Floor") as Sprite2D
-	var items: Array[CanvasItem] = [ground, ground.get_node("Glow"), ground.find_child("Underside", true, false)]
+	var items: Array[CanvasItem] = [ground, ground.get_node("Glow"), ground.find_child("Underside", true, false), ground.get_node_or_null(NodePath(BakeScript.SHOWN))]
 	for shade: Node in layout.get_node("Shade").get_children():
 		items.append(shade as CanvasItem)
 	for item: CanvasItem in items:
@@ -110,12 +110,26 @@ func test_the_bake_is_drawn_at_the_picture_s_scale_and_stands_where_the_floor_st
 	var base := Transform2D(0.0, Vector2(2.0, 2.0), 0.0, -ground.get_rect().position * 2.0)
 	check((viewport.get_child(0) as Sprite2D).transform.is_equal_approx(base), "the floor drawn twice as big from the viewport's corner")
 	check((viewport.get_child(2) as Sprite2D).transform.is_equal_approx(base * _in(ground, layout).affine_inverse() * _in(ground.get_node("Glow"), layout)), "the glow twice as big where it lies")
+	var children: Array[Transform2D] = []
+	for child: Node in ground.get_children():
+		if child is Node2D:
+			children.append((child as Node2D).transform)
 	bake.show_bake(viewport)
-	check_equal(ArtDetail.of(ground.texture), 2, "the bake's texture is marked at the picture's detail")
-	check((ground.transform * ground.get_rect()).is_equal_approx(world_rect), "the baked floor stands where the floor stood")
+	var shown := ground.get_node_or_null(NodePath(BakeScript.SHOWN)) as Sprite2D
+	check(shown != null and shown.get_index() == 0, "the bake on a sprite of its own, the floor's first child")
+	if shown == null:
+		return
+	check_equal(ArtDetail.of(shown.texture), 2, "the bake's texture is marked at the picture's detail")
+	check((ground.transform * shown.transform * shown.get_rect()).is_equal_approx(world_rect), "the baked floor stands where the floor stood")
+	check(ground.offset.is_equal_approx(offset) and ground.scale.is_equal_approx(scale_before), "the floor's own offset and scale untouched (its children are the room's: holes, mote lines)")
+	var at: int = 0
+	for child: Node in ground.get_children():
+		if child is Node2D and child != shown:
+			check((child as Node2D).transform.is_equal_approx(children[at]), "%s where it was" % child.name)
+			at += 1
 	check(BakeScript.unshow(layout), "unshown")
-	check(ground.offset.is_equal_approx(offset) and ground.scale.is_equal_approx(scale_before), "its offset and scale as they were")
-	check((ground.transform * ground.get_rect()).is_equal_approx(world_rect), "and where it stood")
+	check(ground.get_node_or_null(NodePath(BakeScript.SHOWN)) == null or ground.get_node(NodePath(BakeScript.SHOWN)).is_queued_for_deletion(), "its sprite gone")
+	check((ground.transform * ground.get_rect()).is_equal_approx(world_rect), "the floor's art where it stood")
 
 
 func test_drawn_the_floor_shows_the_bake_and_its_stack_is_one_item() -> void:
@@ -132,7 +146,8 @@ func test_drawn_the_floor_shows_the_bake_and_its_stack_is_one_item() -> void:
 	check(BakeScript.is_baked(layout), "shown once a frame was drawn")
 	check_equal(bake.shown, 1, "counted")
 	var ground := layout.get_node("Floor") as Sprite2D
-	check(ground.texture == viewport.get_texture() and ground.material == BakeScript.shown_material(), "the floor draws the bake, premultiplied")
+	var shown := ground.get_node_or_null(NodePath(BakeScript.SHOWN)) as Sprite2D
+	check(shown != null and shown.texture == viewport.get_texture() and shown.material == BakeScript.shown_material() and ground.texture == null, "a sprite under the floor draws the bake, premultiplied; the floor nothing more")
 	check_equal(_stack_shown(layout), 1, "the floor's whole stack is one item drawn (one draw call)")
 	check((ground.get_node("Glow") as Sprite2D).texture == null and (ground.find_child("Underside", true, false) as Sprite2D).texture == null, "the layers' textures let go")
 	check_equal(viewport.render_target_update_mode, SubViewport.UPDATE_DISABLED, "never drawn again")

@@ -273,7 +273,7 @@ func blank_divider(view: int) -> int:
 		# A pair's twin: none toward its own pair (one pane), and toward the others the line it has
 		# with its pair, split the same way (`blank_before`; the twin rect draws its own share).
 		return 0 if view == owner else divider_between(view, owner)
-	return _stage[_slot_of[view]] * 2
+	return _stage[_slot_of[view]] * 2 * int(grid)
 
 
 ## True when the line between view `view` and the blank is split as if the blank came first (it is

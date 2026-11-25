@@ -286,15 +286,18 @@ func _show_staff(at: int) -> void:
 	var staff: StaffBase = actor.caster.staff_of(at) if actor.caster != null else null
 	var head: Texture2D = staff.head if staff != null and staff.head != null else default_head
 	if _sprite != null and head != null:
-		var stretch: Vector2 = _sprite_stretch()
+		# The dash's stretch kept; a pose's or a hit's squash is put on again by its own look.
+		var stretch: Vector2 = _dash_scale() if _dash_look else Vector2.ONE
 		_sprite.texture = head
 		_sprite.hframes = DIRECTIONS
 		_sprite.vframes = RAMPS
 		_fit_head(stretch)
+	if _face != null:
+		# A staff with no face of its own (or none on show) wears the shared sheets.
+		_face.wear_art(staff.face if staff != null else null)
 	if _face != null and staff != null:
 		_face.style = staff.face_style as Face.Style
 		_face.resting_mood = staff.resting_mood as Face.Mood
-		_face.wear_art(staff.face)
 
 
 ## The head's frame on the hand: its grip on the node's origin, measured in the sheet's own art

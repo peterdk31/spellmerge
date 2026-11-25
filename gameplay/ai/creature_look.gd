@@ -127,6 +127,9 @@ func setup(owner_actor: Actor) -> void:
 		_sprite_position = sprite.position
 		_parts.clear()
 		BodyPart.parts_of(sprite, _parts)
+		# At its art's size in the world (a body drawn at 2x detail at half: ArtDetail); the
+		# textures it swaps to are its own kind's, drawn as finely.
+		ArtDetail.fit(sprite)
 	for child in actor.get_children():
 		if child is Face:
 			_face = child as Face

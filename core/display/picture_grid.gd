@@ -28,6 +28,8 @@ const SIZE: Vector2i = Vector2i(640, 360)
 ## holds the two together); everything else reads the picture's own size (`scale_of`), so a
 ## benchmark's other picture works too.
 const PICTURE_SCALE: int = 2
+## The metadata a layer `keep_fitted` keeps its refit under.
+const FITTED_META: StringName = &"picture_grid_fitted"
 
 
 ## How many picture pixels each way one pixel of SIZE is in a picture of `picture` px: the largest
@@ -77,14 +79,28 @@ static func fit_layer(layer: CanvasLayer, full: Control = null) -> void:
 		full.size = picture / float(by)
 
 
-## `fit_layer` now and whenever its viewport's size changes (a benchmark's picture, a test's): once a
-## layer, however often it is called.
+## `fit_layer` now and whenever its viewport's size changes (a benchmark's picture, a test's), for as
+## long as the layer is in the tree: connected as it enters and let go as it leaves, so a freed layer
+## leaves nothing behind on the viewport. Once a layer, however often it is called.
 static func keep_fitted(layer: CanvasLayer, full: Control = null) -> void:
 	fit_layer(layer, full)
-	if not layer.is_inside_tree() or layer.has_meta(&"picture_grid_fitted"):
+	if layer.has_meta(FITTED_META):
 		return
-	layer.set_meta(&"picture_grid_fitted", true)
-	layer.get_viewport().size_changed.connect(func() -> void: fit_layer(layer, full))
+	var refit := func() -> void: fit_layer(layer, full)
+	var watch := func(on: bool) -> void:
+		var viewport: Viewport = layer.get_viewport()
+		if viewport == null:
+			return
+		if on and not viewport.size_changed.is_connected(refit):
+			viewport.size_changed.connect(refit)
+			fit_layer(layer, full)
+		elif not on and viewport.size_changed.is_connected(refit):
+			viewport.size_changed.disconnect(refit)
+	layer.set_meta(FITTED_META, refit)
+	layer.tree_entered.connect(watch.bind(true))
+	layer.tree_exiting.connect(watch.bind(false))
+	if layer.is_inside_tree():
+		watch.call(true)
 
 
 ## Lays `control` (a full-screen Control with no CanvasLayer of its own: the main menu) out over the

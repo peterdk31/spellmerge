@@ -38,12 +38,16 @@ static func of(texture: Texture2D) -> int:
 		return 1
 	if texture.has_meta(META):
 		return maxi(int(texture.get_meta(META)), 1)
+	# Worked out once a texture and kept as its mark: a look asks every frame it poses.
+	var detail: int = 1
 	if texture.resource_path.get_file().get_basename().ends_with(SUFFIX_2X):
-		return DETAIL
-	var atlas := texture as AtlasTexture
-	if atlas != null and atlas.atlas != null:
-		return of(atlas.atlas)
-	return 1
+		detail = DETAIL
+	else:
+		var atlas := texture as AtlasTexture
+		if atlas != null and atlas.atlas != null:
+			detail = of(atlas.atlas)
+	texture.set_meta(META, detail)
+	return detail
 
 
 ## Mark `texture` (one made in the game: a page's region, a copy) as drawn at `detail` art pixels a

@@ -158,6 +158,10 @@ func _get_minimum_size() -> Vector2:
 
 
 func _draw() -> void:
+	# Its canvas scaled since it was fitted (the HUD's layer is fitted to the picture after its
+	# children are ready, and a layer's scale tells them nothing): fitted again next.
+	if _view != null and get_global_transform_with_canvas().get_scale() != _scale:
+		_fit.call_deferred()
 	if _view != null and not is_live():
 		# The picture's pixels under this control, drawn 1:1 through its scale (a layer drawn at the
 		# picture's scale, PictureGrid: `_scale` picture pixels a layout pixel).

@@ -29,8 +29,13 @@ func test_a_layer_is_laid_out_in_layout_pixels_at_the_picture_s_scale() -> void:
 	check_equal(layer.transform, Transform2D.IDENTITY.scaled(Vector2(by, by)), "drawn at the picture's scale")
 	check_equal(full.size, root.get_visible_rect().size / float(by), "its full-screen Control the layout's size")
 	check_equal(full.position, Vector2.ZERO, "from the top left")
+	var connections: int = root.size_changed.get_connections().size()
 	PictureGrid.keep_fitted(layer, full)
-	check_equal(layer.get_meta(&"picture_grid_fitted", false), true, "kept fitted once")
+	check_equal(root.size_changed.get_connections().size(), connections, "kept fitted once")
+	layer.get_parent().remove_child(layer)
+	check_equal(root.size_changed.get_connections().size(), connections - 1, "let go as it leaves the tree")
+	root.add_child(layer)
+	check_equal(root.size_changed.get_connections().size(), connections, "and fitted again as it comes back")
 	layer.get_parent().remove_child(layer)
 
 

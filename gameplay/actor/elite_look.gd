@@ -26,6 +26,8 @@ var _stage_time: float = 0.0
 ## What it drew last: the ring's key, the sprite's corner and its flip (to redraw only on a change).
 var _drawn_texture: int = 0
 var _drawn_frame: Rect2 = Rect2()
+## A pixel of the body's art in world units (1, or a half at 2x detail: ArtDetail).
+var _pixel: float = 1.0
 var _drawn_corner: Vector2 = Vector2.INF
 var _drawn_flip: bool = false
 var _drawn_stage: int = -1
@@ -78,8 +80,10 @@ func step(delta: float) -> void:
 		_ring = found[0]
 		_ring_stages = found[1]
 		_size = frame.size
-	var corner: Vector2 = _sprite.position + _sprite.offset - (frame.size * 0.5 if _sprite.centered else Vector2.ZERO)
-	corner = corner.round()
+	# The frame's pixels are its art's (ArtDetail: half a world pixel each at 2x detail).
+	_pixel = 1.0 / float(ArtDetail.of(_sprite.texture))
+	var corner: Vector2 = _sprite.position + (_sprite.offset - (frame.size * 0.5 if _sprite.centered else Vector2.ZERO)) * _pixel
+	corner = ArtDetail.snap(corner, ArtDetail.of(_sprite.texture))
 	if changed or corner != _drawn_corner or _sprite.flip_h != _drawn_flip or _stage != _drawn_stage:
 		_drawn_texture = texture
 		_drawn_frame = frame
@@ -99,7 +103,7 @@ func _draw() -> void:
 		var pixel: Vector2 = _ring[at]
 		if _drawn_flip:
 			pixel.x = _size.x - 1.0 - pixel.x
-		draw_rect(Rect2(_drawn_corner + pixel, Vector2.ONE), COLOUR)
+		draw_rect(Rect2(_drawn_corner + pixel * _pixel, Vector2.ONE * _pixel), COLOUR)
 
 
 ## The sprite's frame now, in its texture's pixels.

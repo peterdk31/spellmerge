@@ -25,7 +25,7 @@ Each slice is its own PR, with its cards (one folder each: the `.tres` with its 
 - **New number:** `ModifierBase.wind_down_add`, seconds added to the carrier's wind-down after its factors (`wind_down_mult`), below 0 allowed. Range −1 to 1 s. The card: −0.25 s, `mana_mult` 1.5.
 - **The floor at 0 moves from the carrier to the cast** (foundations.md): a carrier's wind-down may be below 0 once its cards are read, and the cast's wind-down (its carriers' and its multicast cards' added up) is floored at 0. So in `double · quick hand · bolt · bolt` the card takes a quarter second off the whole cast, not only off its own bolt's 0.35.
 - **What it leaves alone:** the staff's own cooldown after a cycle (no card reaches it), any wind-up (a telegraph), and a payload, which adds no wind-down to its staff (so it is wasted on a payload's carrier, as Faster Casting's wind-down is).
-- **Nearest card:** Faster Casting, which halves wind-up and wind-down at once. Quick Hand takes a fixed amount off, so it is worth most on a slow cast (a Lumber bolt's 1.2 s, an overcharged slam) and stacks to nothing: two on a bolt make it 0. Mana is the brake.
+- **Nearest card:** Faster Casting, which halves wind-up and wind-down at once. Quick Hand takes a fixed amount off, so it is worth most on a slow cast (a Lumber bolt's 0.46 s, a charged slam) and stacks to nothing: two on a bolt make it 0. Mana is the brake.
 
 ### Point Blank (modifier)
 
@@ -34,6 +34,7 @@ Each slice is its own PR, with its cards (one folder each: the `.tres` with its 
 - **New number:** `ModifierBase.lifetime_most`, seconds: the longest the carrier may live, after every other life card (`lifetime_base`, `lifetime_mult`, `reach_mult`), so Slow cannot lengthen it again. 0 is none; with several, the shortest counts. Range 0 to 30 s. The card: 0.05 s (the shortest life a carrier card may have), no other number.
 - A bolt with it flies about 24 px and ends: its blast, its `on expire` and its `on hit` (if it touched a body on the way) go off at the staff's tip. Any payload becomes a melee strike (build 11). Its blast strikes its caster too, as every blast does.
 - It counts where the carrier has a life that matters (`Carrier.SPEED` or `LASTS`, as `lifetime_mult`): a rune, a pool, a familiar end almost as they are made, and a swing sweeps in a blink. A dash and a teleport are wasted: a move's time is its distance over its speed, not its life.
+- **With Hold** a carrier is kept on for as long as it is held, whatever its life (`HOLD_LIFETIME`), so Point Blank does nothing on a held carrier, as Slow does nothing there. The builder does not mark it yet, since a card's waste is judged on its carrier alone; a rule between two cards is for later.
 
 ### L1's tests
 

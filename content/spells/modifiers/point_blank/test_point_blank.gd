@@ -45,14 +45,22 @@ func test_no_life_card_lengthens_it_in_any_order() -> void:
 
 
 func test_a_shorter_life_stays_shorter() -> void:
-	# A most, never a set: a carrier already shorter keeps its own life.
-	var atom: CompiledSpell = _spell(["point_blank", "atom"])
-	check(atom.lifetime <= _card().lifetime_most + 0.0001, "an atom is capped too: %s" % atom.lifetime)
+	# A most, never a set: a carrier already shorter than the cap keeps its own life.
+	var arena := ArenaScript.new(root)
+	var card: ModifierBase = _card().duplicate() as ModifierBase
+	card.lifetime_most = 1.0
+	var compiler := StaffCompiler.new(func(id: StringName) -> SpellComponent: return card if id == &"point_blank" else arena.spells.call("_component", id))
+	var cards: Array[StringName] = [&"point_blank", &"atom"]
+	var atom: CompiledSpell = compiler.compile(cards, ArenaScript.plain_staff(2)).casts[0].group.spells[0]
+	arena.free_all()
+	check(is_equal_approx(atom.lifetime, 0.3), "an atom's 0.3 s stays under a 1 s cap: %s" % atom.lifetime)
 
 
 func test_it_works_where_life_matters() -> void:
 	check(not _wasted(["point_blank", "bolt"]).has(0), "a bolt")
 	check(not _wasted(["point_blank", "rune"]).has(0), "a rune lasts, so it ends at once")
+	check(_wasted(["point_blank", "dash"]).has(0), "a dash's time is its move's, not its life")
+	check(_wasted(["point_blank", "teleport"]).has(0), "a teleport's too")
 
 
 func test_its_blast_goes_off_at_the_tip() -> void:

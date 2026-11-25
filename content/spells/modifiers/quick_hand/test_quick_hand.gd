@@ -67,6 +67,13 @@ func test_the_floor_is_the_cast_s() -> void:
 	check(quick.wind_down > 0.0, "the other bolt still waits some")
 
 
+func test_it_takes_from_a_multicast_cast_s_sum() -> void:
+	# A multicast cast: the quarter second comes off the three bolts' wind-downs added up.
+	var plain: CompiledCast = _cast(["triple", "bolt", "bolt", "bolt"])
+	var quick: CompiledCast = _cast(["triple", "quick_hand", "bolt", "bolt", "bolt"])
+	check(is_equal_approx(quick.wind_down, maxf(plain.wind_down - 0.25, 0.0)), "%s of %s" % [quick.wind_down, plain.wind_down])
+
+
 func test_it_leaves_the_staff_s_cooldown() -> void:
 	var staff := StaffBase.new()
 	staff.id = &"slow"

@@ -1,6 +1,6 @@
 # The staff as a language: two numbers, conditions, On Any Cast
 
-**Status (2026-11-25): approved by the owner, being built (L1).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
+**Status (2026-11-25): approved by the owner. L1 built (#936); L2 built (this PR).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
 
 ## What it keeps
 
@@ -34,7 +34,7 @@ Each slice is its own PR, with its cards (one folder each: the `.tres` with its 
 - **New number:** `ModifierBase.lifetime_most`, seconds: the longest the carrier may live, after every other life card (`lifetime_base`, `lifetime_mult`, `reach_mult`), so Slow cannot lengthen it again. 0 is none; with several, the shortest counts. Range 0 to 30 s. The card: 0.05 s (the shortest life a carrier card may have), no other number.
 - A bolt with it flies about 24 px and ends: its blast, its `on expire` and its `on hit` (if it touched a body on the way) go off at the staff's tip. Any payload becomes a melee strike (build 11). Its blast strikes its caster too, as every blast does. So an enemy's AI reads such a cast as a blast on its caster (`CastSense.blast_on_caster`: a carrier that ends nearer than its own blast) and never casts it at a foe.
 - It counts where the carrier has a life that matters (`Carrier.SPEED` or `LASTS`, as `lifetime_mult`): a rune, a pool, a familiar end almost as they are made, and a swing sweeps in a blink. A dash and a teleport are wasted: a move's time is its distance over its speed, not its life.
-- **With Hold** a carrier is kept on for as long as it is held, whatever its life (`HOLD_LIFETIME`), so Point Blank does nothing on a held carrier, as Slow does nothing there. The builder does not mark it yet, since a card's waste is judged on its carrier alone; a rule between two cards is for later.
+- **With Hold** a carrier that lasts is kept on for as long as it is held, whatever its life (`HOLD_LIFETIME`), so Point Blank does nothing on it and the compiler lists it as wasted there (L2; `StaffCompiler._modifiers_on`, `held`). A held spray or swing is cast anew, each with its own life, so it still works on those.
 
 ### L1's tests
 
@@ -49,7 +49,7 @@ foundations.md calls these gates; "gate" is the portal's in the code, so the kin
 
 ### The rule
 
-A condition is a modifier with the behaviour `WHEN`: **"this cast leaves only while X; otherwise it is skipped, as a cast the pool cannot pay."** Its X is named by a new field, `ModifierBase.when_id` (`hurt`, `close`), with `behaviour_strength` its amount.
+A condition is a modifier with the behaviour `WHEN`: **"this cast leaves only while X; otherwise it is skipped, as a cast the pool cannot pay."** Its X is named by a new field, `ModifierBase.when_id` (one of `ModifierBase.WHEN_IDS`: `hurt`, `close`), with `behaviour_strength` its amount. The compiler gathers a cast's conditions into `CompiledCast.when_ids` and `when_amounts` (each name once, the strictest amount), and its words into `when_text`.
 
 - **It belongs to the whole cast,** whichever carrier of the cast's own group it lands on (it attaches to the next carrier, as every modifier does, so its tile sits on that carrier's row). Several conditions in one cast must all hold.
 - **In a payload it is wasted** (first build): a payload is not a cast and is never skipped. A condition on a payload ("on hit, if hurt, heal") is a later card.
@@ -66,21 +66,21 @@ X is read from the simulation at the press, the same on every machine:
 | `hurt` | **When Hurt**: "This cast leaves only while you are below half health." | the caster's health is below `behaviour_strength` of its most | 0.5 |
 | `close` | **When Close**: "This cast leaves only while a foe is close to you." | a foe of the caster (`Actors.is_foe`) stands within `behaviour_strength` px of its body | 96 px |
 
-- **Health:** Spells is in `core/` and does not read Combat's health. The Caster hands it, as it hands the mana: every step, and again before a press, `Spells.sense_health(actor, share)` sets a per-actor share (state in Spells, so a snapshot keeps it and the hash covers it; 1 for an actor that never told). A body with no health counts as whole.
-- **Close:** Spells asks the projectile manager for the nearest target of the caster's team's foes within the reach, from the caster's anchor (`nearest_target`, as `on near` does). The HUD and the AI ask it as often as they ask whether a staff is ready; it is one look in the target grid.
-- A new X is a row of `when_id`'s table (`ModifierBase.WHEN`) and a line in `Spells._when_holds`, never a card's script.
+- **Health:** Spells is in `core/` and does not read Combat's health. The Caster tells it, as it hands the mana: when it attaches and whenever the body's `Health.changed` fires, `Spells.sense_health(actor, share)` sets a per-actor share (state in Spells, so a snapshot keeps it and the hash covers it; 1 for an actor that never told, and again when its id is closed). A body with no health counts as whole.
+- **Close:** a foe's hit shape within the reach of the caster's anchor, by the caster's team. At the press (in the tick) Spells asks `nearest_target`, as `on near` does. Every other ask (the corner panel every drawn frame, an AI's look) goes through `ProjectileManager.has_foe_near`, a pure read of the target grid as the simulation left it, so a frame drawn between ticks changes no state (`test_when_close.gd` checks it).
+- A new X is a name in `ModifierBase.WHEN_IDS` and a line in `Spells._when_holds`, never a card's script.
 
 ### Enemy staffs
 
-A condition is a boss phase written as a card: `when hurt · nova · bolt` before a boss's plain cast opens a ring of bolts once it is below half. The AI needs nothing new (`cast_ready` reads it). No enemy's staff is changed in this milestone; which enemy gets one is the owner's (open point 4). A test enemy staff shows it in `test_when_hurt.gd`.
+A condition is a boss phase written as a card: `when hurt · nova · bolt` before a boss's plain cast opens a ring of bolts once it is below half. The AI needs nothing new (`cast_ready` reads it, and `test_ai_combos` has an enemy play both cards' combos). No enemy or boss gets one now (the owner, 2026-11-25).
 
 ### L2's tests
 
-- `test_when_hurt.gd`: a cast with it is skipped at full health and leaves below half; the panic button (`double · when hurt · shield · pulse · teleport`, then `bolt`) casts the bolt when whole and the barrier and blink when hurt; a staff of only conditioned casts fizzles and its cooldown runs; `firing_cast`, `next_cast_mana` and `cast_ready` agree with the press; the share survives a snapshot; wasted in a payload.
+- `test_when_hurt.gd`: a cast with it is skipped at full health and leaves below half; a staff of only conditioned casts fizzles; `firing_cast`, `cast_ready` and the press agree; an id closed and opened again starts whole; wasted in a payload; the builder's line and tree row. The panic button is a combo.
 - `test_when_close.gd`: skipped with no foe near, leaves with one within 96 px; a teammate does not count.
 - `test_card_rules`: a scene for `WHEN` (the open scene: the condition does not hold there, so the cast is skipped and the trace differs from the cast without it).
 - `test_content_determinism` and the snapshot tests: the new per-actor share is state.
-- Combos: `when_hurt_panic` (build 10), `when_hurt_heal` (`when hurt · mend · pulse`, then `bolt`); `when_close_slam` (a slam only when a foe is at arm's length, else a bolt), `when_close_nova`.
+- Combos: `when_hurt_panic` (build 10: a hurt wizard's barrier and blink), `when_hurt_whole` (a whole wizard's nova is skipped for the bolt after it; fails without the card); `when_close_slam` (a slam leaves for an imp at arm's length), `when_close_far` (no foe near: the nova is skipped; fails without the card).
 
 ## L3: On Any Cast
 
@@ -106,7 +106,7 @@ A card once cut for being "hard to understand" (Quicken) sets the bar: each new 
 
 - **Quick Hand:** its numbers line, as every card's: "Delay -0.25s", "Mana x1.5".
 - **Point Blank:** "Life 0.05s at most".
-- **A condition:** its numbers line says "Only when hurt" / "Only when close". The cast it is in carries the same words in the tree, after the cast's first carrier's name ("#2 Pulse · only when hurt"), and in the cast's description ("Only when hurt. ..."), so the plan says why a cast may not leave.
+- **A condition:** its numbers line says "Only when hurt" / "Only when close". The cast it is in carries the same words in the tree, after the cast's first carrier's name ("#1 Pulse, only when hurt"), and in the cast's description ("Only when hurt. ..."), so the plan says why a cast may not leave.
 - **On Any Cast:** a trigger row like the others, named by its card ("On Any Cast"); its numbers line says "On any cast".
 - Text sizes follow the HUD's scale (ART0's HUD at 2×), since the tree's rows and the card's lines are drawn by the code there is.
 

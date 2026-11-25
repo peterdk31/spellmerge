@@ -317,6 +317,9 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [DONOR]
 		ModifierBase.Behaviour.ORBIT:
 			return [CIRCLING]
+		ModifierBase.Behaviour.WHEN:
+			# A condition that does not hold (a whole wizard, no foe near) skips the cast.
+			return [OPEN]
 	return []
 
 

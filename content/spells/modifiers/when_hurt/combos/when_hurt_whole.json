@@ -1,0 +1,10 @@
+{
+	"id": "when_hurt_whole",
+	"name": "Saved for later",
+	"does": "A whole wizard's nova of bolts waits: its cast is skipped as one the pool cannot pay, and the plain bolt after it leaves instead, sparing the imp behind.",
+	"needs": "when_hurt",
+	"casts": [{"staff": 0, "cards": ["when_hurt", "nova", "bolt", "bolt"]}],
+	"imps": [[100, 0], [-100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "lost_at_most", "imps": [1], "max": 0}]
+}

@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator, outline worked out from the shape)",
-			"prompt": "A 16x16 icon for the Penta card: five small light violet orbs on a ring, each with a dot pointing in at a dark centre, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The penta icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: Five shots round a star. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/modifiers/penta/icon@2x.svg",

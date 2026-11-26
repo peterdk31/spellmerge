@@ -154,7 +154,7 @@ def slam() -> list[Part]:
     """A hammer coming down on the floor, sparks flying from the blow."""
     return [
         box(1.0, 13.4, 15.0, 15.0, bevel=0.5, material="Stone", surface="speckle"),
-        rod((8.0, 1.2), (8.0, 8.0), 0.9, material="Wood", surface="grain"),
+        rod((8.0, 1.8), (8.0, 8.0), 0.9, material="Wood", surface="grain"),
         box(3.6, 7.4, 12.4, 12.6, bevel=1.0, corner=0.6, material="Stone", glint=True),
         box(3.6, 9.4, 12.4, 10.4, bevel=0.3, material="Spark", seam=True),
         rod((2.6, 11.6), (1.2, 9.4), 0.45, material="Spark", seam=False),
@@ -634,7 +634,7 @@ def sniper() -> list[Part]:
 
 def spiral() -> list[Part]:
     """A shot's wavy path."""
-    pts = [(1.0 + i * 0.7, 8.0 - 3.0 * math.sin(i * 0.7 * 0.9)) for i in range(21)]
+    pts = [(1.8 + i * 0.62, 8.0 - 3.0 * math.sin(i * 0.62 * 1.0)) for i in range(21)]
     return [rod(pts[i], pts[i + 1], 0.7, material="Bone", seam=False) for i in range(20)]
 
 
@@ -868,10 +868,10 @@ ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
 }
 
 
-## The icons whose 1x `icon.svg` (the HUD's small one, `icon_small`) is drawn here too, from the same
-## parts at one art pixel a world unit: cards made after the 1x icons were drawn by hand, and those whose
-## 1x icon used a player's colours (docs/STYLE.md, "Palette") or showed another thing (slow's snail).
-SMALL_TOO: tuple[str, ...] = ("oil", "spill", "mend", "field", "barrier", "shield", "slow")
+## Every icon's 1x `icon.svg` (the HUD's small one, `icon_small`) is drawn here too, from the same parts
+## at one art pixel a world unit, so a card looks the same in a small cell and a big one (the owner,
+## 2026-11-26: "redraw the small 1x icons from the same parts", until the HUD is redrawn at 2x).
+SMALL_TOO: tuple[str, ...] = tuple(ICONS)
 
 
 def _small(parts: Callable[[], list[Part]]) -> Canvas:

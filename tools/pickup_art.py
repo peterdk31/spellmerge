@@ -113,7 +113,22 @@ def files() -> dict[Path, Callable[[], Canvas]]:
         "vigor": ("content/potions/vigor", vigor),
         "reward_reroll": ("content/rerolls/reward_reroll", reward_reroll),
     }
-    return {ROOT / folder / "icon@2x.svg": (lambda p=parts: sr.draw(p(), SIZE, SIZE)) for folder, parts in every.values()}
+    out: dict[Path, Callable[[], Canvas]] = {}
+    for folder, parts in every.values():
+        out[ROOT / folder / "icon@2x.svg"] = lambda p=parts: sr.draw(p(), SIZE, SIZE)
+        # Its 1x icon (`icon_small`, the HUD's small cells) from the same parts (the owner, 2026-11-26).
+        out[ROOT / folder / "icon.svg"] = lambda p=parts: _small(p)
+    return out
+
+
+def _small(parts: Callable[[], list[Part]]) -> Canvas:
+    """`parts` drawn at 1x (16 x 16): sprite_rules' detail set to 1 for the one drawing."""
+    detail = sr.DETAIL
+    sr.DETAIL = 1
+    try:
+        return sr.draw(parts(), SIZE, SIZE)
+    finally:
+        sr.DETAIL = detail
 
 
 def main(argv: list[str] | None = None) -> int:

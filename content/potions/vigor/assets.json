@@ -6,8 +6,8 @@
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
-			"tool": "Claude (hand-written SVG rects)",
-			"prompt": "A 16x16 icon of a round glass flask with a brown cork, filled with bright green liquid and a white glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tool": "tools/pickup_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The vigor icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon:  Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/potions/vigor/icon@2x.svg",

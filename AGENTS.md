@@ -8,7 +8,7 @@ Spellmerge is a 2D top-down roguelite about building deep, combinable spells, fo
 
 - Vision and pillars: [docs/DESIGN.md](docs/DESIGN.md). Nothing may contradict it.
 - The full plan: [docs/PLAN.md](docs/PLAN.md). Current milestone: [docs/ROADMAP.md](docs/ROADMAP.md).
-- Each area's contract: the `README.md` in that folder.
+- Each area's contract: the `README.md` in that folder (what it owns, its API, its rules, how to add content, its tests). Read only that. Each area's reasons, history and the owner's dated decisions are in [docs/history/](docs/history/) (`core/sim/README.md` → `docs/history/core-sim-README.md`); read it only when a question needs the reasons.
 
 ## Hard rules (checked on every PR; the merge script checks them again)
 
@@ -58,14 +58,18 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 
 ## Check before you commit
 
+Run only the tests your change touches; the PR's `godot-tests` check runs the whole unit suite on every push.
+
 ```sh
 tools/check.sh                     # the same hard rules CI runs, on your changes
-ci/build/build.sh --quick --tests  # the native module, import, smoke test and every unit test, spell validator included (downloads the pinned Godot, the native tools and the WebRTC extension once)
-ci/build/native.sh linux           # only the native module, after changing native/ (then tools/ptest.sh)
-tools/ptest.sh                     # the same unit tests in parallel, about a minute (after one build.sh --quick)
+ci/build/build.sh --quick          # the native module and the import, once (downloads the pinned Godot, the native tools and the WebRTC extension once); add --tests for every unit test
+ci/build/native.sh linux           # only the native module, after changing native/
+tools/ptest.sh                     # the whole unit suite in parallel, about a minute: only when you want it before pushing
 python3 -m unittest discover -s ci/tests -t ci   # the automation's own tests, when you change ci/
 python3 -m unittest discover -s tools            # the tools' tests (the Spell atlas data), when you change tools/ or the spell content
 ```
+
+One test file (or several): `godot --headless --path . --script res://tests/support/run.gd -- res://tests/<area>/test_<name>.gd` (tests/README.md). If you touch simulation state, also run the determinism and snapshot tests (`test_determinism.gd`, `test_content_determinism.gd`, `test_snapshot.gd`, `test_snapshot_game.gd`).
 
 `tools/check.sh` reports every problem as rule, file, line and fix. It needs git and Python 3.10+.
 

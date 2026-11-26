@@ -1,6 +1,6 @@
 # Architecture
 
-How Spellmerge is put together, and where each kind of change goes, so a new feature or a new look never needs a change in the middle of the game. The rules behind it are in [PLAN.md](PLAN.md) and the area READMEs; this page is the map.
+How Spellmerge is put together, and where each kind of change goes, so a new feature or a new look never needs a change in the middle of the game. The rules behind it are in [PLAN.md](PLAN.md) and the area READMEs (their reasons and history in [history/](history/)); this page is the map.
 
 ## Layers
 

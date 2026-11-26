@@ -2,7 +2,7 @@
 
 > A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Made in Godot 4.7 with typed GDScript only, in 32×32 pixel art. Claude, an AI, writes and maintains it; players shape it through Issues and Discussions. Links are paths relative to the repository root.
 
-Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contradict it) and the README of the area you will touch.
+Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contradict it) and the README of the area you will touch: a short contract. Its reasons and history are in docs/history/, read only when a question needs them.
 
 ## Start here
 
@@ -30,6 +30,7 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 - [docs/BACKLOG.md](docs/BACKLOG.md): ideas and future work outside the current milestone.
 - [docs/DECISIONS.md](docs/DECISIONS.md): why things were decided, newest first, so they are not reversed by accident.
 - [docs/LOG.md](docs/LOG.md): a short entry per development session, newest first.
+- [docs/history/](docs/history/): each area README's and docs/STYLE.md's full earlier text (the reasons, history and dated owner decisions), one file a README (`core/sim/README.md` → `docs/history/core-sim-README.md`); read only when a question needs the reasons.
 
 ## Operations
 

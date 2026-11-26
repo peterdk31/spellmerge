@@ -23,8 +23,9 @@ extends Sprite2D
 
 const SHADER: Shader = preload("res://gameplay/feel/cover_flat.gdshader")
 const CoverLightsScript := preload("res://gameplay/feel/cover_lights.gd")
-## The most states a flat kind's look holds (the shader's STATES).
-const STATES: int = 16
+## The most states a flat kind's look holds (the shader's STATES: ten arrays of it, 200 of the 224
+## uniform vectors a fragment shader has at the least, OpenGL ES 3).
+const STATES: int = 20
 ## Art pixels a world pixel of the look (ArtDetail, core/display/art_detail.gd): the shader works its
 ## shapes out at this detail, 64 px a 32-unit cell (the floor's look, ART0's 2x detail).
 const DETAIL: int = ArtDetail.DETAIL
@@ -168,7 +169,7 @@ func _set_looks(made: ShaderMaterial) -> void:
 			continue
 		if state.flat_trace != &"" and Palette.has(state.flat_trace):
 			traces[at] = Palette.shades_of(state.flat_trace)[0]
-		surfaces[at] = Color(float(state.flat_surface), state.flat_trace_seconds, 0.0, 0.0)
+		surfaces[at] = Color(float(state.flat_surface), state.flat_trace_seconds, float(state.flat_under_surface), 0.0)
 		if state.flat_glow != &"" and Palette.has(state.flat_glow) and state.flat_glow_strength > 0.0:
 			_glow[at] = state.flat_glow_strength
 			_glow_colour[at] = Palette.shades_of(state.flat_glow)[2]

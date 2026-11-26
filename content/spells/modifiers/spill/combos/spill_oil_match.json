@@ -1,0 +1,14 @@
+{
+	"id": "spill_oil_match",
+	"name": "Spilt oil",
+	"does": "A Spill oil bolt splashes a wide slick where it hits one imp; a fire bolt into the same imp lights it, and the imp beside it in the slick burns.",
+	"floor": true,
+	"casts": [
+		{"staff": 0, "cards": ["oil", "spill", "bolt"]},
+		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.8}
+	],
+	"imps": [[100, 0], [95, 24]],
+	"seconds": 3.0,
+	"needs": "spill",
+	"checks": [{"kind": "status", "imps": [1], "status": "burn"}]
+}

@@ -1,0 +1,14 @@
+{
+	"id": "oil_pool_spark",
+	"name": "Oil pool and a spark",
+	"does": "A wide oil pool coats the floor under an imp; a fire atom flies past it, close enough to touch the oil, and the pool goes up round the imp.",
+	"floor": true,
+	"casts": [
+		{"staff": 0, "cards": ["oil", "bigger", "pool"]},
+		{"staff": 1, "cards": ["fire", "atom"], "at": 0.5}
+	],
+	"imps": [[56, 13]],
+	"seconds": 2.5,
+	"needs": "oil",
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

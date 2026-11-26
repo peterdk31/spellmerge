@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/spill/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a Python pixel script)",
+			"prompt": "A 64x64 icon for the Spill card, at 64-px detail: a wide splash crown rising out of a broad puddle (Bone ramp, Stone light in the puddle), five drops thrown out wide, and a two-headed arrow of reach under it; 1 px Outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

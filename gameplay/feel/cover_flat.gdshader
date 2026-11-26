@@ -31,7 +31,13 @@ shader_type canvas_item;
 // of its shadow under its upper left bank, a rim of its light inside its lower right one and ripples
 // that shimmer; ICE, a raised sheet lit along its upper left edge, cracks of its shadow, a shine of its
 // light that widens where the spell light is on it (`view_light`, the light grid) and twinkles; STEAM,
-// wisps of `sparks` rising, thinning over the state's frames. `shimmer` off (the effects' Low row)
+// wisps of `sparks` rising, thinning over the state's frames; OIL, a slick lying in the floor as
+// water does, its sheen (thin streaks of its light) drifting a pixel every other shimmer frame; FIRE,
+// flame tongues of its base and `sparks` rising from each block's foot over its shadow, a new height
+// each frame of FIRE_FPS, Bone's white heat at their roots (every row: it is danger); SCORCH, soot
+// speckled with its base, cracks of its shadow, and embers of `sparks` that wink out over the state's
+// frames (docs/milestones/oil-spill.md). Under a state that grows or shrinks, `surfaces` .z is the
+// surface drawn on `unders`: WATER, OIL or SCORCH. `shimmer` off (the effects' Low row)
 // holds the ripples, the twinkles and the wisps still; a crackle plays at every row (it is the game's
 // danger).
 //
@@ -41,7 +47,7 @@ shader_type canvas_item;
 #include "res://gameplay/feel/light_views.gdshaderinc"
 
 const float CELL = 16.0;
-const int STATES = 16;
+const int STATES = 20;
 // A cell's drawn neighbours, by bit (CoverFlat.NEIGHBOURS).
 const int NB_L = 1;
 const int NB_R = 2;
@@ -58,6 +64,11 @@ const int WOBBLE_RUN = 4;
 // widens and turns white-hot (the apply rect's lit and bright steps, SpellLight.lit_steps .y, .w).
 const float SHIMMER_FPS = 6.0;
 const float WISP_FPS = 12.0;
+const float FIRE_FPS = 12.0;
+const int SURFACE_WATER = 1;
+const int SURFACE_OIL = 4;
+const int SURFACE_FIRE = 5;
+const int SURFACE_SCORCH = 6;
 const float ICE_LIT = 0.16;
 const float ICE_BRIGHT = 0.45;
 
@@ -366,16 +377,116 @@ vec4 water(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int
 	return ripple(px, t, d) ? light : base;
 }
 
+// Oil's sheen: thin streaks of its light, an art pixel tall, stepping up a pixel every 3 world px
+// along, a block of 9 x 5 world px each, half the blocks; the whole sheen drifts right an art pixel
+// every other shimmer frame.
+bool sheen(ivec2 px, int t, int d) {
+	ivec2 size = ivec2(9, 5) * d;
+	// Wrapped so it never goes below 0 (integer division truncates toward 0).
+	int period = size.x * 64;
+	ivec2 at = ivec2(px.x + period - (t / 2) % period, px.y);
+	ivec2 block = at / size;
+	ivec2 l = at - block * size;
+	uint h = pixel_hash(block, 23);
+	if (h % 2u != 0u) {
+		return false;
+	}
+	int x0 = int((h >> 4u) % uint(size.x / 2));
+	int y0 = d + int((h >> 8u) % uint(size.y - d));
+	int len = 2 * d + int((h >> 12u) % uint(3 * d));
+	int along = l.x - x0;
+	return along >= 0 && along < len && l.y == y0 - along / (3 * d);
+}
+
+// Oil's detail: a slick lies in the floor as water does (its upper left bank in its shadow, a rim of
+// its light inside its lower right one), its sheen drifting on it.
+vec4 oil(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int t, int d) {
+	if (dist <= d) {
+		return low ? light : shadow;
+	}
+	return sheen(px, t, d) ? light : base;
+}
+
+// Fire's flames: a tongue a block of 5 x 9 world px (each row of blocks shifted by its own hash), most
+// blocks lit: its middle hashed once, its height (3 to 9 world px) new every other flicker and a pixel
+// more or less every flicker, narrowing to its tip and leaning a pixel as it climbs. Its body `base`,
+// its inside `light`, its heart `heart` and its root white-hot, over `shadow` (the fire's bed) with
+// a few embers of `heart` in it.
+vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicker, int d) {
+	int w = 5 * d;
+	int tall = 9 * d;
+	int row = px.y / tall;
+	int x = px.x + int(pixel_hash(ivec2(row, 3), 41) % uint(w));
+	ivec2 block = ivec2(x / w, row);
+	ivec2 l = ivec2(x - block.x * w, px.y - row * tall);
+	uint still = pixel_hash(block, 31);
+	uint slow = pixel_hash(block + ivec2(flicker / 2 * 7, flicker / 2 * 13), 43);
+	uint fast = pixel_hash(block + ivec2(flicker * 11, flicker * 5), 47);
+	if (still % 5u == 0u) {
+		return pixel_hash(px + ivec2(flicker, 0), 53) % uint(61 * d * d) == 0u ? heart : shadow;
+	}
+	int height = 3 * d + int(slow % uint(6 * d + 1)) + (int(fast % 3u) - 1) * d;
+	int up = tall - 1 - l.y;
+	if (up >= height) {
+		return shadow;
+	}
+	int lean = (int((still >> 6u) % 3u) - 1) * up / max(3 * d, 1);
+	int cx = d + int((still >> 9u) % uint(max(w - 2 * d, 1)));
+	int half_width = (2 * d * (height - up) + height - 1) / height;
+	int off = abs(l.x - cx - lean);
+	if (off > half_width) {
+		return shadow;
+	}
+	if (up < d && off < half_width) {
+		return white_hot;
+	}
+	if (off < half_width - d / 2 && up < height / 3) {
+		return heart;
+	}
+	return off < half_width - d && up < height * 2 / 3 ? light : base;
+}
+
+// Scorch's detail: soot (`shadow`) speckled with `base`, cracks, and embers of `ember` that wink out
+// one by one over the state's frames (each its own last frame), `frame` of them.
+vec4 scorch(vec4 base, vec4 shadow, vec4 ember, ivec2 px, int frame, int d) {
+	uint h = pixel_hash(px, 37);
+	if (h % uint(97 * d * d) == 0u && int((h >> 10u) % 4u) > frame) {
+		return ember;
+	}
+	if (crack(px + ivec2(5 * d, 3 * d), d)) {
+		return shadow;
+	}
+	return h % 5u == 0u ? base : shadow;
+}
+
+// The look under a state that grows or shrinks (`surfaces` .z: WATER, OIL or SCORCH).
+vec4 under_look(int s, ivec2 px, int dist, bool low, int t, int d) {
+	int kind = int(surfaces[s].z + 0.5);
+	if (kind == SURFACE_OIL) {
+		return oil(unders[s], under_edges[s], under_lights[s], px, dist, low, t, d);
+	}
+	if (kind == SURFACE_SCORCH) {
+		return scorch(unders[s], under_edges[s], sparks[s], px, 0, d);
+	}
+	return water(unders[s], under_edges[s], under_lights[s], px, dist, low, t, d);
+}
+
 // The colour of interior pixel `px` (`dist` in from its edge, `low` its facing) of state `s`, `frame`
 // of its motion, `t` the shimmer's frame.
 vec4 surface(int s, ivec2 px, int dist, bool low, int frame, int t, int d, vec2 world) {
 	int kind = int(surfaces[s].x + 0.5);
 	int motion = int(motions[s].x + 0.5);
 	vec4 colour = fills[s];
-	if (pixel_hash(px, 0) % uint(31 * d * d) == 0u && kind != 2) {
+	if (pixel_hash(px, 0) % uint(31 * d * d) == 0u && kind != 2 && kind < SURFACE_FIRE) {
 		colour = glints[s];
 	}
-	if (kind == 1 || kind == 3) {
+	if (kind == SURFACE_OIL) {
+		colour = oil(fills[s], edges[s], glints[s], px, dist, low, t, d);
+	} else if (kind == SURFACE_FIRE) {
+		colour = flames(fills[s], edges[s], glints[s], sparks[s], px, int(floor(view_time * FIRE_FPS)), d);
+	} else if (kind == SURFACE_SCORCH) {
+		colour = scorch(fills[s], edges[s], sparks[s], px, frame, d);
+	} else if (kind == 1 || kind == 3) {
 		colour = water(fills[s], edges[s], glints[s], px, dist, low, t, d);
 	} else if (kind == 2) {
 		// Ice: a raised sheet, lit along its upper left edge.
@@ -479,7 +590,7 @@ void fragment() {
 			int under = unders[s].a > 0.0 ? edge_dist(f, side, joined, px, cell, 0, nb, d, under_low) : -1;
 			if (under >= 0) {
 				// The water under ice keeps its look while the ice grows over it or shrinks off it.
-				COLOR = under == 0 ? under_edges[s] : water(unders[s], under_edges[s], under_lights[s], px, under, under_low, t, d);
+				COLOR = under == 0 ? under_edges[s] : under_look(s, px, under, under_low, t, d);
 			} else if (kind == 3) {
 				// Steam rises off where the water was.
 				int full = edge_dist(f, side, joined, px, cell, 0, nb, d, under_low);

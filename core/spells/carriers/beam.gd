@@ -968,7 +968,7 @@ func _end_beam(at: int, finished: bool) -> void:
 	_drop_zaps(at)
 	var tip: Vector2 = _bm_tip[at]
 	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
-		kit.blast(spell, tag, actor, tip)
+		kit.land(spell, tag, actor, tip)
 		if spell.fires_on(TriggerBase.Event.EXPIRE):
 			kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, tip, _bm_tip_dir[at] if not _bm_tip_dir[at].is_zero_approx() else _bm_dir[at], null)
 	kit.shot_ended(tag)

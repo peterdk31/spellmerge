@@ -48,13 +48,16 @@ B.CHAIN:  {"any": HITS},
 B.HOLD:   {"any": LASTS, "not": MOVES_CASTER},
 B.HEAVY:  {"any": HITS, "or_cards": [B.BLAST]},
 B.PLOW:   {"any": FLIES | MOVES_ALONG},
+B.SPILL:  {"not": SPAWNS | GATES, "infused": true},
 E.BLOCK:  {"any": MEETS_SHOTS, "cards": [B.SHIELD, B.DEFLECT]},
 E.WALL:   {"any": FLIES | LINE | MOVES_ALONG, "not_cards": [B.GHOST]},
 ```
 
 A need may also name cards: `"or_cards"` stand in for the traits (what a blast strikes is the
 carrier's hit, rules R4 F2), `"cards"` must be on the carrier (or an infusion, where `"or_infused"`), and
-`"not_cards"` stop it where they work. The compiler has no case per behaviour or trigger.
+`"not_cards"` stop it where they work. A modifier's need may say `"infused": true`: it does something only with
+an infusion that counts on the carrier (Spill: an element is what touches the floor; docs/milestones/oil-spill.md).
+The compiler has no case per behaviour or trigger.
 
 From those two the compiler works out, every time a staff is built, whether a card does anything
 on a carrier: yes or no (Return needs `FLIES`; a decoy does not fly, so Return does nothing on a

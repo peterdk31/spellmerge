@@ -1,0 +1,14 @@
+{
+	"id": "oil_and_a_match",
+	"name": "Oil and a match",
+	"does": "An oil bolt bursts on one imp and coats the floor round it; a fire bolt into the same imp lights the oil, and the imp standing in it beside, which no shot touched, burns.",
+	"floor": true,
+	"casts": [
+		{"staff": 0, "cards": ["oil", "blast", "bolt"]},
+		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.8}
+	],
+	"imps": [[100, 0], [95, 24]],
+	"seconds": 3.0,
+	"needs": "oil",
+	"checks": [{"kind": "status", "imps": [1], "status": "burn"}]
+}

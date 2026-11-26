@@ -67,9 +67,9 @@ vec2 tail_coords(vec2 d) {
 }
 
 vec4 shot(vec2 uv) {
-	// The screen pixel, with +x along the flight, the core at 0, pixel centres on whole numbers.
+	// The screen pixel, with +x along the flight, the core at 0, art pixels' middles (art_centre).
 	vec2 size = vec2(LENGTH, GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - vec2(size.x - FRONT * zoom, size.y * 0.5);
+	vec2 q = art_centre(uv * size) - vec2(size.x - FRONT * zoom, size.y * 0.5);
 	int pi = int(player);
 	vec4 colour = vec4(0.0);
 	vec2 c = vec2(0.5);
@@ -147,7 +147,9 @@ vec4 shot(vec2 uv) {
 		dc.x *= 0.6;
 	}
 	float m = abs(dc.x) + abs(dc.y);
-	float tier = m < 0.5 * zoom ? (has_layer(L_PULL) ? 4.0 : 3.0) : (m < zoom + 0.5 ? 2.0 : 0.0);
+	// Half a world pixel more than on the world's grid (ART2): sampled at art pixels' middles, the
+	// heart and the cross keep their world size (a white-hot world pixel, 3 across at zoom 1).
+	float tier = m < 0.5 * zoom + 0.5 ? (has_layer(L_PULL) ? 4.0 : 3.0) : (m < zoom + 1.0 ? 2.0 : 0.0);
 	if (tier > 0.5) {
 		vec3 rgb = tier < 2.5 ? hi : (tier < 3.5 ? hot : OUTLINE);
 		colour = vec4(rgb, 1.0);

@@ -689,3 +689,13 @@ func test_a_shot_core_is_drawn_at_the_arts_detail() -> void:
 	check(fragments.find("} else if (v1.x < 1.0e6") > 0 and not fragments.contains("!speck && v1.x"), "and for a speck too")
 	var bolt: String = FileAccess.get_file_as_string("res://content/spells/carriers/bolt/bolt.gdshader")
 	check(bolt.contains("#define HEAD_BODY") and bolt.contains("#define HEAD_RAY") and bolt.find("#define HEAD_RAY") < bolt.find("#include"), "the bolt reshapes the core before it includes the head")
+
+
+## ART2: the other shot shaders work their shapes out at the middle of each art pixel (`art_centre`,
+## ART_DETAIL a world pixel, ArtDetail's), so a curve steps by the finer pixel at the same world size.
+func test_the_shot_shaders_sample_art_pixels() -> void:
+	var palette: String = FileAccess.get_file_as_string("res://core/projectiles/shot_palette.gdshaderinc")
+	check(palette.contains("const float ART_DETAIL = %d.0;" % ArtDetail.DETAIL), "ART_DETAIL is ArtDetail.DETAIL")
+	for path: String in ["shot_blast.gdshader", "shot_arc.gdshader", "shot_still.gdshader", "shot_beam.gdshaderinc", "shot_swing.gdshaderinc", "shot_portal.gdshaderinc", "shot_orbit.gdshaderinc"]:
+		var code: String = FileAccess.get_file_as_string("res://core/projectiles/" + path)
+		check(code.contains("art_centre("), "%s samples art pixels" % path)

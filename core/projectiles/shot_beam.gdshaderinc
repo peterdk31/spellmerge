@@ -123,11 +123,12 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P) {
 	float len = max(beam_length, 1.0);
 	float at = floor(along);
 	float off = off_at(along, len);
-	float x = floor((across - off) / max(cheb, 0.5) + 0.5);
+	// The lane across, in art pixels (ART_DETAIL a world pixel; ART2): a line an art pixel thin.
+	float x = floor((across - off) * ART_DETAIL / max(cheb, 0.5) + 0.5);
 	vec4 colour = vec4(0.0);
 	// As it ends it falls apart into pixels.
 	bool kept = hash(at, x + 7.0, 42.0) < beam_fade * 1.4;
-	float rim = 1.0 + floor(0.5 * beam_swell + 0.25);
+	float rim = (1.0 + floor(0.5 * beam_swell + 0.25)) * ART_DETAIL;
 	if (kept && along >= 0.0 && along <= len) {
 		if (x == 0.0) {
 			colour = vec4(has_layer(L_PULL) ? OUTLINE : hot, 1.0);
@@ -184,7 +185,7 @@ void fragment() {
 	// A piece: only the pixels on its side of each bend (the cuts), along it from its start.
 	vec4 colour = vec4(0.0);
 	vec2 P = world;
-	vec2 c = floor(P) + 0.5;
+	vec2 c = art_centre(P);
 	bool inside = dot(c - cut_lo.xy, cut_lo.zw) >= 0.0 && dot(c - cut_hi.xy, cut_hi.zw) < 0.0;
 	vec2 d = P - piece.xy;
 	float along = piece.z + dot(d, piece_way.xy);

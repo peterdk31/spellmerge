@@ -11,6 +11,8 @@ const MOST_FRAMES: int = 3600
 
 func _init() -> void:
 	pin_room = false
+	# Its results screen shows the frames' times: every frame drawn, as a player's run draws them.
+	draw_between = true
 
 
 func take() -> void:

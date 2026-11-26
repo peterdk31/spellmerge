@@ -76,7 +76,7 @@ func take() -> void:
 	root.add_child(whole)
 	lens.make_current()
 	await settle(30)
-	await RenderingServer.frame_post_draw
+	await drawn()
 	var island: Image = whole.get_texture().get_image()
 	island.resize(int(size.x * 0.5), int(size.y * 0.5), Image.INTERPOLATE_BILINEAR)
 	save(island, "hub_island")

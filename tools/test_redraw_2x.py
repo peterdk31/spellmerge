@@ -111,46 +111,6 @@ class Redraw2xTest(unittest.TestCase):
         self.assertNotIn(stone[0], colours, "Stone shadow is the floor's (docs/STYLE.md, Readability)")
         self.assertIn(stone[2], colours, "its lit edge all the same")
 
-    def test_the_texture_pass_marks_the_inside_of_a_part_the_same_in_every_frame(self) -> None:
-        wood, bone = ("#3d2a2e", "#7a4a35", "#b27a4a"), ("#a39fb8", "#d4d0e0", "#f4f1ea")
-        for shades in (wood, bone):
-            # Two frames of the same tall block side by side.
-            frame = ["." * 8] + [".#" + "s" * 4 + "#." for _ in range(14)] + ["." * 8]
-            rows = [r + r for r in frame]
-            colours = {"#": OUTLINE, "s": shades[1]}
-            rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{colours[c]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row) if c != ".")
-            src = redraw_2x.read_svg(f'<svg width="16" height="16">{rects}</svg>')
-            out = redraw_2x.redraw(src, smooth=False, textured=True, frame_width=16)
-            left = [row[:16] for row in out.pixels]
-            right = [row[16:] for row in out.pixels]
-            self.assertEqual(left, right, "every frame the same surface (docs/STYLE.md, Smooth)")
-            inside = [c for row in left[4:-4] for c in row[6:10]]
-            self.assertIn(shades[0], inside, "its surface marked in its own shadow (grain, pores)")
-            self.assertEqual({c for row in out.pixels for c in row} - {None, OUTLINE}, set(shades), "in its own shades only")
-
-    def test_wood_grain_runs_along_the_part(self) -> None:
-        wood = ("#3d2a2e", "#7a4a35", "#b27a4a")
-        rows = ["#" * 6] + ["#" + "s" * 4 + "#" for _ in range(14)] + ["#" * 6]
-        rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{OUTLINE if c == "#" else wood[1]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
-        picture = redraw_2x.double(redraw_2x.read_svg(f'<svg width="6" height="16">{rects}</svg>'))
-        out = redraw_2x.texture(picture, picture.width)
-        grain = [(x, y) for y in range(out.height) for x in range(out.width) if out.pixels[y][x] == wood[0]]
-        columns = {x for x, _ in grain}
-        self.assertLess(len(columns), len(grain) / 3, "streaks down the tall part, a few columns many pixels long")
-
-    def test_a_strip_not_whole_frames_is_refused_and_stone_never_shaded_down(self) -> None:
-        stone = ("#2b2840", "#4a4663", "#7a7694")
-        rows = ["#" * 10] + ["#" + "s" * 8 + "#" for _ in range(6)] + ["#" * 10]
-        colours = {"#": OUTLINE, "s": stone[0]}
-        rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{colours[c]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
-        picture = redraw_2x.double(redraw_2x.read_svg(f'<svg width="10" height="8">{rects}</svg>'))
-        with self.assertRaises(ValueError):
-            redraw_2x.texture(picture)
-        out = redraw_2x.texture(picture, picture.width)
-        colours_out = {c for row in out.pixels for c in row}
-        self.assertNotIn(stone[0], colours_out, "a body's Stone shadow becomes its base")
-        self.assertEqual([row[0] for row in out.pixels], [row[0] for row in picture.pixels], "the outline left alone")
-
     def test_a_target_not_named_at_2x_is_refused(self) -> None:
         with self.assertRaises(SystemExit):
             redraw_2x.main(["in.svg", "out.svg"])

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b53w1oa7m4s4w"
-path="res://.godot/imported/head@2x.svg-7fa0fc2d42409d5da4a8814031bc7e26.ctex"
+uid="uid://d2jksa77tinq6"
+path="res://.godot/imported/head_burning@2x.png-1b6f94183b0b14b0488a85fdf4d9d031.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/bosses/old_broom/head@2x.svg"
-dest_files=["res://.godot/imported/head@2x.svg-7fa0fc2d42409d5da4a8814031bc7e26.ctex"]
+source_file="res://content/bosses/old_broom/head_burning@2x.png"
+dest_files=["res://.godot/imported/head_burning@2x.png-1b6f94183b0b14b0488a85fdf4d9d031.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

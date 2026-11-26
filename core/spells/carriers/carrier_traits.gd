@@ -84,3 +84,7 @@ const MELEE: int = 1 << 29
 ## speed curve (`ModifierBase.move_start`), Plow's carry and `on wall` at a head-on wall count on it
 ## (boss plan OB10-OB12).
 const MOVES_ALONG: int = 1 << 30
+## Does it give its cards to the shots it lets go (a field, docs/milestones/field.md)? A
+## behaviour a field gives a shot names it in its need (`ModifierBase.RULES`); its own shot wears
+## none of them (`Carrier.gives_cards`).
+const GIVES: int = 1 << 31

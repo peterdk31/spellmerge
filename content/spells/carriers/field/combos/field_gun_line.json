@@ -1,0 +1,10 @@
+{
+	"id": "field_gun_line",
+	"name": "The gun line",
+	"does": "A fire field ahead catches the frost bolts fired into it and, when it ends, sends them all on at once, burning as well: Thaw on the imp beyond.",
+	"casts": [{"staff": 0, "cards": ["fire", "field"]}, {"staff": 1, "cards": ["frost", "bolt"], "at": 0.3}],
+	"imps": [[200, 0]],
+	"seconds": 4.5,
+	"needs": "field",
+	"checks": [{"kind": "reaction", "reaction": "thaw"}]
+}

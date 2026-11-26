@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-26: the field catches every shot and lets them go in one burst (owner decisions; foundations Part 2)
+
+- **The owner** (2026-11-26): build the field (docs/milestones/foundations.md, "fields"; builds 5 to 8), with its design: "A circular field (vibrating edge) that sucks in every shot to its center, which then grows and grows based on how many shots are in. Then when it ends, it fires every shot out in one big burst in the opposite direction a shot has come in. No need to keep track of each shot's position, just the angles (rough)." Any shot, anyone's (open point 4, 2026-11-25: one rule); what leaves takes the field's cards; Growth grows the field; Blast and Split work on it; its own payloads are not caught.
+- **How:** docs/milestones/field.md. A still shot that hits nothing (`ProjectileManager.set_field`); the manager's field pass (`shots_into_fields`, natively `ShotKernel.field_pass`, mirrored to the bit) hands back the shots that came into a field each step; the carrier holds each (a local stop) with its way in kept in 32 steps, draws it in, grows the field (1.5 px a shot), and at the field's end sends them all out along their ways with its cards. No most on what a field holds or how big it grows (the owner: "No limits. Lasts 3 s."), but the room's size, the most any shot is. A big burst is spread over steps, 200 shots a step, the first caught first (the owner: "If it helps performance, you can make the field emit its payload over multiple ticks"). A new carrier trait, `GIVES`.
+- **Measured** (this container, 2026-11-26): the field pass with 2048 shots and 16 fields, about 150 us a step natively (5 ms in the GDScript fallback, for a build without the module); nothing runs while no field is open.
+
 ## 2026-11-25: more detailed art: 64x64 a cell in a 1280x720 picture (owner; ART0)
 
 - **The owner** (2026-11-21, confirmed 2026-11-25): "more detailed art, 64×64 sprites at the same on-screen size, in a 1280×720 picture." The world keeps its 32-unit tiles and the simulation is untouched; 64×64 art is drawn at half size. The HUD and the font are redrawn at 2x detail at the same size on screen. Everything is redrawn in this order: players and enemies, spells and effects, rooms and props, HUD and font. The lights were made ready first (#902, #907/#926, #911, #913).

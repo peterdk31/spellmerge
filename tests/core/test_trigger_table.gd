@@ -63,8 +63,9 @@ func _expected(event: int, carrier: StringName) -> bool:
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a familiar (a decoy has a barrier), nor a
 			# portal, which passes every shot on (owner, 2026-11-05).
-			# Nor a spray, whose jet meets no shot.
-			return carrier != &"familiar" and carrier != &"portal" and carrier != &"spray"
+			# Nor a spray, whose jet meets no shot, nor a field, which only gives its guards to the shots it
+			# lets go (docs/milestones/field.md).
+			return carrier != &"familiar" and carrier != &"portal" and carrier != &"spray" and carrier != &"field"
 		E.WALL:
 			# A dash too, stopped by a wall head on (boss plan OB12); a teleport is over at once.
 			return [&"atom", &"swap", &"beam", &"dash"].has(carrier)

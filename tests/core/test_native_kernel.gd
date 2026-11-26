@@ -357,6 +357,74 @@ func test_the_trail_pass_hands_back_like_the_gdscript() -> void:
 		m.free()
 
 
+## The field pass (docs/milestones/field.md): the shots that came into a field this step, handed
+## back alike (each shot with the field it came into, in the same order), straight, circling, homing,
+## falling and stopped ones, through still, growing and circling fields, some of them overlapping,
+## and a stale row in the list passed by.
+func test_the_field_pass_hands_back_like_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	var pair: Array[ManagerScript] = []
+	for side in 2:
+		var m := ManagerScript.new()
+		m.native = side == 1
+		m.set_cap(256)
+		m.set_bounds(Rect2(Vector2(-200.0, -200.0), ROOM + Vector2(400.0, 400.0)))
+		root.add_child(m)
+		pair.append(m)
+	check(pair[1].is_native(), "the kernel runs one side")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 43
+	var fields := PackedInt32Array()
+	for n in 6:
+		var at := Vector2(rng.randf_range(100.0, ROOM.x - 100.0), rng.randf_range(100.0, ROOM.y - 100.0))
+		var radius: float = rng.randf_range(20.0, 90.0)
+		var slot: int = -1
+		for m in pair:
+			slot = m.spawn(0, at, Vector2.ZERO, 30.0, radius, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+			m.set_field(slot)
+			if n == 1:
+				m.set_growth(slot, 1.3)
+			if n == 2:
+				m.set_orbit(slot, 60.0, 0.0, 1.5, at)
+		fields.append(slot)
+	# Stale rows: a slot past the shots, and the first plain shot's (a live shot that is no field).
+	fields.append(250)
+	fields.append(fields[fields.size() - 2] + 1)
+	var handed: int = 0
+	for step in 150:
+		if step % 2 == 0:
+			var from := Vector2(rng.randf_range(0.0, ROOM.x), rng.randf_range(0.0, ROOM.y))
+			var velocity := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(20.0, 700.0)
+			var kind: int = rng.randi() % 5
+			for m in pair:
+				var slot: int = m.spawn(0, from, velocity, 2.0, 4.0, ManagerScript.LAYER_ENEMY)
+				if slot < 0:
+					continue
+				if kind == 1:
+					m.set_homing(slot, 3.0, 150.0)
+				if kind == 2:
+					m.set_floor(slot, from.y + 80.0)
+				if kind == 3:
+					m.set_orbit(slot, 50.0, 0.0, 2.0, from)
+				if kind == 4:
+					m.freeze_shot(slot, 0.2)
+		for m in pair:
+			m.step(DT)
+		var found: Array[int] = []
+		for m in pair:
+			found.append(m.shots_into_fields(fields, fields.size()))
+		check_equal(found[1], found[0], "step %d: as many handed back" % step)
+		for n in mini(found[0], found[1]):
+			check_equal(pair[1].field_shot(n), pair[0].field_shot(n), "step %d: the same shot %d" % [step, n])
+			check_equal(pair[1].field_of(n), pair[0].field_of(n), "step %d: into the same field %d" % [step, n])
+		handed += found[0]
+	check(handed > 20, "shots came into fields (%d)" % handed)
+	check_equal(pair[1].shots_into_fields(fields, fields.size()), pair[1]._pass_fields(fields, fields.size()), "the kernel and the GDScript agree on the kernel's side's last step")
+	for m in pair:
+		m.free()
+
+
 ## The merged scene reached the kernel's own merging: shots whose hits it merged itself, among the
 ## ones handed back to GDScript.
 func _check_the_kernel_merged() -> void:

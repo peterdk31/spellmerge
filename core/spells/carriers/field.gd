@@ -23,21 +23,29 @@ const WAYS: int = 32
 const GROW_PER_SHOT: float = 1.5
 ## A held shot is drawn in to the middle by this share of the way left each step.
 const DRAW_IN: float = 0.2
+## The most shots a burst lets go in one step (the owner, 2026-11-26: a big burst may take a few
+## ticks): a field holding more lets them go over the next steps, in the order it caught them, all
+## from its middle, so it still reads as one burst. About 1 ms of a step at this count
+## (`tests/core/test_field_budget.gd`).
+const BURST_PER_STEP: int = 200
 ## How far short of a wall a field cast at one lies (pixels).
 const WALL_GAP: float = 2.0
 
 ## Not state: scratch, refilled before every use (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_fields_now"]
 
-## The live fields: each one's slot, its shot's birth (`ProjectileManager.get_seq_of`), where its
-## middle is (kept each step, for the burst after its shot is gone), its card's radius and how many
-## shots it holds (for its burst's look), in the order they were cast. A row whose slot ended, or holds another shot, lets
-## its shots go at the next step and is dropped.
+## The live fields: each one's slot, its shot's birth (`ProjectileManager.get_seq_of`), its spell
+## (what its burst gives), where its middle is (kept each step, for the burst after its shot is
+## gone), its card's radius, how many shots it holds (for its burst's look) and whether it is
+## bursting, in the order they were cast. A row whose slot ended, or holds another shot, bursts from
+## the next step on (BURST_PER_STEP shots a step) and is dropped once it holds none.
 var _fd_slot: PackedInt32Array = PackedInt32Array()
 var _fd_seq: PackedInt64Array = PackedInt64Array()
+var _fd_spell: Array[CompiledSpell] = []
 var _fd_at: PackedVector2Array = PackedVector2Array()
 var _fd_radius: PackedFloat32Array = PackedFloat32Array()
 var _fd_held: PackedInt32Array = PackedInt32Array()
+var _fd_bursting: PackedByteArray = PackedByteArray()
 ## The held shots: each one's slot and birth, the birth of the field that holds it, and the way it
 ## came in (0 to WAYS - 1, round from east).
 var _hd_slot: PackedInt32Array = PackedInt32Array()
@@ -110,9 +118,11 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 	var lies: Vector2 = kit.projectiles.get_position_of(slot)
 	_fd_slot.append(slot)
 	_fd_seq.append(seq)
+	_fd_spell.append(spell)
 	_fd_at.append(lies)
 	_fd_radius.append(spell.radius)
 	_fd_held.append(0)
+	_fd_bursting.append(0)
 	if kit.events != null:
 		kit.set_cue_tag(tag)
 		kit.events.carrier_shown.emit(actor, spell.carrier_card_id, lies, heading, spell.radius, spell.tint, spell.look)
@@ -145,31 +155,40 @@ func step(_delta: float) -> void:
 	if _fd_slot.is_empty():
 		return
 	for n in _fd_slot.size():
-		_fd_at[n] = kit.projectiles.get_position_of(_fd_slot[n])
+		if _fd_bursting[n] == 0:
+			_fd_at[n] = kit.projectiles.get_position_of(_fd_slot[n])
 	_draw_in()
+	# A bursting field catches nothing more (its slot may hold another shot already).
 	_fields_now.resize(_fd_slot.size())
 	for n in _fd_slot.size():
-		_fields_now[n] = _fd_slot[n]
+		_fields_now[n] = _fd_slot[n] if _fd_bursting[n] == 0 else -1
 	var found: int = kit.projectiles.shots_into_fields(_fields_now, _fields_now.size())
 	for i in found:
 		_take(kit.projectiles.field_shot(i), kit.projectiles.field_of(i))
 
 
-## Every row whose field ended (its slot dead or holding another shot) lets its shots go in one burst
-## from where its middle was, and goes.
+## Every row whose field ended (its slot dead or holding another shot) bursts: from its middle as it
+## was, BURST_PER_STEP of its shots a step, until it holds none and goes.
 func _burst_ended() -> void:
 	var i: int = 0
 	while i < _fd_slot.size():
-		var slot: int = _fd_slot[i]
-		if kit.projectiles.is_alive(slot) and kit.projectiles.get_seq_of(slot) == _fd_seq[i]:
+		if _fd_bursting[i] == 0:
+			var slot: int = _fd_slot[i]
+			if kit.projectiles.is_alive(slot) and kit.projectiles.get_seq_of(slot) == _fd_seq[i]:
+				i += 1
+				continue
+			_fd_bursting[i] = 1
+			_burst_look(i)
+		if _burst(i, BURST_PER_STEP) > 0:
 			i += 1
 			continue
-		_burst(i)
 		_fd_slot.remove_at(i)
 		_fd_seq.remove_at(i)
+		_fd_spell.remove_at(i)
 		_fd_at.remove_at(i)
 		_fd_radius.remove_at(i)
 		_fd_held.remove_at(i)
+		_fd_bursting.remove_at(i)
 
 
 ## The shot `shot` came into field row `row`: held where it is (its life waits until the burst),
@@ -194,16 +213,16 @@ func _take(shot: int, row: int) -> void:
 	_shown(&"field_through", at, going, manager.get_radius_of(shot), field)
 
 
-## Every held shot moves DRAW_IN of the way left to its field's middle (it is held, so it hits nothing
-## on the way).
+## Every held shot of a field that is not bursting moves DRAW_IN of the way left to its field's middle
+## (it is held, so it hits nothing on the way).
 func _draw_in() -> void:
 	var manager := kit.projectiles
 	for h in _hd_slot.size():
+		var row: int = _fd_seq.find(_hd_field[h])
+		if row < 0 or _fd_bursting[row] != 0:
+			continue
 		var shot: int = _hd_slot[h]
 		if not manager.is_alive(shot) or manager.get_seq_of(shot) != _hd_seq[h]:
-			continue
-		var row: int = _fd_seq.find(_hd_field[h])
-		if row < 0:
 			continue
 		var at: Vector2 = manager.get_position_of(shot)
 		var to: Vector2 = at.lerp(_fd_at[row], DRAW_IN)
@@ -213,17 +232,21 @@ func _draw_in() -> void:
 			manager.pass_shot(shot, to, manager.get_velocity_of(shot))
 
 
-## Field row `row` bursts: every shot it holds leaves from its middle the way it came in, at the speed
-## it had, and takes the field's cards (`_give`). Its look (`field_burst`). The held rows are walked
-## once, the rest kept in their order.
-func _burst(row: int) -> void:
+## Field row `row` lets go of up to `most` of the shots it holds, the first it caught first: each
+## leaves from its middle the way it came in, at the speed it had, and takes the field's cards
+## (`_give`). Returns how many it still holds. The held rows are walked once, the rest kept in their
+## order.
+func _burst(row: int, most: int) -> int:
 	var manager := kit.projectiles
-	var spell: CompiledSpell = kit.spell_of(manager.get_tag_of(_fd_slot[row])) if manager.get_seq_of(_fd_slot[row]) == _fd_seq[row] else null
+	var spell: CompiledSpell = _fd_spell[row]
 	var at: Vector2 = _fd_at[row]
 	var released: int = 0
+	var left: int = 0
 	var kept: int = 0
 	for h in _hd_slot.size():
-		if _hd_field[h] != _fd_seq[row]:
+		if _hd_field[h] != _fd_seq[row] or released >= most:
+			if _hd_field[h] == _fd_seq[row]:
+				left += 1
 			_hd_slot[kept] = _hd_slot[h]
 			_hd_seq[kept] = _hd_seq[h]
 			_hd_field[kept] = _hd_field[h]
@@ -244,9 +267,16 @@ func _burst(row: int) -> void:
 	_hd_seq.resize(kept)
 	_hd_field.resize(kept)
 	_hd_way.resize(kept)
-	if released > 0 and kit.events != null:
-		var tint: Color = spell.tint if spell != null else Color.WHITE
-		kit.events.cue_shown.emit(-1, &"field_burst", at, Vector2.RIGHT, _fd_radius[row] + GROW_PER_SHOT * float(released), tint, 0)
+	return left
+
+
+## Field row `row` begins to burst: its look (`field_burst`), as big as it grew.
+func _burst_look(row: int) -> void:
+	if _fd_held[row] <= 0 or kit.events == null:
+		return
+	var spell: CompiledSpell = _fd_spell[row]
+	var tint: Color = spell.tint if spell != null else Color.WHITE
+	kit.events.cue_shown.emit(-1, &"field_burst", _fd_at[row], Vector2.RIGHT, _fd_radius[row] + GROW_PER_SHOT * float(_fd_held[row]), tint, 0)
 
 
 ## The shot in `shot` leaves the field of `field`: it takes the field's cards, at least the field's of
@@ -308,9 +338,11 @@ func _shown(cue: StringName, at: Vector2, way: Vector2, size: float, field_slot:
 func clear() -> void:
 	_fd_slot.resize(0)
 	_fd_seq.resize(0)
+	_fd_spell.clear()
 	_fd_at.resize(0)
 	_fd_radius.resize(0)
 	_fd_held.resize(0)
+	_fd_bursting.resize(0)
 	_hd_slot.resize(0)
 	_hd_seq.resize(0)
 	_hd_field.resize(0)
@@ -324,7 +356,8 @@ static func of(spells: SpellRuntime) -> CarrierField:
 	return spells.carrier(&"field") as CarrierField
 
 
-## How many fields are open now, and how many shots they hold.
+## How many fields are open now (a bursting one counts until it has let all its shots go), and how
+## many shots they hold.
 func field_count() -> int:
 	return _fd_slot.size()
 

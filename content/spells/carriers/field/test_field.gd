@@ -214,3 +214,22 @@ func test_a_field_holds_every_shot_and_grows_to_the_room_at_most() -> void:
 	check(radius <= maxf(pm.room_size(), FIELD.radius) + 0.01, "never past the room's size (%.1f)" % radius)
 	_arena.run(FIELD.lifetime)
 	check_equal(_fields().held_count(), 0, "its burst let every one go")
+
+
+func test_a_big_burst_is_spread_over_steps_from_its_middle() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	var many: int = CarrierField.BURST_PER_STEP * 2 + 10
+	for n in many:
+		pm.spawn(0, centre - Vector2(FIELD.radius + 5.0, 0.0), Vector2(300.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
+	_arena.run(0.3)
+	check_equal(_fields().held_count(), many, "all held")
+	pm.remove_by_tag(pm.get_tag_of(_fields().field_slot(0)))
+	var left: Array[int] = []
+	for step in 4:
+		_arena.run(STEP)
+		left.append(_fields().held_count())
+	check_equal(left, [many - CarrierField.BURST_PER_STEP, many - CarrierField.BURST_PER_STEP * 2, 0, 0] as Array[int], "it lets them go a share a step, the first caught first")
+	check_equal(_fields().field_count(), 0, "and goes once it holds none")

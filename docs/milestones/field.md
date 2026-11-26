@@ -64,6 +64,7 @@
 - **It grows** 1.5 px of radius a shot caught (`GROW_PER_SHOT`), with no most but the room's size, the most any shot is (as Growth keeps it): at that a field covers the room, catches all that moves in it, and is drawn clipped by the screen. Growth grows it further over time. A wider field catches more.
 - **The burst:**
   - when: the step after its shot ends (its life out, switched off, its caster gone);
+  - spread over steps when it is big (the owner, 2026-11-26: "If it helps performance, you can make the field emit its payload over multiple ticks"): at most 200 a step (`BURST_PER_STEP`), the first caught first, all from its middle as it was, so a field of 2000 bursts over 10 steps (a sixth of a second) and still reads as one burst; a bursting field catches nothing more, and goes once it holds none;
   - every shot it holds leaves from its middle (just outside its own radius) along its kept way, at the speed it had;
   - each is let go (`release_shot`) and takes the field's cards;
   - a shot that circled (an orbit) is let go where it is.
@@ -90,7 +91,7 @@
 - The GDScript stays as the reference and the fallback.
 - `tests/core/test_native_kernel.gd` compares the two to the bit: the pairs and their order, on straight, circling, homing, falling and stopped shots, through still, growing and circling fields, with stale rows in the list.
 
-Nothing runs while no field is open. Holding, drawing in and the burst are GDScript: measured, a field holding 500 shots takes 0.4 ms a step and 2.7 ms to burst, one holding 2000 takes 1.8 ms a step and 10.5 ms to burst (its burst is one step: each shot set up with its cards), held by the same test.
+Nothing runs while no field is open. Holding, drawing in and the burst are GDScript. Measured, held by the same test: a field holding 500 shots takes 0.5 ms a step; one holding 2000 takes 1.8 ms a step. Its burst took 10.5 ms in one step before it was spread over steps, and now takes about 1.4 ms at most a step over 10 steps.
 
 `tests/core/test_field_budget.gd` holds the cost: 2048 shots against 16 fields a step, natively within its budget (about 150 us a step measured; the GDScript fallback's 5 ms is printed, not held). It is printed as `BUDGET:` lines.
 
@@ -114,6 +115,7 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
   - a shot keeps more of a card than the field gives;
   - a shot through it in one step is caught;
   - every shot is held, with no most, and the field grows to the room's size at most;
+  - a big burst is spread over steps, a share a step, the first caught first;
   - its own shot wears none of its cards but Growth;
   - its own payload is not caught;
   - an enemy shot with a shield or deflect leaves the field be.

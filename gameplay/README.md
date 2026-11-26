@@ -2,109 +2,110 @@
 
 ## Purpose
 
-The rules of the game, in 13 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `items` (what lies on the ground, items I6), `cover` (the ground cover's game: fire, frost and what it does to bodies, ground cover GC5), `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
+The rules of the game, in 13 sub-areas: `actor` (the shared body kit), `player`, `combat`, `feel`, `coop`, `ai`, `items`, `cover`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
 - **Entry script:** `gameplay/<area>/<area>.gd`. Other code uses only that script and the area's events.
-- **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events. The one stated exception is the actor kit: every area may use the public scripts of `gameplay/actor` (see its README).
-- **Events:** `core/events` owns the event definitions. A sub-area README only lists which events the area sends and which it listens to, and each event has exactly one sender. The lists must match `core/events/events.gd` and the table below.
-- **Actors and seats:** what acts (casts, is hit, moves) is keyed by its actor id (`core/actors`, actors G3); a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Caster-keyed events name the actor id (`caster`), seat-keyed ones the seat (`player`); see `core/events/events.gd`. Nothing assumes a single player, and nobody ever waits for another player.
+- **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events. The one exception: every area may use the public scripts of `gameplay/actor`.
+- **Events:** `core/events` owns the definitions. A sub-area README lists only the events its area sends and listens to; each event has exactly one sender. The lists must match `core/events/events.gd` and the table below.
+- **Actors and seats:** what acts is keyed by its actor id (`core/actors`); a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Caster-keyed events name the actor id (`caster`, `NO_PLAYER` for none), seat-keyed ones the seat (`player`). Nothing assumes a single player; nobody waits for another player.
+- **Simulation:** every script under `gameplay/` but `feel/` is simulation (AGENTS.md; core/sim/README.md): no clock, dice or `_process` of its own; join the tick.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
 
 ## Events at a glance
 
-One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. Since actors G3b every caster-keyed event names the actor id as `caster` (`NO_PLAYER` only where no actor did it), and `wizard_hurt` is `actor_hurt` (the victim's actor id); the HUD, devices, builder, stats, downed and joined events stay keyed by seat (`player`). The event names and senders match `core/events/events.gd`; the listener column is kept by hand, because `events.gd` records only the HUD's receivers. The per-area lists must match this table.
+One table for all sub-areas, so "each event has exactly one sender" is checked in one place. Names and senders match `core/events/events.gd`; the listener column is kept by hand. The per-area lists must match it. A HUD row is a player-intent request (a command where marked); the area checks it and announces the result as a state event.
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
 | `device_joined`, `device_left` | `core/input` | the frames service (`core/sim`) |
 | `seat_joined`, `seat_left` | the frames service (`core/sim`) | `coop` |
 | `spell_cast` | `player` | `feel` |
-| `actor_cast` | `actor` (the Caster, every actor's cast; actors G8) | nobody yet (a body's cast movement is its carrier's `staff_pose`, drawn by its look) |
-| `staff_shown` | `actor` (the Caster, another staff put on show; living staffs H4) | `feel` (the poof) |
+| `actor_cast` | `actor` (the Caster) | nobody yet |
+| `staff_shown` | `actor` (the Caster) | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `carrier_shown` | `core/spells` | `feel` |
-| `aim_locked` | `ai` (an enemy's AI stops following its target with the cast it winds up: its profile's `aim_lock`; boss plan OB14) | `feel` (a beat on the cast's lane) |
-| `projectile_expired` | `core/projectiles` | `core/spells` (on expire), `feel` |
-| `build_refused` | `player` | `hud` (the builders) |
-| `bag_changed` | `player` | `hud` (the builders) |
-| `staff_cards_requested` | `hud` (the radial builder) | `player` |
-| `staff_hand_requested`, `bag_drop_requested` | `hud` (the inventory; commands, items I7) | `player` |
-| `bag_use_requested` | `hud` (the inventory: a potion drunk; a command, the owner's of 2026-11-19) | `player` |
-| `quick_bind_requested` | `hud` (the inventory's d-pad on a usable item: binds that arm's quick-use slot; a command, the owner's of 2026-11-20) | `player` |
-| `quick_use_requested` | `hud` (a d-pad arm in play, the Y map not held: one of the item bound there used; a command) | `player` |
-| `quick_bound` | `player` (what each quick-use slot of the body a seat shows is bound to, after `inventory_announced` and on every change) | `hud` (the corner panel's cross, the inventory) |
-| `item_recharging` | `player` (an item of the body a seat shows recharges after a use, an active relic's cooldown: seconds left of the whole, at its start, after `inventory_announced` and 0 when ready) | `hud` (the cross's and the ring's fill) |
-| `inventory_refused` | `player` | `hud` (the inventory's note) |
-| `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
-| `staff_changed` | `player` | `hud` (the builders) |
-| `staff_cast` | `player` | nobody now (Feel sounds every cast on `cast_left`) |
-| `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
-| `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
-| `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |
-| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells` (`walled`: a wall ended it, so its `on wall` fires; boss plan OB12) |
+| `aim_locked` | `ai` | `feel` |
+| `projectile_expired` | `core/projectiles` | `core/spells`, `feel` |
+| `build_refused` | `player` | `hud` |
+| `bag_changed` | `player` | `hud` |
+| `staff_cards_requested` | `hud` | `player` |
+| `staff_hand_requested`, `bag_drop_requested` | `hud` (commands) | `player` |
+| `bag_use_requested` | `hud` (a command) | `player` |
+| `quick_bind_requested` | `hud` (a command) | `player` |
+| `quick_use_requested` | `hud` (a command) | `player` |
+| `quick_bound` | `player` | `hud` |
+| `item_recharging` | `player` | `hud` |
+| `inventory_refused` | `player` | `hud` |
+| `inventory_announced` | `player` | `hud` |
+| `staff_changed` | `player` | `hud` |
+| `staff_cast` | `player` | nobody now |
+| `caster_move_requested` | `core/spells` | `actor` (the Mover) |
+| `mana_reserved` | `core/spells` | none |
+| `mana_refund_requested` | `core/spells` | `actor` (the Caster) |
+| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` | `ai`; `target_move_requested` also `actor` (the Mover) |
+| `caster_move_finished` | `actor` (the Mover) | `core/spells` |
 | `entity_ended` | `ai` (Entities) | `core/spells` |
-| `shot_blocked` | `core/projectiles` | `core/spells` (on block) |
-| `barrier_changed` | `combat` (a barrier given, grown, blocking, run out or cleared) | `feel` (the barrier's bubble) |
-| `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` (for every actor: `actor_hurt` and `shield_blocked` name the hurt or shielded actor) | `core/spells` (on block, on kill, on hurt, on reaction) |
+| `shot_blocked` | `core/projectiles` | `core/spells` |
+| `barrier_changed` | `combat` | `feel` |
+| `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel` |
-| `wizard_shield_requested`, `pull_requested` | `core/spells` (staffs B2) | `combat` |
-| `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
-| `carry_ended` | `core/spells` (Plow, boss plan OB11) | `combat` (the pin or the shove), `actor` (the Mover of the body that carried it, for its own id: a pin ends its dash) |
-| `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
+| `wizard_shield_requested`, `pull_requested` | `core/spells` | `combat` |
+| `possess_requested` | `core/spells` | `actor` (`Possession.begin`) |
+| `carry_ended` | `core/spells` (Plow) | `combat`, `actor` (the Mover) |
+| `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
-| `status_applied` | `combat` | `feel` (an actor's own components hear its `Actor.status_gained`, and a reaction on it its `Actor.reacted`, which Combat sends with them) |
-| `cast_left` | `core/spells` (a cast leaving, before its shots) | `actor` (a prop's `PropStateTriggers`, for its `cast` triggers), `feel` (the staff's cast cue, the cast's carrier sounds and infusion hints) |
-| `prop_state_changed` | `actor` (a prop's `PropStateTriggers`, props W6) | none yet (tests; a prop's own look hears its component directly) |
-| `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow`, `rewards` (its coins) |
+| `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only) |
+| `status_applied` | `combat` | `feel` |
+| `cast_left` | `core/spells` | `actor` (`PropStateTriggers`), `feel` |
+| `prop_state_changed` | `actor` (`PropStateTriggers`) | none yet |
+| `enemy_died` | `combat` | `feel`, `flow`, `rewards` |
 | `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
-| `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |
+| `player_stats_changed` | `player` | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
-| `run_begun` | `flow` (a run begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's biome map for them) |
-| `run_room_filled` | `run` (each room's fight of the run's biome map: its enemies, its scale, its pace; connected biomes CB8; before `run_biome_chosen`) | `flow` (the room's `RoomFight`) |
-| `run_biome_chosen` | `run` (the run's biome map, a copy; connected biomes CB8) | `flow` (lays it and plays it) |
-| `run_room_scaled` | `flow` (how much harder the room a fight stands in is: its depth and the run's players, `run_room_filled`'s scale; before each of its enemies stands) | `difficulty` (the level) |
-| `enemy_standing` | `flow` (an enemy or boss body about to stand, not yet in the tree) | `difficulty` (scales it to the room: `Actor.stat_scale`) |
-| `adds_requested` | `actor` (a body's `Phases`: its phase's burst or a wave of adds; boss plan OB13) | `flow` (stands them, for a body it stood) |
-| `crumble_requested` | `flow` (an add whose caller died; boss plan OB13) | `combat` (it dies with no hit, nobody's kill) |
-| `gather_door_shown` | `flow` (a biome's gather door, gate or portal home: who is gathered at it, held, open; connected biomes CB7) | `feel` (its bars, lamps and portal) |
-| `room_left` | `flow` (a world goes: a biome's, `Events.ALL_ROOMS`; the hub's, `FIRST_ROOM`) | `core/spells` (what was cast in the room ends quietly) |
-| `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `rewards` (a new world clears the coins), `feel` (its walls' colours for motes; the party camera jumps to the new room) |
-| `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover_rooms.gd`, a `cover.gd` a piece) and `cover` (GC5): each piece's cover worked out from its layout at its place, mirrored with it, `CoverLayout.of_piece` (connected biomes CB3b) |
-| `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5; with the spell's tag, so the cells it moves remember who lit them, docs/milestones/floor.md) | `cover` (the `element` triggers of the cells inside its circle, at its next step), `flow` (a secret rock of that element breaks, connected biomes CB11), `feel` (a secret rock's crack brightens) |
-| `floor_passed` | `core/spells` (once a tick: every elemental shot entering a new cell, a beam's end, a dash's way, a swing's tip; docs/milestones/floor.md) | `cover` (the one cell under each, at its next step) |
-| `cover_changed` | `cover` (each tick's changes of one room, by its number; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look of that room) |
-| `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is, as the cell's lighter's) | `combat` |
-| `floor_strike_requested` | `cover` (a body standing in cover that strikes: live water, docs/milestones/floor.md; as the cell's lighter's) | `combat` (a spell's hit of that element), `core/spells` (a Siphon on the lighter's spell refunds) |
+| `run_begun` | `flow` | `run` |
+| `run_room_filled` | `run` | `flow` |
+| `run_biome_chosen` | `run` | `flow` |
+| `run_room_scaled` | `flow` | `difficulty` |
+| `enemy_standing` | `flow` | `difficulty` |
+| `adds_requested` | `actor` (`Phases`) | `flow` |
+| `crumble_requested` | `flow` | `combat` |
+| `gather_door_shown` | `flow` | `feel` |
+| `room_left` | `flow` | `core/spells` |
+| `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `rewards`, `feel` |
+| `room_built` | `flow` | `feel`, `cover` |
+| `floor_touched` | `core/spells` | `cover`, `flow`, `feel` |
+| `floor_passed` | `core/spells` | `cover` |
+| `cover_changed` | `cover` | `feel` |
+| `status_requested` | `core/spells`, `cover` | `combat` |
+| `floor_strike_requested` | `cover` | `combat`, `core/spells` |
 | `room_cleared` | `flow` | `run` |
-| `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table, among items of the room's reward type; each seat's reward item at its spot) |
-| `special_room_opened` | `flow` (a shop or a fountain entered the first time: its shelf's spots and reroll sign, or its pool; CB11) | `rewards` (stocks the shelf, fills the pool) |
-| `key_door_shown`, `secret_rock_shown`, `key_shown` | `flow` (a biome's key doors, secret rocks and keys; CB11) | `feel` (`lock_looks.gd`, `special_room_looks.gd`) |
-| `secret_rune_shown` | `flow` (a biome's secret runes: where each end lies, its element, found; the owner, 2026-11-20) | `feel` (`rune_looks.gd`) |
-| `shelf_changed`, `fountain_changed` | `rewards` (a shop's items, a fountain's pool; CB11) | `feel` (`special_room_looks.gd`; `fountain_changed` also `room_hearing.gd`: a fountain's done look once dry) |
-| `rooms_seen` | `flow` (the party's map: each room unseen, shown or entered; again after a restore; connected biomes CB9) | `feel` (the dark over the unvisited rooms, the held Y map) |
-| `rooms_cleared`, `rooms_opened` | `flow` (the rooms cleared, `RoomLife.CLEARED`, and the locked rooms opened, `LockDoors.opened`; again after a restore) | `feel` (the done look of the doorway signs and the held Y map, a secret room's sign once found, `room_hearing.gd`) |
-| `rooms_rewards_left` | `rewards` (the rooms with a clear due or a reward item lying; again after a restore) | `feel` (a reward, treasure or secret room's done look) |
+| `room_rewards_due` | `flow` | `rewards` |
+| `special_room_opened` | `flow` | `rewards` |
+| `key_door_shown`, `secret_rock_shown`, `key_shown` | `flow` | `feel` |
+| `secret_rune_shown` | `flow` | `feel` |
+| `shelf_changed`, `fountain_changed` | `rewards` | `feel` |
+| `rooms_seen` | `flow` | `feel` |
+| `rooms_cleared`, `rooms_opened` | `flow` | `feel` |
+| `rooms_rewards_left` | `rewards` | `feel` |
 | `door_voted` | `flow` | none yet |
-| `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
-| `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |
+| `difficulty_changed` | `difficulty` | none yet |
+| `reward_rolled`, `rewards_waiting_changed` | `rewards` | `hud` |
 | `reward_taken` | `rewards` | none yet (tests) |
-| `reward_refused` | `rewards` (a pick that could not be given: the offer stays) | `hud` (the reward menu opens again, saying why) |
-| `reward_rerolled` | `rewards` (an offer rerolled: one reward reroll spent, its new choices; the owner's of 2026-11-19) | `hud` (the menu turns its cards over) |
-| `reward_reroll_refused` | `rewards` (none held: nothing spent) | `hud` (the menu's title says so) |
-| `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
-| `item_picked_up` | `rewards`, `items`, `flow` (an actor picked up an item: a coin, a key, a bought or ground item, a reward) | `feel` (each kind's pickup sound) |
-| `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
-| `health_gift_requested` | `rewards` (a fountain's draw), `player` (a potion drunk) | `combat` (it keeps an actor's health) |
+| `reward_refused` | `rewards` | `hud` |
+| `reward_rerolled` | `rewards` | `hud` |
+| `reward_reroll_refused` | `rewards` | `hud` |
+| `coin_changed` | `rewards` | `feel` |
+| `item_picked_up` | `rewards`, `items`, `flow` | `feel` |
+| `run_stats_ruled` | `run` | `rewards` |
+| `health_gift_requested` | `rewards`, `player` | `combat` |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
 | `hub_requested` | HUD | `flow`, `core/input` |
@@ -112,41 +113,41 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `start_stone_changed` | `flow` | `hud`, `feel` |
 | `staff_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
-| `reward_reroll_requested` | HUD (X in the reward picker; a command) | `rewards` |
-| `map_teleport_requested` | HUD (A on a room picked on the open Y map; a command; the owner's of 2026-11-19) | `flow` |
-| `map_pick_changed` | HUD (the room picked on a seat's open Y map; view only) | `feel` (its outline on that map) |
-| `map_frame_shown` | `feel` (a seat's map frame and whether it is fully open, as either changes; view only) | `hud` (the map's legend) |
-| `teleport_rooms_shown` | `flow` (the cleared rooms a seat's wizard may teleport to, as it changes; view only) | `hud` (the map picker) |
-| `wizard_teleported` | `flow` (a wizard teleported from the map: where it left, where it stands) | `feel` (the stepped vanish where it left) |
-| `join_held` | `flow` (a seat that joined after the party left the start room waits for the run's end; view only) | `hud` (its corner panel says why) |
+| `reward_reroll_requested` | HUD (a command) | `rewards` |
+| `map_teleport_requested` | HUD (a command) | `flow` |
+| `map_pick_changed` | HUD (view only) | `feel` |
+| `map_frame_shown` | `feel` (view only) | `hud` |
+| `teleport_rooms_shown` | `flow` (view only) | `hud` |
+| `wizard_teleported` | `flow` | `feel` |
+| `join_held` | `flow` (view only) | `hud` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
-| `pad_wait_requested` | `core/input` (a command) | `coop` (the game stops while a seat waits for its unplugged gamepad) |
-| `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
-| `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
-| `shelf_buy_requested` | HUD (a command) | `rewards` (A at a shop's item; connected biomes CB11's follow-up) |
-| `shelf_near_changed`, `shelf_refused` | `rewards` (the shop item or reroll sign in a seat's reach, a refused buy) | HUD (the item hint) |
-| `reward_item_changed` | `rewards` (a seat's reward item lying in its room, or gone) | `feel` (the reward item's look) |
-| `reward_near_changed` | `rewards` (a seat's own reward item in reach) | HUD (the hint; A opens its menu) |
-| `run_stats_told` | `rewards` (a seat's run stats, by name) | `feel` (the held Y map: `secret_sense`) |
-| `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
-| `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag, or what the inventory menu drops, lands beside the body) |
-| `cover_danger_looked` | `ai` (every brain, as it walks and at each decision, ground cover GC7) | `cover` (fills the look at once: where the floor would harm) |
-| `ground_looked`, `actor_take_requested` | `ai` (a brain whose profile takes items, I9) | `items` (fills the look at once; gives the item to the actor's Inventory) |
-| `ground_item_changed` | `items` | `feel` (the look on the ground) |
-| `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |
-| `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
+| `pad_wait_requested` | `core/input` (a command) | `coop` |
+| `pad_wait_changed` | `coop` | `hud` |
+| `item_take_requested` | HUD (a command) | `items` |
+| `shelf_buy_requested` | HUD (a command) | `rewards` |
+| `shelf_near_changed`, `shelf_refused` | `rewards` | HUD |
+| `reward_item_changed` | `rewards` | `feel` |
+| `reward_near_changed` | `rewards` | HUD |
+| `run_stats_told` | `rewards` | `feel` |
+| `room_items_placed` | `flow` | `items` |
+| `item_drop_requested` | `actor` (an Inventory) | `items` |
+| `cover_danger_looked` | `ai` | `cover` |
+| `ground_looked`, `actor_take_requested` | `ai` | `items` |
+| `ground_item_changed` | `items` | `feel` |
+| `item_near_changed`, `item_refused` | `items` | `hud` |
+| `play_load_requested` | net | `flow` |
 
-`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `hub_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the hub and send `room_entered`; `play_requested` starts a run at once (the tests, the bots, the online spike's Host/Join).
+What each event carries and means: `core/events/events.gd`, and the full notes per row in the history file.
 
 ## Allowed files
 
-`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. `gameplay/` is script-only: it has no scenes. The scenes that gameplay scripts drive live with their content in `content/` (the player in `content/wizard/base/`, enemies in `content/enemies/`, rooms in `content/rooms/`) and in `hud/`; the scene's root node carries the gameplay script, and gameplay gets scenes through `core/registry`. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
+`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. `gameplay/` is script-only: no scenes. The scenes gameplay scripts drive live with their content in `content/` and in `hud/`; gameplay gets scenes through `core/registry`. Typed GDScript only; no banned APIs (AGENTS.md, hard rules).
 
 ## Steps
 
 1. Read the area's README and make one focused change.
-2. Add or update tests in `tests/gameplay/<area>/`. The test runner and file naming are documented in `tests/README.md`, which is written by a later task; until it exists, don't invent a layout.
+2. Add or update tests in `tests/gameplay/<area>/` (layout: `tests/README.md`).
 3. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
 
 ## Validate
@@ -155,3 +156,5 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 tools/check.sh                   # hard rules, on your changes
 ci/build/build.sh --quick        # import and smoke test in Godot
 ```
+
+History and reasons: [docs/history/gameplay-README.md](../docs/history/gameplay-README.md).

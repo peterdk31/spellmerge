@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
 [ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="3_hurtbox"]
 [ext_resource type="Script" path="res://gameplay/ai/dummy_look.gd" id="4_look"]
-[ext_resource type="Texture2D" path="res://content/enemies/training_dummy/idle.svg" id="5_idle"]
+[ext_resource type="Texture2D" path="res://content/enemies/training_dummy/idle@2x.svg" id="5_idle"]
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="6_ai"]
 
 [node name="TrainingDummy" type="Node2D"]

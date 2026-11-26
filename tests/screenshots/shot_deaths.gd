@@ -9,10 +9,10 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The bodies, and how much bigger than its art each is drawn.
 const BODIES: Array[Texture2D] = [
-	preload("res://content/enemies/crypt_mite/idle.svg"),
-	preload("res://content/enemies/ember_imp/idle.svg"),
-	preload("res://content/enemies/bone_husk/idle.svg"),
-	preload("res://content/enemies/bone_scepter/idle.svg"),
+	preload("res://content/enemies/crypt_mite/idle@2x.svg"),
+	preload("res://content/enemies/ember_imp/idle@2x.svg"),
+	preload("res://content/enemies/bone_husk/idle@2x.svg"),
+	preload("res://content/enemies/bone_scepter/idle@2x.svg"),
 ]
 const SCALES: Array[float] = [1.0, 1.0, 1.0, 2.0]
 const NAMES: Array[String] = ["mite", "imp", "husk", "boss size"]
@@ -62,7 +62,7 @@ func _kill(actor: int, at: Vector2, r: int) -> void:
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = BODIES[r]
-	sprite.scale = Vector2.ONE * SCALES[r]
+	ArtDetail.fit(sprite, Vector2.ONE * SCALES[r])
 	body.add_child(sprite)
 	root.add_child(body)
 	events.emit_signal(&"enemy_died", actor, body, at, shot)

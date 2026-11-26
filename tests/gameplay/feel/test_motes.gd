@@ -1166,9 +1166,10 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	var motes: MotesScript = feel.motes()
-	var husk: Texture2D = load("res://content/enemies/bone_husk/idle.svg") as Texture2D
+	var husk: Texture2D = load("res://content/enemies/bone_husk/idle@2x.svg") as Texture2D
 	var body := _body_of(husk, Vector2(200.0, 150.0), 1.0)
-	var pixels: int = ArtPixels.pixels_of(husk).size()
+	# Its art's pixels in world pixels' worth (a 2x body's art pixel is a quarter of one: ArtDetail).
+	var pixels: int = roundi(float(ArtPixels.pixels_of(husk).size()) / float(ArtDetail.of(husk) * ArtDetail.of(husk)))
 	check(pixels > 50, "the husk's art has pixels: %d" % pixels)
 	var before: int = motes.next_row()
 	feel.spectacle().break_body(body, body.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
@@ -1194,7 +1195,7 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	var squashed := _body_of(husk, Vector2(100.0, 100.0), 1.0)
 	bus.damage_dealt.emit(0, squashed.get_parent(), 1, Vector2.ZERO)
 	feel.step(0.015625)
-	check(squashed.scale != Vector2.ONE, "squashed when it is killed")
+	check(squashed.scale != ArtDetail.draw_scale(husk), "squashed when it is killed")
 	before = motes.next_row()
 	bus.enemy_died.emit(0, squashed.get_parent(), Vector2(100.0, 100.0), -1)
 	check(feel.spectacle().broken_from() == husk, "the death broke the body's art")
@@ -1210,7 +1211,8 @@ func _body_of(texture: Texture2D, at: Vector2, scale: float) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
-	sprite.scale = Vector2.ONE * scale
+	# At its art's size times `scale` (a 2x body at half: ArtDetail).
+	ArtDetail.fit(sprite, Vector2.ONE * scale)
 	body.add_child(sprite)
 	root.add_child(body)
 	return sprite

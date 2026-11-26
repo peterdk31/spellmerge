@@ -36,8 +36,9 @@ func take() -> void:
 		var imp := Node2D.new()
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
-		sprite.texture = load("res://content/enemies/ember_imp/idle.svg") as Texture2D
+		sprite.texture = load("res://content/enemies/ember_imp/idle@2x.svg") as Texture2D
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ArtDetail.fit(sprite)
 		imp.add_child(sprite)
 		root.add_child(imp)
 		imp.global_position = centre + Vector2((float(i) - 2.5) * GAP, 0.0)

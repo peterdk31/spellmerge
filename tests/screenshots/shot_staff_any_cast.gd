@@ -4,7 +4,7 @@ extends "res://tests/support/screenshot.gd"
 ## down) with a frost nova. `staff_any_cast_play` is the moment of the third answer.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const RUNE: Array[StringName] = [&"on_any_cast", &"rune", &"frost", &"nova", &"atom"]
 const OTHER: Array[StringName] = [&"atom"]
 const FROM := Vector2(200.0, 180.0)

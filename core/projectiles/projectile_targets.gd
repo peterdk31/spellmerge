@@ -2,7 +2,7 @@ class_name ProjectileTargets
 extends Object
 ## The projectile manager's targets (core/projectiles/projectile_manager.gd, the header and "Queries"):
 ## bodies registered with a hit shape, a layer and an owner, their grid of cells refreshed each step,
-## and the asks over it (`nearest_target`, `targets_in`, `targets_near`). Static functions of the
+## and the asks over it (`nearest_target`, `targets_in`, `targets_near`). Methods working on the
 ## manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")

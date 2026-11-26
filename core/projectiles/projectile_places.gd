@@ -2,7 +2,7 @@ class_name ProjectilePlaces
 extends Object
 ## The places shots pass into (core/projectiles/projectile_manager.gd): the portal's gates
 ## (`open_gate`, `shots_into_gates`, `gate_cut`), the fields a shot crosses (`set_field`, `_pass_fields`),
-## and where a shot that passes comes out (`shot_places`, `pass_shot`). Static functions of the
+## and where a shot that passes comes out (`shot_places`, `pass_shot`). Methods working on the
 ## manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")

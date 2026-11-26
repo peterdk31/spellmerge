@@ -2,7 +2,7 @@ class_name ProjectileBatches
 extends Object
 ## The projectile manager's batches and card bodies (core/projectiles/projectile_manager.gd, "Drawing"):
 ## the MultiMesh batches every shot is drawn in, the card bodies' pairs of batches and their nodes,
-## and the heads' mesh. Static functions of the manager (`pm`), whose members hold all of it.
+## and the heads' mesh. Methods working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

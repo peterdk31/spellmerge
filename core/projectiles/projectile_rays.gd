@@ -2,7 +2,7 @@ class_name ProjectileRays
 extends Object
 ## The projectile manager's rays, sweeps and strikes (core/projectiles/projectile_manager.gd): a beam's
 ## path through walls, gates and bodies (`ray`, `_ray_path`), its points and curve, a swing's sweep and a
-## strike's hits. Static functions of the manager (`pm`), whose members hold all of it.
+## strike's hits. Methods working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

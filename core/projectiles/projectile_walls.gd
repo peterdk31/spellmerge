@@ -2,7 +2,7 @@ class_name ProjectileWalls
 extends Object
 ## The projectile manager's walls (core/projectiles/projectile_manager.gd, "Walls"): a room's wall bodies
 ## as rectangles, solid shots (`set_solid`: a segment in the wall grid while they live), and what a
-## shot does at a wall (`_wall_end`: it ends, bounces or passes). Static functions of the manager
+## shot does at a wall (`_wall_end`: it ends, bounces or passes). Methods working on the manager
 ## (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")

@@ -3,7 +3,7 @@ extends Object
 ## The projectile manager's motion (core/projectiles/projectile_manager.gd, "Shot behaviours, stepped
 ## in passes"): the common pass and the trail pass, the behaviour lists (`_join`, `_leave`, `_wait`),
 ## each behaviour's pass, orbits, casters and a card's moves, and the turns and homing they share.
-## Static functions of the manager (`pm`), whose members hold all of it.
+## Methods working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

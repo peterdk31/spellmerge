@@ -2,7 +2,7 @@ class_name ProjectileGuards
 extends Object
 ## What the projectile manager answers about shots coming (core/projectiles/projectile_manager.gd): a
 ## swing's deflect and block, the shots in a wedge or on a segment, the threat to a body (`threat`,
-## its grid of shots), and a shield's or a solid's guard against shots. Static functions of the
+## its grid of shots), and a shield's or a solid's guard against shots. Methods working on the
 ## manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")

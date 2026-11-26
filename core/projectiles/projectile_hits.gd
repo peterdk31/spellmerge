@@ -3,7 +3,7 @@ extends Object
 ## The projectile manager's hits (core/projectiles/projectile_manager.gd, the header): the hit pass
 ## (`_pass_hits`, with the native kernel or alone), one shot's turn in it, the hit test against the
 ## target grid, the targets a shot remembers touching, and the merged hits it sends at the pass's end.
-## Static functions of the manager (`pm`), whose members hold all of it.
+## Methods working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

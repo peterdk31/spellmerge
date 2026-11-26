@@ -2,8 +2,8 @@ class_name ProjectileDraw
 extends Object
 ## The projectile manager's drawing (core/projectiles/projectile_manager.gd, "Drawing"): each frame's
 ## rows of every batch (`update_draw`), the motes shots give off and leave as tails, the tails' groups
-## and their share of the pool, and the codes a row is packed in (`row_*`, `look_*`). Static
-## functions of the manager (`pm`), whose members hold all of it.
+## and their share of the pool, and the codes a row is packed in (`row_*`, `look_*`). Methods
+## working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

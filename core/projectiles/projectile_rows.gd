@@ -1,8 +1,8 @@
 class_name ProjectileRows
 extends Object
 ## The projectile manager's rows (core/projectiles/projectile_manager.gd, the header and "The global
-## cap"): a shot's row written at spawn (`spawn`, `spawn_batch`), its budget's list and the cap's drop, and
-## its end (`_kill`, `_expire`). Static functions of the manager (`pm`), whose members hold all of it.
+## cap"): a shot's row written at spawn (`_write_row`, `spawn_batch`), its budget's list and the cap's drop (its
+## end, `_kill` and `_expire`, is the manager's). Methods working on the manager (`pm`), whose members hold all of it.
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 

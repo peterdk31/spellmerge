@@ -137,10 +137,20 @@ bool moving(int s) {
 	return kind == 1 || kind == 2 || kind == 4;
 }
 
-// The distance from the puddle's edge (cells) at the room's art pixel `px`: the cells' distances
-// (`depths` red, at each cell's middle; -0.5 for a cell not drawn, and outside the grid) weighed
-// between the four nearest middles.
-float depth_at(ivec2 px, int side, ivec2 size) {
+// Whether state `s` has finished growing in (GROW or GROW_IN at its last frame): its shape is whole.
+bool settled(int s, float age) {
+	int kind = int(motions[s].x + 0.5);
+	if (kind != 1 && kind != 4) {
+		return !moving(s);
+	}
+	return frame_of(s, age) >= max(int(motions[s].y + 0.5), 1) - 1;
+}
+
+// The distance from its motion's edge (cells) at the room's art pixel `px`, for a cell whose texel is
+// `here`: the cells' distances (`depths` red, at each cell's middle) weighed between the four nearest
+// middles, a cell not of the same motion (another state or another start) or outside the grid -0.5;
+// never below 0 inside the cell.
+float depth_at(ivec2 px, int side, ivec2 size, vec4 here) {
 	vec2 p = (vec2(px) + 0.5) / float(side) - 0.5;
 	ivec2 c = ivec2(floor(p));
 	vec2 t = p - floor(p);
@@ -148,21 +158,29 @@ float depth_at(ivec2 px, int side, ivec2 size) {
 	for (int k = 0; k < 4; k++) {
 		ivec2 at = c + ivec2(k % 2, k / 2);
 		bool inside = at.x >= 0 && at.y >= 0 && at.x < size.x && at.y < size.y;
-		v[k] = inside ? texelFetch(depths, clamp(at, ivec2(0), size - ivec2(1)), 0).r : -0.5;
+		ivec2 safe = clamp(at, ivec2(0), size - ivec2(1));
+		vec4 other = texelFetch(cells, safe, 0);
+		bool same = inside && abs(other.r - here.r) < 0.5 && other.g == here.g;
+		v[k] = same ? texelFetch(depths, safe, 0).r : -0.5;
 	}
-	return mix(mix(v[0], v[1], t.x), mix(v[2], v[3], t.x), t.y);
+	return max(mix(mix(v[0], v[1], t.x), mix(v[2], v[3], t.x), t.y), 0.0);
 }
 
 // How far (art px; below 0: not yet or no longer there) pixel `px` lies inside the front of state
-// `s`'s motion, `age` seconds after its cell began to show it, in a puddle `most` cells deep at its
-// deepest: GROW spreads from the middle out, SHRINK shrinks from the outer edge in (gone at its last
-// frame), GROW_IN creeps from the outer edge in, all by steps of the state's frames and as one shape.
-int front(int s, float age, ivec2 px, int side, ivec2 size, float most, int d) {
+// `s`'s motion, `age` seconds after its cell (texel `here`) began to show it, its motion `most` cells
+// deep at its deepest: GROW spreads from the middle out, SHRINK shrinks from the outer edge in,
+// GROW_IN creeps from the outer edge in, all by steps of the state's frames and as one shape. The last
+// frame is exact: GROW and GROW_IN whole (the next state's shape), SHRINK gone.
+int front(int s, float age, ivec2 px, int side, ivec2 size, vec4 here, float most, int d) {
 	int kind = int(motions[s].x + 0.5);
 	int frames = max(int(motions[s].y + 0.5), 1);
 	int frame = frame_of(s, age);
-	float deepest = most * float(side) + 1.0;
-	float depth = depth_at(px, side, size) * float(side) + float(wobble(px.x + px.y, 7, 3, d));
+	if (frame >= frames - 1) {
+		return kind == 2 ? -1 : 9999;
+	}
+	// Past the deepest pixel, its wobble taken in.
+	float deepest = most * float(side) + float(2 * d) + 1.0;
+	float depth = depth_at(px, side, size, here) * float(side) + float(wobble(px.x + px.y, 7, 3, d));
 	if (kind == 1) {
 		return int(floor(depth - deepest * float(frames - 1 - frame) / float(frames)));
 	}
@@ -415,7 +433,7 @@ void fragment() {
 			int sa = state_of(a);
 			int sb = state_of(b);
 			int sc = state_of(c);
-			if (drawn(sa) && drawn(sb) && drawn(sc) && !moving(sa) && !moving(sb) && !moving(sc)) {
+			if (drawn(sa) && drawn(sb) && drawn(sc) && settled(sa, view_time - a.g) && settled(sb, view_time - b.g) && settled(sc, view_time - c.g)) {
 				ivec2 into = ivec2(sx < 0 ? r : side - r, sy < 0 ? r : side - r);
 				float from_far = length(vec2(f) + 0.5 - vec2(into));
 				if (from_far > float(r)) {
@@ -449,7 +467,7 @@ void fragment() {
 		// While it grows or shrinks, its front moves through the puddle as one shape (the owner,
 		// 2026-11-26: a puddle shrinks as one puddle from its outer edge, never cell by cell).
 		if (moving(s)) {
-			int ahead = front(s, age, px, side, size, texelFetch(depths, cell, 0).g, d);
+			int ahead = front(s, age, px, side, size, here, texelFetch(depths, cell, 0).g, d);
 			if (ahead < dist) {
 				dist = ahead;
 				low = false;

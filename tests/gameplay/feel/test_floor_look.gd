@@ -188,27 +188,30 @@ func test_a_cell_knows_its_drawn_neighbours() -> void:
 	check_equal(flat.neighbours_drawn(0), 128, "and it is the down-right of cell 0")
 
 
-func test_a_puddle_knows_how_deep_each_cell_lies() -> void:
+func test_a_motion_knows_how_deep_each_cell_lies_and_holds_it() -> void:
 	var laid := _layout()
 	var flat := _flat(laid)
-	# A 3 x 3 puddle at cells (1..3, 1..3) and a lone cell at (6, 4).
+	var drying: int = _state(&"drying")
+	# A 3 x 3 puddle at cells (1..3, 1..3) drying at once, and a lone cell at (6, 4).
 	for y in range(1, 4):
 		for x in range(1, 4):
-			flat.show_cell(y * laid.columns + x, laid.columns, _state(&"wet"), 1.0)
-	flat.show_cell(4 * laid.columns + 6, laid.columns, _state(&"wet"), 1.0)
+			flat.show_cell(y * laid.columns + x, laid.columns, drying, 1.0)
+	flat.show_cell(4 * laid.columns + 6, laid.columns, drying, 1.0)
 	flat.hand(1.0)
 	var middle: Vector2 = flat.depth_of(2 * laid.columns + 2)
 	var rim: Vector2 = flat.depth_of(1 * laid.columns + 2)
 	var lone: Vector2 = flat.depth_of(4 * laid.columns + 6)
 	check(absf(middle.x - 1.5) < 0.001, "the middle lies 1.5 cells in (%s)" % middle.x)
 	check(absf(rim.x - 0.5) < 0.001, "a rim cell half a cell in (%s)" % rim.x)
-	check(absf(rim.y - 1.5) < 0.001 and absf(middle.y - 1.5) < 0.001, "the puddle's most is its middle's, for every cell of it")
-	check(absf(lone.x - 0.5) < 0.001 and absf(lone.y - 0.5) < 0.001, "a lone cell is its own puddle")
-	check(absf(flat.depth_of(0).x + 0.5) < 0.001, "dry floor is -0.5")
-	# Its middle dried: the ring left is no deeper than half a cell.
-	flat.show_cell(2 * laid.columns + 2, laid.columns, _state(&"dry"), 2.0)
-	flat.hand(2.0)
-	check(absf(flat.depth_of(1 * laid.columns + 2).y - 0.5) < 0.001, "worked out again as what is drawn changes")
+	check(absf(rim.y - 1.5) < 0.001 and absf(middle.y - 1.5) < 0.001, "the motion's most is its middle's, for every cell of it")
+	check(absf(lone.x - 0.5) < 0.001 and absf(lone.y - 0.5) < 0.001, "a lone cell is its own motion")
+	# A ring begun later beside it is a motion of its own, and the first one's values are held.
+	for x in range(0, 5):
+		flat.show_cell(4 * laid.columns + x, laid.columns, drying, 1.2)
+	flat.show_cell(1 * laid.columns + 1, laid.columns, _state(&"dry"), 1.2)
+	flat.hand(1.2)
+	check(absf(flat.depth_of(2 * laid.columns + 2).x - 1.5) < 0.001, "a motion playing keeps its depth when its neighbours change")
+	check(absf(flat.depth_of(4 * laid.columns + 2).x - 0.5) < 0.001 and absf(flat.depth_of(4 * laid.columns + 2).y - 0.5) < 0.001, "the later row is one cell deep: its own motion")
 
 
 func test_the_freezing_ice_creeps_in_from_the_edge() -> void:

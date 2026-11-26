@@ -10,10 +10,9 @@ extends Sprite2D
 ## states' looks (`CoverState.flat_*`, the palette's shades) are the shader's uniforms, set once.
 ##
 ## A puddle grows and shrinks as one shape (the owner, 2026-11-26): a second texture, `depths`, holds
-## each cell's distance from its puddle's edge (in cells, at its middle: red; -0.5 for a cell not drawn)
-## and the most of its puddle (green), worked out here whenever a cell is drawn or no longer drawn
-## (`_work_depths`: a chamfer distance over the grid, then each joined puddle's most), and the shader
-## moves a growing or shrinking state's front through it.
+## each growing or shrinking cell's distance from its motion's edge (in cells, at its middle: red) and
+## its motion's most (green), worked out here as the motion begins and held until it ends
+## (`_work_depths`), and the shader moves the state's front through it.
 ##
 ## Its states' glow (`CoverState.flat_glow`) is written as the floor's lights each frame
 ## (`write_lights`, `cover_lights.gd`), and the shader reads the spell light (`light_views.gdshaderinc`:
@@ -60,6 +59,9 @@ var _shape_dirty: bool = false
 var _depth: PackedFloat32Array = PackedFloat32Array()
 var _stack: PackedInt32Array = PackedInt32Array()
 var _seen: PackedByteArray = PackedByteArray()
+## The cells whose state changed since the depths were last worked out, and which states grow or shrink.
+var _fresh: PackedByteArray = PackedByteArray()
+var _moving: PackedByteArray = PackedByteArray()
 ## Each state's glow (0: none) and its colour, from its kind's data.
 var _glow: PackedFloat32Array = PackedFloat32Array()
 var _glow_colour: PackedColorArray = PackedColorArray()
@@ -101,6 +103,8 @@ func lay(laid: CoverLayout, kind_index: int, now: float) -> void:
 	_depth.resize(cells)
 	_stack.resize(cells)
 	_seen.resize(cells)
+	_fresh.resize(cells)
+	_fresh.fill(0)
 	_depths = Image.create_empty(_columns, rows, false, Image.FORMAT_RGF)
 	_glowing.resize(0)
 	_glowing_at.resize(cells)
@@ -156,6 +160,8 @@ func _set_looks(made: ShaderMaterial) -> void:
 	_glow_colour.fill(Color.BLACK)
 	_drawn.resize(STATES)
 	_drawn.fill(0)
+	_moving.resize(STATES)
+	_moving.fill(0)
 	for at in mini(kind.states.size(), STATES):
 		var state: CoverState = kind.states[at]
 		if state == null:
@@ -170,6 +176,8 @@ func _set_looks(made: ShaderMaterial) -> void:
 			continue
 		var shades: PackedColorArray = Palette.shades_of(state.flat_material)
 		_drawn[at] = 1
+		if state.flat_motion == CoverState.FlatMotion.GROW or state.flat_motion == CoverState.FlatMotion.SHRINK or state.flat_motion == CoverState.FlatMotion.GROW_IN:
+			_moving[at] = 1
 		edges[at] = shades[0]
 		fills[at] = shades[1]
 		glints[at] = shades[2]
@@ -211,8 +219,10 @@ func show_cell(cell: int, columns: int, state: int, now: float) -> void:
 	_state[cell] = state
 	_since[cell] = now
 	_write(cell)
-	if _is_drawn(state) != _is_drawn(was):
+	_fresh[cell] = 1
+	if _is_moving(state):
 		_shape_dirty = true
+	if _is_drawn(state) != _is_drawn(was):
 		# Its neighbours' masks change with it.
 		var x: int = cell % _columns
 		var y: int = cell / _columns
@@ -246,6 +256,10 @@ func glowing_count() -> int:
 	return _glowing.size()
 
 
+func _is_moving(state: int) -> bool:
+	return state >= 0 and state < _moving.size() and _moving[state] != 0
+
+
 func _is_drawn(state: int) -> bool:
 	return state >= 0 and state < _drawn.size() and _drawn[state] != 0
 
@@ -263,49 +277,51 @@ func _mask_of(cell: int) -> int:
 	return mask
 
 
-## Each drawn cell's distance from its puddle's edge (cells, at its middle) and its puddle's most, into
-## `depths`: a two-pass chamfer distance to the nearest cell not drawn (the grid's outside counts as
-## not drawn; 1 a side, SQRT2 a corner), less half a cell; then each puddle (cells joined by a side)
-## flooded for its most and flooded again to write it. A cell not drawn is -0.5. Runs only on a frame
-## when what is drawn changed; allocates nothing (its lists are made at `lay`).
+## Each cell that began a growing or shrinking state this frame: its distance from its motion's edge
+## (cells, at its middle) and its motion's most, into `depths`. A motion is the cells joined by a side
+## that began the same state at the same moment (the same Feel clock: one touch, or a lake that dries
+## at once), so new water at a puddle's edge, a patch of steam in a lake or a ring that dries first is
+## each its own shape. The distance is a two-pass chamfer (1 a side, SQRT2 a corner) to the nearest cell
+## not of its motion (the grid's outside too), less half a cell; each motion flooded for its most, then
+## again to write it. A cell's values are written once, as its motion begins, and held until it ends,
+## so a change nearby never moves a front already playing. Runs only on a frame when a motion began;
+## allocates nothing (its lists are made at `lay`).
 func _work_depths() -> void:
 	var cells: int = _state.size()
 	for cell in cells:
-		_depth[cell] = FAR if _is_drawn(_state[cell]) else 0.0
+		_depth[cell] = FAR if _is_moving(_state[cell]) else 0.0
 	for y in _rows:
 		for x in _columns:
 			var at: int = y * _columns + x
 			if _depth[at] > 0.0:
 				var d: float = _depth[at]
-				d = minf(d, _chamfer(x - 1, y, 1.0))
-				d = minf(d, _chamfer(x, y - 1, 1.0))
-				d = minf(d, _chamfer(x - 1, y - 1, SQRT2))
-				d = minf(d, _chamfer(x + 1, y - 1, SQRT2))
+				d = minf(d, _chamfer(at, x - 1, y, 1.0))
+				d = minf(d, _chamfer(at, x, y - 1, 1.0))
+				d = minf(d, _chamfer(at, x - 1, y - 1, SQRT2))
+				d = minf(d, _chamfer(at, x + 1, y - 1, SQRT2))
 				_depth[at] = d
 	for y in range(_rows - 1, -1, -1):
 		for x in range(_columns - 1, -1, -1):
 			var at: int = y * _columns + x
 			if _depth[at] > 0.0:
 				var d: float = _depth[at]
-				d = minf(d, _chamfer(x + 1, y, 1.0))
-				d = minf(d, _chamfer(x, y + 1, 1.0))
-				d = minf(d, _chamfer(x + 1, y + 1, SQRT2))
-				d = minf(d, _chamfer(x - 1, y + 1, SQRT2))
+				d = minf(d, _chamfer(at, x + 1, y, 1.0))
+				d = minf(d, _chamfer(at, x, y + 1, 1.0))
+				d = minf(d, _chamfer(at, x + 1, y + 1, SQRT2))
+				d = minf(d, _chamfer(at, x - 1, y + 1, SQRT2))
 				_depth[at] = d
 	_seen.fill(0)
 	for start in cells:
-		if _seen[start] != 0:
-			continue
-		if _depth[start] <= 0.0:
-			_seen[start] = 2
-			_depths.set_pixel(start % _columns, start / _columns, Color(-0.5, 0.0, 0.0, 1.0))
+		if _fresh[start] == 0 or _seen[start] != 0 or _depth[start] <= 0.0:
 			continue
 		var most: float = _flood(start, 1, 0.0)
 		_flood(start, 2, most)
+	_fresh.fill(0)
 
 
-## Floods the puddle of cell `start` (cells joined by a side), marking each `mark` in `_seen`: mark 1
-## returns its most distance; mark 2 writes each cell's distance and `most` into `depths`.
+## Floods the motion of cell `start` (cells joined by a side, of its state and start), marking each
+## `mark` in `_seen`: mark 1 returns its most distance; mark 2 writes each cell's distance and `most`
+## into `depths`.
 func _flood(start: int, mark: int, most: float) -> float:
 	var top: int = 1
 	_stack[0] = start
@@ -326,22 +342,29 @@ func _flood(start: int, mark: int, most: float) -> float:
 			if nx < 0 or ny < 0 or nx >= _columns or ny >= _rows:
 				continue
 			var next: int = ny * _columns + nx
-			if _depth[next] > 0.0 and _seen[next] < mark:
+			if _seen[next] < mark and _same_motion(at, next):
 				_seen[next] = mark
 				_stack[top] = next
 				top += 1
 	return found
 
 
-## The chamfer's distance through cell (`x`, `y`) at `step` more: the grid's outside is not drawn (0).
-func _chamfer(x: int, y: int, step: float) -> float:
+## Whether cells `a` and `b` play one motion: the same growing or shrinking state, begun at the same moment.
+func _same_motion(a: int, b: int) -> bool:
+	return _state[a] == _state[b] and _since[a] == _since[b] and _is_moving(_state[a])
+
+
+## The chamfer's distance for cell `at` through cell (`x`, `y`) at `step` more: a cell not of its
+## motion, or the grid's outside, is its edge (0).
+func _chamfer(at: int, x: int, y: int, step: float) -> float:
 	if x < 0 or y < 0 or x >= _columns or y >= _rows:
 		return step
-	return _depth[y * _columns + x] + step
+	var other: int = y * _columns + x
+	return _depth[other] + step if _same_motion(at, other) else step
 
 
-## Cell `cell`'s distance from its puddle's edge (cells, at its middle; -0.5 not drawn) and its
-## puddle's most, as the shader reads them (for tests).
+## Cell `cell`'s distance from its motion's edge (cells, at its middle) and its motion's most, as the
+## shader reads them (held from when its motion began; for tests).
 func depth_of(cell: int) -> Vector2:
 	if _depths == null or cell < 0 or cell >= _state.size():
 		return Vector2(-0.5, 0.0)

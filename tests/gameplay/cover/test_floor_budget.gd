@@ -22,7 +22,7 @@ const SHOTS: int = 2048
 const DT: float = 1.0 / 60.0
 const STEPS: int = 30
 ## In references (tests/support/wall_clock.gd), so they hold on any machine and beside other tests.
-## The trail pass natively: 0.0012 native references measured (10 us of a 8 ms reference, 4-core
+## Deliberately as loose as the old fixed limits (a gross-slowdown guard, not a tight one). The trail pass natively: 0.0012 native references measured (10 us of an 8 ms reference, 4-core
 ## container, 2026-11-26); the budget keeps the old 400 us, 0.05 of a reference.
 const TRAIL_BUDGET_REFERENCES: float = 0.05
 ## The cover's tick: 1.3 GDScript references when the cells move, 0.35 for renewals (the same

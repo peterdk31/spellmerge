@@ -21,7 +21,7 @@ const FIELDS: int = 16
 const DT: float = 1.0 / 60.0
 const STEPS: int = 30
 ## In native references (tests/support/wall_clock.gd), so it holds on any machine and beside other
-## tests. The native pass measured about 150 us a step with 2048 shots and 16 fields on a 4-core
+## tests, as loose as the old fixed limit on purpose. The native pass measured about 150 us a step with 2048 shots and 16 fields on a 4-core
 ## container, 2026-11-26 (see the BUDGET lines); the old 1500 us was about 0.19 of its reference.
 const FIELD_BUDGET_REFERENCES: float = 0.19
 ## The held shots' counts and their budgets, in GDScript (2026-11-26, this 4-core container: 2000 held

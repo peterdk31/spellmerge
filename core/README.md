@@ -35,6 +35,24 @@ The shared services every other area stands on.
 - `projectiles/`: `Projectiles` autoload (below) and its jobs, `RoomGrid` (`grid()`: walls, holes, footprints; `walk_body`), `HitBatch`, `Batches`, `ShaderWarmup`.
 - `pools/`: `pool.gd`, fixed size, never grows; for nodes and effects only.
 
+## The spell runtime
+
+Its code is split by job, as the projectile manager's is; its state is not. `spells.gd` (`SpellRuntime`) holds every member (state, DERIVED, REFS, SPARES, BY_ACTOR, in their order), every constant, `PendingLaunch`, the public API (a moved function keeps a one-line wrapper there, as does a private one the kit or a test calls), the lifecycle (`_init`, `bind`, `clear`, `begin_run`, `rebuild_derived`, the hash's `actor_part*`), `step`, the static helpers others call, and the small readers. Each job is a script of its own, an `Object` the runtime makes and frees (`_job_<name>`, DERIVED):
+
+| Job | Script | What |
+|---|---|---|
+| views | `spell_views.gd` | `compile_staff`, `staff_view`, `cast_tree`, `component_*`, `cards_of`, the card looks and a launch's body |
+| generations | `spell_generations.gd` | `begin_generation`, `install_staff`, live shots, `hit_profile`, holds and reserved mana |
+| casts | `spell_casts.gd` | `cast_staff`, `press_staff`, `recast_staff`, wind-ups, the next cast and `next_cast_*`, casters opened and closed |
+| launches | `spell_launches.gd` | a group fired, fan, nova, Penta, scatter, `_launch`, shots landed, travel, records, who casts a payload |
+| fires | `spell_fires.gd` | waiting launches, a trigger's fires and their pacing, an event's payloads, the jump ring |
+| strikes | `spell_strikes.gd` | the ray hit path, strikes, blasts, `_shoot_ray` and its guard, floor and passed elements |
+| lasting | `spell_lasting.gd` | the carriers that last (`_lc_*`) and their timers |
+| zaps | `spell_zaps.gd` | zaps, sparks and magnets |
+| hits | `spell_hits.gd` | the event handlers (`_on_hit`, `_on_expired`, ...), a hit's cards, relay and infusion |
+
+A job reads the runtime's arrays and dictionaries through members of its own of the same names, aliases of the runtime's (`link`), so its code reads as the runtime's did and loops as fast; scalars, objects and the runtime's own functions go through `rt` (a public one always, so a subclass may override it), another job's through that job. The runtime links its jobs again whenever its arrays may have been replaced (`_link_jobs`: after a snapshot's restore and a run's renew); its own code only ever resizes them. A member the runtime replaces whole (the jump ring `_jq_*`, grown by `_grow_jumps`) is never aliased: `rt._jq_spell`. `tests/core/test_spell_jobs.gd` checks the links.
+
 ## The projectile manager
 
 Rows in packed arrays, stepped by the Tick (`step`). `spawn`, `add_target`, `ray`, `sweep`, `strike`, `threat`, `nearest_target`, `targets_in`, `set_cap`. Events (`projectile_hit`, `projectile_expired`, `shot_ended`, ...) name the shot's slot last. The hit-work budget is work units, never time. Tests: `tests/core/test_projectiles_kit.gd`, `test_hit_budget.gd`, `test_draw_regions.gd`, `test_body_walk.gd`.

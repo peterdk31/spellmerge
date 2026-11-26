@@ -52,7 +52,7 @@ func test_the_card_is_an_infusion_of_the_floor() -> void:
 	check(not card.heals, "it does not heal")
 	check(card.icon != null, "it has an icon")
 	check_equal(card.icon.get_width(), 64, "drawn at 64 px")
-	check_equal(card.look_id, &"", "no particle look of its own yet: its shots read by its tint (oil-spill.md)")
+	check_equal(card.look_id, &"slick", "its own look: drips that hang and fall, the sheen catching the light")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check(card.tint.is_equal_approx(Palette.shades_of(&"oil")[1]), "its tint is the Oil material's base")
 	check(card.description.length() <= 60, "its builder line fits")

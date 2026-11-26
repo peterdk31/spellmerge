@@ -43,6 +43,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `wisp` | 3 (storm) | blown along, swaying | a dash along its drift |
 | `murk` | 4 (void) | slow, sinking specks | a pixel or a 2x2 chunk |
 | `droplet` | 22 (water) | shaken off and falling, bouncing once | a drop that stretches as it falls and splashes (`#`, `o#`, `#.#` looping) |
+| `oil_drip` | 23 (slick: oil) | heavy, falling fast and dragged, no bounce | a dark drip, its top catching the light, stretching to a string as it falls (`o#`, `o##`, `.o##`) |
 | `glimmer` | 6 (mend) | drifts up softly, glowing | a plus that shrinks to a pixel |
 | `chip` | surface | knocked off a struck wall; bounces once and lies; settles as a `speck` | a pixel, or now and then a 2x2 chunk |
 | `grit` | card `heavy` | heavy's own: falls hard, bounces a little and lies (a demo of a card's own motes) | a pixel or two across |

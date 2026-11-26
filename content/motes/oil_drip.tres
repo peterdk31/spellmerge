@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"oil_drip"
+look_ids = Array[StringName]([&"slick"])
+gravity = 520.0
+drag = 2.5
+bounce = 0.0
+glow = 0.15
+shade_from = 1
+shape = "
+o
+#
+
+o
+#
+#
+
+.o
+##
+#
+
+o
+#
+"
+shape_2x = "
+o#
+##
+.#
+
+.o.
+o##
+###
+.#.
+.#.
+
+.o
+o#
+##
+##
+.#
+.#
+
+o#
+##
+##
+.#
+"
+shape_play = "loop"
+shape_rate = 5.0
+shape_turns = false
+count = 3
+speed = Vector2(10.0, 40.0)
+up = Vector2(0.0, 20.0)
+life = Vector2(0.5, 0.9)
+spread = 60.0
+height = 3.0

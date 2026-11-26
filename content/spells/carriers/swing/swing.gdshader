@@ -81,7 +81,7 @@ vec3 ramp4(vec3 h, vec3 l, vec3 m, vec3 s, float u) {
 }
 
 void vertex() {
-	vec3 b = vec3(float(swing_look & 255), float((swing_look >> 8) & 255), float((swing_look >> 16) & 255));
+	vec3 b = look_channels(swing_look);
 	float who = swing_player < 0 ? ENEMY_PLAYER : float(min(swing_player, 3));
 	Look L = look_of(core_override.rgb, who, 1.0, b, swing_seed, true);
 	SET_LOOK(L);

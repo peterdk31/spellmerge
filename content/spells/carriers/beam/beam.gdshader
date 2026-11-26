@@ -108,7 +108,7 @@ vec2 way_of(int n) {
 }
 
 void vertex() {
-	vec3 b = vec3(float(beam_look & 255), float((beam_look >> 8) & 255), float((beam_look >> 16) & 255));
+	vec3 b = look_channels(beam_look);
 	Look L = look_of(core_override.rgb, beam_player < 0 ? ENEMY_PLAYER : float(min(beam_player, 3)), 1.0, b, 0.0, true);
 	SET_LOOK(L);
 	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and

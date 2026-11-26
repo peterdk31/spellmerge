@@ -83,8 +83,8 @@ const MARK_RADIUS: float = 8.0
 const LIGHT_RADIUS: float = 40.0
 const LIGHT_STRENGTH: float = 1.0
 const LIGHT_SECONDS: float = 0.3
-## The look bit of an exact colour (Feel's EXACT: kind 24 of the shot look).
-const EXACT: int = 1 << 23
+## The look bit of an exact colour (Feel's EXACT: kind 30 of the shot look).
+const EXACT: int = ProjectileManagerScript.LOOK_ENEMY_RAMP << 1
 ## A status's motes (`status_motes`): how far they drift (pixels), their kind's speed up times
 ## this, and how flat the oval round the character they leave from is.
 const STATUS_DRIFT: float = 6.0

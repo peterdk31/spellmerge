@@ -19,6 +19,13 @@ o
 
 ##o
 "
+shape_2x = "
+o#
+
+##oo
+
+####oo
+"
 shape_play = "life"
 shape_rate = 8.0
 shape_turns = true

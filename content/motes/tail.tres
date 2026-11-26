@@ -12,6 +12,10 @@ bounce = 0.0
 glow = 0.35
 shade_from = 1
 shape = "#"
+shape_2x = "
+o#
+#.
+"
 shape_play = "life"
 count = 1
 speed = Vector2(4.0, 20.0)

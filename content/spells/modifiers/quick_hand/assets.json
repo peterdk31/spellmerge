@@ -8,6 +8,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by a small generator)",
 			"prompt": "A 16x16 icon for the Quick Hand card: a grey hourglass with gold sand and a gold chevron beside it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/spells/modifiers/quick_hand/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The quick hand icon, 16x16 world units drawn at 2x detail (32x32 art pixels): An hourglass, its sand running fast. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

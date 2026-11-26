@@ -130,11 +130,15 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 	if component.display_name.strip_edges() == "":
 		problems.append(_problem("required-field", file, "display_name", "Give it a name for the builder, for example \"Frost\"."))
 	if component.icon == null:
-		problems.append(_problem("icon", file, "icon", "Add a 16x16 icon.svg to the folder and set `icon` to it."))
+		problems.append(_problem("icon", file, "icon", "Add its icons to the folder: `icon@2x.svg` (32 by 32 art pixels, 16 world units at 2x detail) as `icon`, and `icon.svg` (16 by 16) as `icon_small` for the HUD's small cells (content/spells/README.md)."))
 	else:
 		var icon_path: String = component.icon.resource_path
 		if icon_path == "" or not manifest.has(icon_path.trim_prefix("res://")):
 			problems.append(_problem("icon-manifest", file, "icon", "Add a line for '%s' to the assets.json beside it (path, origin, author, license; the same shape as art/manifest.json)." % icon_path.trim_prefix("res://")))
+	if component.icon_small != null:
+		var small_path: String = component.icon_small.resource_path
+		if small_path == "" or not manifest.has(small_path.trim_prefix("res://")):
+			problems.append(_problem("icon-manifest", file, "icon_small", "Add a line for '%s' to the assets.json beside it (path, origin, author, license; the same shape as art/manifest.json)." % small_path.trim_prefix("res://")))
 	for line in component.range_problems():
 		var field: String = line.get_slice(":", 0)
 		problems.append(_problem("range", file, field, "%s. Change it to a value inside the range (documented next to the field)." % line))

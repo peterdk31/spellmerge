@@ -25,8 +25,11 @@ extends Resource
 ## A rough measure of the card's power (1-4). There is no complexity budget since the staffs
 ## rework; the validator still keeps it in range, and it may come back as a price.
 @export var complexity: int = 1
-## The 16x16 icon shown in the builder.
+## Its icon, 16 by 16 world units: at 2x detail a 32 by 32 `icon@2x.svg` (ArtDetail; ART2).
 @export var icon: Texture2D
+## Its icon at 1x (16 by 16 art pixels, `icon.svg`), for the HUD's small cells until the HUD is
+## redrawn at 2x (`IconDetail.fitting`); null when it has none.
+@export var icon_small: Texture2D
 
 ## The smallest and largest allowed complexity of one component.
 const COMPLEXITY_MIN: int = 1

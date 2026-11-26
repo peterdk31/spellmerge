@@ -23,7 +23,8 @@ func test_the_card() -> void:
 	check_equal(card.behaviour_strength, 32.0, "32 px wider")
 	check_equal(ModifierBase.stacks(ModifierBase.Behaviour.SPILL), ModifierBase.Stack.ADD, "more cards add")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
-	check(card.icon != null and card.icon.get_width() == 64, "a 64-px icon")
+	check(card.icon != null and card.icon.get_width() == 32 and ArtDetail.of(card.icon) == ArtDetail.DETAIL, "its icon at 2x detail, 32 art pixels (ART2)")
+	check(card.icon_small != null and card.icon_small.get_width() == 16, "and at 1x for the HUD's small cells")
 	check(card.description.length() <= 60, "its builder line fits")
 
 

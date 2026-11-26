@@ -8,6 +8,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by hand)",
 			"prompt": "A 16x16 icon for the Recoil card: a gold arrow kicking back from a cyan shot flying away, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/spells/modifiers/recoil/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The recoil icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A shot leaving one way, a kick back the other. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

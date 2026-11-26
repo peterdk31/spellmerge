@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/skyfall/icon@2x.svg" id="2_icon_2x"]
 [ext_resource type="Texture2D" path="res://content/spells/modifiers/skyfall/icon.svg" id="2_icon"]
 
 [resource]
@@ -9,7 +10,8 @@ id = &"skyfall"
 display_name = "Skyfall"
 description = "The next spell falls from a hole in the sky."
 complexity = 2
-icon = ExtResource("2_icon")
+icon = ExtResource("2_icon_2x")
+icon_small = ExtResource("2_icon")
 damage_mult = 1.25
 mana_mult = 1.5
 behaviour_id = &"skyfall"

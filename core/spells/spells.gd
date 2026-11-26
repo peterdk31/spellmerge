@@ -923,6 +923,19 @@ func component_icon(id: StringName) -> Texture2D:
 	return component.icon if component != null else null
 
 
+## Card `id`'s 1x icon (`icon_small`, the HUD's small cells), null for none.
+func component_icon_small(id: StringName) -> Texture2D:
+	var component: SpellComponent = _component(id)
+	return component.icon_small if component != null else null
+
+
+## Card `id`'s icon for a cell `side` layout pixels across: its 1x icon in a cell too small for its
+## 2x one (`IconDetail.fitting`).
+func component_icon_for(id: StringName, side: float) -> Texture2D:
+	var component: SpellComponent = _component(id)
+	return IconDetail.fitting(component.icon, component.icon_small, side) if component != null else null
+
+
 ## The card's own numbers for the builder, as short lines of at most three (none for an unknown
 ## id): a carrier's damage (times its shots), mana and delay ("Dmg 3x8", "Mana 10", "Delay 1s");
 ## a modifier's changes ("Dmg x0.5", "Shots x3", "Homes in"); an element's status and how long it

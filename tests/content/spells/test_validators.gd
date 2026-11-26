@@ -227,7 +227,7 @@ func test_an_icon_missing_from_the_manifest_is_reported() -> void:
 	var element := _component("res://content/spells/elements/fire/fire.tres")
 	check_equal(SpellValidator.check_component(element, _manifest()).size(), 0, "fire is fine with the real manifest")
 	var problems := SpellValidator.check_component(element, {})
-	check_equal(_fields(problems, "icon-manifest"), ["icon"] as Array[String], "an empty manifest lists no icon")
+	check_equal(_fields(problems, "icon-manifest"), ["icon", "icon_small"] as Array[String], "an empty manifest lists neither icon (ART2: its small one too)")
 	check(String(problems[0]["fix"]).contains("assets.json"), "the fix names the assets file")
 
 

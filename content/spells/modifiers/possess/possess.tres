@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/possess/icon@2x.svg" id="2_icon_2x"]
 [ext_resource type="Texture2D" path="res://content/spells/modifiers/possess/icon.svg" id="2_icon"]
 
 [resource]
@@ -9,7 +10,8 @@ id = &"possess"
 display_name = "Possess"
 description = "Every body the next shot hits obeys you for 3 s."
 complexity = 4
-icon = ExtResource("2_icon")
+icon = ExtResource("2_icon_2x")
+icon_small = ExtResource("2_icon")
 mana_mult = 2.5
 wind_down_mult = 2.0
 behaviour_id = &"possess"

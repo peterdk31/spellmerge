@@ -895,13 +895,13 @@ func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 	var icons: Array[Texture2D] = []
 	for id: Variant in plan.get("cards", []):
 		var card: StringName = StringName(id)
-		icons.append(spells.component_icon(card) if spells != null and card != &"" else null)
+		icons.append(spells.component_icon_for(card, StaffRowScript.ICON) if spells != null and card != &"" else null)
 	# Its sigils' icons (staff-language L4), from their content, once here.
 	var sigil_icons: Array[Texture2D] = []
 	var registry: RegistryScript = get_node_or_null(^"/root/Registry") as RegistryScript
 	for id: Variant in plan.get("sigils", []):
 		var sigil: ItemContent = ItemKinds.content(ItemKinds.SIGIL, StringName(id), registry) as ItemContent
-		sigil_icons.append(sigil.icon if sigil != null else null)
+		sigil_icons.append(IconDetail.fitting(sigil.icon, sigil.icon_small, StaffRowScript.ICON) if sigil != null else null)
 	_panels[player].set_staff_plan(staff, plan, icons, sigil_icons)
 
 

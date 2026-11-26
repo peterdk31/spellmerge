@@ -5,9 +5,18 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator, outline worked out from the shape)",
-			"prompt": "A 16x16 icon for the Field card: a pale blue ring seen at a slant, filled dark, with a small bright knot of caught shots bursting at its middle, a 1 px closed outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The field icon at 1x for the HUD's small cells, 16x16 art pixels: A trembling ring on the floor, seen at a slant, shots caught in it. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+		},
+		{
+			"path": "content/spells/carriers/field/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The field icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A trembling ring on the floor, seen at a slant, shots caught in it. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

@@ -8,6 +8,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by hand)",
 			"prompt": "A 16x16 icon for the Mirror card: a bright Bone orb on the left and its reflection on the right, a grey mirror line between them, each orb with a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/spells/modifiers/mirror/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The mirror icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A shot and its mirror image either side of a glass. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

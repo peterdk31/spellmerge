@@ -8,6 +8,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (SVG written by hand)",
 			"prompt": "A 16x16 icon for the On Near trigger card, in the trigger cards' style: a light round disc with a 1 px dark outline and a grey lower part, a small dark dot left of its middle and two dark arcs to its right, like a sense reaching out. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/spells/triggers/on_near/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The on near icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A watching face with sense rings out to one side: when something comes near. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

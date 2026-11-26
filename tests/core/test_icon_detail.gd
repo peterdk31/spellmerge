@@ -29,3 +29,20 @@ func test_every_pickup_has_both_icons() -> void:
 		check_equal(ArtDetail.of(item.icon), ArtDetail.DETAIL, "%s: its icon at 2x" % path)
 		check_equal(item.icon.get_width(), 32, "%s: 32 art pixels" % path)
 		check_equal(item.icon_small.get_width(), 16, "%s: its small icon 16" % path)
+
+
+## ART2: every card and sigil has its icon at 2x detail (32 art pixels) and its 1x icon (16) beside it.
+func test_every_card_and_sigil_has_both_icons() -> void:
+	var found: int = 0
+	for folder: String in ["res://content/spells/carriers", "res://content/spells/elements", "res://content/spells/modifiers", "res://content/spells/multicasts", "res://content/spells/triggers", "res://content/sigils"]:
+		for id: String in DirAccess.get_directories_at(folder):
+			var path: String = "%s/%s/%s.tres" % [folder, id, id]
+			if not ResourceLoader.exists(path):
+				continue
+			var thing: Resource = load(path)
+			var icon: Texture2D = thing.get(&"icon") as Texture2D
+			var small: Texture2D = thing.get(&"icon_small") as Texture2D
+			found += 1
+			check(icon != null and ArtDetail.of(icon) == ArtDetail.DETAIL and icon.get_width() == 32, "%s: its icon at 2x, 32 art pixels" % id)
+			check(small != null and small.get_width() == 16, "%s: its 1x icon, 16" % id)
+	check(found >= 86, "every card and sigil looked at (%d)" % found)

@@ -307,6 +307,467 @@ def cast_when_hurt() -> list[Part]:
     ]
 
 
+# --- modifiers ------------------------------------------------------------------------------------
+# A shot is a pale bead (`_shot`) unless the card is about something else; Spark marks power.
+
+
+def _shot(c: tuple[float, float], r: float = 2.0, material: str = "Bone") -> Part:
+    return ball(c, r, r, material=material, glint=True)
+
+
+def _arrow(points: list[tuple[float, float]], material: str = "Bone", bevel: float = 0.6) -> Part:
+    return poly(points, bevel=bevel, material=material)
+
+
+def barrier() -> list[Part]:
+    """A ring of ice round a shot: a ward that holds."""
+    return [ring((8.0, 8.0), 7.0, 5.0, material="Ice"), _shot((8.0, 8.0), 2.0)]
+
+
+def bigger() -> list[Part]:
+    """A great round shot, swollen, its glow a ring round it."""
+    return [ball((8.0, 8.0), 7.0, 7.0, material="Spark", glint=True), ball((6.0, 6.0), 2.4, 2.4, colour=sr.PALETTE["Spark"][2], seam=False)]
+
+
+def blast() -> list[Part]:
+    """A round bomb with its fuse lit."""
+    return [
+        ball((7.4, 9.6), 5.2, 5.2, material="Stone", glint=True),
+        box(6.2, 3.4, 8.6, 5.0, bevel=0.3, material="Stone"),
+        rod((8.0, 3.8), (10.2, 2.6), 0.45, material="Wood"),
+        ball((11.0, 2.4), 1.1, 1.1, material="Spark", glint=True),
+    ]
+
+
+def bounce() -> list[Part]:
+    """A shot leaving a wall it struck."""
+    return [
+        box(1.2, 1.0, 3.6, 15.0, bevel=0.6, material="Stone", surface="speckle"),
+        rod((4.4, 12.0), (9.0, 7.8), 0.5, material="Spark", seam=False),
+        _shot((11.4, 5.6), 2.6),
+    ]
+
+
+def chain() -> list[Part]:
+    """Two links of a chain, joined: a shot that goes on to the next."""
+    return [ring((5.0, 8.0), 3.6, 1.8, material="Bone"), ring((11.0, 8.0), 3.6, 1.8, material="Bone")]
+
+
+def charge() -> list[Part]:
+    """A gold shot swelling with gathered sparks round it."""
+    return [
+        _shot((8.0, 9.4), 4.0, "Spark"),
+        ball((3.4, 3.6), 0.9, 0.9, material="Spark", glint=True),
+        ball((8.0, 1.8), 0.9, 0.9, material="Spark", glint=True),
+        ball((12.6, 3.6), 0.9, 0.9, material="Spark", glint=True),
+    ]
+
+
+def deflect() -> list[Part]:
+    """A blade turning a dark shot aside."""
+    return [
+        ball((5.4, 11.0), 3.4, 3.4, material="Stone", glint=True),
+        rod((7.0, 9.4), (14.4, 1.6), 1.0, material="Spark", glint=True),
+        rod((5.6, 6.0), (10.4, 10.8), 0.7, material="Wood", surface="grain"),
+    ]
+
+
+def echo() -> list[Part]:
+    """A shot and its echo beside it, fainter."""
+    return [box(1.6, 5.2, 7.2, 10.8, bevel=0.9, corner=1.4, material="Stone"), box(8.8, 5.2, 14.4, 10.8, bevel=0.9, corner=1.4, material="Bone", glint=True)]
+
+
+def faster() -> list[Part]:
+    """Two chevrons pressing right."""
+    return [
+        _arrow([(2.0, 3.0), (5.0, 3.0), (9.0, 8.0), (5.0, 13.0), (2.0, 13.0), (6.0, 8.0)], "Spark"),
+        _arrow([(7.4, 3.0), (10.4, 3.0), (14.4, 8.0), (10.4, 13.0), (7.4, 13.0), (11.4, 8.0)], "Spark"),
+    ]
+
+
+def faster_casting() -> list[Part]:
+    """Two long chevrons, one behind the other, quicker still."""
+    return [
+        _arrow([(1.0, 1.4), (4.4, 1.4), (10.4, 8.0), (4.4, 14.6), (1.0, 14.6), (7.0, 8.0)], "Spark"),
+        _arrow([(6.6, 1.4), (10.0, 1.4), (15.2, 8.0), (10.0, 14.6), (6.6, 14.6), (11.8, 8.0)], "Spark"),
+    ]
+
+
+def ghost() -> list[Part]:
+    """A shot passing through a wall as if it were not there."""
+    return [
+        box(7.0, 1.0, 9.0, 15.0, bevel=0.4, material="Stone", surface="speckle"),
+        rod((1.6, 8.0), (13.0, 8.0), 0.7, material="Ice", seam=False),
+        _shot((12.6, 8.0), 2.4, "Ice"),
+    ]
+
+
+def growth() -> list[Part]:
+    """A small shot, then a bigger one: it grows as it flies."""
+    return [_shot((3.2, 8.0), 1.3, "Spark"), _shot((10.4, 8.0), 4.2, "Spark")]
+
+
+def heavy() -> list[Part]:
+    """An iron weight with a handle."""
+    return [
+        poly([(2.6, 14.6), (3.8, 6.4), (12.2, 6.4), (13.4, 14.6)], bevel=1.0, material="Stone", surface="speckle", glint=True),
+        ring((8.0, 5.0), 2.8, 1.5, material="Stone"),
+    ]
+
+
+def hold() -> list[Part]:
+    """A shot held in a cage of light, waiting."""
+    return [
+        ball((8.0, 8.0), 5.0, 5.6, material="Ice", glint=True),
+        box(1.2, 3.0, 3.0, 13.0, bevel=0.5, material="Spark"),
+        box(13.0, 3.0, 14.8, 13.0, bevel=0.5, material="Spark"),
+    ]
+
+
+def homing() -> list[Part]:
+    """A shot curving round to its mark."""
+    arc = [(8.0 + 5.4 * math.cos(a), 8.0 + 5.4 * math.sin(a)) for a in [math.pi * (0.9 + i * 0.12) for i in range(11)]]
+    inner = [(8.0 + 3.8 * math.cos(a), 8.0 + 3.8 * math.sin(a)) for a in [math.pi * (0.9 + i * 0.12) for i in range(11)]][::-1]
+    return [
+        poly(arc + inner, bevel=0.4, material="Ice", seam=False),
+        _shot((3.2, 11.2), 1.8, "Ice"),
+        box(10.2, 10.2, 14.0, 14.0, bevel=0.6, material="Fire", glint=True),
+    ]
+
+
+def linger() -> list[Part]:
+    """A shot slowing to a stop, its pauses left behind it."""
+    return [
+        box(1.2, 6.6, 2.6, 9.4, bevel=0.3, material="Stone"),
+        box(4.0, 6.0, 5.6, 10.0, bevel=0.3, material="Stone"),
+        _shot((10.6, 8.0), 4.0),
+    ]
+
+
+def lumber() -> list[Part]:
+    """A heavy log, its end rings showing, rolling slow."""
+    return [
+        box(3.6, 4.6, 14.6, 11.4, bevel=1.0, corner=1.6, material="Wood", surface="board"),
+        ball((3.6, 8.0), 2.4, 3.4, lean=0.6, material="Wood"),
+        ring((3.6, 8.0), 1.6, 0.8, material="Wood", seam=False),
+    ]
+
+
+def magnet() -> list[Part]:
+    """A horseshoe magnet, its ends bright."""
+    arc = [(8.0 + 6.0 * math.cos(a), 8.6 - 6.0 * math.sin(a)) for a in [math.pi * i / 10 for i in range(11)]]
+    inner = [(8.0 + 2.8 * math.cos(a), 8.6 - 2.8 * math.sin(a)) for a in [math.pi * i / 10 for i in range(11)]][::-1]
+    return [
+        poly(arc + [(5.2, 14.6), (2.0, 14.6)][::-1] + inner + [(10.8, 14.6), (14.0, 14.6)], bevel=0.8, material="Fire"),
+        box(2.0, 12.0, 5.2, 14.6, bevel=0.4, material="Bone", seam=True),
+        box(10.8, 12.0, 14.0, 14.6, bevel=0.4, material="Bone", seam=True),
+    ]
+
+
+def mirror() -> list[Part]:
+    """A shot and its mirror image either side of a glass."""
+    return [
+        box(7.0, 1.0, 9.0, 15.0, bevel=0.5, material="Ice", surface="streak", glint=True),
+        box(2.0, 6.2, 5.2, 9.8, bevel=0.6, corner=0.6, material="Bone"),
+        box(10.8, 6.2, 14.0, 9.8, bevel=0.6, corner=0.6, material="Stone"),
+    ]
+
+
+def nova() -> list[Part]:
+    """A ring bursting out round a bright middle."""
+    return [ring((8.0, 8.0), 7.2, 5.4, material="Bone"), ring((8.0, 8.0), 3.8, 2.4, material="Stone"), _shot((8.0, 8.0), 1.4, "Spark")]
+
+
+def orbit() -> list[Part]:
+    """Shots circling a middle."""
+    parts: list[Part] = [_shot((8.0, 8.0), 1.6, "Spark")]
+    for i in range(6):
+        a = math.pi * i / 3.0
+        parts.append(_shot((8.0 + 5.6 * math.cos(a), 8.0 + 5.6 * math.sin(a)), 1.2))
+    return parts
+
+
+def overcharge() -> list[Part]:
+    """A bolt of power, its spill crackling off it."""
+    return [poly(_bolt(-1.0, -0.6, 0.86), bevel=0.6, material="Spark", glint=True), box(11.6, 11.6, 13.4, 13.4, bevel=0.3, material="Fire"), box(13.4, 13.4, 15.0, 15.0, bevel=0.3, material="Fire")]
+
+
+def penta() -> list[Part]:
+    """Five shots round a star."""
+    parts: list[Part] = [poly(_star((8.0, 8.0), 3.4, 1.4, 5, -math.pi / 2), bevel=0.4, material="Void", glint=True)]
+    for i in range(5):
+        a = -math.pi / 2 + 2 * math.pi * i / 5
+        parts.append(_shot((8.0 + 6.0 * math.cos(a), 8.0 + 6.0 * math.sin(a)), 1.4, "Void"))
+    return parts
+
+
+def pierce() -> list[Part]:
+    """A spear head through a plate."""
+    return [
+        box(6.4, 2.0, 9.6, 14.0, bevel=0.7, material="Stone", surface="speckle"),
+        rod((1.6, 8.0), (11.0, 8.0), 0.9, material="Bone", seam=True),
+        _arrow([(10.6, 5.2), (15.2, 8.0), (10.6, 10.8)], "Bone"),
+    ]
+
+
+def plow() -> list[Part]:
+    """A plough's blade on its pole, driven through the floor."""
+    return [
+        rod((1.6, 2.0), (8.0, 8.4), 0.8, material="Wood", surface="grain"),
+        poly([(7.0, 6.4), (13.6, 5.0), (14.4, 12.4), (8.4, 14.2)], bevel=1.0, material="Stone", glint=True),
+        box(1.0, 13.6, 7.0, 14.6, bevel=0.3, material="Stone", seam=False),
+    ]
+
+
+def point_blank() -> list[Part]:
+    """A staff's end bursting at the touch."""
+    return [
+        rod((1.6, 14.4), (8.6, 7.4), 0.9, material="Wood", surface="grain"),
+        poly(_star((10.6, 5.4), 4.6, 1.8, 6), bevel=0.5, material="Spark", glint=True),
+    ]
+
+
+def possess() -> list[Part]:
+    """A spirit's face in a ring of void."""
+    return [
+        ball((8.0, 8.0), 7.2, 7.2, material="Void"),
+        ball((8.0, 8.4), 4.0, 4.6, material="Void", glint=True),
+        ball((6.6, 7.6), 0.8, 1.1, colour=OUTLINE),
+        ball((9.4, 7.6), 0.8, 1.1, colour=OUTLINE),
+    ]
+
+
+def pull() -> list[Part]:
+    """An anchor's hook, drawing things in."""
+    return [
+        ring((8.0, 3.0), 2.2, 1.0, material="Stone"),
+        rod((8.0, 5.0), (8.0, 13.0), 0.9, material="Stone"),
+        poly([(1.6, 9.6), (3.4, 9.6), (8.0, 13.2), (12.6, 9.6), (14.4, 9.6), (8.0, 15.0)], bevel=0.6, material="Stone", glint=True),
+    ]
+
+
+def quick_hand() -> list[Part]:
+    """An hourglass, its sand running fast."""
+    return [
+        box(3.0, 1.0, 13.0, 2.6, bevel=0.4, material="Wood", surface="grain"),
+        box(3.0, 13.4, 13.0, 15.0, bevel=0.4, material="Wood", surface="grain"),
+        poly([(4.0, 2.6), (12.0, 2.6), (8.8, 8.0), (12.0, 13.4), (4.0, 13.4), (7.2, 8.0)], bevel=0.8, material="Ice", surface="streak"),
+        poly([(5.6, 13.4), (8.0, 10.4), (10.4, 13.4)], bevel=0.3, material="Spark", seam=False),
+    ]
+
+
+def reach() -> list[Part]:
+    """A long arrow, far further than a shot goes."""
+    return [rod((1.6, 8.0), (11.6, 8.0), 1.0, material="Ice", seam=False), _arrow([(10.6, 4.0), (15.2, 8.0), (10.6, 12.0)], "Ice")]
+
+
+def recoil() -> list[Part]:
+    """A shot leaving one way, a kick back the other."""
+    return [_arrow([(1.0, 8.0), (5.4, 4.0), (5.4, 6.6), (9.0, 6.6), (9.0, 9.4), (5.4, 9.4), (5.4, 12.0)], "Spark"), _shot((12.4, 8.0), 2.6, "Ice")]
+
+
+def relay() -> list[Part]:
+    """A shot handing on to an arrow beyond it."""
+    return [_shot((4.0, 8.0), 2.8, "Ice"), _arrow([(8.0, 6.8), (11.4, 6.8), (11.4, 4.6), (15.0, 8.0), (11.4, 11.4), (11.4, 9.2), (8.0, 9.2)], "Spark")]
+
+
+def return_() -> list[Part]:
+    """An arc turning back on itself: it comes home."""
+    arc = [(8.0 + 6.2 * math.cos(a), 8.0 + 6.2 * math.sin(a)) for a in [math.pi * (0.75 + i * 0.15) for i in range(11)]]
+    inner = [(8.0 + 4.2 * math.cos(a), 8.0 + 4.2 * math.sin(a)) for a in [math.pi * (0.75 + i * 0.15) for i in range(11)]][::-1]
+    return [poly(arc + inner, bevel=0.6, material="Bone"), _arrow([(1.8, 9.0), (5.6, 13.6), (7.4, 9.6)], "Bone")]
+
+
+def shield() -> list[Part]:
+    """A heater shield, rimmed, its face lit."""
+    return [
+        poly([(2.0, 2.0), (14.0, 2.0), (14.0, 8.4), (8.0, 15.0), (2.0, 8.4)], bevel=1.2, material="Ice", glint=True),
+        poly([(4.6, 4.4), (11.4, 4.4), (11.4, 8.0), (8.0, 11.8), (4.6, 8.0)], bevel=0.4, material="Ice", seam=True),
+    ]
+
+
+def siphon() -> list[Part]:
+    """A flask drawing mana up out of a body."""
+    return [
+        ball((8.0, 11.2), 4.6, 3.8, material="Mana", glint=True),
+        box(6.8, 4.6, 9.2, 7.6, bevel=0.4, material="Bone", surface="streak"),
+        _arrow([(8.0, 0.8), (11.0, 3.8), (5.0, 3.8)], "Spark"),
+    ]
+
+
+def skyfall() -> list[Part]:
+    """A pillar falling from above onto the floor."""
+    return [
+        box(1.6, 1.0, 14.4, 3.6, bevel=0.6, material="Spark"),
+        box(6.4, 3.6, 9.6, 13.0, bevel=0.8, material="Spark", glint=True),
+        box(3.0, 13.0, 13.0, 15.0, bevel=0.4, material="Stone", seam=False),
+    ]
+
+
+def slow() -> list[Part]:
+    """A shot dragging a heavy trail of cold behind it."""
+    return [rod((1.6, 11.6), (6.0, 9.0), 1.2, material="Ice", seam=False), ball((9.6, 7.0), 5.0, 4.4, material="Ice", surface="streak", glint=True)]
+
+
+def sniper() -> list[Part]:
+    """A sight's cross on its mark."""
+    return [
+        ring((8.0, 8.0), 6.8, 5.6, material="Stone"),
+        box(7.4, 0.6, 8.6, 15.4, bevel=0.2, material="Stone", seam=False),
+        box(0.6, 7.4, 15.4, 8.6, bevel=0.2, material="Stone", seam=False),
+        ball((8.0, 8.0), 1.4, 1.4, material="Fire", glint=True),
+    ]
+
+
+def spiral() -> list[Part]:
+    """A shot's wavy path."""
+    pts = [(1.0 + i * 0.7, 8.0 - 3.0 * math.sin(i * 0.7 * 0.9)) for i in range(21)]
+    return [rod(pts[i], pts[i + 1], 0.7, material="Bone", seam=False) for i in range(20)]
+
+
+def split() -> list[Part]:
+    """One shot parting into three."""
+    return [
+        rod((4.0, 8.0), (11.0, 3.0), 0.5, material="Stone", seam=False),
+        rod((4.0, 8.0), (11.0, 8.0), 0.5, material="Stone", seam=False),
+        rod((4.0, 8.0), (11.0, 13.0), 0.5, material="Stone", seam=False),
+        _shot((3.6, 8.0), 2.4),
+        _shot((12.4, 3.0), 1.8), _shot((12.4, 8.0), 1.8), _shot((12.4, 13.0), 1.8),
+    ]
+
+
+def sticky() -> list[Part]:
+    """A shot stuck to a wall, the wall's face round it."""
+    return [
+        box(9.4, 1.0, 14.6, 15.0, bevel=0.8, material="Stone", surface="speckle"),
+        box(2.0, 6.0, 9.6, 10.0, bevel=0.6, corner=0.8, material="Bone", glint=True),
+    ]
+
+
+def zap() -> list[Part]:
+    """A small arc of lightning, crackling."""
+    return [poly(_bolt(0.0, 0.0, 0.92), bevel=0.6, material="Arc", glint=True), box(12.6, 11.4, 14.0, 12.8, bevel=0.2, material="Arc")]
+
+
+# --- multicasts -----------------------------------------------------------------------------------
+
+
+def burst() -> list[Part]:
+    """Three shots in a row, cast at once."""
+    return [_shot((3.0, 8.0), 1.8), _shot((8.0, 8.0), 1.8), _shot((13.0, 8.0), 1.8)]
+
+
+def double() -> list[Part]:
+    """Two shots side by side, flying down."""
+    return [
+        rod((4.6, 1.6), (4.6, 10.0), 0.9, material="Bone", seam=False), _arrow([(2.4, 10.0), (6.8, 10.0), (4.6, 14.8)], "Bone"),
+        rod((11.4, 1.6), (11.4, 10.0), 0.9, material="Bone", seam=False), _arrow([(9.2, 10.0), (13.6, 10.0), (11.4, 14.8)], "Bone"),
+    ]
+
+
+def scatter() -> list[Part]:
+    """Shots flung every way."""
+    return [_shot((3.0, 3.4), 1.6), _shot((12.4, 4.4), 1.6), _shot((6.2, 12.6), 1.6), _shot((12.8, 11.6), 1.4), _shot((8.4, 7.6), 1.3)]
+
+
+def triple() -> list[Part]:
+    """Three shots side by side."""
+    parts: list[Part] = []
+    for x in (3.0, 8.0, 13.0):
+        parts.append(rod((x, 1.6), (x, 11.0), 0.8, material="Bone", seam=False))
+        parts.append(_arrow([(x - 1.8, 11.0), (x + 1.8, 11.0), (x, 14.8)], "Bone"))
+    return parts
+
+
+# --- triggers: a shot (white) and the moment it fires on ------------------------------------------
+
+
+def on_any_cast() -> list[Part]:
+    """A spark among shots in every way: any cast."""
+    parts: list[Part] = [_shot((8.0, 8.0), 2.0, "Spark")]
+    for i in range(8):
+        a = math.pi * i / 4.0
+        parts.append(_shot((8.0 + 5.8 * math.cos(a), 8.0 + 5.8 * math.sin(a)), 0.9, "Spark"))
+    return parts
+
+
+def on_block() -> list[Part]:
+    """A shot meeting a raised guard."""
+    return [_shot((4.0, 8.0), 2.2), box(9.0, 2.0, 13.4, 14.0, bevel=0.8, corner=0.6, material="Stone", glint=True)]
+
+
+def on_cast() -> list[Part]:
+    """A shot leaving the staff."""
+    return [box(10.2, 5.0, 15.0, 11.0, bevel=0.6, material="Wood", surface="grain"), ball((5.6, 8.0), 4.0, 3.6, material="Bone", glint=True)]
+
+
+def on_expire() -> list[Part]:
+    """A shot at the end of its way, a box drawn round where it stops."""
+    return [_shot((3.6, 8.0), 1.4), box(8.2, 4.4, 15.0, 11.6, bevel=0.8, material="Bone"), box(10.2, 6.4, 13.0, 9.6, bevel=0.3, colour=OUTLINE)]
+
+
+def on_hit() -> list[Part]:
+    """A shot striking a mark."""
+    return [rod((1.6, 8.0), (7.0, 8.0), 0.9, material="Bone", seam=False), _shot((8.0, 8.0), 2.4), box(11.0, 1.4, 13.0, 14.6, bevel=0.5, material="Bone", glint=True)]
+
+
+def on_hurt() -> list[Part]:
+    """A heart: when its bearer is hurt."""
+    return [
+        ball((5.2, 6.4), 3.6, 3.6, material="Fire", glint=True),
+        ball((10.8, 6.4), 3.6, 3.6, material="Fire", seam=False),
+        poly([(1.6, 7.4), (14.4, 7.4), (8.0, 14.6)], bevel=1.0, material="Fire", seam=False),
+    ]
+
+
+def on_kill() -> list[Part]:
+    """A skull: when a foe falls."""
+    return [
+        ball((8.0, 7.0), 5.4, 4.8, material="Bone", surface="pores", glint=True),
+        box(5.6, 10.0, 10.4, 13.2, bevel=0.5, material="Bone"),
+        ball((5.8, 7.4), 1.2, 1.4, colour=OUTLINE),
+        ball((10.2, 7.4), 1.2, 1.4, colour=OUTLINE),
+    ]
+
+
+def on_near() -> list[Part]:
+    """A watching face with sense rings out to one side: when something comes near."""
+    return [
+        ring((8.0, 8.0), 7.4, 6.4, material="Stone"),
+        ring((8.0, 8.0), 5.4, 4.6, material="Stone", seam=False),
+        ball((6.6, 8.0), 4.0, 4.0, material="Bone", glint=True),
+        ball((5.4, 7.4), 0.7, 1.0, colour=OUTLINE),
+        ball((7.8, 7.4), 0.7, 1.0, colour=OUTLINE),
+    ]
+
+
+def on_reaction() -> list[Part]:
+    """A four-point flare where two elements meet."""
+    return [poly(_star((8.0, 8.0), 7.0, 1.8, 4, -math.pi / 2), bevel=0.8, material="Spark", glint=True)]
+
+
+def on_recast() -> list[Part]:
+    """A flame on a stone block: cast again."""
+    return [
+        box(3.0, 10.0, 13.0, 15.0, bevel=0.8, material="Stone", surface="speckle"),
+        poly([(8.0, 2.0), (11.2, 6.8), (10.4, 10.0), (5.6, 10.0), (4.8, 6.8), (6.6, 7.6)], bevel=0.6, material="Fire", surface="flame", seam=False),
+    ]
+
+
+def on_wall() -> list[Part]:
+    """A shot about to meet a wall."""
+    return [_shot((4.0, 8.0), 2.2), box(10.0, 1.0, 14.8, 15.0, bevel=0.8, material="Stone", surface="speckle")]
+
+
+def timer() -> list[Part]:
+    """A clock face, its hands at a quarter."""
+    return [
+        ball((8.0, 8.0), 7.2, 7.2, material="Bone", glint=True),
+        box(7.4, 3.0, 8.6, 8.6, bevel=0.1, colour=OUTLINE),
+        box(7.4, 7.4, 12.0, 8.6, bevel=0.1, colour=OUTLINE),
+    ]
+
+
 ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
     "atom": (SPELLS / "carriers/atom", atom), "beam": (SPELLS / "carriers/beam", beam),
     "bolt": (SPELLS / "carriers/bolt", bolt), "dash": (SPELLS / "carriers/dash", dash),
@@ -322,6 +783,64 @@ ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
     "oil": (SPELLS / "elements/oil", oil), "storm": (SPELLS / "elements/storm", storm),
     "void": (SPELLS / "elements/void", void), "water": (SPELLS / "elements/water", water),
     "spill": (SPELLS / "modifiers/spill", spill),
+    "barrier": (SPELLS / "modifiers/barrier", barrier),
+    "bigger": (SPELLS / "modifiers/bigger", bigger),
+    "blast": (SPELLS / "modifiers/blast", blast),
+    "bounce": (SPELLS / "modifiers/bounce", bounce),
+    "chain": (SPELLS / "modifiers/chain", chain),
+    "charge": (SPELLS / "modifiers/charge", charge),
+    "deflect": (SPELLS / "modifiers/deflect", deflect),
+    "echo": (SPELLS / "modifiers/echo", echo),
+    "faster": (SPELLS / "modifiers/faster", faster),
+    "faster_casting": (SPELLS / "modifiers/faster_casting", faster_casting),
+    "ghost": (SPELLS / "modifiers/ghost", ghost),
+    "growth": (SPELLS / "modifiers/growth", growth),
+    "heavy": (SPELLS / "modifiers/heavy", heavy),
+    "hold": (SPELLS / "modifiers/hold", hold),
+    "homing": (SPELLS / "modifiers/homing", homing),
+    "linger": (SPELLS / "modifiers/linger", linger),
+    "lumber": (SPELLS / "modifiers/lumber", lumber),
+    "magnet": (SPELLS / "modifiers/magnet", magnet),
+    "mirror": (SPELLS / "modifiers/mirror", mirror),
+    "nova": (SPELLS / "modifiers/nova", nova),
+    "orbit": (SPELLS / "modifiers/orbit", orbit),
+    "overcharge": (SPELLS / "modifiers/overcharge", overcharge),
+    "penta": (SPELLS / "modifiers/penta", penta),
+    "pierce": (SPELLS / "modifiers/pierce", pierce),
+    "plow": (SPELLS / "modifiers/plow", plow),
+    "point_blank": (SPELLS / "modifiers/point_blank", point_blank),
+    "possess": (SPELLS / "modifiers/possess", possess),
+    "pull": (SPELLS / "modifiers/pull", pull),
+    "quick_hand": (SPELLS / "modifiers/quick_hand", quick_hand),
+    "reach": (SPELLS / "modifiers/reach", reach),
+    "recoil": (SPELLS / "modifiers/recoil", recoil),
+    "relay": (SPELLS / "modifiers/relay", relay),
+    "return": (SPELLS / "modifiers/return", return_),
+    "shield": (SPELLS / "modifiers/shield", shield),
+    "siphon": (SPELLS / "modifiers/siphon", siphon),
+    "skyfall": (SPELLS / "modifiers/skyfall", skyfall),
+    "slow": (SPELLS / "modifiers/slow", slow),
+    "sniper": (SPELLS / "modifiers/sniper", sniper),
+    "spiral": (SPELLS / "modifiers/spiral", spiral),
+    "split": (SPELLS / "modifiers/split", split),
+    "sticky": (SPELLS / "modifiers/sticky", sticky),
+    "zap": (SPELLS / "modifiers/zap", zap),
+    "burst": (SPELLS / "multicasts/burst", burst),
+    "double": (SPELLS / "multicasts/double", double),
+    "scatter": (SPELLS / "multicasts/scatter", scatter),
+    "triple": (SPELLS / "multicasts/triple", triple),
+    "on_any_cast": (SPELLS / "triggers/on_any_cast", on_any_cast),
+    "on_block": (SPELLS / "triggers/on_block", on_block),
+    "on_cast": (SPELLS / "triggers/on_cast", on_cast),
+    "on_expire": (SPELLS / "triggers/on_expire", on_expire),
+    "on_hit": (SPELLS / "triggers/on_hit", on_hit),
+    "on_hurt": (SPELLS / "triggers/on_hurt", on_hurt),
+    "on_kill": (SPELLS / "triggers/on_kill", on_kill),
+    "on_near": (SPELLS / "triggers/on_near", on_near),
+    "on_reaction": (SPELLS / "triggers/on_reaction", on_reaction),
+    "on_recast": (SPELLS / "triggers/on_recast", on_recast),
+    "on_wall": (SPELLS / "triggers/on_wall", on_wall),
+    "timer": (SPELLS / "triggers/timer", timer),
     "cast_when_close": (SIGILS / "cast_when_close", cast_when_close), "cast_when_hurt": (SIGILS / "cast_when_hurt", cast_when_hurt),
 }
 

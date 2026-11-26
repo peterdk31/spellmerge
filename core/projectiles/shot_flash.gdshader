@@ -245,7 +245,9 @@ void vertex() {
 			a2 = column;
 			k0 = vec4(shade_of(L, curve(row, C_FIRST, a, z, given, -1.0)), 1.0);
 			k1 = vec4(shade_of(L, curve(row, C_SECOND, a, z, given, -1.0)), 1.0);
-			k2 = vec4(L.mid, 1.0);
+			// The lower-right edge a shade below its second shade (lit from the top-left; ART2).
+			float second = curve(row, C_SECOND, a, z, given, -1.0);
+			k2 = vec4(shade_of(L, second < -0.5 ? 2.0 : min(second + 1.0, 3.0)), 1.0);
 		}
 		q_lo = vec2(-max(reach, 0.0)) - 2.0;
 		q_hi = vec2(max(reach, 0.0)) + 3.0;
@@ -337,13 +339,13 @@ void fragment() {
 		bool turned = v3.x >= 0.0 || v3.y > v3.z || v3.w >= 0.0 || v4.x >= 0.0;
 		float turn = turned ? atan(d.y, d.x) : 0.0;
 		float round_r = turned ? length(d) : 0.0;
-		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot's pixel, a plus from zoom 2
-		// (v1.w 128 or more).
+		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot a world pixel (FLASH_DETAIL
+		// art pixels each way), a plus of them from zoom 2 (v1.w 128 or more).
 		if (v3.w >= 0.0) {
 			float n = max(mod(v1.w, 128.0), 1.0);
 			float at = round(turn / 6.2832 * n) / n * 6.2832;
 			vec2 dot_at = round(vec2(cos(at), sin(at)) * v3.w);
-			vec2 off = abs(d - dot_at);
+			vec2 off = abs(floor((d - dot_at) / FLASH_DETAIL));
 			if (off.x + off.y <= (v1.w >= 128.0 ? 1.0 : 0.0)) {
 				colour = c1;
 			}
@@ -363,7 +365,7 @@ void fragment() {
 			float at = round(turn / 6.2832 * n) / n * 6.2832;
 			float along = round_r * cos(turn - at);
 			if (abs(round_r * sin(turn - at)) < 0.5 && along >= v3.z && along <= v3.y) {
-				colour = along < v3.z + 2.0 ? c0 : (along > v3.y - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
+				colour = along < v3.z + 2.0 * FLASH_DETAIL ? c0 : (along > v3.y - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
 			}
 		}
 		// A star of mod(v4.w, 16) points out to v3.x: its reach narrows between the points.
@@ -392,7 +394,7 @@ void fragment() {
 	} else {
 		// A quake's cracks, on a floor seen flat: the crack nearest the pixel's way (one of
 		// QUAKE_CRACKS round about, each turned and as long as its hash says, v0.x at most), its
-		// line measured in whole pixels, jagged every 4 px, 2 px wide near the middle with a dark
+		// line measured in whole world pixels (FLASH_DETAIL art pixels each), jagged every 4, 2 wide near the middle with a dark
 		// rim (cut into the floor), dotted at the tip. They open at once, white-hot (c0), cool
 		// from the tips in through c1, c2, v2 to dark stone, and crumble away.
 		float s = v0.z;
@@ -405,13 +407,13 @@ void fragment() {
 		u /= flat_len;
 		float along = dot(d, u);
 		float reach = v0.x * flat_len * (0.6 + 0.4 * hash_seeded(k, 51.0, 31.0, s)) * min(a / 0.04, 1.0);
-		float rung = max(along, 0.0) / 4.0;
+		float rung = max(along, 0.0) / (4.0 * FLASH_DETAIL);
 		float jag = mix(hash_seeded(k, floor(rung), 52.0, s), hash_seeded(k, floor(rung) + 1.0, 52.0, s), fract(rung)) - 0.5;
-		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0) * 0.5);
-		float wide = along < reach * 0.4 ? 1.0 : 0.6;
-		bool inside = along > 1.5 && along <= reach && (along < reach * 0.8 || dotted(d));
+		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0 * FLASH_DETAIL) * 0.5);
+		float wide = (along < reach * 0.4 ? 1.0 : 0.6) * FLASH_DETAIL;
+		bool inside = along > 1.5 * FLASH_DETAIL && along <= reach && (along < reach * 0.8 || dotted(d));
 		bool crack = inside && side < wide;
-		bool rim = inside && !crack && side < wide + 1.0 && along < reach * 0.6;
+		bool rim = inside && !crack && side < wide + FLASH_DETAIL && along < reach * 0.6;
 		bool kept = a < 0.7 || hash_seeded(d.x, d.y, 53.0, s) > (a - 0.7) / 0.3;
 		float heat = a * 1.5 + along / max(reach, 1.0) * 0.4;
 		vec3 rgb = heat < 0.12 ? c0.rgb : (heat < 0.3 ? c1.rgb : (heat < 0.5 ? c2.rgb : (heat < 0.7 ? v2.rgb : STONE_SHADOW)));

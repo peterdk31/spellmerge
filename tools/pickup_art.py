@@ -50,7 +50,7 @@ def key() -> list[Part]:
     ]
 
 
-def _flask(body: list[Part], neck: tuple[float, float, float, float], cork: tuple[float, float, float, float], liquid: str) -> list[Part]:
+def _flask(body: list[Part], neck: tuple[float, float, float, float], cork: tuple[float, float, float, float]) -> list[Part]:
     """A glass flask: its neck pale glass, its cork, then its body of `liquid` with a shine."""
     nx0, ny0, nx1, ny1 = neck
     cx0, cy0, cx1, cy1 = cork
@@ -67,11 +67,11 @@ def _shine(cx: float, cy: float, liquid: str) -> Part:
 
 
 def healing() -> list[Part]:
-    return _flask([ball((8.0, 10.4), 4.9, 4.4, material="Fire", glint=True), _shine(5.6, 9.6, "Fire")], (6.6, 4.0, 9.4, 6.6), (6.2, 2.2, 9.8, 4.2), "Fire")
+    return _flask([ball((8.0, 10.4), 4.9, 4.4, material="Fire", glint=True), _shine(5.6, 9.6, "Fire")], (6.6, 4.0, 9.4, 6.6), (6.2, 2.2, 9.8, 4.2))
 
 
 def large_healing() -> list[Part]:
-    return _flask([ball((8.0, 9.9), 6.2, 5.4, material="Fire", glint=True), _shine(4.8, 8.6, "Fire")], (6.4, 2.6, 9.6, 5.0), (6.1, 0.8, 9.9, 2.8), "Fire")
+    return _flask([ball((8.0, 9.9), 6.2, 5.4, material="Fire", glint=True), _shine(4.8, 8.6, "Fire")], (6.4, 2.6, 9.6, 5.0), (6.1, 0.8, 9.9, 2.8))
 
 
 def max_health() -> list[Part]:
@@ -84,11 +84,11 @@ def max_health() -> list[Part]:
 
 def small_healing() -> list[Part]:
     """A little upright vial."""
-    return _flask([box(6.2, 7.4, 9.8, 13.6, bevel=0.7, corner=1.1, material="Fire", glint=True)], (6.9, 5.8, 9.1, 7.6), (6.6, 4.2, 9.4, 6.0), "Fire")
+    return _flask([box(6.2, 7.4, 9.8, 13.6, bevel=0.7, corner=1.1, material="Fire", glint=True)], (6.9, 5.8, 9.1, 7.6), (6.6, 4.2, 9.4, 6.0))
 
 
 def vigor() -> list[Part]:
-    return _flask([ball((8.0, 10.4), 5.2, 4.7, material="Arc", glint=True), _shine(5.4, 9.4, "Arc")], (6.6, 3.8, 9.4, 6.4), (6.2, 2.0, 9.8, 4.0), "Arc")
+    return _flask([ball((8.0, 10.4), 5.2, 4.7, material="Arc", glint=True), _shine(5.4, 9.4, "Arc")], (6.6, 3.8, 9.4, 6.4), (6.2, 2.0, 9.8, 4.0))
 
 
 def reward_reroll() -> list[Part]:

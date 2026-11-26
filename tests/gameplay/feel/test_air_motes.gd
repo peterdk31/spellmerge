@@ -141,8 +141,8 @@ func test_a_lit_only_kind_tells_the_shader_and_reads_the_light_it_is_handed() ->
 	var plain := _dust(&"plain_here")
 	plain.lit_only = false
 	var motes: MotesScript = _pool(1024, [plain, _dust()])
-	check_equal(motes.kind_numbers(0)[3], Vector4(0.0, 0.0, 0.0, 0.0), "a plain kind is drawn as it is")
-	check_equal(motes.kind_numbers(1)[3], Vector4(1.0, 0.0, 0.0, 0.0), "a lit-only kind, in its row's light texel")
+	check_equal(motes.kind_numbers(0)[3], Vector4(0.0, 0.0, 1.0, 0.0), "a plain kind is drawn as it is (z: its art detail, 1)")
+	check_equal(motes.kind_numbers(1)[3], Vector4(1.0, 0.0, 1.0, 0.0), "a lit-only kind, in its row's light texel")
 	check(motes.light() == null and motes.shader_parameter(&"light_on") != true, "no light buffer until one is handed: lit-only motes are not drawn")
 	var light: SpellLightScript = own(SpellLightScript.new(null, 0)) as SpellLightScript
 	root.add_child(light)

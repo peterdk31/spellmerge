@@ -302,7 +302,9 @@ the hit, not the step before (`Actor.step`).
 A field (`field.gd`, docs/milestones/field.md) is a still shot of the projectile manager that hits
 nothing (`set_field`: no hit layers, so no guard or threat test meets it). The manager's field pass
 (`shots_into_fields`, natively `ShotKernel.field_pass`, the same to the bit) hands back each shot whose
-middle went from outside a field's circle to inside it (or through it) in the last step; the carrier
+middle is inside a field's circle (or went through it) after the last step, wherever it came from
+(flown in, cast or spawned inside, grown over), but still shots and the field's own payloads, each
+once, the first field's it is in; the carrier
 holds it (a local stop), keeps only its way in (32 steps), draws it in and grows the field, and when
 the field ends sends every shot it holds out along its way, giving each the field's cards (`_give`:
 its infusion through `CarrierKit.infuse_shot`, its homing and its behaviours, at least the field's of

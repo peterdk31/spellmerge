@@ -7,7 +7,7 @@
 **Field** (`content/spells/carriers/field/`, carrier `field`, `core/spells/carriers/field.gd`): "Catches every shot, then lets them all go at once."
 
 - It is **a round field on the floor a step ahead** (`ray_length`, short of a wall), there for its life, its edge trembling. It hits nothing.
-- **Every shot that comes into it is caught**: drawn in to its middle and held there, its life waiting. Anyone's shots: a teammate's, an enemy's, the caster's own (the owner's answer 4).
+- **Every shot in it is caught**, wherever it came from: one that flies in, one cast from inside it, one split or spawned inside it, one it grows over (the owner, 2026-11-26: "It should capture all that hits it's area"). It is drawn in to its middle and held there, its life waiting. Anyone's shots: a teammate's, an enemy's, the caster's own (the owner's answer 4).
 - **It grows with every shot it holds**, so a full field catches more.
 - **When it ends it lets them all go in one burst** from its middle, each the way it was going when it came in: a shot that came in from the west going east leaves to the east, carrying on through. An enemy's bolt at you leaves at you.
 - **What leaves it takes its cards**: a fire field's burst is fire, a homing field's burst homes, a bounce field's comes off the walls.
@@ -50,25 +50,27 @@
 ## How a shot is caught and let go
 
 - **Caught:**
-  - when: the step its middle goes from outside the field's circle to inside it, or through it (a shot faster than the field is wide in a step, an atom);
+  - when: the first step its middle is inside the field's circle, wherever it came from (flown in, cast, split or spawned inside it, or the field grew over it), or went through it (a shot faster than the field is wide in a step, an atom). A wizard casts after the field's step, so a bolt cast inside a field is caught the next step, one step out of the hand;
   - how: the manager's field pass hands it back, and the carrier holds it with a local stop (`freeze_shot`), so its life, its motion and its hits wait;
-  - what is kept: only **the way it was going, in 32 steps round** (a byte, `WAYS`), not its position.
+  - what is kept: only **the way it was going, in 32 steps round** (a byte, `WAYS`), not its position. A shot with no velocity (one that circles, or is at rest) keeps the way from it to the field's middle;
+  - **in two fields at once** it is the first one's in the carrier's list, the one cast first: the pass hands back each shot once.
 - **Drawn in:** each step a held shot moves a fifth of the way left to the middle (`DRAW_IN`). It is held, so it hits nothing on the way.
-- **What is caught:** every live shot that moved this step (flying, circling, spiralling, homing, returning). Not caught:
+- **What is caught:** every live shot in it (flying, circling, spiralling, homing, returning, slowed to a stop by its speed). Not caught:
   - a field;
   - a shot already stopped (a local stop, a linger's hold, a stuck one);
   - a falling shot in the air;
-  - a rune, a pool and a wall, which stand still and so never come in;
+  - a still shot: a rune, a pool or a wall standing in it (it is placed, it does not hit the field), but what a rune's Timer fires inside it is caught;
+  - the field's own payloads (a Timer's bolts from its middle): a shot whose caster is that field's shot (`set_caster_shot`) is never that field's, though another field over it catches it;
   - a shot another field holds, which is stopped.
 - **No most** (the owner, 2026-11-26: "No limits"): a field holds every shot that comes in. Its rows grow by doubling and are walked once a step and once at the burst, so nothing is allocated a step once grown.
 - **It grows** 1.5 px of radius a shot caught (`GROW_PER_SHOT`), with no most but the room's size, the most any shot is (as Growth keeps it): at that a field covers the room, catches all that moves in it, and is drawn clipped by the screen. Growth grows it further over time. A wider field catches more.
 - **The burst:**
   - when: the step after its shot ends (its life out, switched off, its caster gone);
   - spread over steps when it is big (the owner, 2026-11-26: "If it helps performance, you can make the field emit its payload over multiple ticks"): at most 200 a step (`BURST_PER_STEP`), the first caught first, all from its middle as it was, so a field of 2000 bursts over 10 steps (a sixth of a second) and still reads as one burst; a bursting field catches nothing more, and goes once it holds none;
-  - every shot it holds leaves from its middle (just outside its own radius) along its kept way, at the speed it had;
+  - every shot it holds leaves from its middle (just outside its own radius) along its kept way, at the speed it had. Its field is gone, so it is not caught again by it; let go inside another live field, it is caught by that one;
   - each is let go (`release_shot`) and takes the field's cards;
   - a shot that circled (an orbit) is let go where it is.
-- **A field's own payloads** (a Timer's bolts, from its middle) are born inside it, so they are not caught.
+- **A field's own payloads** (a Timer's bolts, from its middle) are not caught by it: the pass passes a shot by for the field that is its caster.
 - **A wall in the same step:** a shot that comes into a field and meets a wall in one step ends at the wall first (the manager's step runs before the field pass).
 - **Not in this build:** beams (a beam's ray is no shot), and bodies (the floor's and the Pool's).
 
@@ -85,11 +87,11 @@
 
 ## The cost, and where it runs
 
-**Catching runs in the projectile manager and its native kernel.** `ProjectileManager.shots_into_fields` is a pass over every shot against every field. The field carrier's step calls it once per tick, after the manager's step. It hands back pairs (a shot, the field it came into), in slot order and then field order. The pass is the hot part:
+**Catching runs in the projectile manager and its native kernel.** `ProjectileManager.shots_into_fields` is a pass over every shot against every field. The field carrier's step calls it once per tick, after the manager's step. It hands back pairs (a shot, the field it is in), in slot order, each shot once (the first field in the list it is in). The pass is the hot part:
 
 - `ShotKernel.field_pass` runs it natively.
 - The GDScript stays as the reference and the fallback.
-- `tests/core/test_native_kernel.gd` compares the two to the bit: the pairs and their order, on straight, circling, homing, falling and stopped shots, through still, growing and circling fields, with stale rows in the list.
+- `tests/core/test_native_kernel.gd` compares the two to the bit: the pairs and their order, on straight, circling, homing, falling and stopped shots, shots born inside a field (at rest or slow), still shots and a field's own payloads, through still, growing and circling fields, with stale rows in the list.
 
 Nothing runs while no field is open. Holding, drawing in and the burst are GDScript. Measured, held by the same test: a field holding 500 shots takes 0.5 ms a step; one holding 2000 takes 1.8 ms a step. Its burst took 10.5 ms in one step before it was spread over steps, and now takes about 1.4 ms at most a step over 10 steps.
 
@@ -114,6 +116,10 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
   - an enemy's shot is caught and sent on at the caster with the field's frost;
   - a shot keeps more of a card than the field gives;
   - a shot through it in one step is caught;
+  - a cast made inside it is caught, and leaves the way it was going;
+  - a shot spawned inside it (a rune's Timer bolts) is caught, the rune is not;
+  - a field grown over a slow shot catches it;
+  - a shot in two fields is the first one's;
   - every shot is held, with no most, and the field grows to the room's size at most;
   - a big burst is spread over steps, a share a step, the first caught first;
   - its own shot wears none of its cards but Growth;
@@ -137,5 +143,6 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
 1. **The design** above (catch, grow, burst the way they came; only a rough angle kept).
 2. **Growth grows the field itself**, not the shots.
 3. **Blast and Split work on a field** (a blast where it ends, more fields), as on a portal.
-4. **A field's own payloads are not caught** (born inside, they never come in).
+4. **A field's own payloads are not caught** (born inside it; the pass passes them by for their own field).
+6. **A field catches every shot in its circle**, not only what crosses its edge (2026-11-26: "It should capture all that hits it's area"): a cast made inside it, a shot spawned inside it, one it grows over.
 5. **What leaves it takes its cards** ("as in the gives rule").

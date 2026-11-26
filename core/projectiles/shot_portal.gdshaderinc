@@ -30,7 +30,7 @@ float gate_seed(float custom_a) {
 	return fract(custom_a * 2.0) * 97.0;
 }
 
-// The world pixel under this fragment, from the gate's middle: x across the way through, y up it.
+// The middle of the art pixel under this fragment (art_centre; ART2), from the gate's middle: x across the way through, y up it.
 vec2 gate_pixel() {
 	vec2 d = art_centre(gate_world) - gate_centre;
 	return vec2(dot(d, gate_axes.xy), dot(d, gate_axes.zw));

@@ -228,7 +228,8 @@ void fragment() {
 		float cut = v1.w > 0.5 ? hash_seeded(d.x, d.y, 61.0, v0.x) : bayer4(d);
 		bool kept = q <= v0.z && cut < v1.x * (1.0 - k * k * v1.y);
 		// Its rim lit from the top-left (ART2): wide on the lower right, an art pixel on the upper left.
-		float rim_width = dot(d - floor(v0.xy), vec2(1.0)) > 0.0 ? 1.3 : 0.5;
+		vec2 rel = d - floor(v0.xy);
+		float rim_width = mix(0.5, 1.3, clamp(0.5 + dot(rel / max(length(rel), 0.001), vec2(0.7071)), 0.0, 1.0));
 		vec4 rgb = q > v0.z - rim_width && c2.a > 0.0 ? c2 : (k < v1.z ? c0 : c1);
 		colour = kept ? rgb : vec4(0.0);
 	} else if (mode < M_STREAK + 0.5) {

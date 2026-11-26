@@ -28,9 +28,11 @@ void vertex() {
 void fragment() {
 	vec2 q = gate_pixel();
 	vec4 colour = plain_gate(q, pal);
+	// Its stars a world pixel each (the gate's own shape is drawn at art pixels, ART2).
+	vec2 w = floor(q);
 	// A star: now and then a pixel of the dark lit, drifting across with the way through.
-	if (gate_part(q) > 1.5 && hash(q.y, floor(q.x + sim_time * 3.0 * gate.z), gate.w) > 0.95) {
-		colour = vec4(palette_turn(pal, int(q.x + q.y), hash(q.x, q.y, 4.0) > 0.7 ? 2 : 1, hash(q.x, q.y, 4.0) > 0.7 ? hi : mid), 1.0);
+	if (gate_part(q) > 1.5 && hash(w.y, floor(w.x + sim_time * 3.0 * gate.z), gate.w) > 0.95) {
+		colour = vec4(palette_turn(pal, int(w.x + w.y), hash(w.x, w.y, 4.0) > 0.7 ? 2 : 1, hash(w.x, w.y, 4.0) > 0.7 ? hi : mid), 1.0);
 	}
 	COLOR = colour;
 }

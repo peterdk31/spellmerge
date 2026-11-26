@@ -137,7 +137,6 @@ bool on(vec2 q, vec2 at) {
 	return all(equal(floor(q), floor(at)));
 }
 
-// 1 at the middle, 0 from `reach` on, eased: the shape of every glow.
 // The art's detail (ArtDetail.DETAIL; docs/STYLE.md, "The picture and the art's detail"; ART2): the
 // shot shaders work their shapes out at the middle of each art pixel, two a world pixel each way, so
 // a curve, a diagonal and an edge step by the finer pixel while every shape keeps its world size.
@@ -148,6 +147,7 @@ vec2 art_centre(vec2 p) {
 	return (floor(p * ART_DETAIL) + 0.5) / ART_DETAIL;
 }
 
+// 1 at the middle, 0 from `reach` on, eased: the shape of every glow.
 float falloff(float x, float reach) {
 	float k = max(1.0 - x / reach, 0.0);
 	return k * k;

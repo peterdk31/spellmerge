@@ -104,8 +104,8 @@ vec4 arc(vec2 uv) {
 	vec2 to_end = p - end;
 	float flash = max(1.0 - a / 0.4, 0.0);
 	float star = max(abs(to_end.x), abs(to_end.y));
-	bool on_star = flash > 0.0 && (abs(to_end.x) < 0.6 || abs(to_end.y) < 0.6) && star <= 1.5 + 3.0 * flash;
-	bool star_corner = flash > 0.0 && abs(abs(to_end.x) - abs(to_end.y)) < 0.6 && star <= 1.5 + flash;
+	bool on_star = flash > 0.0 && (abs(to_end.x) < 1.0 || abs(to_end.y) < 1.0) && star <= 1.5 + 3.0 * flash;
+	bool star_corner = flash > 0.0 && abs(abs(to_end.x) - abs(to_end.y)) < 1.0 && star <= 1.5 + flash;
 	bool spark = false;
 	bool spark_tail = false;
 	if (a < 0.85) {
@@ -121,7 +121,8 @@ vec4 arc(vec2 uv) {
 	}
 
 	// The pixels: core, edges, forks, star and sparks.
-	if (kept && dist < 0.75) {
+	// Thresholds for art pixels' middles (ART2): the core 2 world pixels, the band 4, as before.
+	if (kept && dist < 1.0) {
 		return vec4(strong ? hot : hi, 1.0);
 	}
 	if (on_star) {
@@ -133,7 +134,7 @@ vec4 arc(vec2 uv) {
 	if (kept && fork < 0.75) {
 		return vec4(strong ? hi : mid, 1.0);
 	}
-	if (kept && dist < 1.6 && hash(floor(p.x), jf, 63.0) < 0.7) {
+	if (kept && dist < 2.0 && hash(floor(p.x), jf, 63.0) < 0.7) {
 		return vec4(strong ? hi : mid, 1.0);
 	}
 	if (star_corner || spark_tail) {

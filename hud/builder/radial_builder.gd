@@ -74,6 +74,9 @@ extends Control
 ## items I5): this builder lays its cards out on it and draws them, the inventory
 ## (`hud/menus/inventory/`, items I7) its bags and items.
 
+## Where the line of what a staff does by itself (its sigils) sits, under the ring, and its colour.
+const SIGIL_LINE_Y: float = 70.0
+const SIGIL_TEXT: Color = Color("#e08ad8")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -582,9 +585,6 @@ func hub_lines() -> PackedStringArray:
 		lines.append_array(_spells.component_stats(id) if _spells != null else PackedStringArray())
 		return lines
 	var lines := PackedStringArray([_staff_label(_viewed)])
-	var by_itself: String = sigil_line(_plan(_viewed))
-	if by_itself != "":
-		lines.append(by_itself)
 	lines.append_array(_number_lines(_numbers(_plan(_viewed)), {}))
 	return lines
 
@@ -1755,6 +1755,10 @@ func _draw_hub() -> void:
 		_text(line, center + Vector2(0.0, -13.0 + (at - 1) * LINE_STEP), WARN if line.ends_with("!") else MUTED, true)
 	# An empty bag says so; otherwise the hub asks for a card.
 	_text(NO_CARDS_TEXT if _menu.is_empty() else "Point", center + Vector2(0.0, 17.0), DIM, true)
+	# What the staff does by itself (staff-language L4), under the ring.
+	var by_itself: String = sigil_line(_plan(_viewed))
+	if by_itself != "":
+		_text(by_itself, center + Vector2(0.0, SIGIL_LINE_Y), SIGIL_TEXT, true)
 
 
 ## `text` cut with ".." to fit `width` pixels.

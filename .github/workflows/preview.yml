@@ -3,11 +3,12 @@
 # After each merge to main (about hourly, as the develop sessions merge), the web build only
 # (build.sh --web: no unit tests or smoke tests; the daily run checks everything, and a broken
 # build is not released), then it goes to Pages at /preview/ at once, in a few minutes (the
-# owner, 2026-11-26). The screenshots for the gallery are a job of their own beside it (most of
-# the time: about an hour by 2026-11-26), and when they are done the site goes out once more with
-# them; a failed one never keeps the build off Pages. No release, no itch.io, no AI and no
-# secrets. /nightly/ and /play/ stay the daily releases (smbot.site --preview). A newer merge
-# cancels a build or a set of screenshots still running, so a burst of merges builds once.
+# owner, 2026-11-26), keeping the last gallery that went out. The screenshots are a job of their
+# own beside it (most of the time: about an hour by 2026-11-26), and when they are done the site
+# goes out once more with them; a failed one never keeps the build off Pages. No release, no
+# itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases (smbot.site
+# --preview). A newer merge cancels a build or a set of screenshots still running, so a burst of
+# merges builds once.
 name: preview
 
 on:
@@ -73,6 +74,7 @@ jobs:
     uses: ./.github/workflows/preview-pages.yml
     permissions:
       contents: read
+      actions: read
       issues: read
       pull-requests: read
       pages: write
@@ -106,6 +108,7 @@ jobs:
       - name: Virtual display for the screenshots
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
       - name: Screenshots
+        continue-on-error: true # a failed script only warns here, as it did in the web build (the daily run fails on it)
         run: ci/build/build.sh --quick --screenshots
       - name: Keep the logs
         if: always()
@@ -131,6 +134,7 @@ jobs:
     uses: ./.github/workflows/preview-pages.yml
     permissions:
       contents: read
+      actions: read
       issues: read
       pull-requests: read
       pages: write

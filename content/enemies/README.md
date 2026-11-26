@@ -2,28 +2,26 @@
 
 ## Purpose
 
-Regular enemies: a body, its staffs and how it plays them. Enemies create the "readable chaos" of the game: clear telegraphs, distinct roles, fair at any player count.
-
-**Built in M3** (Run structure; see docs/ROADMAP.md) on the enemy AI of M2 (docs/milestones/M2-enemy-ai.md): an enemy is data (`core/base/enemy_base.gd`, `EnemyBase`: its body's numbers, 1–4 staffs, a profile, a boss's phases) and a scene. The example to copy is the Cinder Rod, `content/enemies/ember_imp/`.
+Regular enemies: a body, its staffs and how it plays them, with clear telegraphs, distinct roles, fair at any player count. An enemy is data (`EnemyBase`, `core/base/enemy_base.gd`) and a scene. The example to copy is the Cinder Rod, `content/enemies/ember_imp/`.
 
 ## Contract
 
-- An enemy is one folder with a `.tres` resource on the enemy base class (`EnemyBase`: `id`, `display_name`, `max_health`, `move_speed`, `contact_damage`, `scene`, `size`, `hit_color`, `staffs`, `profile`, `phases`, `lore`, `stats`; `stats` is an `ActorStats` (power, mass, spell scale, resists; boss plan OB7, content/bosses/README.md), null for the defaults, which change nothing; `hit_color` is its own colour when hit, the spray on its body and its death's puff, ember by default; `lore` a line of why it fights, which a boss has and a stray may leave empty, checked by the story check, content/bosses/README.md), a `.tscn` scene (an actor: see the example) and sprites. **No `.gd` per enemy, a boss included:** how it fights comes from its staffs and its profile; a kind of behaviour the AI lacks goes into `gameplay/ai/behaviours/` for every enemy.
-- The AI targets every actor of another team (the players, whatever their seat).
+- **One folder per enemy:** a `.tres` on `EnemyBase` (`id`, `display_name`, `max_health`, `move_speed`, `contact_damage`, `scene`, `size`, `hit_color`, `staffs`, `profile`, `phases`, `lore`, `stats` (an `ActorStats`, null for the defaults)), a `.tscn` scene (an actor) and sprites.
+- **No `.gd` per enemy, a boss included:** how it fights comes from its staffs and profile; a kind of behaviour the AI lacks goes into `gameplay/ai/behaviours/` for every enemy.
+- **Every enemy plays by the enemy AI** (dummies and swarmers included): its scene has an `AIController`, its data a `profile`.
+- **Staffs:** 1–4 `staffs`, each a `StaffCards` (a `StaffBase` with `max_mana`, `mana_regen` and `cards`, player card ids by slot, no more than its slots). No staff = it only chases and hurts by `contact_damage`. The enemy pays mana like a player; range comes from its staffs' reach, its telegraph from the staff's `wind_up`, its lane from the cast card's `wind_cue`.
+- **Profiles** (`AIProfile`) are shared presets in `profiles/`: `shooter`, `rusher`, `zoner`, `dummy`, `post`, `swarmer`, `sprayer`. `profiles/aim_tuning.tres` is the enemies' `AimTuning`, not a profile (gameplay/ai/README.md, "Aim").
+- `EnemyBase.problems()` must be empty. A boss adds `phases` (`EnemyPhase`) and a `size`.
+- The AI targets every actor of another team, never "the player".
 - Every attack has a visible telegraph before it deals damage.
-- Enemy health and count scale with player count; use the scaling the base class provides rather than your own.
-- Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (1 MB per sprite sheet; validators for the rest arrive when M3 extends the base class).
-- Communicate only through `core/` events (`enemy_died`, ...). Original names and art only.
-
-- **Every enemy plays by the enemy AI (docs/milestones/M2-enemy-ai.md),** the dummies and the swarmers included: its scene has an `AIController` and its data a `profile` (`tests/content/enemies/test_enemy_data.gd` checks both).
-- **Enemies cast staffs (staffs F8a; enemy AI AI4):** list 1–4 `staffs` on the `.tres`, each a `StaffCards` (a `StaffBase` with its pool, `max_mana` and `mana_regen`, and its `cards`, player card ids by slot, no more than its slots), and name a `profile` (`AIProfile`; the shared presets are in `profiles/`: `shooter`, `rusher`, `zoner`, `dummy`, `post` (stands, the training dummy), `swarmer`, `sprayer` (holds a held cast down for `channel_max`, 1.2 s, turning after its target at `track_speed`, 45° a second, so a player can step out of it)); `profiles/aim_tuning.tres` is no profile but the enemies' aim tuning (`AimTuning`: how much sloppier a shallow room's enemies aim, an elite's share nearer sharp, and the global knobs on every enemy's lead and aim error; gameplay/ai/README.md, "Aim")). The AI reads what each staff casts next and plays it; the enemy pays mana like a player and its telegraph shows the next cast's reach. `EnemyBase.problems()` must be empty (`tests/content/enemies/test_enemy_data.gd` checks every enemy). A boss adds `phases` (`EnemyPhase`) and a `size`. A new enemy type is then a sprite, a scene and a staff, with no code. An enemy without a staff only chases (and hurts by touch with `contact_damage`); how it plays them is its profile's (range from its staffs' reach, its telegraph its staff's `wind_up`, its lane the cast card's `wind_cue`: docs/milestones/cast-timing.md). The ember imp casts `fire · bolt` (10 mana, 3 a second back) and the shooting dummy `slow · bolt` (5 mana, 2 a second back), each staff a sub-resource of the enemy's `.tres` (staffs F9a).
-- **Every enemy is a stray** (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): one of the wizard's earlier staffs, thrown out like the players and gone sour. A stray is a 32×32 body sprite (a staff, its ferrule at the bottom), the shared `Face` (`gameplay/actor/face.gd`: style `STRAY`, or `STRAY_ONE` for one eye; `resting_mood` angry; `glow` the light shade of its element's ramp; `anchor` the left eye's top-left pixel in the actor's space) after its `CreatureLook` in the scene, and a staff of player cards. It hops; its face goes furious while it winds up. The strays now: **the Cinder Rod** (`ember_imp/`, the id kept: fire · bolt, the shooter), **the Splinter** (`splinter/`: dash, a swarmer that lunges and hurts by touch, one eye) and **the Storm Fork** (`storm_fork/`: triple · lightning · bolt, the spreader), **the Rime Crook** (`rime_crook/`: frost · pull · bolt, the puller), **the Bone Scepter** (`bone_scepter/`: on hit · bolt · skyfall · void · bolt, the zoner: where its bolt hits, a void bolt falls from the sky; a skull whose sockets the face lights) and **the Spitter** (`spitter/`: spray, the sprayer: a snake staff, one eye, that keeps to its spray's short reach, telegraphs, then holds a cone of acid (the enemies' Blight) on a player for a moment, turning slowly after them, `sprayer` profile; its staff's `cast_cue` `spitter_acid` pours a jet of Blight over each cast; its telegraph lane widens into the cone; its own test `test_spitter.gd`). The swarmers (the `swarmer` profile, made for crowds) are strays with no staff, so their scenes have no `Caster` and no `Telegraph`: **the Crypt Mite** (`crypt_mite/`: a small knot of wood on root-legs, one eye; fast, fragile, a light touch) and **the Bone Husk** (`bone_husk/`: a hollow thighbone club; slow, tough, a heavy touch). Test: `tests/content/enemies/test_swarmers.gd`.
-
-- **Where it fights** (run generation RG1, docs/milestones/run-generation.md): the `biomes` it appears in (`&"crypt"`), its `cost` in a room's enemy budget (at least 1; the tougher, the more) and the first row of a run's map it may stand in (`min_depth`, 0 the first room). A biome's enemy pool is every enemy that names it, so a new enemy joins the runs of its biome by its own data; one with no biome (the dummies) is in no run. The crypt's: the Crypt Mite (1), the Bone Husk, the Cinder Rod and the Splinter (2), the Rime Crook, the Storm Fork and the Spitter (3, from row 1) and the Bone Scepter (4, from row 2).
-- **The coins it carries** (the owner, 2026-11-19): `coins` go into its own currency bag as it comes (a seat possessing it sees them and may spend them in a shop); with `coins_most` above `coins`, a whole number from one to the other, rolled by the run's chance once a body. As it dies they drop on the floor by `coin_drop_chance` (rolled by the Rewards area), each a coin anyone may take that adds one to every player's coins; a boss's go to every player instead. The keys it carries (taken while possessed) are laid by `key_drop_chance`, a half, a roll of its own (the owner, 2026-11-25), lost with it otherwise. Every enemy today carries 1 at chance 1 (the dummies 0), CB10's economy; an add carries none.
-- **How it spawns in** (spawn styles AS2, docs/milestones/spawn-styles.md): `spawn_style`, a style's id from content/spawn_styles, wins over its room's biome's style (`SpawnStyle.pick`); empty (every enemy today) takes the biome's, or `rise`. A test checks the id names a style.
-
-- **Standing in a room** (props W8a/W8b; the training and shooting dummies): a room's scene places an enemy with an `EnemyStandIn` (tools/enemy_stand_in.gd) whose `enemy` is its `.tres`, under `Dummies`; the editor shows the enemy's scene there, and Flow stands the real enemy (content/rooms/README.md). Nothing to add to the enemy's folder.
+- Health and count scale with player count through the base class's scaling, never your own.
+- Enemies come from pools; no per-frame allocations. 1 MB per sprite sheet.
+- Talk only through `core/` events (`enemy_died`, ...). Original names and art only.
+- **Every enemy is a stray** (docs/milestones/M2-living-staffs.md, "The strays"): a 32-unit body sprite (a staff, ferrule at the bottom), the shared `Face` (`gameplay/actor/face.gd`: style `STRAY` or `STRAY_ONE`; `resting_mood` angry; `glow` its element's light shade; `anchor` the left eye's top-left pixel) after its `CreatureLook`. Swarmers (`swarmer` profile) have no staff, so no `Caster` and no `Telegraph`.
+- **Where it fights:** `biomes` (`&"crypt"`), `cost` in a room's enemy budget (at least 1) and `min_depth` (first map row it may stand in, 0 the first room). A biome's pool is every enemy naming it; no biome (the dummies) = in no run.
+- **Coins and keys:** `coins` (to `coins_most`, rolled once a body by the run's chance) go into its bag; dropped on death by `coin_drop_chance`; a boss's go to every player. Keys it carries drop by `key_drop_chance`. An add carries none.
+- **Spawning in:** `spawn_style`, a style id from content/spawn_styles, wins over its biome's (`SpawnStyle.pick`); empty takes the biome's, or `rise`.
+- **Standing in a room:** a room places an enemy with an `EnemyStandIn` (tools/enemy_stand_in.gd) under `Dummies`; Flow stands the real enemy (content/rooms/README.md).
 
 ## Allowed files
 
@@ -33,17 +31,17 @@ Regular enemies: a body, its staffs and how it plays them. Enemies create the "r
 
 1. Copy the example folder and rename it.
 2. Edit the `.tres` values and the scene; replace the sprites (see `docs/STYLE.md`).
-3. Give it staffs (`staffs`) and a profile (one of `profiles/` or its own); try it in play: a run of its biome stands it (`biomes`, `cost`, `min_depth`), and a test plays it in a run of one room (`bench/pinned_run.gd`). (The sandbox's enemy arena and its AI view went with the sandbox, crypt rework CR-S.)
-4. Add each asset to `art/manifest.json`; commit the `.uid` files Godot creates.
+3. Give it `staffs` and a `profile`; set `biomes`, `cost`, `min_depth`; try it in a run of one room (`bench/pinned_run.gd`).
+4. List its art in an `assets.json` in its folder (like `splinter/`); commit the `.uid` files Godot creates.
 5. Run the checks below, then open a PR with a short GIF of the enemy in action.
 
 ## Example to copy
 
-`content/enemies/ember_imp/` (the Cinder Rod): `ember_imp.tres` (an `EnemyBase` with `id`, `max_health`, `move_speed`, `contact_damage`, `scene`, its `staffs` (one `StaffCards`: the staff, with its `max_mana` and `mana_regen`, and its `cards`) and its `profile`), `ember_imp.tscn` and its body `idle@2x.svg` (64×64 art pixels for its 32-unit cell, drawn at half size since ART1, drawn by `tools/enemy_art.py` from parts of its own: a new enemy's body is a function there; with its `.import` and its entry in `art/manifest.json`; a new enemy lists its art in an `assets.json` in its folder, like `splinter/`). A new enemy type is that folder copied, with a new body, face anchor and glow, and numbers: no code.
+`content/enemies/ember_imp/` (the Cinder Rod): `ember_imp.tres` (its numbers, one `StaffCards`, its `profile`), `ember_imp.tscn` and its body `idle@2x.svg` (drawn by `tools/enemy_art.py` from parts of its own: a new enemy's body is a function there). A new enemy is that folder copied with a new body, face anchor, glow and numbers: no code.
 
-Since actors G6 (docs/milestones/M2-actors.md) the scene is an **actor**: its root is a `CharacterBody2D` with `gameplay/actor/actor.gd` (`hand_offset` and `body_offset` (0, -12), `staff_reach` 0, so its spells start at its body), and its children are the actor kit's components, which the actor fills from the `.tres`: `Health`, `Hurtbox` (radius 11, offset (0, -12)), `Contact`, `Mover`, `Caster`; the `AIController` (`gameplay/ai/ai.gd`: plays whatever staffs the actor holds by the data's profile; the scene holds no AI numbers); the `CreatureLook` (`gameplay/ai/creature_look.gd`: the hop, the flash, and optional poses `windup_texture` and `hurt_texture` that no stray uses; a body drawn in parts instead, `BodyPart`s under its `Sprite`, moved by the poses read from its states, is a boss's so far: content/bosses/README.md, "Its look"); the `Face` (after the look); the `Sprite` (named so: Feel and the decoys find it by name) and a `CollisionShape2D` (walls). Leave out what an enemy does not need: no staff in the `.tres` means no attack (it chases and hurts by `contact_damage`). The imp has no contact damage: its only damage is the telegraphed cast. Its tests are `tests/gameplay/ai/test_ai.gd` and `tests/content/enemies/test_strays.gd` (every stray).
+The scene is an **actor**: root a `CharacterBody2D` with `gameplay/actor/actor.gd` (`hand_offset` and `body_offset` (0, -12), `staff_reach` 0), children the actor kit's components filled from the `.tres`: `Health`, `Hurtbox`, `Contact`, `Mover`, `Caster`, the `AIController` (`gameplay/ai/ai.gd`; the scene holds no AI numbers), the `CreatureLook` (`gameplay/ai/creature_look.gd`; a body in `BodyPart`s is a boss's: content/bosses/README.md, "Its look"), the `Face` (after the look), the `Sprite` (named so: Feel and the decoys find it by name) and a `CollisionShape2D`. Leave out what it does not need.
 
-The dummies (staffs B7) are actors too, drawn as staffs staked in the floor (living staffs H5; no face: they are props, not strays): `training_dummy/` (Health with a billion, a Hurtbox at (0, -14), no Mover and no staff, so it never dies or moves; an `AIController` with the `post` profile like every enemy, on the enemies' team, so enemies never target it; its `DummyLook` from `gameplay/ai/dummy_look.gd` shows damage numbers from `damage_dealt`, damage per second over the last 5 s from its health in Combat so burn ticks count, its statuses and the last reaction) and `shooting_dummy/` (the imp's parts with no walking speed and a slow cast behind a long telegraph, aimed at the nearest player). The hub stands three training dummies (content/rooms/hub); no room stands the shooting dummy since the sandbox went (crypt rework CR-S), and it is kept as content for a room that wants one. Test: `tests/content/enemies/test_dummies.gd`.
+The dummies are actors drawn as staffs staked in the floor (props, no face): `training_dummy/` (huge health, no Mover, no staff, `post` profile, a `DummyLook` from `gameplay/ai/dummy_look.gd`) and `shooting_dummy/`.
 
 ## Validate
 
@@ -52,6 +50,8 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
+Tests: `tests/content/enemies/test_enemy_data.gd` (every enemy's data and scene), `tests/content/enemies/test_strays.gd`, `tests/content/enemies/test_swarmers.gd`, `tests/content/enemies/test_dummies.gd`, `tests/gameplay/ai/test_ai.gd`, and an enemy's own test in its folder (`spitter/test_spitter.gd`).
+
 ## Review questions
 
 Besides the general review:
@@ -59,3 +59,5 @@ Besides the general review:
 - Are the telegraphs readable at 1× with 4 players and many projectiles on screen?
 - Does it scale sensibly from 1 to 4 players?
 - Is it a distinct role, not a re-skin of an existing enemy?
+
+History and reasons: [docs/history/content-enemies-README.md](../../docs/history/content-enemies-README.md).

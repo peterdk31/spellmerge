@@ -83,9 +83,9 @@ const float BLINK_RATE = 0.31;
 const float BLINK_SHARE = 0.05;
 
 vec4 shot(vec2 uv) {
-	// The screen pixel, with +x along the flight, the core at 0, pixel centres on whole numbers.
+	// The art pixel's middle (art_centre; ART2), with +x along the flight, the core at 0.
 	vec2 size = vec2(LENGTH, GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - vec2(size.x - FRONT * zoom, size.y * 0.5);
+	vec2 q = art_centre(uv * size) - vec2(size.x - FRONT * zoom, size.y * 0.5);
 	vec4 colour = vec4(0.0);
 	vec2 c = vec2(0.5);
 	// It bobs a pixel across its way, slowly, each on its own beat.
@@ -139,7 +139,8 @@ vec4 shot(vec2 uv) {
 	float d2 = dot(d, d);
 	if (d2 <= R * R + R * 0.6) {
 		bool rim = d2 > (R - 1.0) * (R - 1.0) + (R - 1.0) * 0.6;
-		vec3 rgb = rim ? lo : (d.x > 0.5 * zoom ? hi : mid);
+		// Its rim lit on the upper left (ART2): the base there, its shadow round the rest.
+		vec3 rgb = rim ? (d.x + d.y < -0.5 * R ? mid : lo) : (d.x > 0.5 * zoom ? hi : mid);
 		vec2 glint = floor(vec2(-0.3, -0.6) * R + 0.5);
 		rgb = all(equal(floor(d / zoom), floor(glint / zoom))) ? BONE_LIGHT : rgb;
 		bool blink = fract(sim_time * BLINK_RATE + seed * 0.13) < BLINK_SHARE;

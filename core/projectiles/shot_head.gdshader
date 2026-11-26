@@ -10,7 +10,7 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // of three tail kinds a shot, and Feel's motes throw them), and so are the card particles it gives
 // off (S3) and a dash's speed streaks (S5); the tail this shader once drew from each shot's path
 // (a texture of the paths) is gone with the paths. Everything is drawn axis-aligned on the art's
-// pixel grid (two art pixels a world unit, HEAD_DETAIL; ART2): the core is a shaded bead lit from the
+// pixel grid (two art pixels a world unit, ART_DETAIL; ART2): the core is a shaded bead lit from the
 // top-left with a `+` of one-pixel rays whatever way the shot flies.
 //
 // PARTICLES ARE GEOMETRY (the owner, 2026-10-29). Windows browsers compile WebGL through

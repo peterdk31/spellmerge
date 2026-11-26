@@ -136,7 +136,9 @@ void vertex() {
 
 void fragment() {
 	vec2 P = world;
-	vec2 c = floor(P) + 0.5;
+	// The art pixel's middle (art_centre; ART2) for its glow and its box; its sparkles stay a world
+	// pixel each (`twinkle_px`), so they read zoomed out.
+	vec2 c = art_centre(P);
 	vec4 colour = vec4(0.0);
 	if (mode < M_GLOW + 0.5) {
 		// A round light (v0 its middle, the dark it casts and how far; v1 two falloffs).

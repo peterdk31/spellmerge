@@ -225,6 +225,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(trail_out, "_trail_out", PACKED_INT32_ARRAY) \
 	X(field_out, "_field_out", PACKED_INT32_ARRAY) \
 	X(field_out_field, "_field_out_field", PACKED_INT32_ARRAY) \
+	X(caster_seq, "_caster_seq", PACKED_INT64_ARRAY) \
 	X(floor_y, "_floor", PACKED_FLOAT32_ARRAY) \
 	X(draw_regions, "_draw_regions", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
@@ -2778,28 +2779,36 @@ int64_t ShotKernel::trail_pass(Object *m, int64_t top) {
 }
 
 // The field pass (`_pass_fields`, docs/milestones/field.md): every live shot that is no field, not
-// stopped (a local stop, a linger's hold, stuck), moved this step and is not falling in the air, whose
-// middle was outside one of the first `count` fields of `fields` (live still shots marked F_FIELD)
-// before the step and is inside it now, or went through it (a fast shot), is written to `_field_out` with the field's index in
-// `_field_out_field`, in slot order, then the fields' order, at most as many as `_field_out` holds.
-// Returns how many, or -1 on bad sizes (GDScript then runs the pass itself).
+// still (a rune, a pool, a wall), not held (a local stop, a linger's hold, stuck) and not falling in
+// the air, whose middle is inside one of the first `count` fields of `fields` (live still shots
+// marked F_FIELD) now, wherever it came from, or went through it in the step (a fast shot), and is
+// not that field's own payload (its caster that field's shot), is written to `_field_out` with the
+// index of the first such field in `_field_out_field`, in slot order, at most as many as
+// `_field_out` holds. Returns how many, or -1 on bad sizes (GDScript then runs the pass itself).
 int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_t count) {
 	const Names &k = *names;
-	Arr<PackedByteArray> alive, state;
+	Arr<PackedByteArray> alive, state, motion;
 	Arr<PackedVector2Array> pos, prev;
-	Arr<PackedInt32Array> flags, out, out_field;
-	Arr<PackedFloat32Array> floor_y, radius;
+	Arr<PackedInt32Array> flags, out, out_field, caster_slot;
+	Arr<PackedInt64Array> seq, caster_seq;
+	Arr<PackedFloat32Array> floor_y, radius, freeze, hold;
 	alive.load(m, k.alive);
+	hold.load(m, k.hold);
 	state.load(m, k.state);
+	motion.load(m, k.motion);
+	freeze.load(m, k.freeze);
 	pos.load(m, k.pos);
 	prev.load(m, k.prev);
 	flags.load(m, k.flags);
 	out.load(m, k.field_out);
 	out_field.load(m, k.field_out_field);
+	caster_slot.load(m, k.caster_slot);
+	seq.load(m, k.seq);
+	caster_seq.load(m, k.caster_seq);
 	floor_y.load(m, k.floor_y);
 	radius.load(m, k.radius);
 	const int64_t high = m->get(k.high);
-	ERR_FAIL_COND_V(count < 0 || count > fields.size() || high < 0 || high > alive.n || high > state.n || high > pos.n || high > prev.n || high > flags.n || high > floor_y.n || high > radius.n || out_field.n < out.n, -1);
+	ERR_FAIL_COND_V(count < 0 || count > fields.size() || high < 0 || high > alive.n || high > state.n || high > motion.n || high > freeze.n || high > hold.n || high > pos.n || high > prev.n || high > flags.n || high > floor_y.n || high > radius.n || high > caster_slot.n || high > seq.n || high > caster_seq.n || out_field.n < out.n, -1);
 	const int32_t *field_slots = fields.ptr();
 	const int64_t most = out.n;
 	int64_t found = 0;
@@ -2808,16 +2817,17 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 			continue;
 		}
 		const int32_t f = flags[s];
-		if ((f & F_FIELD) != 0) {
+		if ((f & F_FIELD) != 0 || motion[s] == MOTION_STILL) {
 			continue;
 		}
 		const int st = state[s];
-		if (st == S_FROZEN || st == S_STUCK || st == S_HELD) {
+		// Stopped: a local stop (`_freeze`), a linger's hold (`_hold`), stuck.
+		if (st == S_FROZEN || st == S_STUCK || st == S_HELD || freeze[s] > 0.0f || hold[s] > 0.0f) {
 			continue;
 		}
 		const Vector2 to = pos[s];
 		const Vector2 from = prev[s];
-		if (from == to || !from.is_finite() || !to.is_finite()) {
+		if (!from.is_finite() || !to.is_finite()) {
 			continue;
 		}
 		if ((f & F_FALLING) != 0 && (double)to.y < (double)floor_y[s] - FALL_BAND) {
@@ -2826,6 +2836,10 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 		for (int64_t n = 0; n < count; n++) {
 			const int64_t field = field_slots[n];
 			if (field < 0 || field >= high || alive[field] == 0 || (flags[field] & F_FIELD) == 0) {
+				continue;
+			}
+			// A field's own payload (a Timer's bolt from its middle) is born in it: never its.
+			if ((int64_t)caster_slot[s] == field && caster_seq[s] == seq[field]) {
 				continue;
 			}
 			const Vector2 centre = pos[field];
@@ -2839,11 +2853,11 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 				continue;
 			}
 			const double within = r * r;
-			if ((double)from.distance_squared_to(centre) <= within) {
-				continue;
-			}
 			if ((double)to.distance_squared_to(centre) > within) {
 				// Not inside now: in only if it went through it in this step (a fast shot).
+				if (from == to) {
+					continue;
+				}
 				const Vector2 way = to - from;
 				double t = (double)(centre - from).dot(way) / (double)way.dot(way);
 				t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
@@ -2857,6 +2871,8 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 			out[found] = (int32_t)s;
 			out_field[found] = (int32_t)n;
 			found++;
+			// In two fields at once, it is the first one's.
+			break;
 		}
 	}
 	return found;

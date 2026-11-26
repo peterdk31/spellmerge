@@ -1016,7 +1016,7 @@ func _draw_info() -> void:
 			var tile := Rect2(Vector2(x, y), Vector2(SMALL_ICON, SMALL_ICON))
 			draw_rect(tile, TILE)
 			if id != &"":
-				var icon: Texture2D = _spells.component_icon(id) if _spells != null else null
+				var icon: Texture2D = _spells.component_icon_for(id, SMALL_ICON) if _spells != null else null
 				if icon != null:
 					draw_texture_rect(icon, tile, false)
 			x += SMALL_ICON + 1.0
@@ -1107,6 +1107,7 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 		var icon: Texture2D = _spells.component_icon(id) if _spells != null else null
 		if icon != null and size >= SMALL_ICON:
 			var side: float = minf(ICON_SIZE, rect.size.x - 2.0)
+			icon = _spells.component_icon_for(id, side)
 			draw_texture_rect(icon, Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side)), false)
 		var kind: StringName = _spells.component_kind(id) if _spells != null else &""
 		draw_rect(Rect2(rect.position.x, rect.end.y - 2.0, rect.size.x, 2.0), CardKindsScript.COLORS.get(kind, DIM))
@@ -1115,6 +1116,8 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 		if item_icon != null and size >= SMALL_ICON:
 			var side: float = floorf(minf(ICON_SIZE, rect.size.x - 2.0))
 			var icon_rect := Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side))
+			var look: Dictionary = _look(data["item"])
+			item_icon = IconDetail.fitting(item_icon, look["icon_small"] as Texture2D, side)
 			draw_texture_rect(item_icon, icon_rect, false, shade_tint(int(_shade.get(data["item"], 0))))
 			RechargeShutter.draw(self, icon_rect, recharge_rows(data["item"]))
 	var none_left: bool = data.has("item") and int(data["count"]) == 0

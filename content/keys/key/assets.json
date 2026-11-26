@@ -1,6 +1,15 @@
 {
 	"assets": [
 		{
+			"path": "content/keys/key/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (hand-written SVG rects)",
+			"prompt": "A 16x16 icon of a brass key lying flat: a ring bow on the left, a shaft and two teeth, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
 			"path": "content/keys/key/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",

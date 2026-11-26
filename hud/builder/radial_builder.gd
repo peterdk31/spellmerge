@@ -1596,10 +1596,10 @@ func _draw_card(id: StringName, rect: Rect2, alpha: float) -> void:
 
 
 func _draw_icon(id: StringName, rect: Rect2, alpha: float) -> void:
-	var icon: Texture2D = _spells.component_icon(id) if _spells != null else null
+	var size: float = minf(ICON_SIZE, rect.size.x)
+	var icon: Texture2D = _spells.component_icon_for(id, size) if _spells != null else null
 	if icon == null:
 		return
-	var size: float = minf(ICON_SIZE, rect.size.x)
 	var at: Vector2 = (rect.get_center() - Vector2(size, size) * 0.5).round()
 	draw_texture_rect(icon, Rect2(at, Vector2(size, size)), false, Color(1.0, 1.0, 1.0, alpha))
 

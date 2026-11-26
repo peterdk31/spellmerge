@@ -106,7 +106,7 @@ func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) ->
 	_icons.clear()
 	for id: Variant in view.get("cards", []):
 		if StringName(id) != &"" and _spells != null:
-			_icons.append(_spells.component_icon(StringName(id)))
+			_icons.append(_spells.component_icon_for(StringName(id), ICON))
 	_lay_out()
 	queue_redraw()
 

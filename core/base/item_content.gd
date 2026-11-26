@@ -19,6 +19,9 @@ extends Resource
 @export_multiline var description: String = ""
 ## Its icon (16 by 16 world units: at 2x detail a 32 by 32 `icon@2x.svg`, ArtDetail; drawn 2x on a reward's card).
 @export var icon: Texture2D = null
+## Its icon at 1x (16 by 16 art pixels, `icon.svg`), for the HUD's small cells until the HUD is
+## redrawn at 2x (`IconDetail.fitting`); null when it has none.
+@export var icon_small: Texture2D = null
 
 
 ## Its name for people: `display_name`, else its id in words.

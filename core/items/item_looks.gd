@@ -15,13 +15,15 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 
 
 ## The look of one `kind` `id`: `name` (its id in words when nothing names it), `icon` (null for
-## none) and `description` ("" for none).
+## none), `icon_small` (its 1x icon for the HUD's small cells, `IconDetail`; null for none) and
+## `description` ("" for none).
 static func of(kind: StringName, id: StringName, registry: RegistryScript, spells: SpellsScript) -> Dictionary:
-	var look: Dictionary = {"name": "", "icon": null, "description": ""}
+	var look: Dictionary = {"name": "", "icon": null, "icon_small": null, "description": ""}
 	if kind == ItemKinds.CARD:
 		if spells != null:
 			look["name"] = spells.component_name(id)
 			look["icon"] = spells.component_icon(id)
+			look["icon_small"] = spells.component_icon_for(id, 0.0)
 			look["description"] = spells.component_description(id)
 	else:
 		var content: Resource = content_of(kind, id, registry)
@@ -31,6 +33,7 @@ static func of(kind: StringName, id: StringName, registry: RegistryScript, spell
 			if content.has_method(&"shown_name"):
 				look["name"] = str(content.call(&"shown_name"))
 			look["icon"] = content.get(&"icon") as Texture2D
+			look["icon_small"] = content.get(&"icon_small") as Texture2D
 			look["description"] = str(content.get(&"description")) if content.get(&"description") != null else ""
 	if String(look["name"]) == "":
 		look["name"] = String(id).capitalize()

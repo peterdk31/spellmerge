@@ -11,6 +11,7 @@ extends RefCounted
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
 
 const SEATS: int = 4
 const SLOTS: int = 4
@@ -127,7 +128,8 @@ func _tell(seat: int, slot: int, at_once: bool) -> void:
 	var icon: Texture2D = null
 	var count: int = 0
 	if id != &"":
-		icon = ItemLooks.of(ItemKinds.kind_in(bag, id), id, _registry, _spells)["icon"] as Texture2D
+		var look: Dictionary = ItemLooks.of(ItemKinds.kind_in(bag, id), id, _registry, _spells)
+		icon = IconDetail.fitting(look["icon"] as Texture2D, look["icon_small"] as Texture2D, QuickCrossScript.ICON)
 		if icon == null:
 			icon = _no_icon
 		count = int((_held[seat].get(bag, {}) as Dictionary).get(id, 0))

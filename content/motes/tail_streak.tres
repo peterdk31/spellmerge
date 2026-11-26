@@ -18,6 +18,15 @@ shape = "
 
 #
 "
+shape_2x = "
+..#oo
+####.
+
+##o
+.##
+
+#o
+"
 shape_play = "life"
 shape_turns = true
 count = 1

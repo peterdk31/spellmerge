@@ -27,6 +27,26 @@ o
 #o#
 .#.
 "
+shape_2x = "
+#
+#
+
+o
+#
+
+o
+
+#
+#
+
+#
+
+..#..
+..#..
+##o##
+..#..
+..#..
+"
 shape_play = "loop"
 shape_rate = 6.0
 shape_turns = false

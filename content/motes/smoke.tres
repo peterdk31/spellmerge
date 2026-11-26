@@ -21,6 +21,18 @@ shape = "
 
 #
 "
+shape_2x = "
+.o#.
+o###
+####
+.##.
+
+#..
+.##
+.#.
+
+#
+"
 shape_play = "life"
 shape_rate = 8.0
 shape_turns = false

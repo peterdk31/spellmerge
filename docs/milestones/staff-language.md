@@ -151,7 +151,7 @@ A new item kind, **sigil** (`content/sigils/<id>/`, a `SigilBase` on `ItemConten
 
 - **The corner panel's staff row:** a small icon for each sigil beside the staff's glyph, and while one holds, a slow glow round the glyph (by whole pixels, in at least 3 frames; Smooth) so the player sees why the staff is firing.
 - **The builder:** under the staff's name on its hub, its sigils' words ("By itself when hurt, when close"); their icons are the corner panel's, beside it.
-- **The inventory menu:** the Sigils bag lists the sigils held and those on the hands' staffs; a hand's button puts the one pointed at on that hand's staff, or takes it off (a staff in the staff bag is put on a hand first); its line says which hands' staffs have it.
+- **The inventory menu:** the Sigils bag lists the sigils held and those on the hands' staffs; a hand's button puts the one pointed at on that hand's staff, or takes it off; its line says which hands' staffs have it. A on a sigil opens the ring of every staff owned, the staff bag's too (the owner, 2026-11-25), each saying whether it has that sigil; A there puts it on or takes it off.
 
 ### L4's tests
 

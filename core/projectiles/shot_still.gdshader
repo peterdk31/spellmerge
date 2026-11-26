@@ -32,7 +32,7 @@ void vertex() {
 vec4 still_look(vec2 uv) {
 	// The screen pixel, the centre at 0, pixel centres on whole numbers.
 	vec2 size = vec2(GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - size * 0.5;
+	vec2 q = art_centre(uv * size) - size * 0.5;
 	float reach = size.x * 0.5 * 0.3;
 	vec4 colour = vec4(0.0);
 	// What the cards give off: particles born at random points round it.

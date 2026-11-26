@@ -56,7 +56,7 @@ vec4 arc(vec2 uv) {
 	float len = zoom * 4.0;
 	vec2 size = vec2(len + 2.0 * ARC_MARGIN, ARC_ACROSS);
 	// The pixel's middle, the bolt from (0, 0) to (len, 0).
-	vec2 p = floor(uv * size) + 0.5 - vec2(ARC_MARGIN, size.y * 0.5);
+	vec2 p = art_centre(uv * size) - vec2(ARC_MARGIN, size.y * 0.5);
 	float a = age;
 	float jf = floor(sim_time * 30.0);
 	float n = ceil(len / SEG);

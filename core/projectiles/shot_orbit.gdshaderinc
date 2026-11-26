@@ -69,7 +69,7 @@ vec2 tail_coords(vec2 d) {
 vec4 shot(vec2 uv) {
 	// The screen pixel, with +x along the flight, the core at 0, pixel centres on whole numbers.
 	vec2 size = vec2(LENGTH, GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - vec2(size.x - FRONT * zoom, size.y * 0.5);
+	vec2 q = art_centre(uv * size) - vec2(size.x - FRONT * zoom, size.y * 0.5);
 	int pi = int(player);
 	vec4 colour = vec4(0.0);
 	vec2 c = vec2(0.5);

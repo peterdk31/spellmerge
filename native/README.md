@@ -6,12 +6,12 @@ Spellmerge's own C++, loaded by Godot as a GDExtension: faster versions of hot l
 
 | Class | What it runs | GDScript it stands for |
 |---|---|---|
-| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's common pass, the hit pass's eventless shots, the behaviour passes, trail sampling, draw batches, the threat grid, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows`; loops on several threads | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`) |
+| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's passes, the hit pass's eventless shots, draw batches, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows` | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`) |
 | `MoteKernel` (`src/mote_kernel.cpp`) | the motes' trail births, settling marks, `region_rows` | `gameplay/feel/mote.gd` (`give_off`, `burst`), `gameplay/feel/mote_regions.gd` |
 | `LightKernel` (`src/light_grid.cpp`) | grid lighting: `light_grid_rows`, `light_grid_beam`, `light_grid_bake`, checked by `check_light_grid` | `gameplay/feel/light_grid.gd` |
 | `GroundKernel` (`src/ground_kernel.cpp`) | a room's ground drawn from `GroundShape.spec` (`draw`) | `gameplay/feel/ground/ground_drawing.gd` (twin of `tools/ground_shape.py`) |
-| `BodyKernel` (`src/body_kernel.cpp`) | a body's slide against the wall grid, `walk` (a whole walk), `wall_hit`/`way_hit` (long rays, `src/grid_ray.h`), `places` (every open body's place) | `core/projectiles/wall_slide.gd` (`WallSlide.gd_slide`), `core/projectiles/room_grid.gd` (`RoomGrid.gd_walk_body`), `gameplay/flow/room_life.gd` (`RoomLife.gd_find_places`) |
-| `DMathKernel` (`src/dmath_kernel.cpp`, `src/dmath.h`) | deterministic maths: sin, cos, tan, atan, atan2, asin, acos, exp, log, pow, lerp_angle, Vector2 turns | `core/sim/dmath.gd` (`DMath`) |
+| `BodyKernel` (`src/body_kernel.cpp`) | a body's slide, `walk`, `wall_hit`/`way_hit` (`src/grid_ray.h`), `places` | `core/projectiles/wall_slide.gd` (`WallSlide.gd_slide`), `core/projectiles/room_grid.gd` (`RoomGrid.gd_walk_body`), `gameplay/flow/room_life.gd` (`RoomLife.gd_find_places`) |
+| `DMathKernel` (`src/dmath_kernel.cpp`, `src/dmath.h`) | deterministic maths | `core/sim/dmath.gd` (`DMath`) |
 
 **The GDScript stays** as the reference, the fallback and the readable spec. Every exported build has the module; an export without it logs an error (`core/native/native.gd`).
 
@@ -23,7 +23,7 @@ This folder is Claude's and the owner's only (the owner's decision of 2026-11-02
 
 - **Same results, to the bit.** Every kernel method does exactly what its GDScript does on the same arrays: same branches, same float rounding (GDScript `float` is double; `Vector2` and `PackedFloat32Array` single; `src/packed.h` has GDScript's helpers). Engine behaviour is called, not copied (`hash`, `wrapf`, `move_toward`, `RandomNumberGenerator`). A member the side-by-side compare leaves out is DERIVED or VIEW, never state (reviewed exceptions: `STATE_NOT_READ_BY_TYPE`).
 - **The object's arrays, in place, for one call.** A kernel takes the object and reads its packed arrays with `get` (held objects through their own field table: `GRID_FIELDS`, `BATCH_FIELDS`, checked by `check_fields`). It writes through the shared buffers and keeps no reference once it returns. The object sizes every array before a call; a kernel never grows one. No object keeps a copy of an array another holds for a kernel. A buffer handed to the renderer is written with `ptrw`. Between calls a kernel keeps only numbers it worked out, never an array of the object's.
-- **Hand back what needs GDScript.** Anything that sends an event stays in GDScript. The native hit pass hands back each shot that needs GDScript, in turn, so events go out in the same order; if it fails (bad sizes, logged) the manager finishes in GDScript. Merged hits the kernel can take itself (`HitPass::merge_hits`, `can_open`, `open_entry`) it takes; a dry run first declines, writing nothing, any shot GDScript must take.
+- **Hand back what needs GDScript.** Anything that sends an event stays in GDScript. The native hit pass hands back each shot that needs GDScript, in turn, so events go out in the same order; if it fails (logged) the manager finishes in GDScript. A dry run declines, writing nothing, any shot GDScript must take (`HitPass::merge_hits`, `can_open`, `open_entry`).
 - **Constants and members are checked when a kernel is switched on.** `CONSTANTS` in `src/shot_kernel.cpp` is compared with `native_constants` by `check`; members read are declared once with types (`MANAGER_FIELDS`, `GRID_FIELDS`, `BATCH_FIELDS`, `REGION_FIELDS`, `MOTE_FIELDS`, `MOTE_REGION_FIELDS`, `check_regions`) and checked by `check_fields`. A mismatch is an error and the GDScript runs: change the kernel with the member or constant.
 - **Bodies read by a kernel** (`BodyKernel.places`): a kernel may read a body through its node by the actor table's instance ids (`ObjectDB::get_instance`, typed `Node2D` calls, `get` of a member by name) and set a plain member by name (`room`), on the calling thread only, in id order; never a call of a script's method, never on a span (the owner's decision of 2026-11-22, AGENTS.md hard rule 4). Never, here or anywhere in the module: system calls, starting programs, files, the network, loading code, assembly, calls of a method by name (`call`, `callv`, `get_singleton`; the raw interface but `object_get_instance_from_id`), and any engine API in a span of `jobs::for_spans` but pure functions ("What a span may do" below).
 - **No script runs while a kernel holds the arrays.** Kernels call engine methods only.
@@ -39,7 +39,7 @@ Threads never change a result: the bits are the same on one thread or sixteen.
 - **One place knows threads.** `src/jobs.h` (`jobs::for_spans`: fixed-size spans on up to `width` threads, the caller's among them). `src/jobs.cpp` is the pool (the module's own `std::thread`s) and the only file that may include a thread header or make a thread (`NATIVE_THREADS_FILE`). A kernel knows nothing of threads; the pool nothing of shots.
 - **What a span may do.** A span writes only its own slots or row. What spans share is combined after, in span order, on the calling thread. A span calls no engine API but pure functions (`wrapf`): no Variant of an array or Object, no printing, no `ERR_` macro, no nested loop of its own.
 - **The hit pass stays on one thread.**
-- **Where else.** Any kernel's loop may run on `jobs::for_spans` where measured faster (the ground's per-pixel loops do; the motes' don't).
+- **Where else.** Any kernel's loop may run on `jobs::for_spans` where measured faster.
 - **Feel's threads are the engine's.** `gameplay/feel/feel_jobs.gd` runs `LightKernel.light_grid_rows`/`light_grid_beam` a view a thread (`first_view`, `views`) with `WorkerThreadPool`; the kernel starts no thread for it and keeps nothing between calls; `check_light_grid` runs on the main thread first.
 - **How many.** `ShotKernel.threads` (the manager's `native_threads`; 0 = cores less one, at most 16); 1 on the web (`threads=no`). A machine setting, never a run's.
 - **Platforms.** Linux `-pthread`; Windows links MinGW's thread runtime statically (`native.sh` checks: no `libwinpthread` import).
@@ -50,7 +50,7 @@ What a kernel computes for the simulation uses `src/dmath.h` for every C-library
 
 ### The desktop builds optimised (the owner, 2026-11-22)
 
-Release target, `-O3`; desktop libraries (Linux, MinGW Windows) linked whole (`lto=full`, float flags passed to the link) for `x86-64-v2`. No AVX2 library. `ci/build/native.sh` refuses a desktop library holding any fused multiply-add instruction or a call of `fma` (`no_fma`). `cpu=` is for measuring only.
+`-O3`; desktop libraries linked whole (`lto=full`, float flags passed to the link) for `x86-64-v2`; no AVX2 library. `ci/build/native.sh` refuses a desktop library holding any fused multiply-add or a call of `fma` (`no_fma`). `cpu=` is for measuring only.
 
 ## Building
 
@@ -58,7 +58,7 @@ Release target, `-O3`; desktop libraries (Linux, MinGW Windows) linked whole (`l
 ci/build/native.sh linux web windows     # the libraries and the .gdextension (build.sh runs it first)
 ```
 
-- Pinned tools in `ci/build/godot.env` (godot-cpp for the 4.7 API and the classes in `build_profile.json`, SCons from its hash-checked wheel, Emscripten 4.0.20 for the web; another version may not load).
+- Pinned tools in `ci/build/godot.env` (godot-cpp, SCons's hash-checked wheel, Emscripten 4.0.20).
 - Platforms: `linux.x86_64`, `web.wasm32` (no threads), `windows.x86_64` (MinGW-w64; `native.sh` refuses a DLL that imports MinGW's runtime DLLs). macOS is not a target.
 - Every build has the module; a platform that doesn't build fails the run. `SPELLMERGE_NATIVE=required` makes comparing tests fail if the module did not load. `NATIVE=0` is local only; CI refuses it. `native = false` on the manager (or `stress.gd -- --no-native`) runs the GDScript with the module loaded.
 

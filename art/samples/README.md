@@ -7,7 +7,8 @@ The record of the art direction choice (M2 part 27). The owner picked **N** (rou
 - Do not use these samples in the game, and do not extend them; new art goes under `art/` or a content folder, in the chosen style (docs/STYLE.md).
 - They are 32×32 rect SVGs in the shared palette, checked by `tests/core/test_svg_art.gd` like any SVG.
 - Exceptions the test allows here only: E's icon is outlined in Fire's dark red instead of `#14121f` (`e_soft/`); I's proposed colours (vivid player ramps, warm floor) are allowed only in `i_warm/` and `hats_vivid/`.
-- Deleting a sample folder is allowed only together with its exception in `tests/core/test_svg_art.gd`.
+- `tests/core/test_svg_art.gd` names sample files that must be found (`KNOWN`) and the per-folder outlines (`SAMPLE_OUTLINES`): moving or deleting a sample changes that test with it.
+- Every sample is listed in `art/manifest.json`.
 
 ## The folders
 

@@ -201,10 +201,12 @@ func loadout() -> PlayerLoadout:
 	# The staffs and the hands first, so a loadout at its limit loses a stack, never a hand.
 	for stack: ItemStack in _hands:
 		if stack != null and made.add_staff(stack.number, stack.id, stack.cards):
-			made.set_staff_sigils(stack.number, stack.sigils)
+			if not made.set_staff_sigils(stack.number, stack.sigils):
+				push_warning("Inventory: the sigils of staff %d pass what a loadout carries; the next run's staff has none." % stack.number)
 	for stack: ItemStack in _stacks(ItemKinds.bag_of(ItemKinds.STAFF)):
 		if made.add_staff(stack.number, stack.id, stack.cards):
-			made.set_staff_sigils(stack.number, stack.sigils)
+			if not made.set_staff_sigils(stack.number, stack.sigils):
+				push_warning("Inventory: the sigils of staff %d pass what a loadout carries; the next run's staff has none." % stack.number)
 	var held: PackedInt32Array = hands()
 	for at in held.size():
 		if held[at] != NO_STAFF and made.staff_id(held[at]) == &"":
@@ -822,6 +824,7 @@ func put_on_hand(stack: ItemStack, hand: int) -> bool:
 	if caster == null or not caster.fill_hand(hand, made.staff, made.cards, made.mana):
 		# Hands are a Caster's: with none, there is no hand to put it on.
 		return false
+	caster.set_sigils(hand, _sigil_contents(made.sigils))
 	made.number = _next_number
 	_next_number += 1
 	_hands[hand] = made
@@ -936,6 +939,18 @@ func drop_staff(number: int) -> Refusal:
 	_say_staff(number)
 	var lying: ItemStack = found.copy()
 	lying.number = NO_STAFF
+	# Its sigils come off into the sigils bag as it leaves the hand (staff-language L4): a staff on the
+	# ground holds none (the ground's recording carries none), and what the bag has no room for is
+	# laid beside it.
+	lying.sigils.clear()
+	var sigil_bag: StringName = ItemKinds.bag_of(ItemKinds.SIGIL)
+	for id: StringName in found.sigils:
+		if capacity_of(sigil_bag) == UNLIMITED or copies(sigil_bag) < capacity_of(sigil_bag):
+			_change_count(sigil_bag, id, 1)
+		else:
+			_drop(ItemStack.of(ItemKinds.SIGIL, id, 1))
+	if not found.sigils.is_empty():
+		_say_bag(sigil_bag)
 	_drop(lying)
 	return Refusal.NONE
 

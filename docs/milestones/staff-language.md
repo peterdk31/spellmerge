@@ -123,7 +123,7 @@ A new item kind, **sigil** (`content/sigils/<id>/`, a `SigilBase` on `ItemConten
 | **Cast when Hurt** | its holder's health is below half its most | 0.5 |
 | **Cast when Close** | a foe's hit shape is within 96 px of its holder's body | 96 px |
 
-- **On a staff:** a staff's sigils are its own (`ItemStack.sigils`, ids in the order put on), so they travel with it: a staff swapped to another hand, put in the bag, or carried to the next run keeps them. At most **3** a staff; the same sigil twice adds nothing, so it is refused.
+- **On a staff:** a staff's sigils are its own (`ItemStack.sigils`, ids in the order put on), so they travel with it: a staff swapped to another hand, put in the bag, or carried to the next run keeps them. **Dropped on the ground, its sigils come off into the sigils bag** (laid beside it when the bag is full): a staff on the ground holds none, so the ground's recording header needs no new field. A boss's phase staffs carry none yet (a phase entry with sigils is a data problem), and new staffs drop the old ones' sigils. At most **3** a staff; the same sigil twice adds nothing, so it is refused.
 - **Putting one on, taking one off:** from the bag onto one of your staffs, and back, in the inventory menu, each a command (`InputFrame.COMMAND_NAMES`: `sigil_put_requested(seat, sigil id, staff number)` and `sigil_take_requested(seat, staff number, sigil id)`), applied at the next tick's start, refused as any inventory change is while a menu cannot be used. A fourth, or a second of the same, is refused and stays in the bag.
 - **How a player gets one:**
   - a **reward**: a line of kind `sigil` in the clear, treasure and challenge tables (rare), picked from a chest as any item is, into the bag;

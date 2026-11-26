@@ -263,8 +263,9 @@ func sigils_of(at: int) -> Array[StringName]:
 
 ## True when one of hand `at`'s sigils holds now: the one rule the auto cast and the HUD's glow read.
 ## `hurt`: the body's health below the amount's share of its most; `close`: a foe's hit shape within
-## the amount's pixels of its body (`ProjectileManager.has_foe_near`, a pure read). Read from the
-## simulation only (core/sim/README.md).
+## the amount's pixels of its body (`ProjectileManager.has_foe_near`, the grid brought up to date as
+## any query in the tick). Read from the simulation only (core/sim/README.md); asked in the tick only
+## (the auto cast, the player controller's `announce_stats`), never by the HUD.
 func sigil_holds(at: int) -> bool:
 	if at < 0 or at >= _sigil_whens.size() or not (_sigil_whens[at] is Array):
 		return false
@@ -276,7 +277,7 @@ func sigil_holds(at: int) -> bool:
 				if actor.health != null and actor.health.max_health > 0.0 and actor.health.health < amounts[i] * actor.health.max_health:
 					return true
 			&"close":
-				if actor.projectiles != null and actor.actors != null and actor.projectiles.has_foe_near(actor.global_position + actor.body_offset, amounts[i], SpellsScript.HITS, actor.actors.team_of(actor.id)):
+				if actor.projectiles != null and actor.actors != null and actor.projectiles.has_foe_near(actor.global_position + actor.body_offset, amounts[i], SpellsScript.HITS, actor.actors.team_of(actor.id), true):
 					return true
 	return false
 
@@ -294,7 +295,8 @@ func _auto_cast(intent: ActorIntent) -> void:
 			continue
 		if not actor.spells.cast_ready(number, at, 0.0, free_mana(at)) or not sigil_holds(at):
 			continue
-		cast(at, false)
+		# The body's own cast, no driver's: its wind-up goes on when the driver changes (`own`).
+		cast(at, false, true)
 
 
 ## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
@@ -620,6 +622,9 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 		return
 	var before: int = staff_count
 	_edited = true
+	# The old staffs' sigils go with them (a phase's staffs carry none yet: staff-language L4).
+	for at in MAX_STAFFS:
+		set_sigils(at, [] as Array[SigilBase])
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)

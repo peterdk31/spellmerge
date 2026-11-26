@@ -6727,8 +6727,13 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 ## condition's `close` (docs/milestones/staff-language.md, L2). A pure read: it writes nothing, not
 ## `nearest_point` and not the grid (it does not refresh a stale one, so between ticks it answers from
 ## the grid as the simulation last left it), so the HUD may ask it every frame without changing the
-## state a tick hashes. Allocation-free.
-func has_foe_near(point: Vector2, radius: float, layers: int, team: int) -> bool:
+## state a tick hashes. `refresh`: asked in the tick, where a stale grid is refilled first, as
+## `nearest_target` does. Allocation-free.
+func has_foe_near(point: Vector2, radius: float, layers: int, team: int, refresh: bool = false) -> bool:
+	if refresh:
+		# In the tick (a sigil's close, staff-language L4): a stale grid is brought up to date first,
+		# as every query of the simulation's is (`_query_ready`).
+		_query_ready()
 	if not point.is_finite() or not is_finite(radius) or _cell_head.size() < _grid_w * _grid_h:
 		return false
 	var cells: Vector4i = _query_cells(point, radius)

@@ -72,8 +72,8 @@ const TOGGLE_ACTION: StringName = &"inventory"
 const HINT_ACTIONS: Array[StringName] = [&"accept", &"alternate", &"back", &"inventory", &"dpad"]
 ## The d-pad's arms by quick-use slot (0 up, 1 right, 2 down, 3 left), as the input manager has them.
 const QUICK_ACTIONS: Array[StringName] = InputManagerScript.QUICK_ACTIONS
-## Each hand's button in words, by hand (a sigil's line says which staffs have it).
-const HAND_WORDS: Array[String] = ["RB", "RT", "LB", "LT"]
+## Each hand's staff in words, by hand, as the builder names it (a sigil's line says which have it).
+const HAND_WORDS: Array[String] = ["staff 1", "staff 2", "staff 3", "staff 4"]
 ## The buttons read here (the rest come as UIFocus signals).
 const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"inventory", &"quick_up", &"quick_right", &"quick_down", &"quick_left"]
 ## Which layer the ring shows.

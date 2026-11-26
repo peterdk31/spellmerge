@@ -91,6 +91,43 @@ func test_what_is_refused() -> void:
 		_world.registry.remove(&"sigils", id)
 
 
+func test_a_dropped_staff_s_sigils_come_off_into_the_bag() -> void:
+	var body: Actor = _wizard()
+	var inventory: Inventory = body.inventory
+	inventory.put_sigil(0, HURT)
+	var lying: Array[ItemStack] = []
+	_world.bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: lying.append(stack))
+	check_equal(inventory.drop_staff(0), Inventory.Refusal.NONE, "dropped")
+	check_equal(inventory.count_of(BAG, HURT), 1, "its sigil is back in the bag")
+	check(lying.size() == 1 and lying[0].sigils.is_empty(), "the staff on the ground holds none")
+
+
+func test_a_staff_picked_up_onto_a_hand_casts_by_its_sigils() -> void:
+	var body: Actor = _wizard()
+	var held := ItemStack.of_staff(_staff, [&"bolt"] as Array[StringName])
+	held.sigils = [HURT] as Array[StringName]
+	check(body.inventory.put_on_hand(held, 1), "onto RT")
+	check_equal(body.caster.sigils_of(1), [HURT] as Array[StringName], "its hand casts by its sigil")
+
+
+func test_sigils_follow_a_staff_from_hand_to_hand() -> void:
+	var body: Actor = _wizard()
+	body.inventory.put_sigil(0, HURT)
+	check_equal(body.inventory.set_hand(0, 2), Inventory.Refusal.NONE, "RB's staff onto LB")
+	check(body.caster.sigils_of(0).is_empty(), "RB casts by none")
+	check_equal(body.caster.sigils_of(2), [HURT] as Array[StringName], "LB by its sigil")
+	check_equal(body.inventory.set_hand(0, Inventory.NO_HAND), Inventory.Refusal.NONE, "into the bag")
+	check(body.caster.sigils_of(2).is_empty(), "no hand casts by it")
+	check_equal(body.inventory.sigils_of(0), [HURT] as Array[StringName], "the staff in the bag keeps it")
+
+
+func test_new_staffs_drop_the_old_staffs_sigils() -> void:
+	var body: Actor = _wizard()
+	body.inventory.put_sigil(0, HURT)
+	body.caster.replace_staffs([_staff] as Array[StaffBase], [[&"bolt"]])
+	check(body.caster.sigils_of(0).is_empty(), "a boss's phase staffs carry none")
+
+
 func test_it_casts_by_itself_only_while_hurt() -> void:
 	var body: Actor = _wizard()
 	body.inventory.put_sigil(0, HURT)

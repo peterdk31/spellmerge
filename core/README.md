@@ -51,7 +51,7 @@ Its code is split by job, as the projectile manager's is; its state is not. `spe
 | zaps | `spell_zaps.gd` | zaps, sparks and magnets |
 | hits | `spell_hits.gd` | the event handlers (`_on_hit`, `_on_expired`, ...), a hit's cards, relay and infusion |
 
-A job reads the runtime's arrays and dictionaries through members of its own of the same names, aliases of the runtime's (`link`), so its code reads as the runtime's did and loops as fast; scalars, objects and calls go through `rt`, and a public function is always called through `rt` (a subclass may override it). The runtime links its jobs again whenever its arrays may have been replaced (`_link_jobs`: after a snapshot's restore and a run's renew); its own code only ever resizes them. A member the runtime replaces whole (the jump ring `_jq_*`, grown by `_grow_jumps`) is never aliased: `rt._jq_spell`. `tests/core/test_spell_jobs.gd` checks the links.
+A job reads the runtime's arrays and dictionaries through members of its own of the same names, aliases of the runtime's (`link`), so its code reads as the runtime's did and loops as fast; scalars, objects and the runtime's own functions go through `rt` (a public one always, so a subclass may override it), another job's through that job. The runtime links its jobs again whenever its arrays may have been replaced (`_link_jobs`: after a snapshot's restore and a run's renew); its own code only ever resizes them. A member the runtime replaces whole (the jump ring `_jq_*`, grown by `_grow_jumps`) is never aliased: `rt._jq_spell`. `tests/core/test_spell_jobs.gd` checks the links.
 
 ## The projectile manager
 

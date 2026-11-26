@@ -543,3 +543,35 @@ func test_x_dropping_a_staff_is_a_choice() -> void:
 	_frame()
 	check_equal(_drop_asks.size(), 1, "the staff asked dropped")
 	check(sounds.has(UiSounds.CHOOSE), "with a choice's sound, got %s" % [sounds])
+
+
+func test_a_sigil_goes_on_and_off_a_staff_in_the_bag() -> void:
+	# Staff-language L4 (the owner, 2026-11-25): the Sigils bag reaches every staff owned, the bag's too.
+	_start()
+	_wizard.inventory.registry = _world.registry
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.SIGIL, &"cast_when_hurt", 1)), "a sigil in the bag")
+	var asks: Array = []
+	_bus.sigil_put_requested.connect(func(player: int, staff: int, id: StringName, _body: int) -> void: asks.append([&"put", player, staff, id]))
+	_bus.sigil_take_requested.connect(func(player: int, staff: int, id: StringName, _body: int) -> void: asks.append([&"take", player, staff, id]))
+	var inventory: InventoryScript = _open()
+	_enter(&"sigils")
+	check_equal(inventory.layer(), InventoryScript.Layer.ITEMS, "the Sigils bag's ring")
+	_point("item", &"cast_when_hurt")
+	_tap(&"accept")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.SIGIL_STAFFS, "A on a sigil: the ring of every staff")
+	var bagged: int = _wizard.inventory.stacks_in(STAFFS)[0].number
+	check(inventory.entry_of("staff", bagged) != InventoryScript.NONE, "the bag's staff is on it")
+	_point("staff", bagged)
+	_tap(&"accept")
+	_frame()
+	check_equal(asks, [[&"put", 0, bagged, &"cast_when_hurt"]], "A puts it on the staff in the bag")
+	_wizard.inventory.put_sigil(bagged, &"cast_when_hurt")
+	_bus.owned_staff_changed.emit(0, bagged, _wizard.inventory.plan_of(bagged))
+	_frame()
+	_tap(&"accept")
+	_frame()
+	check_equal(asks.back(), [&"take", 0, bagged, &"cast_when_hurt"], "on it already: A takes it off")
+	_tap(&"back")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.ITEMS, "B: back to the Sigils bag")

@@ -27,11 +27,12 @@ const POTION: StringName = &"potion"
 const COIN: StringName = &"coin"
 const KEY: StringName = &"key"
 const REROLL: StringName = &"reroll"
+const SIGIL: StringName = &"sigil"
 
 ## The bags, in the order the inventory shows them (owner, 2026-11-13: Staffs, Cards, Relics, Potions;
 ## the currency after them, connected biomes CB10's follow-up, the owner's of 2026-11-19: the coins
-## and the keys, "a currency bag (along with coins)").
-const BAGS: Array[StringName] = [&"staffs", &"cards", &"relics", &"potions", &"currency"]
+## and the keys, "a currency bag (along with coins)"; the sigils before the currency, staff-language L4).
+const BAGS: Array[StringName] = [&"staffs", &"cards", &"relics", &"potions", &"sigils", &"currency"]
 
 ## What can be done with one held.
 const DROP: StringName = &"drop"
@@ -47,7 +48,8 @@ const HAND: StringName = &"hand"
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
 ## room's door (the owner, 2026-11-19: "Keys are also just inventory items"); a reroll is a
 ## `RerollBase` (content/rerolls), one stack beside them, the reward reroll, spent by X in the
-## reward picker (the owner, 2026-11-19). Everything is dropped
+## reward picker (the owner, 2026-11-19); a sigil is a `SigilBase` (content/sigils), kept in its bag
+## until put on a staff in the inventory menu (staff-language L4). Everything is dropped
 ## (the owner, 2026-11-19: "Everything is droppable"): a coin or a key one copy at a time, as a potion,
 ## lying as any item, taken by A into the taker's own bag (a dropped coin is not shared: only the
 ## coins a foe dies with are, gameplay/rewards).
@@ -58,6 +60,7 @@ const RULES: Dictionary = {
 	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop"], "premade": []},
 	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [&"drop"], "premade": [], "ids": [&"coin"]},
 	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [&"drop"], "premade": [], "ids": [&"key"]},
+	&"sigil": {"bag": &"sigils", "stacks": true, "content": [&"sigils"], "type": &"SigilBase", "actions": [&"drop"], "premade": []},
 	&"reroll": {"bag": &"currency", "stacks": true, "content": [&"rerolls"], "type": &"RerollBase", "actions": [&"drop"], "premade": [], "ids": [&"reward_reroll"]},
 }
 ## The class of a kind with none of its own yet.

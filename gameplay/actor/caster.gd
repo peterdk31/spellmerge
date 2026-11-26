@@ -100,6 +100,15 @@ var _built: bool = false
 var _edited: bool = false
 ## The plain staff used when `staff` is null.
 var _plain: StaffBase = null
+## The sigils each hand's staff holds (staff-language L4, `set_sigils`): by hand, their ids, what each
+## waits for (`SigilBase.when`) and its amount, in the order put on. A staff with any casts by itself
+## while one holds (`_auto_cast`). State: a snapshot keeps them.
+var _sigil_ids: Array = []
+var _sigil_whens: Array = []
+var _sigil_amounts: Array = []
+## The sigils each staff of an enemy's or a prop's data names (`StaffCards.sigils`, by button), put
+## on its hands as the actor enters play.
+var start_sigils: Array = []
 ## What `_push_place` sent last: the feet, aim and staff on show it was worked out from (INF feet:
 ## send at the next step), the anchor and the staff tip it sent.
 var _placed_feet: Vector2 = Vector2.INF
@@ -122,6 +131,14 @@ func setup(owner_actor: Actor) -> void:
 		var empty: Array[StringName] = []
 		_cards[at] = empty
 	_has_build.resize(MAX_STAFFS)
+	_sigil_ids.resize(MAX_STAFFS)
+	_sigil_whens.resize(MAX_STAFFS)
+	_sigil_amounts.resize(MAX_STAFFS)
+	for at in MAX_STAFFS:
+		var sigils: Array[SigilBase] = []
+		if at < start_sigils.size() and start_sigils[at] is Array:
+			sigils.assign(start_sigils[at])
+		set_sigils(at, sigils)
 
 
 func attach() -> void:
@@ -130,11 +147,8 @@ func attach() -> void:
 		actor.events.mana_refund_requested.connect(_on_mana_refund)
 	if actor.events != null and not actor.events.mana_spend_requested.is_connected(_on_mana_spend):
 		actor.events.mana_spend_requested.connect(_on_mana_spend)
-	if actor.health != null and not actor.health.changed.is_connected(_on_health_changed):
-		actor.health.changed.connect(_on_health_changed)
 	if number < 0:
 		return
-	_tell_health()
 	own_hurtbox()
 	if not _built:
 		_built = true
@@ -168,24 +182,7 @@ func detach() -> void:
 		actor.events.mana_refund_requested.disconnect(_on_mana_refund)
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_spend_requested.is_connected(_on_mana_spend):
 		actor.events.mana_spend_requested.disconnect(_on_mana_spend)
-	if actor.health != null and is_instance_valid(actor.health) and actor.health.changed.is_connected(_on_health_changed):
-		actor.health.changed.disconnect(_on_health_changed)
 	_close_number()
-
-
-## Spells reads no health: a `hurt` condition (docs/milestones/staff-language.md, L2) reads the share
-## the Caster tells it, whenever the body's health changes.
-func _on_health_changed(_health: float, _max_health: float) -> void:
-	_tell_health()
-
-
-func _tell_health() -> void:
-	if number < 0 or actor.spells == null:
-		return
-	var share: float = 1.0
-	if actor.health != null and actor.health.max_health > 0.0:
-		share = actor.health.health / actor.health.max_health
-	actor.spells.sense_health(number, share)
 
 
 ## Mana back, the anchor and the aim to the systems, then the casts the intent asks for.
@@ -212,6 +209,7 @@ func step(delta: float) -> void:
 	if actor.spells == null:
 		return
 	var intent: ActorIntent = actor.intent
+	_auto_cast(intent)
 	if (intent.pressed_bits | intent.held_bits) == 0:
 		# No button: nothing to cast or show (most steps of most actors).
 		return
@@ -229,6 +227,76 @@ func step(delta: float) -> void:
 		if pressed or held:
 			_show(at)
 			cast(at, pressed)
+
+
+# --- Sigils (staff-language L4) ----------------------------------------------------------
+
+## Hand `at`'s staff holds `sigils` (none: casts only when pressed). The Inventory tells it whenever a
+## staff with sigils comes onto a hand or its sigils change; an enemy's come from its data.
+func set_sigils(at: int, sigils: Array[SigilBase]) -> void:
+	if at < 0 or at >= MAX_STAFFS or _sigil_ids.size() <= at:
+		return
+	var ids: Array[StringName] = []
+	var whens: Array[StringName] = []
+	var amounts := PackedFloat32Array()
+	for sigil: SigilBase in sigils:
+		if sigil == null or ids.has(sigil.id) or ids.size() >= SigilBase.MOST_A_STAFF:
+			continue
+		ids.append(sigil.id)
+		whens.append(sigil.when)
+		amounts.append(sigil.amount)
+	_sigil_ids[at] = ids
+	_sigil_whens[at] = whens
+	_sigil_amounts[at] = amounts
+	if number >= 0 and holds(at):
+		# The corner panel's row shows its sigils (`plan_of`).
+		staff_built.emit(at)
+
+
+## The ids of the sigils hand `at`'s staff holds (none for a hand past its staffs).
+func sigils_of(at: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if at >= 0 and at < _sigil_ids.size() and _sigil_ids[at] is Array:
+		out.assign(_sigil_ids[at])
+	return out
+
+
+## True when one of hand `at`'s sigils holds now: the one rule the auto cast and the HUD's glow read.
+## `hurt`: the body's health below the amount's share of its most; `close`: a foe's hit shape within
+## the amount's pixels of its body (`ProjectileManager.has_foe_near`, the grid brought up to date as
+## any query in the tick). Read from the simulation only (core/sim/README.md); asked in the tick only
+## (the auto cast, the player controller's `announce_stats`), never by the HUD.
+func sigil_holds(at: int) -> bool:
+	if at < 0 or at >= _sigil_whens.size() or not (_sigil_whens[at] is Array):
+		return false
+	var whens: Array = _sigil_whens[at]
+	var amounts: PackedFloat32Array = _sigil_amounts[at]
+	for i in whens.size():
+		match whens[i]:
+			&"hurt":
+				if actor.health != null and actor.health.max_health > 0.0 and actor.health.health < amounts[i] * actor.health.max_health:
+					return true
+			&"close":
+				if actor.projectiles != null and actor.actors != null and actor.projectiles.has_foe_near(actor.global_position + actor.body_offset, amounts[i], SpellsScript.HITS, actor.actors.team_of(actor.id), true):
+					return true
+	return false
+
+
+## Each step: every staff on a hand with a sigil that holds, which its driver neither presses nor
+## holds, is cast as a held button's repeat (no new press, so no `on recast`), along the body's aim, at
+## its own cooldown and mana: only when Spells says it is ready (`cast_ready`), never while its
+## sustained cards are on (that cast would switch them off). Its wind-up is a cast's as any (an
+## enemy's telegraph).
+func _auto_cast(intent: ActorIntent) -> void:
+	for at in staff_count:
+		if _has_build[at] == 0 or (_sigil_whens[at] as Array).is_empty():
+			continue
+		if intent.is_pressed(at) or intent.is_held(at) or actor.spells.is_holding(number, at):
+			continue
+		if not actor.spells.cast_ready(number, at, 0.0, free_mana(at)) or not sigil_holds(at):
+			continue
+		# The body's own cast, no driver's: its wind-up goes on when the driver changes (`own`).
+		cast(at, false, true)
 
 
 ## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
@@ -438,7 +506,10 @@ func _show(at: int) -> void:
 func plan_of(at: int) -> Dictionary:
 	if actor.spells == null or not holds(at):
 		return {}
-	return actor.spells.staff_view(cards_of(at), staff_of(at))
+	var view: Dictionary = actor.spells.staff_view(cards_of(at), staff_of(at))
+	# Its sigils (staff-language L4), for the corner panel: ids in the order put on.
+	view["sigils"] = sigils_of(at)
+	return view
 
 
 ## The carrier card of the carrier staff `at` cast last (`Spells.last_carrier_card`), or &"".
@@ -451,11 +522,14 @@ func last_carrier_card(at: int) -> StringName:
 func hold_staffs(entries: Array[StaffCards], extra_card: StringName = &"") -> void:
 	var held: Array[StaffBase] = []
 	var cards: Array = []
+	var sigils: Array = []
 	for entry: StaffCards in entries.slice(0, MAX_STAFFS):
 		held.append(entry.staff if entry != null else null)
 		cards.append(entry.cards.duplicate() if entry != null else [])
+		sigils.append(entry.sigils.duplicate() if entry != null else [])
 	if held.is_empty():
 		return
+	start_sigils = sigils
 	extra_slots = 0
 	if extra_card != &"" and held[0] != null:
 		# An elite's card (connected biomes CB11): one slot more on its first staff, the card in front of
@@ -528,6 +602,7 @@ func empty_hand(at: int) -> float:
 		staffs[at] = null
 	_cards[at] = [] as Array[StringName]
 	_mana[at] = 0.0
+	set_sigils(at, [] as Array[SigilBase])
 	_edited = true
 	_install(at)
 	if current == at and holds(first_held()):
@@ -547,6 +622,9 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 		return
 	var before: int = staff_count
 	_edited = true
+	# The old staffs' sigils go with them (a phase's staffs carry none yet: staff-language L4).
+	for at in MAX_STAFFS:
+		set_sigils(at, [] as Array[SigilBase])
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)

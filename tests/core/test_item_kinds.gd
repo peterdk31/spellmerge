@@ -54,7 +54,7 @@ func test_the_currency_bag_holds_the_coins_and_the_keys() -> void:
 
 
 func test_the_owners_kinds() -> void:
-	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"currency"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order, then the currency")
+	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"sigils", &"currency"] as Array[StringName], "Staffs, Cards, Relics, Potions, Sigils (staff-language L4), in order, then the currency")
 	check(ItemKinds.stacks(ItemKinds.CARD) and ItemKinds.stacks(ItemKinds.POTION), "cards and potions stack")
 	check(ItemKinds.stacks(ItemKinds.COIN) and ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, dropped")
 	for kind: StringName in ItemKinds.kinds():

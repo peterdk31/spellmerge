@@ -166,6 +166,23 @@ func base_of(number: int) -> StaffBase:
 	return plan_of(number).get("staff") as StaffBase
 
 
+## Staff `number`'s sigils (staff-language L4), in the order put on.
+func sigils_of(number: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id: Variant in plan_of(number).get("sigils", []):
+		out.append(StringName(id))
+	return out
+
+
+## The hands whose staffs hold the sigil `id`, by hand.
+func hands_with_sigil(id: StringName) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for hand in HANDS:
+		if on_hand(hand) != NONE and sigils_of(on_hand(hand)).has(id):
+			out.append(hand)
+	return out
+
+
 ## Staff `number`'s cards by slot (`&""` for an empty slot).
 func cards_of(number: int) -> Array[StringName]:
 	var out: Array[StringName] = []

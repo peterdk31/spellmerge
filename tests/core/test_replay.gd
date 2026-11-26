@@ -154,8 +154,8 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	carry_seats[carry_at] = 0x14
 	cases["a loadout of a seat past the four"] = carry_seats
 	var sections: PackedByteArray = good.duplicate()
-	sections[carry_at + 1] = 5
-	cases["a loadout of five sections"] = sections
+	sections[carry_at + 1] = 6
+	cases["a loadout of six sections"] = sections
 	var unknown: PackedByteArray = good.duplicate()
 	unknown[carry_at + 2] = 9
 	cases["a section nobody knows"] = unknown

@@ -172,7 +172,7 @@ func test_the_decoder_refuses_what_is_not_whole_and_in_bounds() -> void:
 		cases[name] = bytes
 	change.call("two sections", 0, 2)
 	change.call("three sections", 0, 3)
-	change.call("five sections", 0, 5)
+	change.call("six sections", 0, 6)
 	change.call("a section it does not know", bags, 9)
 	change.call("a section out of its place", bags, PlayerLoadout.STAFFS)
 	change.call("a later section it does not know", at[3], 9)

@@ -82,7 +82,7 @@ extends ActorComponent
 ## `quick_changed(slot)`.
 
 ## Why a change was refused (NONE: it was made).
-enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP, NO_USE }
+enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP, NO_USE, SIGILS_FULL, SIGIL_TWICE }
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -156,6 +156,15 @@ func _init() -> void:
 	_hands.resize(HANDS)
 
 
+## Its Caster's hands cast by their staffs' sigils (staff-language L4): a loadout's staffs went on the
+## hands before the Caster was ready.
+func attach() -> void:
+	super.attach()
+	for stack: ItemStack in _hands:
+		if stack != null and not stack.sigils.is_empty():
+			_tell_sigils(stack.number)
+
+
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	if _started:
@@ -177,6 +186,8 @@ func setup(owner_actor: Actor) -> void:
 				cards.append(StringName(str(id)))
 		var stack := ItemStack.of_staff(caster.staff_of(at), cards)
 		stack.number = at
+		# An enemy's staff entry may name sigils (`StaffCards.sigils`): the Caster holds them already.
+		stack.sigils = caster.sigils_of(at)
 		_hands[at] = stack
 
 
@@ -189,10 +200,13 @@ func loadout() -> PlayerLoadout:
 	var made := PlayerLoadout.new()
 	# The staffs and the hands first, so a loadout at its limit loses a stack, never a hand.
 	for stack: ItemStack in _hands:
-		if stack != null:
-			made.add_staff(stack.number, stack.id, stack.cards)
+		if stack != null and made.add_staff(stack.number, stack.id, stack.cards):
+			if not made.set_staff_sigils(stack.number, stack.sigils):
+				push_warning("Inventory: the sigils of staff %d pass what a loadout carries; the next run's staff has none." % stack.number)
 	for stack: ItemStack in _stacks(ItemKinds.bag_of(ItemKinds.STAFF)):
-		made.add_staff(stack.number, stack.id, stack.cards)
+		if made.add_staff(stack.number, stack.id, stack.cards):
+			if not made.set_staff_sigils(stack.number, stack.sigils):
+				push_warning("Inventory: the sigils of staff %d pass what a loadout carries; the next run's staff has none." % stack.number)
 	var held: PackedInt32Array = hands()
 	for at in held.size():
 		if held[at] != NO_STAFF and made.staff_id(held[at]) == &"":
@@ -251,6 +265,7 @@ func take_loadout(loadout: PlayerLoadout, in_registry: Node) -> void:
 			continue
 		var stack := ItemStack.of_staff(base, loadout.staff_cards(number))
 		stack.number = number
+		stack.sigils = _known_sigils(loadout.staff_sigils(number), in_registry)
 		_next_number = maxi(_next_number, number + 1)
 		var hand: int = loadout.hand_of(number)
 		if hand >= 0 and hand < HANDS:
@@ -609,7 +624,10 @@ func plan_of(number: int) -> Dictionary:
 	var found: ItemStack = _staff(number)
 	if found == null or found.staff == null or actor == null or actor.spells == null:
 		return {}
-	return actor.spells.staff_view(found.cards, found.staff)
+	var view: Dictionary = actor.spells.staff_view(found.cards, found.staff)
+	# Its sigils (staff-language L4), for the corner panel and the builder: ids in the order put on.
+	view["sigils"] = found.sigils.duplicate()
+	return view
 
 
 ## Put `card_id` in slot `slot` of staff `number` (`&""` empties it), counted (see the class doc).
@@ -680,6 +698,96 @@ func set_cards(number: int, cards: Array[StringName]) -> Refusal:
 	return Refusal.NONE
 
 
+# --- Sigils (staff-language L4) ----------------------------------------------------------
+
+## Put the sigil `sigil_id` from the sigils bag on staff `number` (the inventory menu's
+## `sigil_put_requested`): refused, and nothing changes, for a staff it does not own, a sigil it does
+## not have, a staff with `SigilBase.MOST_A_STAFF` already, or one that has this sigil already.
+## On a hand, its Caster casts by it from the next step.
+func put_sigil(number: int, sigil_id: StringName) -> Refusal:
+	var found: ItemStack = _staff(number)
+	if found == null:
+		return Refusal.NO_STAFF
+	var bag: StringName = ItemKinds.bag_of(ItemKinds.SIGIL)
+	if count_of(bag, sigil_id) < 1 or _sigil_content(sigil_id) == null:
+		return Refusal.NO_ITEM
+	if found.sigils.has(sigil_id):
+		return Refusal.SIGIL_TWICE
+	if found.sigils.size() >= SigilBase.MOST_A_STAFF:
+		return Refusal.SIGILS_FULL
+	_change_count(bag, sigil_id, -1)
+	found.sigils.append(sigil_id)
+	_tell_sigils(number)
+	_say_bag(bag)
+	_say_staff(number)
+	return Refusal.NONE
+
+
+## Take the sigil `sigil_id` off staff `number` into the sigils bag (`sigil_take_requested`):
+## refused for a staff it does not own or one without it, and for a full bag (nothing changes).
+func take_sigil(number: int, sigil_id: StringName) -> Refusal:
+	var found: ItemStack = _staff(number)
+	if found == null:
+		return Refusal.NO_STAFF
+	if not found.sigils.has(sigil_id):
+		return Refusal.NO_ITEM
+	var bag: StringName = ItemKinds.bag_of(ItemKinds.SIGIL)
+	if capacity_of(bag) != UNLIMITED and copies(bag) >= capacity_of(bag):
+		return Refusal.NO_ROOM
+	found.sigils.erase(sigil_id)
+	_change_count(bag, sigil_id, 1)
+	_tell_sigils(number)
+	_say_bag(bag)
+	_say_staff(number)
+	return Refusal.NONE
+
+
+## The sigils of staff `number` (ids, in the order put on; none for a staff it does not own).
+func sigils_of(number: int) -> Array[StringName]:
+	var found: ItemStack = _staff(number)
+	var out: Array[StringName] = []
+	if found != null:
+		out.assign(found.sigils)
+	return out
+
+
+## Its Caster's hand holding staff `number` casts by that staff's sigils now.
+func _tell_sigils(number: int) -> void:
+	var hand: int = hand_of(number)
+	var caster: Caster = actor.caster if actor != null else null
+	if hand >= 0 and caster != null:
+		caster.set_sigils(hand, _sigil_contents(_staff(number).sigils))
+
+
+## The sigil content of `ids` (each the registry's; an unknown id is left out).
+func _sigil_contents(ids: Array[StringName]) -> Array[SigilBase]:
+	var out: Array[SigilBase] = []
+	for id: StringName in ids:
+		var found: SigilBase = _sigil_content(id)
+		if found != null:
+			out.append(found)
+	return out
+
+
+func _sigil_content(id: StringName) -> SigilBase:
+	return ItemKinds.content(ItemKinds.SIGIL, id, _registry()) as SigilBase
+
+
+## The ids of `ids` that `in_registry` has as sigils, at most `SigilBase.MOST_A_STAFF`, each once (a
+## loadout's, read from bytes).
+static func _known_sigils(ids: Array[StringName], in_registry: Node) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id: StringName in ids:
+		if out.size() >= SigilBase.MOST_A_STAFF or out.has(id) or in_registry == null or not in_registry.has_method(&"get_resource"):
+			continue
+		# As `staff_content` finds a staff: any node that serves content by folder and id.
+		for folder: StringName in ItemKinds.content_of(ItemKinds.SIGIL):
+			if ItemKinds.is_content(ItemKinds.SIGIL, in_registry.call(&"get_resource", folder, id) as Resource):
+				out.append(id)
+				break
+	return out
+
+
 ## Lay `stack` on the ground at the body's feet (`item_drop_requested`: the Items area finds the
 ## spot). It is gone from here already; with no bus it is gone for good.
 func _drop(stack: ItemStack) -> void:
@@ -716,6 +824,7 @@ func put_on_hand(stack: ItemStack, hand: int) -> bool:
 	if caster == null or not caster.fill_hand(hand, made.staff, made.cards, made.mana):
 		# Hands are a Caster's: with none, there is no hand to put it on.
 		return false
+	caster.set_sigils(hand, _sigil_contents(made.sigils))
 	made.number = _next_number
 	_next_number += 1
 	_hands[hand] = made
@@ -830,6 +939,18 @@ func drop_staff(number: int) -> Refusal:
 	_say_staff(number)
 	var lying: ItemStack = found.copy()
 	lying.number = NO_STAFF
+	# Its sigils come off into the sigils bag as it leaves the hand (staff-language L4): a staff on the
+	# ground holds none (the ground's recording carries none), and what the bag has no room for is
+	# laid beside it.
+	lying.sigils.clear()
+	var sigil_bag: StringName = ItemKinds.bag_of(ItemKinds.SIGIL)
+	for id: StringName in found.sigils:
+		if capacity_of(sigil_bag) == UNLIMITED or copies(sigil_bag) < capacity_of(sigil_bag):
+			_change_count(sigil_bag, id, 1)
+		else:
+			_drop(ItemStack.of(ItemKinds.SIGIL, id, 1))
+	if not found.sigils.is_empty():
+		_say_bag(sigil_bag)
 	_drop(lying)
 	return Refusal.NONE
 
@@ -899,6 +1020,7 @@ func _on_hand(stack: ItemStack, hand: int) -> void:
 	var caster: Caster = actor.caster if actor != null else null
 	if caster != null:
 		caster.fill_hand(hand, stack.staff, stack.cards, stack.mana)
+		caster.set_sigils(hand, _sigil_contents(stack.sigils))
 
 
 # --- Inside -----------------------------------------------------------------------------

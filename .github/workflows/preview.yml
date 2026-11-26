@@ -25,7 +25,7 @@ jobs:
     name: web build
     if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90 # the web build and its ~830 screenshots took 59 minutes by 2026-11-26
     concurrency:
       group: preview-build
       cancel-in-progress: true

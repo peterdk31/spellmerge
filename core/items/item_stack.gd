@@ -38,6 +38,9 @@ var number: int = NO_NUMBER
 var staff: StaffBase = null
 var cards: Array[StringName] = []
 var mana: float = 0.0
+## A staff's sigils (staff-language L4): the ids of the sigils put on it, in the order put on (at most
+## `SigilBase.MOST_A_STAFF`, no two the same). They go wherever the staff goes.
+var sigils: Array[StringName] = []
 ## Seconds before its use can be used again (0: ready), and the whole cooldown it recharges for
 ## (0: not recharging): `start_recharge`, `step_recharge`.
 var recharge_left: float = 0.0
@@ -101,6 +104,7 @@ func copy() -> ItemStack:
 	made.number = number
 	made.staff = staff
 	made.cards = cards.duplicate()
+	made.sigils = sigils.duplicate()
 	made.mana = mana
 	made.recharge_left = recharge_left
 	made.recharge_whole = recharge_whole

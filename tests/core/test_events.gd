@@ -20,6 +20,8 @@ const EVENTS: Dictionary = {
 	&"map_pick_changed": [["player", TYPE_INT], ["room", TYPE_INT]],
 	&"quick_bind_requested": [["player", TYPE_INT], ["slot", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["body", TYPE_INT]],
 	&"quick_use_requested": [["player", TYPE_INT], ["slot", TYPE_INT]],
+	&"sigil_put_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["id", TYPE_STRING_NAME], ["body", TYPE_INT]],
+	&"sigil_take_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["id", TYPE_STRING_NAME], ["body", TYPE_INT]],
 	&"map_frame_shown": [["player", TYPE_INT], ["frame", TYPE_RECT2I], ["open", TYPE_BOOL]],
 	&"teleport_rooms_shown": [["player", TYPE_INT], ["rooms", TYPE_PACKED_INT32_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"wizard_teleported": [["player", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],

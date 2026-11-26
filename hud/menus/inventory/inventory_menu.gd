@@ -73,7 +73,7 @@ const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"s
 ## Which layer the ring shows.
 enum Layer { BAGS, STAFFS, KINDS, CARDS, ITEMS }
 ## Each bag's word.
-const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions", &"currency": "Currency"}
+const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions", &"sigils": "Sigils", &"currency": "Currency"}
 ## The staff numbers the column shows, in order, with their headers and how each is written.
 const NUMBERS: Array[String] = ["slots", "cooldown", "max_mana"]
 const NUMBER_WORDS: Array[String] = ["Slots", "Delay", "Mana"]

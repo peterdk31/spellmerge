@@ -36,7 +36,12 @@ const BAGS: int = 1
 const STAFFS: int = 2
 const HANDS: int = 3
 const QUICK: int = 4
-const SECTIONS: PackedByteArray = [BAGS, STAFFS, HANDS, QUICK]
+## A staff's sigils (staff-language L4): by staff number, its sigil ids. A loadout written before it
+## (four sections) is read as one with no sigils.
+const SIGILS: int = 5
+const SECTIONS: PackedByteArray = [BAGS, STAFFS, HANDS, QUICK, SIGILS]
+## The sections every loadout has; those past them are read only when its count says so.
+const FIRST_SECTIONS: int = 4
 
 ## The limits, the writers' and the decoder's: bags, counted stacks in all bags together, copies
 ## in a stack, staffs owned, a staff's number, the slots of a staff (StaffBase's range), hands.
@@ -48,12 +53,14 @@ const MAX_NUMBER: int = 0xfffe
 const MAX_CARDS: int = 64
 const MAX_HANDS: int = 8
 const QUICK_SLOTS: int = 4
+## The most sigils one staff carries (the format's; SigilBase.MOST_A_STAFF is the game's).
+const MAX_SIGILS: int = 8
 ## The most bytes one takes; a writer refuses what would pass it.
 const MAX_BYTES: int = 16384
 ## A hand with no staff, as its bytes.
 const _NO_STAFF_BYTES: int = 0xffff
 ## The bytes of an empty loadout: the section count, and each section's tag, length and count of none.
-const _EMPTY_BYTES: int = 1 + 4 * 4
+const _EMPTY_BYTES: int = 1 + 4 * 5
 
 ## The bags that hold something, by name, and beside each its stacks' ids (an `Array[StringName]`)
 ## and their copies (a PackedInt32Array).
@@ -67,6 +74,9 @@ var _staff_ids: Array[StringName] = []
 var _staff_cards: Array = []
 ## By hand: the number of the staff on it, or NO_STAFF.
 var _hands: PackedInt32Array = PackedInt32Array()
+## The staffs with sigils, by number, and beside each its sigil ids (an `Array[StringName]`).
+var _sigil_numbers: PackedInt32Array = PackedInt32Array()
+var _sigil_ids: Array = []
 ## By quick-use slot: the bag and the id bound to it (`&""`: none).
 var _quick_bags: Array[StringName] = [&"", &"", &"", &""]
 var _quick_ids: Array[StringName] = [&"", &"", &"", &""]
@@ -127,6 +137,36 @@ func add_staff(number: int, id: StringName, cards: Array[StringName]) -> bool:
 	_staff_cards.append(cards.duplicate())
 	_size += more
 	return true
+
+
+## Staff `number`'s sigils are `ids` (staff-language L4). False, and nothing changes, when it owns
+## no such staff, it has its sigils already, there are more than MAX_SIGILS, one is not an id, or it
+## would pass MAX_BYTES. None: nothing to write.
+func set_staff_sigils(number: int, ids: Array[StringName]) -> bool:
+	if ids.is_empty():
+		return true
+	if not _numbers.has(number) or _sigil_numbers.has(number) or ids.size() > MAX_SIGILS:
+		return false
+	var more: int = 2 + 1
+	for id: StringName in ids:
+		if not _is_name(id):
+			return false
+		more += _id_bytes(id)
+	if _size + more > MAX_BYTES:
+		return false
+	_sigil_numbers.append(number)
+	_sigil_ids.append(ids.duplicate())
+	_size += more
+	return true
+
+
+## The sigil ids of staff `number` (none for a staff it does not own or without any).
+func staff_sigils(number: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var at: int = _sigil_numbers.find(number)
+	if at >= 0:
+		out.assign(_sigil_ids[at])
+	return out
 
 
 ## Its hands are `numbers`: by hand, the number of a staff it owns or NO_STAFF. False, and nothing
@@ -255,6 +295,9 @@ func copy() -> PlayerLoadout:
 	for cards: Array[StringName] in _staff_cards:
 		made._staff_cards.append(cards.duplicate())
 	made._hands = _hands.duplicate()
+	made._sigil_numbers = _sigil_numbers.duplicate()
+	for ids: Array[StringName] in _sigil_ids:
+		made._sigil_ids.append(ids.duplicate())
 	made._quick_bags = _quick_bags.duplicate()
 	made._quick_ids = _quick_ids.duplicate()
 	made._size = _size
@@ -323,6 +366,14 @@ func encode_into(out: PackedByteArray) -> void:
 						out.append(slot)
 						_encode_id(out, _quick_bags[slot])
 						_encode_id(out, _quick_ids[slot])
+			SIGILS:
+				out.append(_sigil_numbers.size())
+				for at in _sigil_numbers.size():
+					_encode_u16(out, _sigil_numbers[at])
+					var ids: Array[StringName] = _sigil_ids[at]
+					out.append(ids.size())
+					for id: StringName in ids:
+						_encode_id(out, id)
 		out.encode_u16(length_at, out.size() - length_at - 2)
 
 
@@ -341,6 +392,8 @@ func decode_at(bytes: PackedByteArray, at: int) -> String:
 	_staff_ids = read._staff_ids
 	_staff_cards = read._staff_cards
 	_hands = read._hands
+	_sigil_numbers = read._sigil_numbers
+	_sigil_ids = read._sigil_ids
 	_quick_bags = read._quick_bags
 	_quick_ids = read._quick_ids
 	_size = read._size
@@ -353,10 +406,11 @@ func decode_at(bytes: PackedByteArray, at: int) -> String:
 func _read(bytes: PackedByteArray, at: int) -> String:
 	if at < 0 or at >= bytes.size():
 		return "the loadout is cut short"
-	if bytes[at] != SECTIONS.size():
-		return "%d sections, not %d" % [bytes[at], SECTIONS.size()]
+	var sections: int = bytes[at]
+	if sections != SECTIONS.size() and sections != FIRST_SECTIONS:
+		return "%d sections, not %d" % [sections, SECTIONS.size()]
 	at += 1
-	for tag in SECTIONS:
+	for tag in SECTIONS.slice(0, sections):
 		if at + 3 > bytes.size():
 			return "section %d is cut short" % tag
 		if bytes[at] != tag:
@@ -375,6 +429,8 @@ func _read(bytes: PackedByteArray, at: int) -> String:
 				problem = _read_hands(bytes, at, end)
 			QUICK:
 				problem = _read_quick(bytes, at, end)
+			SIGILS:
+				problem = _read_sigils(bytes, at, end)
 		if problem != "":
 			return problem
 		if read_to != end:
@@ -437,6 +493,31 @@ func _read_staffs(bytes: PackedByteArray, at: int, end: int) -> String:
 			at = card[1]
 		if not add_staff(number, id[0], cards):
 			return "staff %d (number %d, '%s', %d cards) is past a limit or numbered twice" % [staff, number, id[0], slots]
+	read_to = at
+	return ""
+
+
+## The SIGILS section's payload, as `_read_bags`: each staff it names must be one of its staffs.
+func _read_sigils(bytes: PackedByteArray, at: int, end: int) -> String:
+	if at >= end:
+		return "the sigils are cut short"
+	var count: int = bytes[at]
+	at += 1
+	for staff in count:
+		if at + 3 > end:
+			return "the sigils of staff %d are cut short" % staff
+		var number: int = bytes.decode_u16(at)
+		var many: int = bytes[at + 2]
+		at += 3
+		var ids: Array[StringName] = []
+		for one in many:
+			var id: Array = _decode_id(bytes, at, end)
+			if id.is_empty():
+				return "the sigils of staff %d are cut short or not ids" % number
+			ids.append(id[0])
+			at = id[1]
+		if ids.is_empty() or not set_staff_sigils(number, ids):
+			return "the sigils of staff %d are none, past a limit, given twice or of a staff it does not own" % number
 	read_to = at
 	return ""
 

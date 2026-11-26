@@ -65,3 +65,33 @@ jobs:
             python3 -m unittest discover -s tools
           fi
 
+
+  godot-tests:
+    # The game's whole unit test suite on every PR (the owner, 2026-11-26), so a session needs no
+    # full run of its own and a PR is merged on this check, run again for each new push.
+    name: godot-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Godot, restored only (the daily build saves it; build.sh checks its hashes again)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pinned-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module, import, smoke test and every unit test
+        run: ci/build/build.sh --quick --tests
+      - name: Keep the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: godot-test-logs
+          path: build/logs
+          retention-days: 3

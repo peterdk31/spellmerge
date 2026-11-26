@@ -233,3 +233,147 @@ func test_a_big_burst_is_spread_over_steps_from_its_middle() -> void:
 		left.append(_fields().held_count())
 	check_equal(left, [many - CarrierField.BURST_PER_STEP, many - CarrierField.BURST_PER_STEP * 2, 0, 0] as Array[int], "it lets them go a share a step, the first caught first")
 	check_equal(_fields().field_count(), 0, "and goes once it holds none")
+
+
+## The owner, 2026-11-26: a field catches all that is in its circle, not only what crosses its
+## edge. A bolt cast from inside it is caught, and still leaves the way it was going.
+func test_a_cast_made_inside_it_is_caught() -> void:
+	_arena = ArenaScript.new(root)
+	var imp: Node2D = _arena.add_imp(Vector2(260.0, 0.0))
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	_arena.place_caster(0, centre + Vector2(-8.0, 4.0))
+	_bolt()
+	_arena.run(0.5)
+	check_equal(_fields().held_count(), 1, "the bolt cast inside the field is caught")
+	var held: Array[int] = _shots()
+	check_equal(held.size(), 1, "one bolt alive")
+	check(pm.get_position_of(held[0]).distance_to(centre) < 1.0, "drawn in to its middle (%s)" % pm.get_position_of(held[0]))
+	check(pm.freeze_left_of(held[0]) > FIELD.lifetime * 100.0, "held until the field lets it go, so never caught twice")
+	check_equal(_arena.lost(imp), 0, "the imp beyond is not hit while it holds the bolt")
+	_arena.run(FIELD.lifetime)
+	check_equal(_fields().held_count(), 0, "its burst let the bolt go")
+	check(_arena.lost(imp) > 0, "the way it was going (+x), on to the imp")
+
+
+## A shot a trigger spawns inside a field (a rune's Timer bolts, the rune standing in it) is caught;
+## the rune itself, which stands still, is not.
+func test_a_shot_spawned_inside_it_is_caught() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	_arena.place_caster(0, centre)
+	_arena.install_cards(0, 1, ["timer", "rune", "bolt"])
+	check(_arena.cast(0, 1), "a rune is placed in the field")
+	_arena.run(STEP)
+	var rune: int = -1
+	for slot in _shots():
+		if pm._motion[slot] == ManagerScript.MOTION_STILL:
+			rune = slot
+	check(rune >= 0 and pm.get_position_of(rune).distance_to(centre) < FIELD.radius, "the rune stands inside the field")
+	_arena.run(FIELD.lifetime - 0.3)
+	check(_fields().held_count() > 0, "the bolts its timer spawned inside the field are caught (%d)" % _fields().held_count())
+	check(not _fields()._hd_slot.has(rune), "the rune, standing still, is not (%.2f)" % pm.freeze_left_of(rune))
+
+
+## A field that grows over a slow shot (one going out from its middle, so it never crosses the edge
+## inward) catches it.
+func test_a_field_that_grows_over_a_slow_shot_catches_it() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var field: int = _fields().field_slot(0)
+	var centre: Vector2 = pm.get_position_of(field)
+	pm.spawn(0, centre + Vector2(0.0, FIELD.radius + 6.0), Vector2(0.0, 6.0), 5.0, 1.0, ManagerScript.LAYER_ENEMY)
+	_arena.run(0.2)
+	check_equal(_fields().held_count(), 0, "outside the field, going away, it is not caught")
+	pm.set_field_radius(field, FIELD.radius + 20.0)
+	_arena.run(STEP)
+	check_equal(_fields().held_count(), 1, "the field grown over it catches it")
+
+
+## A shot in two fields at once is held by one: the one cast first.
+func test_a_shot_in_two_fields_is_the_first_ones() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var first: int = _fields().field_slot(0)
+	_arena.place_caster(0, Vector2(20.0, 0.0))
+	_arena.install_cards(0, 1, ["field"])
+	check(_arena.cast(0, 1), "a second field is cast over the first")
+	_arena.run(STEP)
+	check_equal(_fields().field_count(), 2, "two fields open")
+	var between: Vector2 = (pm.get_position_of(first) + pm.get_position_of(_fields().field_slot(1))) * 0.5
+	pm.spawn(0, between, Vector2(0.0, 5.0), 5.0, 1.0, ManagerScript.LAYER_ENEMY)
+	_arena.run(STEP)
+	check_equal(_fields().held_count(), 1, "held once")
+	check_equal(_fields()._hd_field[0], pm.get_seq_of(first), "by the field cast first")
+	check_equal(pm.get_radius_of(_fields().field_slot(1)), FIELD.radius, "the other did not grow")
+
+
+## A field (32 round) at `at` in the bare manager `pm`; its slot.
+func _bare_field(pm: ManagerScript, at: Vector2) -> int:
+	var slot: int = pm.spawn(0, at, Vector2.ZERO, 30.0, 32.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	pm.set_field(slot)
+	return slot
+
+
+## The field pass passes by a shot stopped by a local stop and one held by its linger, though both
+## are inside; a shot at rest beside them is handed back.
+func test_a_stopped_or_lingering_shot_is_not_caught() -> void:
+	var pm := ManagerScript.new()
+	pm.set_cap(16)
+	pm.set_bounds(Rect2(-500.0, -500.0, 1000.0, 1000.0))
+	root.add_child(pm)
+	var field: int = _bare_field(pm, Vector2(100.0, 100.0))
+	var stopped: int = pm.spawn(0, Vector2(100.0, 110.0), Vector2(30.0, 0.0), 5.0, 1.0, ManagerScript.LAYER_ENEMY)
+	pm.freeze_shot(stopped, 2.0)
+	var lingering: int = pm.spawn(0, Vector2(90.0, 100.0), Vector2(1.0, 0.0), 0.2, 1.0, ManagerScript.LAYER_ENEMY)
+	pm.set_linger(lingering, 2.0)
+	for step in 12:
+		pm.step(STEP)
+	check(pm._hold[lingering] > 0.0 and pm.get_position_of(lingering) == pm.get_prev_of(lingering), "the lingering shot is in its hold")
+	var at_rest: int = pm.spawn(0, Vector2(105.0, 95.0), Vector2.ZERO, 5.0, 1.0, ManagerScript.LAYER_ENEMY)
+	var fields := PackedInt32Array([field])
+	check_equal(pm.shots_into_fields(fields, 1), 1, "one shot handed back")
+	check_equal(pm.field_shot(0), at_rest, "the one at rest, not the stopped or lingering ones")
+	pm.free()
+
+
+## A field's own payload is never its own, but a field lying over it catches it.
+func test_a_fields_own_payload_is_caught_by_another_field_over_it() -> void:
+	var pm := ManagerScript.new()
+	pm.set_cap(16)
+	pm.set_bounds(Rect2(-500.0, -500.0, 1000.0, 1000.0))
+	root.add_child(pm)
+	var own: int = _bare_field(pm, Vector2(100.0, 100.0))
+	var other: int = _bare_field(pm, Vector2(120.0, 100.0))
+	var payload: int = pm.spawn(0, Vector2(105.0, 100.0), Vector2(10.0, 0.0), 5.0, 1.0, ManagerScript.LAYER_ENEMY)
+	pm.set_caster_shot(payload, own)
+	check_equal(pm.shots_into_fields(PackedInt32Array([own]), 1), 0, "its own field passes it by")
+	check_equal(pm.shots_into_fields(PackedInt32Array([own, other]), 2), 1, "the other field over it catches it")
+	check_equal(pm.field_of(0), 1, "the other one")
+	pm.free()
+
+
+## A burst's shot let go inside another live field is caught by that one (its own field is gone).
+func test_a_burst_let_go_inside_another_field_is_caught_by_it() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var first: int = _fields().field_slot(0)
+	_bolt()
+	_arena.run(0.5)
+	check_equal(_fields().held_count(), 1, "the first field holds the bolt")
+	_arena.place_caster(0, Vector2(16.0, 0.0))
+	_arena.install_cards(0, 2, ["field"])
+	check(_arena.cast(0, 2), "a second field is cast over the first")
+	_arena.run(STEP)
+	var second_seq: int = pm.get_seq_of(_fields().field_slot(1))
+	pm.remove_by_tag(pm.get_tag_of(first))
+	_arena.run(0.2)
+	check_equal(_fields().field_count(), 1, "the first field is gone")
+	check_equal(_fields().held_count(), 1, "its bolt, let go inside the second, is held again")
+	check_equal(_fields()._hd_field[0], second_seq, "by the second field")

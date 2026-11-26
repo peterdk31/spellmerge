@@ -253,6 +253,8 @@ const CROWD_AGAIN: Dictionary = {"name": "a crowd, cast again", "line": true, "c
 ## recast`), busy or not. Without the card the carrier holds its payload under a trigger that stays
 ## quiet here (`stand_in`: `on hurt`, and no one is hurt), so both staffs cast the same cycle and
 ## only the recast differs.
+## Another staff of the wizard casts (an atom aimed behind) while the carrier lives: `on any cast`.
+const OPEN_OTHER: Dictionary = {"name": "open, another staff casts", "other": [6, 9, 14, 22, 40, 70]}
 const OPEN_AGAIN: Dictionary = {"name": "open, pressed again", "again": [6, 9, 14, 22, 40, 70], "stand_in": TriggerBase.Event.HURT}
 const SIDE_TARGET: Dictionary = {"name": "target off the line", "side": true}
 ## The same, cast again while it lasts: a zap is a chance (50% a body a shot), so one shot may
@@ -346,6 +348,9 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 		TriggerBase.Event.NEAR:
 			# A foe beside the carrier's way, or on it: the payload goes off as it comes near.
 			return [SIDE_TARGET, LINE]
+		TriggerBase.Event.ANY_CAST:
+			# Another staff casts while the carrier lives (its own is often still busy then).
+			return [OPEN_OTHER]
 	return []
 
 
@@ -827,6 +832,8 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		world.press(scene.get("repeat", false))
 	for step: int in scene.get("again", []):
 		world.press_at(step)
+	for step: int in scene.get("other", []):
+		world.cast_other_at(step)
 	if scene.get("circling", false):
 		var watch: Callable = _watch_circling.bind(world)
 		for step in range(0, int(ceilf(seconds / World.STEP)), World.SAMPLE_EVERY):

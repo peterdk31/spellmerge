@@ -1,6 +1,6 @@
 # The staff as a language: two numbers, conditions, On Any Cast
 
-**Status (2026-11-25): approved by the owner. L1 built (#936); L2 built (this PR).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
+**Status (2026-11-25): approved by the owner. L1 built (#936), L2 built (#938), L3 built (this PR).** Part 4 of [foundations.md](foundations.md) ("Part 3: the staff as a language"), which the owner chose on 2026-11-25 to build now, beside Part 1 (the floor). It opens builds 9 to 12 of foundations.md's table. The numbers below are proposals; those that are really the owner's are under "Open points". Open point 6 of foundations.md, **a card that stands for another card, stays not proposed** (the owner, 2026-11-25): nothing here copies or repeats a card.
 
 ## What it keeps
 
@@ -88,7 +88,7 @@ A condition is a boss phase written as a card: `when hurt · nova · bolt` befor
 
 - **A new event,** `TriggerBase.Event.ANY_CAST`, added at the end of the enum (cards store the event as a number). It needs a carrier that lasts (`NEEDS`: `LASTS`) and is one of the events listed while its carrier lives (`TriggerBase.LIVE`).
 - **What it hears:** a cast of any staff of its caster leaving (`Spells._leave`, where `cast_left` is sent), its own staff too. Every live carrier of that caster with the trigger fires its payload from where it is, as `on recast` fires on a press.
-- **Before the new cast's shots:** it is heard before the leaving cast's group is launched, so a carrier never hears the cast that made it.
+- **Once the new cast's shots started:** it is heard by the live carriers listed before the leaving cast's own joined, so a carrier never hears the cast that made it; and a cast whose every shot would start inside a wall (refused: no mana paid, no cooldown) is no cast and sets nothing off.
 - **No loop:** a payload is not a cast and sends no `cast_left`, so two On Any Cast carriers cannot set each other off. Each staff keeps its own cursor, cooldown and pool.
 - **A held spray** leaves a cast at every pour, so a stream sets it off at the stream's pace. The spell runtime's per-step fire cap still bounds it.
 - **Nearest card:** On Cast fires once, as its own carrier is cast. On Any Cast fires every time, for as long as its carrier lasts.
@@ -96,9 +96,9 @@ A condition is a boss phase written as a card: `when hurt · nova · bolt` befor
 
 ### L3's tests
 
-- `test_on_any_cast.gd`: a familiar with it fires its payload once for each cast of the caster's other staffs and of its own staff after it; not for the cast that made it; not for another actor's casts; not for a payload; a familiar of a cast that ended hears nothing.
-- `test_card_rules`: a scene for `ANY_CAST` (a second staff of the wizard casts once the carrier is out).
-- Combos: `on_any_cast_echo` (build 9), `on_any_cast_rune` (a rune that answers every cast with a frost nova).
+- `test_on_any_cast.gd`: a rune with it fires its payload for each cast of the caster's other staffs and of its own staff's next cast, every time; not for the cast that made it; not for another actor's casts; not for a payload (two of them never chain); not for a cast refused in a wall.
+- `test_card_rules`: a scene for `ANY_CAST`, "open, another staff casts" (a second staff of the wizard casts an atom behind it while the carrier lives: its own staff is often still busy then, a dash's or a swing's).
+- Combos (each fails without the card): `on_any_cast_echo` (build 9: a familiar fires frost bolts as another staff casts), `on_any_cast_rune` (a rune answers another staff's cast with a fire blast).
 
 ## Reading it in the builder
 

@@ -11,7 +11,7 @@ const E := TriggerBase.Event
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
 const SHOTS: Array = [&"atom", &"rune", &"swap", &"wall", &"pool"]
 ## What is over at once: no timer ticks, nothing hears a hurt on it (rules R4d) and nothing is left
-## for a recast.
+## for a recast or any cast.
 const AT_ONCE: Array = [&"slam", &"teleport", &"spray"]
 
 var _items: Dictionary = {}
@@ -58,7 +58,7 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 func _expected(event: int, carrier: StringName) -> bool:
 	match event:
-		E.TIMER, E.HURT, E.RECAST, E.NEAR:
+		E.TIMER, E.HURT, E.RECAST, E.NEAR, E.ANY_CAST:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a familiar (a decoy has a barrier), nor a

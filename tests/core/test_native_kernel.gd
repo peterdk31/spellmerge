@@ -394,6 +394,8 @@ func test_the_field_pass_hands_back_like_the_gdscript() -> void:
 	fields.append(fields[fields.size() - 2] + 1)
 	var handed: int = 0
 	var born_inside: int = 0
+	# The kind of each slot's latest shot (pair[0]'s; the sides spawn into the same slots).
+	var kinds := {}
 	for step in 150:
 		if step % 2 == 0:
 			var from := Vector2(rng.randf_range(0.0, ROOM.x), rng.randf_range(0.0, ROOM.y))
@@ -406,6 +408,8 @@ func test_the_field_pass_hands_back_like_the_gdscript() -> void:
 				velocity = Vector2.ZERO if kind == 5 else velocity * 0.05
 			for m in pair:
 				var slot: int = m.spawn(0, from, velocity, 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL if kind == 7 else ManagerScript.MOTION_STRAIGHT)
+				if m == pair[0] and slot >= 0:
+					kinds[slot] = kind
 				if slot < 0:
 					continue
 				if kind == 1:
@@ -418,6 +422,8 @@ func test_the_field_pass_hands_back_like_the_gdscript() -> void:
 					m.freeze_shot(slot, 0.2)
 				if kind == 8:
 					m.set_caster_shot(slot, inside)
+				if kind == 6 and step % 4 == 0:
+					m.set_linger(slot, 0.5)
 		for m in pair:
 			m.step(DT)
 		var found: Array[int] = []
@@ -435,11 +441,35 @@ func test_the_field_pass_hands_back_like_the_gdscript() -> void:
 			check(pair[0]._motion[shot] != ManagerScript.MOTION_STILL, "step %d: no still shot handed back" % step)
 			var field: int = fields[pair[0].field_of(n)]
 			check(not (pair[0]._caster_slot[shot] == field and pair[0]._caster_seq[shot] == pair[0].get_seq_of(field)), "step %d: no field's own payload handed back" % step)
-			if pair[0].get_position_of(shot).distance_to(pair[0].get_position_of(field)) <= 15.0:
+			if kinds.get(shot, -1) == 5 or kinds.get(shot, -1) == 6:
 				born_inside += 1
+		# Every shot in a field is handed back (with a field no later than the first it is in), but
+		# the ones passed by: a field's own payloads (kind 8) are left out of this count.
+		var m0: ManagerScript = pair[0]
+		for slot in m0._high:
+			if m0._alive[slot] == 0 or (m0._flags[slot] & ManagerScript.F_FIELD) != 0 or m0._motion[slot] == ManagerScript.MOTION_STILL or kinds.get(slot, -1) == 8:
+				continue
+			var state: int = m0._state[slot]
+			if state == ManagerScript.S_FROZEN or state == ManagerScript.S_STUCK or state == ManagerScript.S_HELD or m0._freeze[slot] > 0.0 or m0._hold[slot] > 0.0:
+				continue
+			if (m0._flags[slot] & ManagerScript.F_FALLING) != 0 and m0._pos[slot].y < m0._floor[slot] - ManagerScript.FALL_BAND:
+				continue
+			var first: int = -1
+			for n in fields.size():
+				var field: int = fields[n]
+				if field < m0._high and m0._alive[field] != 0 and (m0._flags[field] & ManagerScript.F_FIELD) != 0 and m0._pos[slot].distance_squared_to(m0._pos[field]) <= m0._radius[field] * m0._radius[field]:
+					first = n
+					break
+			if first < 0:
+				continue
+			var at: int = -1
+			for n in found[0]:
+				if m0.field_shot(n) == slot:
+					at = n
+			check(at >= 0 and m0.field_of(at) <= first, "step %d: shot %d in field %d is handed back" % [step, slot, first])
 		handed += found[0]
 	check(handed > 20, "shots came into fields (%d)" % handed)
-	check(born_inside > 5, "shots born inside a field were handed back (%d)" % born_inside)
+	check(born_inside > 5, "shots born inside a field, at rest or slow, were handed back (%d)" % born_inside)
 	check_equal(pair[1].shots_into_fields(fields, fields.size()), pair[1]._pass_fields(fields, fields.size()), "the kernel and the GDScript agree on the kernel's side's last step")
 	for m in pair:
 		m.free()

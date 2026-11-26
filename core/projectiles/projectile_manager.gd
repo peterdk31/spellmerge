@@ -5017,7 +5017,9 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 		if (flags & F_FIELD) != 0 or _motion[slot] == MOTION_STILL:
 			continue
 		var state: int = _state[slot]
-		if state == S_FROZEN or state == S_STUCK or state == S_HELD or _freeze[slot] > 0.0:
+		# Stopped: a local stop (`_freeze`), a linger's hold (`_hold`; its S_HELD is the hit pass's
+		# S_DONE by now), stuck.
+		if state == S_FROZEN or state == S_STUCK or state == S_HELD or _freeze[slot] > 0.0 or _hold[slot] > 0.0:
 			continue
 		var to: Vector2 = _pos[slot]
 		var from: Vector2 = _prev[slot]

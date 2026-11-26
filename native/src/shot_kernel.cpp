@@ -2791,8 +2791,9 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 	Arr<PackedVector2Array> pos, prev;
 	Arr<PackedInt32Array> flags, out, out_field, caster_slot;
 	Arr<PackedInt64Array> seq, caster_seq;
-	Arr<PackedFloat32Array> floor_y, radius, freeze;
+	Arr<PackedFloat32Array> floor_y, radius, freeze, hold;
 	alive.load(m, k.alive);
+	hold.load(m, k.hold);
 	state.load(m, k.state);
 	motion.load(m, k.motion);
 	freeze.load(m, k.freeze);
@@ -2807,7 +2808,7 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 	floor_y.load(m, k.floor_y);
 	radius.load(m, k.radius);
 	const int64_t high = m->get(k.high);
-	ERR_FAIL_COND_V(count < 0 || count > fields.size() || high < 0 || high > alive.n || high > state.n || high > motion.n || high > freeze.n || high > pos.n || high > prev.n || high > flags.n || high > floor_y.n || high > radius.n || high > caster_slot.n || high > seq.n || high > caster_seq.n || out_field.n < out.n, -1);
+	ERR_FAIL_COND_V(count < 0 || count > fields.size() || high < 0 || high > alive.n || high > state.n || high > motion.n || high > freeze.n || high > hold.n || high > pos.n || high > prev.n || high > flags.n || high > floor_y.n || high > radius.n || high > caster_slot.n || high > seq.n || high > caster_seq.n || out_field.n < out.n, -1);
 	const int32_t *field_slots = fields.ptr();
 	const int64_t most = out.n;
 	int64_t found = 0;
@@ -2820,7 +2821,8 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 			continue;
 		}
 		const int st = state[s];
-		if (st == S_FROZEN || st == S_STUCK || st == S_HELD || freeze[s] > 0.0f) {
+		// Stopped: a local stop (`_freeze`), a linger's hold (`_hold`), stuck.
+		if (st == S_FROZEN || st == S_STUCK || st == S_HELD || freeze[s] > 0.0f || hold[s] > 0.0f) {
 			continue;
 		}
 		const Vector2 to = pos[s];

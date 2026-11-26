@@ -43,7 +43,7 @@ func take() -> void:
 	_cast(wizard, FIELD_STAFF, from, Vector2.RIGHT)
 	await _frames(20)
 	# The wizard steps into the field and casts from inside it.
-	var hand: Vector2 = middle + Vector2(-14.0, 6.0)
+	var hand: Vector2 = middle + Vector2(-22.0, 6.0)
 	_stand(hand)
 	_shots.call("set_anchor", wizard, hand)
 	_cast(wizard, BOLT_STAFF, hand, Vector2.RIGHT)
@@ -67,8 +67,8 @@ func take() -> void:
 	await snap(middle + Vector2(70.0, 0.0), "field_inside_burst", Vector2i(150, 70), 2)
 
 
-## The wizard's look (its first idle frame) with its body's middle at the world point `hand`, its
-## feet 12 units below (as shot_barriers.gd stands one), over the field.
+## The wizard's look (its first idle frame), its 32-unit cell centred on the world point `hand`,
+## over the field.
 func _stand(hand: Vector2) -> void:
 	var sprite := Sprite2D.new()
 	sprite.texture = WIZARD

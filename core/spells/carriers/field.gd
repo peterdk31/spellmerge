@@ -30,6 +30,10 @@ const DRAW_IN: float = 0.2
 ## from its middle, so it still reads as one burst. About 1 ms of a step at this count
 ## (`tests/core/test_field_budget.gd`).
 const BURST_PER_STEP: int = 200
+## The local stop on a held shot (seconds): held until its field lets it go (`_burst` releases it,
+## `clear` ends it), never running out on its own, so a held shot is never caught again (the pass
+## passes a stopped shot by) however long its field is held open (Hold, Slow).
+const HELD_STOP: float = 1.0e9
 ## How far short of a wall a field cast at one lies (pixels).
 const WALL_GAP: float = 2.0
 
@@ -201,7 +205,7 @@ func _take(shot: int, row: int) -> void:
 	if not manager.is_alive(shot):
 		return
 	var field: int = _fd_slot[row]
-	if not manager.freeze_shot(shot, manager.get_life_of(field) + 1.0):
+	if not manager.freeze_shot(shot, HELD_STOP):
 		return
 	var at: Vector2 = manager.get_position_of(shot)
 	var going: Vector2 = manager.get_velocity_of(shot)

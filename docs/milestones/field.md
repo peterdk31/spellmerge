@@ -50,9 +50,9 @@
 ## How a shot is caught and let go
 
 - **Caught:**
-  - when: the first step its middle is inside the field's circle, wherever it came from (flown in, cast, split or spawned inside it, or the field grew over it), or went through it (a shot faster than the field is wide in a step, an atom). A wizard casts after the field's step, so a bolt cast inside a field is caught the next step, one step out of the hand;
-  - how: the manager's field pass hands it back, and the carrier holds it with a local stop (`freeze_shot`), so its life, its motion and its hits wait;
-  - what is kept: only **the way it was going, in 32 steps round** (a byte, `WAYS`), not its position. A shot with no velocity (one that circles, or is at rest) keeps the way from it to the field's middle;
+  - when: the first step its middle is inside the field's circle, wherever it came from (flown in, cast, split or spawned inside it, or the field grew over it), or went through it (a shot faster than the field is wide in a step, an atom). A wizard casts after the field's step, so a bolt cast inside a field is caught the next step, one step out of the hand (it can hit a body in that first step, as the hit pass runs before the field's);
+  - how: the manager's field pass hands it back, and the carrier holds it with a local stop (`freeze_shot`) that lasts until its field lets it go (`HELD_STOP`), so its life, its motion and its hits wait, and it is never caught twice;
+  - what is kept: only **the way it was going, in 32 steps round** (a byte, `WAYS`), not its position. A shot at rest (no velocity) keeps the way from it to the field's middle;
   - **in two fields at once** it is the first one's in the carrier's list, the one cast first: the pass hands back each shot once.
 - **Drawn in:** each step a held shot moves a fifth of the way left to the middle (`DRAW_IN`). It is held, so it hits nothing on the way.
 - **What is caught:** every live shot in it (flying, circling, spiralling, homing, returning, slowed to a stop by its speed). Not caught:
@@ -60,7 +60,7 @@
   - a shot already stopped (a local stop, a linger's hold, a stuck one);
   - a falling shot in the air;
   - a still shot: a rune, a pool or a wall standing in it (it is placed, it does not hit the field), but what a rune's Timer fires inside it is caught;
-  - the field's own payloads (a Timer's bolts from its middle): a shot whose caster is that field's shot (`set_caster_shot`) is never that field's, though another field over it catches it;
+  - the field's own payloads (a Timer's bolts from its middle): a shot whose caster is that field's shot (`set_caster_shot`) is never that field's, though another field over it catches it. Only its direct payloads: a payload's own payload (its caster that bolt) is caught;
   - a shot another field holds, which is stopped.
 - **No most** (the owner, 2026-11-26: "No limits"): a field holds every shot that comes in. Its rows grow by doubling and are walked once a step and once at the burst, so nothing is allocated a step once grown.
 - **It grows** 1.5 px of radius a shot caught (`GROW_PER_SHOT`), with no most but the room's size, the most any shot is (as Growth keeps it): at that a field covers the room, catches all that moves in it, and is drawn clipped by the screen. Growth grows it further over time. A wider field catches more.
@@ -69,7 +69,6 @@
   - spread over steps when it is big (the owner, 2026-11-26: "If it helps performance, you can make the field emit its payload over multiple ticks"): at most 200 a step (`BURST_PER_STEP`), the first caught first, all from its middle as it was, so a field of 2000 bursts over 10 steps (a sixth of a second) and still reads as one burst; a bursting field catches nothing more, and goes once it holds none;
   - every shot it holds leaves from its middle (just outside its own radius) along its kept way, at the speed it had. Its field is gone, so it is not caught again by it; let go inside another live field, it is caught by that one;
   - each is let go (`release_shot`) and takes the field's cards;
-  - a shot that circled (an orbit) is let go where it is.
 - **A field's own payloads** (a Timer's bolts, from its middle) are not caught by it: the pass passes a shot by for the field that is its caster.
 - **A wall in the same step:** a shot that comes into a field and meets a wall in one step ends at the wall first (the manager's step runs before the field pass).
 - **Not in this build:** beams (a beam's ray is no shot), and bodies (the floor's and the Pool's).
@@ -118,6 +117,9 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
   - a shot through it in one step is caught;
   - a cast made inside it is caught, and leaves the way it was going;
   - a shot spawned inside it (a rune's Timer bolts) is caught, the rune is not;
+  - a shot stopped (a local stop) or held by a linger is not caught;
+  - a field's own payload is caught by another field over it;
+  - a burst's shot let go inside another live field is caught by that one;
   - a field grown over a slow shot catches it;
   - a shot in two fields is the first one's;
   - every shot is held, with no most, and the field grows to the room's size at most;
@@ -132,7 +134,7 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
   - **6, the ricochet gate:** a bounce field; a bolt it caught leaves, comes off the wall beyond and hits the imp it could not reach.
   - **7, the dam:** a field holds a volley; the imp beyond is untouched while it lasts.
   - **8, the bend:** a homing field past a pillar; a straight bolt it caught leaves homing and turns to the imp behind the pillar.
-- Screenshots (`tests/screenshots/shot_field.gd`, `shot_field_tree.gd`):
+- Screenshots (`tests/screenshots/shot_field.gd`, `shot_field_tree.gd`, `shot_field_inside.gd`):
   - a field catching shots, grown;
   - the burst with its cards;
   - an enemy's shots caught by a player's field and sent back;
@@ -144,5 +146,5 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
 2. **Growth grows the field itself**, not the shots.
 3. **Blast and Split work on a field** (a blast where it ends, more fields), as on a portal.
 4. **A field's own payloads are not caught** (born inside it; the pass passes them by for their own field).
-6. **A field catches every shot in its circle**, not only what crosses its edge (2026-11-26: "It should capture all that hits it's area"): a cast made inside it, a shot spawned inside it, one it grows over.
 5. **What leaves it takes its cards** ("as in the gives rule").
+6. **A field catches every shot in its circle**, not only what crosses its edge (2026-11-26: "It should capture all that hits it's area"): a cast made inside it, a shot spawned inside it, one it grows over.

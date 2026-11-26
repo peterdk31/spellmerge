@@ -382,7 +382,9 @@ vec4 water(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int
 // every other shimmer frame.
 bool sheen(ivec2 px, int t, int d) {
 	ivec2 size = ivec2(9, 5) * d;
-	ivec2 at = px - ivec2(t / 2, 0);
+	// Wrapped so it never goes below 0 (integer division truncates toward 0).
+	int period = size.x * 64;
+	ivec2 at = ivec2(px.x + period - (t / 2) % period, px.y);
 	ivec2 block = at / size;
 	ivec2 l = at - block * size;
 	uint h = pixel_hash(block, 23);
@@ -448,7 +450,7 @@ vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicke
 // one by one over the state's frames (each its own last frame), `frame` of them.
 vec4 scorch(vec4 base, vec4 shadow, vec4 ember, ivec2 px, int frame, int d) {
 	uint h = pixel_hash(px, 37);
-	if (h % uint(97 * d * d) == 0u && int((h >> 10u) % 4u) >= frame) {
+	if (h % uint(97 * d * d) == 0u && int((h >> 10u) % 4u) > frame) {
 		return ember;
 	}
 	if (crack(px + ivec2(5 * d, 3 * d), d)) {

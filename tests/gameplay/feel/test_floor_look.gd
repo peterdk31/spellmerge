@@ -68,7 +68,8 @@ func test_the_oil_states_name_their_looks() -> void:
 	check_equal(FLOOR.states[_state(&"catching")].flat_under, &"oil", "a fire catching creeps over the oil")
 	check_equal(FLOOR.states[_state(&"catching")].flat_under_surface, CoverState.FlatSurface.OIL, "drawn as oil")
 	check_equal(FLOOR.states[_state(&"burning_down")].flat_under_surface, CoverState.FlatSurface.SCORCH, "burning down onto soot")
-	check(FLOOR.states[_state(&"scorched")].flat_trace != &"", "the scorch fades as a mark")
+	check_equal(FLOOR.states[_state(&"scorch_fading")].flat_motion, CoverState.FlatMotion.SHRINK, "the soot shrinks away")
+	check(FLOOR.states[_state(&"scorch_fading")].flat_trace != &"", "and fades as a mark")
 	check(FLOOR.states[_state(&"soaking")].flat_trace != &"", "oil leaves its stain")
 	check(not FLOOR.states[_state(&"burning")].motes.is_empty(), "burning gives off embers and smoke")
 

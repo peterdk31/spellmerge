@@ -288,6 +288,8 @@ func test_it_burns_long_burns_down_to_scorched_then_dry() -> void:
 	_kit.steps(1)
 	check_equal(_kit.state_of(cell), &"scorched", "fire does nothing to it")
 	_kit.wait(10.2)
+	check_equal(_kit.state_of(cell), &"scorch_fading", "its soot shrinks away (Smooth)")
+	_kit.wait(0.6)
 	check_equal(_kit.state_of(cell), &"dry", "then dry")
 
 

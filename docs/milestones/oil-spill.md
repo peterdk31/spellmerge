@@ -24,7 +24,8 @@
 | `catching` | flames creep in over the oil from the shore, 4 frames in 0.25 s; Fire light | burn | spreads fire to its neighbours, 8 a second; water or frost: `doused`; after 0.3 s: `burning` |
 | `burning` | flames on the oil, a 6-frame loop at 12 fps; embers and smoke given off; Fire light | burn 3 for 2 s, every 0.5 s, and struck: fire, 2 damage, every 0.5 s | spreads fire to its neighbours, 8 a second; water or frost: `doused`; after 6 s: `burning_down` |
 | `burning_down` | the flames sink into the soot, 4 frames, 0.5 s | burn | after 0.5 s: `scorched` |
-| `scorched` | soot and cracks, its last embers winking out | nothing | oil: `oiling`; after 10 s: `dry`, leaving a faint scorch (Stone's shadow, 3 s) |
+| `scorched` | soot and cracks, its last embers winking out | nothing | oil: `oiling`; after 10 s: `scorch_fading` |
+| `scorch_fading` | the soot shrinks to its middle, 4 frames, 0.5 s; a faint scorch left (Stone's shadow, 3 s) | nothing | after 0.5 s: `dry` |
 | `doused` | the flames go out over the oil, 4 frames, 0.35 s; smoke | nothing | after 0.35 s: `oiled` |
 
 - **The fire touches its neighbours** (`spreads = fire`), so it does what fire does to each: oil catches, grass catches, a puddle's edge boils away (steam), ice thaws. One rule, the cover's own; no row names a neighbour's kind.
@@ -81,7 +82,7 @@
 
 - **`ModifierBase.Behaviour.SPILL`** and its RULES row, with the new `"infused"` key; `Carrier.works(behaviour, blasts, infused)`; the compiler hands whether the carrier has an infusion that counts (`_elements_on`) to `_modifiers_on`; `card_works` answers a card alone (Spill alone: wasted). `test_behaviour_table.gd` knows the key.
 - **Spells' `_touch_floor`** adds the spell's Spill to every landing touch; **`CarrierKit.land(spell, tag, actor, at)`**, where a carrier that touched no floor of its own ends (a beam's end, a dash's or a teleport's, a swing's tip, a slam's impact), goes off as its blast, or with none touches Spill's width round it (nothing without either). No new state: Spill is a compiled number.
-- **A spray pours on the floor** (the first slice's order named it, but a spray touched nothing: it strikes its cone at once, with no shot): along its middle (a passing touch, `floor_passed`) and over its cone's end (`floor_touched`, half the cone's width there). So `oil · spray` lays oil down a corridor (build 2).
+- **A spray pours on the floor** (the first slice's order named it, but a spray touched nothing: it strikes its cone at once, with no shot): along its middle (a passing touch, `floor_passed`) and over its cone's end (`floor_touched`, within a quarter of the cone's width there: about a cell at a spray's reach). So `oil · spray` lays oil down a corridor (build 2).
 - **No change to the trail pass or its native kernel**: what passes still touches one cell; Spill changes where a carrier lands. No new member of the simulation; the floor's states are data.
 - **The combo arena gets a floor** (`"floor": true` in a combo: the real cover area with the `floor` kind under the combo, its imps in the actor table so the floor's statuses and strikes reach them), so a card whose point is the floor has combos that show it.
 
@@ -113,7 +114,7 @@ Three new surfaces (`CoverState.FlatSurface`: OIL, FIRE, SCORCH; a branch each i
 - `content/spells/modifiers/spill/test_spill.gd`: the card's data; Spill alone is wasted, with an infusion it is kept; on every carrier card the registry finds where it is kept, a cast with Spill touches the floor at least 32 px wider than without (`floor_touched`), and where it is wasted (decoy, familiar, portal) nothing changes; two Spills add.
 - `content/cover/floor/test_floor.gd`: the oil rows of the table through the real area.
 - **Build 2** and **build 3** (`tests/gameplay/cover/test_floor_builds.gd`): `oil · spray` held down a corridor, then one `fire · atom`: the corridor burns end to end, the dummies in it are struck as the atom's caster's, and a kill is that caster's (`kill_landed`); a dash with Oil lays a lane, a second staff's `fire · bolt` lights it: a burning line along the dash's way.
-- The combos: Oil's two (`oil_and_a_match`, `fire_road`) and Spill's two (`spill_puddle`, `spill_oil_blast`) in the combo arena's floor.
+- The combos: Oil's two (`oil_and_a_match`, `oil_pool_spark`) and Spill's two (`spill_puddle`, `spill_oil_match`) in the combo arena's floor.
 - `tests/core/test_card_rules.gd`: a probe for Spill (it plays every card on every carrier; Spill alone is wasted everywhere, and forced on it changes nothing with no element).
 - `tests/gameplay/feel/test_floor_look.gd`: the new states' looks as data (a surface, a glow, a mark each); burning lights a patch in Fire; scorched leaves its mark.
 - The determinism, snapshot and content-determinism tests play the new cards and states as they are (state by default; no new member).

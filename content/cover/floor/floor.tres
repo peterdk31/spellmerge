@@ -225,6 +225,12 @@ then = &"oiling"
 script = ExtResource("3_trigger")
 when = 1
 seconds = 10.0
+then = &"scorch_fading"
+
+[sub_resource type="Resource" id="scorch_fading_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.5
 then = &"dry"
 
 [sub_resource type="Resource" id="doused_after"]
@@ -556,10 +562,8 @@ animation_fps = 2
 sway = 0.0
 bend = 0.0
 flat_material = &"stone"
-flat_spark = &"fire"
+flat_spark = &"spark"
 flat_surface = 6
-flat_trace = &"stone"
-flat_trace_seconds = 3.0
 triggers = Array[ExtResource("3_trigger")]([SubResource("scorched_oil"), SubResource("scorched_after")])
 
 [sub_resource type="Resource" id="doused"]
@@ -579,6 +583,21 @@ flat_motion = 2
 flat_under = &"oil"
 triggers = Array[ExtResource("3_trigger")]([SubResource("doused_after")])
 
+[sub_resource type="Resource" id="scorch_fading"]
+script = ExtResource("2_state")
+state_id = &"scorch_fading"
+frames = PackedInt32Array()
+animation_frames = 4
+sway = 0.0
+bend = 0.0
+flat_material = &"stone"
+flat_spark = &"spark"
+flat_surface = 6
+flat_trace = &"stone"
+flat_trace_seconds = 3.0
+flat_motion = 2
+triggers = Array[ExtResource("3_trigger")]([SubResource("scorch_fading_after")])
+
 [resource]
 script = ExtResource("1_kind")
 id = &"floor"
@@ -591,4 +610,4 @@ fills_floor = true
 look = 1
 tufts_per_cell = 1
 sway = 0.0
-states = Array[ExtResource("2_state")]([SubResource("dry"), SubResource("wetting"), SubResource("wet"), SubResource("drying"), SubResource("live"), SubResource("spent"), SubResource("freezing"), SubResource("ice"), SubResource("thawing"), SubResource("steam"), SubResource("oiling"), SubResource("oiled"), SubResource("soaking"), SubResource("catching"), SubResource("burning"), SubResource("burning_down"), SubResource("scorched"), SubResource("doused")])
+states = Array[ExtResource("2_state")]([SubResource("dry"), SubResource("wetting"), SubResource("wet"), SubResource("drying"), SubResource("live"), SubResource("spent"), SubResource("freezing"), SubResource("ice"), SubResource("thawing"), SubResource("steam"), SubResource("oiling"), SubResource("oiled"), SubResource("soaking"), SubResource("catching"), SubResource("burning"), SubResource("burning_down"), SubResource("scorched"), SubResource("doused"), SubResource("scorch_fading")])

@@ -123,7 +123,7 @@ enum Behaviour {
 	## Every touch of the floor the carrier makes where it lands (a shot's or a ray's end, a blast, a
 	## pulse's ring, a pool) is `behaviour_strength` pixels wider (more cards add); a carrier that only
 	## passes over the floor (a dash, a swing, a beam) touches that wide where it lands
-	## (`CarrierKit.spill`). Its passing touches stay one cell each. It changes the floor only, never
+	## (`CarrierKit.land`). Its passing touches stay one cell each. It changes the floor only, never
 	## what it hits (docs/milestones/oil-spill.md). Nothing with no infusion: nothing then touches.
 	SPILL,
 }

@@ -78,6 +78,15 @@ func test_on_every_carrier_it_lands_wide_where_it_is_kept() -> void:
 	check(tried >= 10, "played on the carriers (%d)" % tried)
 
 
+## Regression (the review): a pulling shot spent by its hit touches the floor where it arrives (its
+## end touch waits for the arrival), as wide as its own end, and wider with Spill.
+func test_a_pulling_shot_touches_where_it_arrives() -> void:
+	var plain: float = _widest([&"fire", &"pull", &"bolt"])
+	check(plain > 0.0, "a fire pull bolt touches the floor (%s)" % plain)
+	var spilt: float = _widest([&"fire", &"spill", &"pull", &"bolt"])
+	check(spilt >= plain + 31.9, "Spill widens it (%s, without %s)" % [spilt, plain])
+
+
 func test_two_spills_add() -> void:
 	var one: float = _widest([&"fire", &"spill", &"bolt"])
 	var two: float = _widest([&"fire", &"spill", &"spill", &"bolt"])

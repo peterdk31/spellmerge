@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## What fields cost (docs/milestones/field.md, "The cost, and where it runs"): the field pass
 ## (`ProjectileManager.shots_into_fields`, natively `ShotKernel.field_pass`) over SHOTS shots in flight
 ## against FIELDS fields, each step. Each step hands back every shot at most once, only shots in a
-## field (inside it after the step, or through it), and natively within FIELD_BUDGET_US a step
+## field (inside it after the step, or through it), and natively within FIELD_BUDGET_REFERENCES native references a step
 ## (the GDScript fallback's time is printed, not held).
 ##
 ## - **What held shots cost** (the owner, 2026-11-26: "No limits"): one field holding HELD shots, its
@@ -14,15 +14,16 @@ extends "res://tests/support/suite.gd"
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const NativeScript := preload("res://core/native/native.gd")
+const WallClock := preload("res://tests/support/wall_clock.gd")
 
 const SHOTS: int = 2048
 const FIELDS: int = 16
 const DT: float = 1.0 / 60.0
 const STEPS: int = 30
-## Generous for a shared CI machine running the suite in parallel (alone, the native pass measured
-## about 150 us a step with 2048 shots and 16 fields on the 4-core machine it was written on,
-## 2026-11-26: see the BUDGET lines).
-const FIELD_BUDGET_US: int = 1500
+## In native references (tests/support/wall_clock.gd), so it holds on any machine and beside other
+## tests. The native pass measured about 150 us a step with 2048 shots and 16 fields on a 4-core
+## container, 2026-11-26 (see the BUDGET lines); the old 1500 us was about 0.19 of its reference.
+const FIELD_BUDGET_REFERENCES: float = 0.19
 ## The held shots' counts and their budgets, in GDScript (2026-11-26, this 4-core container: 2000 held
 ## measured about 1.8 ms a step to draw in; their burst 10.5 ms in one step before it was spread,
 ## about 1.4 ms a step since, BURST_PER_STEP at a time; generous for a shared machine).
@@ -50,15 +51,13 @@ func _manager(native: bool) -> Array:
 	return [m, fields]
 
 
-## The mean microseconds of the field pass over STEPS steps, checking each step's hand-back.
-func _field_cost(m: ManagerScript, fields: PackedInt32Array) -> float:
-	var spent: int = 0
+## Steps STEPS times checking each step's hand-back, then times the field pass alone against
+## `reference` (the shots stay where the last step left them).
+func _field_cost(m: ManagerScript, fields: PackedInt32Array, reference: Callable) -> WallClock.Timed:
 	var handed: int = 0
 	for step in STEPS:
 		m.step(DT)
-		var start: int = Time.get_ticks_usec()
 		var count: int = m.shots_into_fields(fields, fields.size())
-		spent += Time.get_ticks_usec() - start
 		handed += count
 		var seen := {}
 		for n in count:
@@ -73,22 +72,22 @@ func _field_cost(m: ManagerScript, fields: PackedInt32Array) -> float:
 			var near: Vector2 = Geometry2D.get_closest_point_to_segment(centre, from, to)
 			check(near.distance_to(centre) <= r + 0.01, "step %d: shot %d is in field %d" % [step, slot, field])
 	check(handed > STEPS, "shots came into fields (%d)" % handed)
-	return float(spent) / float(STEPS)
+	return WallClock.against(func() -> void: m.shots_into_fields(fields, fields.size()), reference, STEPS)
 
 
 func test_the_field_pass_is_within_its_budget() -> void:
 	var gd: Array = _manager(false)
-	var gd_cost: float = _field_cost(gd[0], gd[1])
-	print("BUDGET: field pass, GDScript, %d shots, %d fields: %.1f us a step" % [SHOTS, FIELDS, gd_cost])
+	var gd_cost: WallClock.Timed = _field_cost(gd[0], gd[1], WallClock.gdscript_reference)
+	print("BUDGET: field pass, GDScript, %d shots, %d fields: %d us a step" % [SHOTS, FIELDS, gd_cost.work_usec])
 	(gd[0] as ManagerScript).free()
 	if not NativeScript.loaded():
 		print("NOTE: the native module is not built; its budget is not held")
 		return
 	var native: Array = _manager(true)
 	check((native[0] as ManagerScript).is_native(), "the kernel runs it")
-	var native_cost: float = _field_cost(native[0], native[1])
-	print("BUDGET: field pass, native, %d shots, %d fields: %.1f us a step" % [SHOTS, FIELDS, native_cost])
-	check(native_cost < float(FIELD_BUDGET_US), "the native pass within %d us (%.1f)" % [FIELD_BUDGET_US, native_cost])
+	var native_cost: WallClock.Timed = _field_cost(native[0], native[1], WallClock.native_reference)
+	print("BUDGET: field pass, native, %d shots, %d fields: %d us a step (%.3f native references)" % [SHOTS, FIELDS, native_cost.work_usec, native_cost.multiple])
+	check(native_cost.multiple <= FIELD_BUDGET_REFERENCES, "the native pass within %.2f native references (%.3f)" % [FIELD_BUDGET_REFERENCES, native_cost.multiple])
 	(native[0] as ManagerScript).free()
 
 

@@ -33,8 +33,9 @@ shader_type canvas_item;
 // light that widens where the spell light is on it (`view_light`, the light grid) and twinkles; STEAM,
 // wisps of `sparks` rising, thinning over the state's frames; OIL, a slick lying in the floor as
 // water does, its sheen (thin streaks of its light) drifting a pixel every other shimmer frame; FIRE,
-// flame tongues of its base and `sparks` rising from each block's foot over its shadow, a new height
-// each frame of FIRE_FPS, Bone's white heat at their roots (every row: it is danger); SCORCH, soot
+// a low bed of its shadow glowing in flickering patches of its base with thin tongues an art pixel
+// wide, a new height each frame of FIRE_FPS, Bone's white heat at their roots (every row: it is
+// danger), the rest of the fire its state's motes (smoke, specks, cinders); SCORCH, soot
 // speckled with its base, cracks of its shadow, and embers of `sparks` that wink out over the state's
 // frames (docs/milestones/oil-spill.md). Under a state that grows or shrinks, `surfaces` .z is the
 // surface drawn on `unders`: WATER, OIL or SCORCH. `shimmer` off (the effects' Low row)
@@ -407,58 +408,36 @@ vec4 oil(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int t
 	return sheen(px, t, d) ? light : base;
 }
 
-// Fire's flames (ART2: drawn at the art's detail, each tongue its own shape and light): a tongue a
-// block of 5 x 9 world px, each column of blocks lifted by its own hash and each row shifted by its
-// own, so the tongues never stand in ranks; most blocks lit: its middle hashed once, its height (3 to
-// 9 world px) new every other flicker and a pixel more or less every flicker. A tongue swells from
-// its root to its belly (a third of the way up) and narrows to a point, its tip curling a pixel or
-// two to its side as it climbs (the side new every other flicker). Lit from the top-left: its left
-// edge `light` an art pixel wide, its body `base`, its heart `heart` low in its middle and white-hot at the middle of its root alone. Now and then a lick of `base` tears off
-// above its tip. Over `shadow` (the fire's bed) with a few embers of `heart` in it.
+// Fire on the floor (ART2; the owner, 2026-11-26: "too chunky ... a completely new direction":
+// the fire is mostly motes, its smoke, specks and cinders given off by the state, content/cover).
+// Drawn here, low and thin at the art's detail: the fire's bed (`shadow`) glowing in patches of
+// `base` that flicker a step at a time (each patch 3 art pixels, new every flicker), a few pixels
+// of `light` in them, and small tongues an art pixel wide: one a block of 4 x 6 world px (each row
+// of blocks shifted by its own hash), half the blocks with one, its height 2 to 5 art pixels new
+// every flicker, its root white-hot (it is danger), `heart` above it, `light` and its tip `base`;
+// now and then an ember of `heart` in the bed.
 vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicker, int d) {
-	int w = 5 * d;
-	int tall = 9 * d;
-	int column = px.x / w;
-	int y = px.y + int(pixel_hash(ivec2(column, 5), 39) % uint(tall / 2));
-	int row = y / tall;
+	int w = 4 * d;
+	int tall = 6 * d;
+	int row = px.y / tall;
 	int x = px.x + int(pixel_hash(ivec2(row, 3), 41) % uint(w));
 	ivec2 block = ivec2(x / w, row);
-	ivec2 l = ivec2(x - block.x * w, y - row * tall);
+	ivec2 l = ivec2(x - block.x * w, px.y - row * tall);
 	uint still = pixel_hash(block, 31);
-	uint slow = pixel_hash(block + ivec2(flicker / 2 * 7, flicker / 2 * 13), 43);
-	uint fast = pixel_hash(block + ivec2(flicker * 11, flicker * 5), 47);
-	if (still % 5u == 0u) {
-		return pixel_hash(px + ivec2(flicker, 0), 53) % uint(61 * d * d) == 0u ? heart : shadow;
-	}
-	int height = 3 * d + int(slow % uint(6 * d + 1)) + (int(fast % 3u) - 1) * d;
+	uint now = pixel_hash(block + ivec2(flicker * 11, flicker * 5), 47);
+	// A tongue: an art pixel wide at its column, climbing from the block's foot.
 	int up = tall - 1 - l.y;
-	int cx = d + int((still >> 9u) % uint(max(w - 2 * d, 1)));
-	// The tip's curl: up to `bend` art pixels to its side at the tip, growing with the square of
-	// the height climbed.
-	float side = (slow >> 5u) % 2u == 0u ? -1.0 : 1.0;
-	float bend = float(d) * (1.0 + float((still >> 4u) % 2u));
-	float t = float(up) / float(max(height, 1));
-	float centre = float(cx) + side * bend * t * t;
-	float dx = float(l.x) + 0.5 - centre - 0.5;
-	if (up >= height) {
-		// A lick torn off above the tip, a short while each.
-		bool lick = fast % 4u == 0u && up >= height + d / 2 && up < height + d + d / 2 && abs(dx - side * bend) <= float(d) * 0.5;
-		return lick ? base : shadow;
+	int cx = 1 + int((still >> 9u) % uint(max(w - 2, 1)));
+	int height = 2 + int(now % 4u);
+	if (still % 2u == 0u && l.x == cx && up < height) {
+		return up == 0 ? white_hot : (up == 1 ? heart : (up < height - 1 ? light : base));
 	}
-	// Its half width: swelling to its belly a third of the way up, then narrowing to a point.
-	float belly = float(d) * 2.1;
-	float half_width = t < 0.33 ? belly * (0.7 + 0.3 * t / 0.33) : belly * pow((1.0 - t) / 0.67, 0.8);
-	if (abs(dx) > half_width) {
-		return shadow;
+	// The bed: patches of 3 art pixels glowing a step at a time.
+	uint patch = pixel_hash(px / 3 + ivec2(flicker * 7, flicker * 3), 59);
+	if (patch % 10u < 3u) {
+		return pixel_hash(px, 61) % 7u == 0u ? light : base;
 	}
-	if (up < d / 2 + 1 && abs(dx) < max(half_width * 0.3, 0.5)) {
-		return white_hot;
-	}
-	if (abs(dx) < half_width * 0.34 && t < 0.28) {
-		return heart;
-	}
-	// Its left edge lit an art pixel wide (from the top-left), the rest of it its base.
-	return dx < -(half_width - 1.0) && t < 0.75 ? light : base;
+	return pixel_hash(px + ivec2(flicker, 0), 53) % uint(61 * d * d) == 0u ? heart : shadow;
 }
 
 // Scorch's detail: soot (`shadow`) speckled with `base`, cracks, and embers of `ember` that wink out

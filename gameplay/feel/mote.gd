@@ -203,6 +203,8 @@ var _tail_kinds: PackedInt32Array = PackedInt32Array()
 var _tail_codes: Array[PackedInt32Array] = []
 ## The kinds that name each card by id (`MoteKind.cards`).
 var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
+## The kinds a status gives off, by its id (`MoteKind.statuses`).
+var _status_kinds: Dictionary[StringName, PackedInt32Array] = {}
 ## The trails' births' kinds by their shot's spell (`card_kinds.gd`, the spectacle's: anything
 ## with `layer_motes(tag, layer)`), or null: by their look layer only.
 var _cards: Object = null
@@ -495,6 +497,12 @@ func kinds_of_card(card: StringName) -> PackedInt32Array:
 
 
 ## Whether any kind names a card by id (when none does, every spell's kinds are its look's).
+## The kinds a body with status `status` gives off (`MoteKind.statuses`); empty for none.
+func kinds_of_status(status: StringName) -> PackedInt32Array:
+	var found: Variant = _status_kinds.get(status)
+	return found as PackedInt32Array if found != null else PackedInt32Array()
+
+
 func has_card_kinds() -> bool:
 	return not _card_kinds.is_empty()
 
@@ -1218,6 +1226,10 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			if not _card_kinds.has(card):
 				_card_kinds[card] = PackedInt32Array()
 			_card_kinds[card].append(k)
+		for status in kind.statuses:
+			if not _status_kinds.has(status):
+				_status_kinds[status] = PackedInt32Array()
+			_status_kinds[status].append(k)
 	_material.set_shader_parameter(&"kind_table", ImageTexture.create_from_image(_kind_image))
 	_material.set_shader_parameter(&"shape_atlas", ImageTexture.create_from_image(_shape_image))
 	_fit_tail_codes()

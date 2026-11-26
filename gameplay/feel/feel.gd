@@ -1883,7 +1883,7 @@ func _status_motes(real_delta: float) -> void:
 		var rate: float = preset.status_mote_rate * (preset.status_deep_motes if _status_deep(id) else 1.0)
 		var count: int = floori(rate * real_delta + _rng.randf())
 		if count > 0:
-			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
+			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count, id)
 
 
 ## An enemy starts to come out of its mark (`SpawnLook`): its style's cue `cue` at its feet, as no

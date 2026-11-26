@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/fire/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The fire icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A flame: an outer tongue of fire, a hotter one inside it, a white heart at its root. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
+		}
+	]
+}

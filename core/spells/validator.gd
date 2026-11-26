@@ -130,7 +130,7 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 	if component.display_name.strip_edges() == "":
 		problems.append(_problem("required-field", file, "display_name", "Give it a name for the builder, for example \"Frost\"."))
 	if component.icon == null:
-		problems.append(_problem("icon", file, "icon", "Add a 16x16 icon.svg to the folder and set `icon` to it."))
+		problems.append(_problem("icon", file, "icon", "Add its icon to the folder (16 by 16 world units: an `icon@2x.svg` of 32 by 32 art pixels, or a 16 by 16 `icon.svg`) and set `icon` to it."))
 	else:
 		var icon_path: String = component.icon.resource_path
 		if icon_path == "" or not manifest.has(icon_path.trim_prefix("res://")):

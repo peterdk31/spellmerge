@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="CarrierCard" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="CarrierCard" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://core/base/carrier_card.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/carriers/wall/icon@2x.svg" id="2_icon_2x"]
 [ext_resource type="Texture2D" path="res://content/spells/carriers/wall/icon.svg" id="2_icon"]
 [ext_resource type="Shader" path="res://content/spells/carriers/wall/stone.gdshader" id="3_shader"]
 [ext_resource type="Script" path="res://core/base/card_mote_stream.gd" id="9_source"]
@@ -18,7 +19,8 @@ id = &"wall"
 display_name = "Wall"
 description = "A wall rises across your aim; nothing gets through."
 complexity = 2
-icon = ExtResource("2_icon")
+icon = ExtResource("2_icon_2x")
+icon_small = ExtResource("2_icon")
 base_damage = 3
 mana_cost = 6.0
 wind_down = 1.0

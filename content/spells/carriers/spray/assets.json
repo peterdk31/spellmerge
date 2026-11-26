@@ -8,6 +8,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (a character grid, icon.grid.json, made into SVG rects by tools/pixel_grid.py)",
 			"prompt": "A 16x16 icon for the Spray card: a wooden staff from the bottom left with its tip at the middle, a widening cone of Ice-shaded droplets spraying out of the tip to the top right, a 1 px outline round the staff. Palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/spells/carriers/spray/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The spray icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A fan of droplets thrown up and right from a nozzle. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

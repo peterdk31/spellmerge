@@ -6,8 +6,17 @@
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a Python pixel script)",
-			"prompt": "A 64x64 icon for the Oil card, at 64-px detail: a heavy dark drop of oil (Oil ramp, an amber sheen streak and a white glint on its upper left) over a flat slick with amber flecks, a small flame (Fire ramp, Spark heart) licking at the slick's right edge; 1 px Outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The icon at 1x for the HUD's small cells, 16x16 art pixels: A dark drop of oil over the slick it makes, a small flame lit at its edge. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+		},
+		{
+			"path": "content/spells/elements/oil/icon@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "The oil icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A dark drop of oil over the slick it makes, a small flame lit at its edge. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

@@ -99,6 +99,8 @@ var _fail_on_errors: bool = false
 
 func _init() -> void:
 	pin_room = false
+	# Watched on a display, and its render-thread check needs the frames drawn.
+	draw_between = true
 
 
 func take() -> void:

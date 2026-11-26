@@ -154,42 +154,45 @@ func take() -> void:
 ## imp one frame after a hit (hurt pose), and an enemy shot beside a player's shot.
 ## Returns false after a failure. The imps are held still so the poses can be framed.
 func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
-	var spare: Array[Node2D] = []
+	var alive: Array[Node2D] = []
 	for candidate: Variant in flow.get("_enemies"):
-		if is_instance_valid(candidate) and spare.size() < 2:
-			spare.append(candidate as Node2D)
-	if spare.size() < 2:
+		if is_instance_valid(candidate):
+			alive.append(candidate as Node2D)
+	if alive.size() < 2:
 		fail("fewer than two imps are left for enemy_windup")
 		return false
-	for other: Variant in flow.get("_enemies"):
-		if is_instance_valid(other) and not spare.has(other):
-			(other as Node2D).process_mode = Node.PROCESS_MODE_DISABLED
-	var winding: Node2D = spare[0]
-	var hurt: Node2D = spare[1]
-	(winding as Actor).ticking = false
-	(hurt as Actor).ticking = false
+	for other: Node2D in alive:
+		other.process_mode = Node.PROCESS_MODE_DISABLED
+		(other as Actor).ticking = false
 	wizard.global_position = Vector2(200.0, 180.0)
-	winding.global_position = Vector2(200.0, 130.0)
-	hurt.global_position = Vector2(470.0, 130.0)
-	# The imps are actors (actors G6): the AI and the look are their own nodes. The wizard is the
-	# nearest of the other team, so it is the target.
-	var winding_ai: Node = winding.get_node("AIController")
-	# Stepped by hand, with Spells, where its cast winds up (docs/milestones/cast-timing.md), until it
-	# winds up (it may be resting after an attack), then half-way through its windup.
-	var spells: Node = root.get_node("Spells")
-	for i in 64:
-		if winding_ai.call("is_telegraphing"):
+	# The run's foes are dealt by its seed, so the first may be one that never winds up a cast (a
+	# Bone Husk strikes in reach): each is tried in turn until one is half-way through its windup.
+	# A foe that strikes in reach may hit the wizard while it is tried: its health is put back after.
+	var winding: Node2D = null
+	var tried: Array[Node2D] = []
+	var wizard_health: Health = (wizard as Actor).health
+	var health_was: float = wizard_health.health
+	for candidate: Node2D in alive:
+		var was_at: Vector2 = candidate.global_position
+		if _wind_up(candidate):
+			winding = candidate
 			break
-		winding.call("step", 0.0625)
-		# It may walk to where it likes to cast from (its band) first.
-		winding.global_position += winding.get("velocity") * 0.0625
-		spells.call("step", 0.0625)
-	for i in roundi(float(winding_ai.get("windup_time")) * 0.5 / 0.0625):
-		winding.call("step", 0.0625)
-		spells.call("step", 0.0625)
-	if not winding_ai.call("is_telegraphing"):
+		candidate.global_position = was_at
+		(candidate as Actor).velocity = Vector2.ZERO
+		tried.append(candidate)
+	wizard_health.reset(health_was)
+	if winding == null:
 		fail("the imp is not winding up in enemy_windup")
 		return false
+	# The hurt one a foe not tried, if there is one (a tried one may be mid-strike).
+	var hurt: Node2D = null
+	for other: Node2D in alive:
+		if other != winding and (hurt == null or tried.has(hurt) and not tried.has(other)):
+			hurt = other
+	for held: Node2D in [winding, hurt]:
+		held.process_mode = Node.PROCESS_MODE_INHERIT
+	# The winding one stays where it wound up (it may have walked to its band, its lane aimed from there).
+	hurt.global_position = Vector2(470.0, 130.0)
 	combat.call("hit", int(wizard.get("id")), hurt, 1)
 	hurt.call("step", 0.0)
 	if not hurt.get_node("CreatureLook").call("is_hurt"):
@@ -248,3 +251,27 @@ func _party_camera() -> RefCounted:
 ## A 4x enlarged crop of `image` around `node` (see `save_crop`).
 func _crop_round(image: Image, node: Node2D, name: String) -> void:
 	save_crop(image, node.get_global_transform_with_canvas().origin, name)
+
+
+## Steps `foe` by hand from above the wizard, with Spells, where its cast winds up
+## (docs/milestones/cast-timing.md), until it winds up (it may be resting after an attack), then
+## half-way through its windup. Whether it is winding up then.
+func _wind_up(foe: Node2D) -> bool:
+	foe.global_position = Vector2(200.0, 130.0)
+	# The imps are actors (actors G6): the AI and the look are their own nodes. The wizard is the
+	# nearest of the other team, so it is the target.
+	var ai: Node = foe.get_node("AIController")
+	var spells: Node = root.get_node("Spells")
+	for i in 64:
+		if ai.call("is_telegraphing"):
+			break
+		foe.call("step", 0.0625)
+		# It may walk to where it likes to cast from (its band) first.
+		foe.global_position += foe.get("velocity") * 0.0625
+		spells.call("step", 0.0625)
+	if not ai.call("is_telegraphing"):
+		return false
+	for i in roundi(float(ai.get("windup_time")) * 0.5 / 0.0625):
+		foe.call("step", 0.0625)
+		spells.call("step", 0.0625)
+	return ai.call("is_telegraphing")

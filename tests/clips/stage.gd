@@ -34,7 +34,7 @@ const SHOT_CAP: int = 512
 ## The world the projectile manager draws in.
 const BOUNDS: Rect2 = Rect2(-640.0, -400.0, 1280.0, 800.0)
 const FLOOR: Texture2D = preload("res://art/tilesets/crypt/floor.svg")
-const IMP_ART: Texture2D = preload("res://content/enemies/ember_imp/idle.svg")
+const IMP_ART: Texture2D = preload("res://content/enemies/ember_imp/idle@2x.svg")
 const WIZARD_ART: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
 const HATS: Array[Texture2D] = [
 	preload("res://content/wizard/base/wizard_hat_p1@2x.svg"),
@@ -240,6 +240,7 @@ func _add_imp(at: Vector2) -> void:
 	sprite.texture = IMP_ART
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.position = Vector2(0.0, -SPRITE_LIFT)
+	ArtDetail.fit(sprite)
 	imp.add_child(sprite)
 	world.add_child(imp)
 	imp.global_position = at

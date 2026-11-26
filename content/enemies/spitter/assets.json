@@ -1,13 +1,13 @@
 {
 	"assets": [
 		{
-			"path": "content/enemies/spitter/idle.svg",
+			"path": "content/enemies/spitter/idle@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
-			"tool": "Claude (drawn as a grid, written as idle.grid.json and made into the SVG by tools/pixel_grid.py, 2026-11-16; a snake staff, the owner's direction)",
-			"prompt": "The Spitter, a stray: a snake staff. An olive (Leaf) snake with a pale Skin belly coiled twice round a Wood staff, its neck rising from the staff's head into a wedge-shaped head side-on, facing right, jaws open with Bone fangs and a forked Fire tongue; a Skin band round the shaft and a ferrule. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (one eye and its brow) is a separate layer on the head. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours and no Blight (its spray is drawn in the enemies' Blight by the game)."
+			"tool": "Claude (drawn by tools/enemy_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART1's redraw at 2x detail, 2026-11-26)",
+			"prompt": "At 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, about its 1x silhouette, size and frames: The Spitter: a hooded leafy head with a pale face and a forked spit, its stalk wound with leaves. Drawn part by part, each a rod, a ball, a bevelled box or polygon (or, for the straw, its 1x outline and tuft splits filled with strands): lit from the top-left in three shades of its material, the base the most on wood, leaf, gold, stone and bone, with its material's surface where it has one (wood grain along each piece, bone pores and cracks, a leaf's vein, a flame's bright core, ice streaks, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque."
 		}
 	]
 }

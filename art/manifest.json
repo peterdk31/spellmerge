@@ -73,13 +73,13 @@
       "prompt": "A 32x32 hit spark: a four-pointed star with a Spark light core and Spark base rays, plus four small Spark flecks on the diagonals, outlined in Spark shadow. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/enemies/ember_imp/idle.svg",
+      "path": "content/enemies/ember_imp/idle@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "good",
-      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
-      "prompt": "The Cinder Rod, a stray (an old staff gone sour): a charred Wood rod with a round knob and a crown of Fire flames that never stopped burning, a Fire band on the shaft and a Bone ferrule. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (eyes and brows) is a separate layer. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "tool": "Claude (drawn by tools/enemy_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART1's redraw at 2x detail, 2026-11-26)",
+      "prompt": "At 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, about its 1x silhouette, size and frames: The Cinder Rod: a charred rod, a knot at its top under a crown of fire, an ember band, a bone ferrule. Drawn part by part, each a rod, a ball, a bevelled box or polygon (or, for the straw, its 1x outline and tuft splits filled with strands): lit from the top-left in three shades of its material, the base the most on wood, leaf, gold, stone and bone, with its material's surface where it has one (wood grain along each piece, bone pores and cracks, a leaf's vein, a flame's bright core, ice streaks, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque."
     },
     {
       "path": "art/vfx/telegraph_dash.svg",

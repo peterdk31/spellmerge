@@ -6,7 +6,7 @@ extends "res://tests/support/screenshot.gd"
 ## two cells.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 ## Each row: the style, the ramp of its actor and the tint (white: plain).
 const ROWS: Array = [

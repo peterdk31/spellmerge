@@ -193,3 +193,19 @@ func test_size_scales_the_body() -> void:
 	check(body.scale.is_equal_approx(Vector2(2.0, 2.0)), "a body twice the size")
 	check(body.hurtbox != null and is_equal_approx(body.hurtbox.radius, 22.0), "with a hurt circle twice as wide: %s" % (body.hurtbox.radius if body.hurtbox != null else 0.0))
 	fx.free_all()
+
+
+## Regression (ART1's review): every enemy's body, set up by its look, stands at its art's size in
+## the world (a body drawn at 2x detail at half: ArtDetail), whatever look it has (a dummy's too).
+func test_every_enemy_body_is_fitted_to_its_art_s_detail() -> void:
+	var world := Fixture.new(root, 1)
+	for data: EnemyBase in _enemies():
+		if data.scene == null or data.boss:
+			continue
+		var body: Actor = world.enemy(data.scene, data, Vector2(80.0, 0.0))
+		world.run_all(1)
+		var sprite := body.get_node_or_null(^"Sprite") as Sprite2D
+		if sprite != null and sprite.texture != null:
+			check_equal(sprite.scale, ArtDetail.draw_scale(sprite.texture), "%s: its body at its art's scale" % data.id)
+			check_equal(ArtDetail.size_of(sprite.texture), Vector2(32.0, 32.0), "%s: a 32-unit body" % data.id)
+	world.free_all()

@@ -54,8 +54,8 @@ func add(at: Vector2, way: Vector2, layer: int, ramp: int, look: int, core: Colo
 	rows[i + ProjectilesScript.SPARK_BACK_X] = way.x
 	rows[i + ProjectilesScript.SPARK_BACK_Y] = way.y
 	rows[i + ProjectilesScript.SPARK_KIND] = float(layer)
-	rows[i + ProjectilesScript.SPARK_RAMP] = float(ramp)
-	rows[i + ProjectilesScript.SPARK_LOOK] = float(look)
+	rows[i + ProjectilesScript.SPARK_RAMP] = ProjectilesScript.birth_ramp(ramp, look)
+	rows[i + ProjectilesScript.SPARK_LOOK] = ProjectilesScript.birth_look(look)
 	rows[i + ProjectilesScript.SPARK_CORE] = core.r
 	rows[i + ProjectilesScript.SPARK_CORE + 1] = core.g
 	rows[i + ProjectilesScript.SPARK_CORE + 2] = core.b

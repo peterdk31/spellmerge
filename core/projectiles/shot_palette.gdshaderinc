@@ -112,6 +112,13 @@ bool bit_set(vec3 b, float look) {
 	return mod(floor(channel / exp2(mod(bit, LOOK_BITS))), 2.0) > 0.5;
 }
 
+// A look int's three channels (`ProjectileManager.look_color`'s green, blue and alpha, as whole
+// numbers), for `bit_set`: a beam's or a swing's look comes as an int, never through a colour.
+vec3 look_channels(int look) {
+	int m = (1 << int(LOOK_BITS)) - 1;
+	return vec3(float(look & m), float((look >> int(LOOK_BITS)) & m), float((look >> (2 * int(LOOK_BITS))) & m));
+}
+
 bool flag_set(float flags, float f) {
 	return mod(floor(flags / f + 0.001), 2.0) > 0.5;
 }

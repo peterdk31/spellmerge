@@ -478,7 +478,7 @@ const LOOK_DOUBLE: int = 19
 const LOOK_CONVERGE: int = 20
 const LOOK_DRIFT: int = 21
 ## Water: drops shaken off the path that fall and splash (kind 22, Feel's poof flag until the poof
-## became a flash kind of its own: flash kinds F2). 23 is the enemy ramp and 24 the exact colour:
+## became a flash kind of its own: flash kinds F2). 29 is the enemy ramp and 30 the exact colour:
 ## not kinds.
 const LOOK_DROPS: int = 22
 ## Oil: a dark drip that hangs under the shot, stretches and falls, its sheen catching the light
@@ -5709,6 +5709,38 @@ func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, cor
 	return spark_birth_count < SPARK_BIRTHS_MAX
 
 
+## A birth's look float holds its layers only: a float keeps whole numbers to 2^24, and the look's
+## flags (the enemy ramp, Feel's EXACT) sit at bits 28 and 29 since the look widened to 30. Its
+## flags ride in its ramp float instead, `ramp + SPARK_FLAG_STEP x flags` (`birth_ramp`), read back
+## by `birth_ramp_of` and `birth_look_of` (the motes, in GDScript and natively).
+const SPARK_FLAG_STEP: int = 16
+## The look's first flag's bit (LOOK_ENEMY_RAMP's).
+const SPARK_FLAG_SHIFT: int = 28
+const SPARK_LAYER_MASK: int = (1 << SPARK_FLAG_SHIFT) - 1
+
+
+## A birth's ramp float: `ramp` (-1 to 7) and the flags of `look`.
+static func birth_ramp(ramp: int, look: int) -> float:
+	return float(ramp + SPARK_FLAG_STEP * (look >> SPARK_FLAG_SHIFT))
+
+
+## A birth's look float: the layers of `look`.
+static func birth_look(look: int) -> float:
+	return float(look & SPARK_LAYER_MASK)
+
+
+## The ramp a birth's ramp float `ramp_value` carries.
+static func birth_ramp_of(ramp_value: float) -> int:
+	var whole: int = int(ramp_value)
+	return whole - SPARK_FLAG_STEP * floori(float(whole + SPARK_FLAG_STEP / 2) / float(SPARK_FLAG_STEP))
+
+
+## The whole look a birth carries: the layers of its look float and the flags of its ramp float.
+static func birth_look_of(ramp_value: float, look_value: float) -> int:
+	var whole: int = int(ramp_value)
+	return int(look_value) | (floori(float(whole + SPARK_FLAG_STEP / 2) / float(SPARK_FLAG_STEP)) << SPARK_FLAG_SHIFT)
+
+
 ## Write a birth (see `_add_birth`) as birth `n` of `births`.
 static func _put_birth(births: PackedFloat32Array, n: int, at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> void:
 	var i: int = n * SPARK_BIRTH_STRIDE
@@ -5717,8 +5749,8 @@ static func _put_birth(births: PackedFloat32Array, n: int, at: Vector2, back: Ve
 	births[i + SPARK_BACK_X] = back.x
 	births[i + SPARK_BACK_Y] = back.y
 	births[i + SPARK_KIND] = float(kind)
-	births[i + SPARK_RAMP] = float(ramp)
-	births[i + SPARK_LOOK] = float(look)
+	births[i + SPARK_RAMP] = birth_ramp(ramp, look)
+	births[i + SPARK_LOOK] = birth_look(look)
 	births[i + SPARK_CORE] = core.r
 	births[i + SPARK_CORE + 1] = core.g
 	births[i + SPARK_CORE + 2] = core.b

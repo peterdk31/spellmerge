@@ -648,3 +648,26 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the pool")
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_share, 1.0, "and the births thin by it")
+
+
+## Regression (the review of the widened look): a beam's and a swing's look comes as an int, and
+## four shaders split it in bytes of 8 after the channels became 10 bits, so every kind past 8 read
+## wrong. Every shader splits it with `look_channels`, the include's one place.
+func test_a_looks_int_is_split_by_its_channels_everywhere() -> void:
+	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
+	check(palette.code.contains("vec3 look_channels(int look)"), "the include splits a look int")
+	for path: String in ["res://core/projectiles/shot_beam.gdshaderinc", "res://core/projectiles/shot_swing.gdshaderinc", "res://content/spells/carriers/beam/beam.gdshader", "res://content/spells/carriers/swing/swing.gdshader"]:
+		var code: String = FileAccess.get_file_as_string(path)
+		check(code.contains("look_channels("), "%s splits its look by the channels" % path)
+		check(not code.contains("_look & 255)"), "%s keeps no byte split" % path)
+
+
+## Regression (the same review): a birth's look float lost the low bits of a look with a flag (a
+## float is whole only to 2^24, the flags sit at 28 and 29); its flags ride in its ramp float.
+func test_a_births_flags_and_layers_come_back_whole() -> void:
+	for ramp: int in [-1, 0, 3, 4, 7]:
+		for flags: int in [0, ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.LOOK_ENEMY_RAMP << 1, ManagerScript.LOOK_ENEMY_RAMP | (ManagerScript.LOOK_ENEMY_RAMP << 1)]:
+			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 9, 17, ManagerScript.LOOK_SLICK])) | flags
+			var births := PackedFloat32Array([ManagerScript.birth_ramp(ramp, look), ManagerScript.birth_look(look)])
+			check_equal(ManagerScript.birth_ramp_of(births[0]), ramp, "the ramp %d with flags %d" % [ramp, flags])
+			check_equal(ManagerScript.birth_look_of(births[0], births[1]), look, "and the whole look")

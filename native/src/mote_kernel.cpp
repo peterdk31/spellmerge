@@ -177,7 +177,8 @@ bool MoteKernel::configure(const Dictionary &c) {
 			take_int(c, "SPARK_X", _spark_x) && take_int(c, "SPARK_Y", _spark_y) &&
 			take_int(c, "SPARK_BACK_X", _spark_back_x) && take_int(c, "SPARK_BACK_Y", _spark_back_y) &&
 			take_int(c, "SPARK_KIND", _spark_kind) && take_int(c, "SPARK_RAMP", _spark_ramp) &&
-			take_int(c, "SPARK_LOOK", _spark_look) && take_int(c, "SPARK_CORE", _spark_core) &&
+			take_int(c, "SPARK_LOOK", _spark_look) && take_int(c, "SPARK_FLAG_STEP", _spark_flag_step) &&
+			take_int(c, "SPARK_FLAG_SHIFT", _spark_flag_shift) && take_int(c, "SPARK_CORE", _spark_core) &&
 			take_int(c, "SPARK_TAG", _spark_tag) && take_int(c, "SPARK_TAG_BITS", _spark_tag_bits) &&
 			take_int(c, "SPARK_STREAK", _spark_streak) && take_int(c, "PAIR_LAYERS", _pair_layers) &&
 			take_int(c, "ENEMY_SOURCE", _enemy_source) && take_int(c, "EXACT_SOURCE", _exact_source) &&
@@ -364,8 +365,11 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 		const double spread = k_spread[kk];
 		const Vector2 up = vmul(k_up[kk], _trail_speed);
 		const Vector2 life = k_life[kk];
-		const int64_t ramp = (int64_t)(double)g[b + _spark_ramp];
-		const int64_t look = (int64_t)(double)g[b + _spark_look];
+		// `ProjectileManager.birth_ramp_of` and `birth_look_of`: the flags ride in the ramp float.
+		const int64_t ramp_whole = (int64_t)(double)g[b + _spark_ramp];
+		const int64_t flags = (int64_t)std::floor((double)(ramp_whole + _spark_flag_step / 2) / (double)_spark_flag_step);
+		const int64_t ramp = ramp_whole - _spark_flag_step * flags;
+		const int64_t look = (int64_t)(double)g[b + _spark_look] | (flags << _spark_flag_shift);
 		const int64_t who = ramp >= 0 && ramp < _enemy_source && (look & _look_enemy_ramp) == 0 ? ramp : _enemy_source;
 		const int64_t source = who + ((look & _look_exact) != 0 ? _exact_source : 0);
 		float core_r = g[b + _spark_core], core_g = g[b + _spark_core + 1], core_b = g[b + _spark_core + 2];

@@ -357,6 +357,7 @@ func set_native(on: bool) -> void:
 		"SPARK_KIND": ProjectilesScript.SPARK_KIND, "SPARK_RAMP": ProjectilesScript.SPARK_RAMP,
 		"SPARK_LOOK": ProjectilesScript.SPARK_LOOK, "SPARK_CORE": ProjectilesScript.SPARK_CORE,
 		"SPARK_TAG": ProjectilesScript.SPARK_TAG, "SPARK_TAG_BITS": ProjectilesScript.SPARK_TAG_BITS,
+		"SPARK_FLAG_STEP": ProjectilesScript.SPARK_FLAG_STEP, "SPARK_FLAG_SHIFT": ProjectilesScript.SPARK_FLAG_SHIFT,
 		"SPARK_STREAK": ProjectilesScript.SPARK_STREAK, "PAIR_LAYERS": PAIR_LAYERS,
 		"ENEMY_SOURCE": ENEMY_SOURCE, "EXACT_SOURCE": EXACT_SOURCE, "LOOK_ENEMY_RAMP": LOOK_ENEMY_RAMP,
 		"LOOK_EXACT": LOOK_EXACT, "LIFE_MAX": LIFE_MAX, "HEIGHT_MAX": HEIGHT_MAX, "SOURCE_CODE": SOURCE_CODE,
@@ -642,7 +643,7 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
 		var kind: MoteKind = _kinds[k]
 		births += 1
-		var look: int = int(given[b + ProjectilesScript.SPARK_LOOK])
+		var look: int = ProjectilesScript.birth_look_of(given[b + ProjectilesScript.SPARK_RAMP], given[b + ProjectilesScript.SPARK_LOOK])
 		var core: Color = Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2])
 		# A birth of an infusion's layer is in its colours; any other of a spell of several (a tail, a
 		# splash) takes the next infusion (the native kernel does the same, in the same order).
@@ -653,7 +654,7 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		burst(k, Vector2(given[b + ProjectilesScript.SPARK_X], given[b + ProjectilesScript.SPARK_Y]),
 			Vector2(given[b + ProjectilesScript.SPARK_BACK_X], given[b + ProjectilesScript.SPARK_BACK_Y]),
 			1, kind.speed * TRAIL_SPEED, kind.spread, kind.up * TRAIL_SPEED, kind.life,
-			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), look), core, kind.height)
+			spell_source(ProjectilesScript.birth_ramp_of(given[b + ProjectilesScript.SPARK_RAMP]), look), core, kind.height)
 
 
 ## `give_off` in the native kernel: it names each birth's (tag, kind) pair, the kinds of each pair

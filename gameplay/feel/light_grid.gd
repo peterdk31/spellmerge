@@ -38,6 +38,7 @@ extends RefCounted
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const LightGridGpuScript := preload("res://gameplay/feel/light_grid_gpu.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 ## The cell's size (world px each way) by default.
 const CELL: float = 8.0
@@ -85,12 +86,14 @@ const SHADES: PackedFloat64Array = [
 	0.129, 0.102, 0.118, 0.290, 0.216, 0.161, 0.722, 0.541, 0.243,
 ]
 const ENEMY_PLAYER: int = 4
-const KIND_COUNT: int = 23
-const ENEMY_RAMP: int = 29
-const EXACT: int = 30
-## A look channel's bits (ProjectileManager.LOOK_CHANNEL_BITS): a row's look is n / LOOK_CHANNEL.
-const LOOK_BITS: int = 10
-const LOOK_CHANNEL: float = 1023.0
+## The look's layout, from the projectile manager's (its kinds, then the enemy ramp's flag and Feel's
+## EXACT past it; a channel of LOOK_BITS bits, a row's look n / LOOK_CHANNEL): the native kernel and
+## the compute shader keep the same numbers (`check_light_grid`, test_light_grid.gd).
+const KIND_COUNT: int = ProjectileManagerScript.LOOK_COUNT - 1
+const ENEMY_RAMP: int = ProjectileManagerScript.SPARK_FLAG_SHIFT + 1
+const EXACT: int = ENEMY_RAMP + 1
+const LOOK_BITS: int = ProjectileManagerScript.LOOK_CHANNEL_BITS
+const LOOK_CHANNEL: float = float(ProjectileManagerScript.LOOK_CHANNEL_MAX)
 const PALETTE_MOST: int = 4
 ## The most boxes that block light (LightBlockers.MAX; the kernel's checked against it).
 const BLOCKERS_MOST: int = LightBlockersScript.MAX
@@ -621,6 +624,12 @@ static func _bit_set(b0: int, b1: int, b2: int, look: int) -> bool:
 	var bit: int = look - 1
 	var channel: int = b0 if bit < LOOK_BITS else (b1 if bit < 2 * LOOK_BITS else b2)
 	return (channel >> (bit % LOOK_BITS)) & 1 == 1
+
+
+## A look int's three channels (`look_glow`'s b0, b1, b2): its bits LOOK_BITS at a time.
+static func channels_of(look: int) -> Vector3i:
+	var m: int = (1 << LOOK_BITS) - 1
+	return Vector3i(look & m, (look >> LOOK_BITS) & m, (look >> (2 * LOOK_BITS)) & m)
 
 
 static func _flag_set(flags: float, f: float) -> bool:

@@ -777,7 +777,8 @@ func light_beam(_i: int, path: PackedVector3Array, points: int, player: int, loo
 	if _beams_lit >= BEAMS_MOST:
 		return
 	var who: int = LightGridScript.ENEMY_PLAYER if player < 0 else mini(player, 3)
-	var glow: Vector3 = grid.look_glow(core.r, core.g, core.b, who, look & 1023, (look >> 10) & 1023, (look >> 20) & 1023, true)
+	var channels: Vector3i = LightGridScript.channels_of(look)
+	var glow: Vector3 = grid.look_glow(core.r, core.g, core.b, who, channels.x, channels.y, channels.z, true)
 	var strength: float = BEAM_STRENGTH * intensity * fade
 	_beam_paths[_beams_lit] = path
 	_beam_points[_beams_lit] = mini(points, BEAM_POINTS)

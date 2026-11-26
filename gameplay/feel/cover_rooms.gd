@@ -25,6 +25,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
+const CoverLightsScript := preload("res://gameplay/feel/cover_lights.gd")
 
 ## The bus and the registry (Feel's).
 var events: EventsScript = null
@@ -36,6 +37,12 @@ var _views: Array[CoverScript] = []
 var _z: int = 0
 ## The spectacle's ramps, which every view's motes cool through (GC8; null until Feel sets them).
 var _ramps: RampTableScript = null
+## The floor's lights of every shown room this frame (`step`; the spectacle hands them to the spell
+## light). Read only.
+var lights: CoverLightsScript = CoverLightsScript.new()
+## The effects' row for the flat kinds (`set_floor_quality`), for every view, a new one too.
+var _floor_motes: float = 1.0
+var _floor_shimmer: bool = true
 
 
 ## Views drawn at `z` (Feel's MARK_Z).
@@ -105,6 +112,33 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 		var other: CoverScript = _views[number]
 		if other.layout != null and not other.batches().is_empty():
 			other.step_with(lead.bodies(), lead.body_count(), now, pool, view, stirs_version, hand_stirs, lead.found_box())
+	lights.begin()
+	for each in _views:
+		if each.layout != null and each.is_visible_in_tree():
+			each.write_lights(lights, now)
+
+
+## The effects' row for the flat kinds (EffectsQuality `floor_motes`, `floor_shimmer`), every view's.
+func set_floor_quality(motes_share: float, shimmer: bool) -> void:
+	_floor_motes = motes_share
+	_floor_shimmer = shimmer
+	for view in _views:
+		view.set_floor_quality(motes_share, shimmer)
+
+
+## A number that changes whenever a view lays its flat looks anew (so their materials are handed to
+## the light again: `flat_materials`).
+func flats_version() -> int:
+	var sum: int = _views.size()
+	for view in _views:
+		sum += view.flats_laid
+	return sum
+
+
+## Every view's flat looks' materials, into `into`.
+func flat_materials(into: Array[ShaderMaterial]) -> void:
+	for view in _views:
+		view.flat_materials(into)
 
 
 ## A view for piece `number`, a child of this node.
@@ -114,5 +148,6 @@ func _view(number: int) -> CoverScript:
 	made.registry = registry
 	if _ramps != null:
 		made.motes.ramp_table = _ramps
+	made.set_floor_quality(_floor_motes, _floor_shimmer)
 	add_child(made)
 	return made

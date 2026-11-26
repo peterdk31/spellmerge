@@ -12,6 +12,7 @@ extends SceneTree
 ## ... -- --quality=low                     the effects at the low row (or medium; high unless told;
 ##                                           effects_quality.gd), told in a BENCH: line a scenario
 ## ... -- --quality=each                    every scenario at each row ("1p near low", ... "high")
+## ... -- --lake                          a big lake beside each wizard, cycling wet, live, spent
 ## ... -- --picture=1280x720                 the picture drawn at that size (the world drawn finer)
 
 const RunnerScript := preload("res://bench/play_frames_runner.gd")

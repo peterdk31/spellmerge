@@ -60,6 +60,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const CoverMotesScript := preload("res://gameplay/feel/cover_motes.gd")
 const CoverFlatScript := preload("res://gameplay/feel/cover_flat.gd")
+const CoverLightsScript := preload("res://gameplay/feel/cover_lights.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 
@@ -112,6 +113,11 @@ var _batches: Array[MultiMeshInstance2D] = []
 ## Each kind's flat look (`CoverKind.Look.FLAT`: the floor's water and ice, `cover_flat.gd`), by its
 ## index; null for a kind drawn in tufts.
 var _flats: Array[CoverFlatScript] = []
+## How many times flat looks were laid (a new room's or none), so whoever hands their materials to the
+## light knows when to again (`flat_materials`). Read only.
+var flats_laid: int = 0
+## Whether the flat looks play their animated detail (the effects' row, `set_floor_quality`).
+var _shimmer: bool = true
 ## Each laid kind's rows (STRIDE floats a tuft), the copy every change is written to, and whether
 ## they changed since they were last handed to their batch (`step` hands them over).
 var _rows: Array[PackedFloat32Array] = []
@@ -284,6 +290,7 @@ func lay(laid: CoverLayout) -> void:
 		_slot_rolls.append(PackedInt64Array())
 		_flats.append(_lay_flat(index))
 		_batches.append(_lay_kind(index) if _flats[index] == null else null)
+	flats_laid += 1
 	motes.lay(laid)
 
 
@@ -667,9 +674,34 @@ func _lay_flat(index: int) -> CoverFlatScript:
 	var flat := CoverFlatScript.new()
 	flat.name = "Flat%d" % index
 	flat.lay(layout, index, _now)
+	flat.set_shimmer(_shimmer)
 	add_child(flat)
 	move_child(flat, 0)
 	return flat
+
+
+## Every flat look's material laid (the shader reads the spell light: Feel hands them to it), into `into`.
+func flat_materials(into: Array[ShaderMaterial]) -> void:
+	for flat in _flats:
+		if flat != null and flat.material is ShaderMaterial:
+			into.append(flat.material as ShaderMaterial)
+
+
+## The floor's lights of this room's flat looks into `lights` at Feel's clock `now` (`cover_lights.gd`).
+func write_lights(lights: CoverLightsScript, now: float) -> void:
+	for flat in _flats:
+		if flat != null:
+			flat.write_lights(lights, now)
+
+
+## The effects' row for the flat kinds (EffectsQuality: `floor_motes`, `floor_shimmer`): the share of
+## their states' motes given off, and whether their ripples, twinkles and wisps play.
+func set_floor_quality(motes_share: float, shimmer: bool) -> void:
+	_shimmer = shimmer
+	motes.flat_share = motes_share
+	for flat in _flats:
+		if flat != null:
+			flat.set_shimmer(shimmer)
 
 
 ## The flat look of the kind `kind_id` in the room laid (null for none, or a kind drawn in tufts).

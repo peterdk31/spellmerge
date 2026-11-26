@@ -14,11 +14,13 @@ enum Level { LOW, MEDIUM, HIGH }
 const DEFAULT_LEVEL: Level = Level.HIGH
 ## The rows: the light's cell (world px, one of LightGrid.CELLS) and whether it is smoothed between the
 ## cells' middles; the mist's layers of billows (1 to 3); the share of the air's motes given off (the
-## rooms', the kinds' and the void's).
+## rooms', the kinds' and the void's); the share of the floor's motes (a flat cover kind's: sparks
+## over live water, steam's wisps) and whether its ripples, twinkles and wisps play (the floor's look,
+## docs/milestones/floor-look.md: none of either at Low).
 const ROWS: Dictionary[Level, Dictionary] = {
-	Level.LOW: {&"light_cell": 16.0, &"light_smooth": true, &"mist_billows": 1, &"air_share": 0.5},
-	Level.MEDIUM: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 2, &"air_share": 0.75},
-	Level.HIGH: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 3, &"air_share": 1.0},
+	Level.LOW: {&"light_cell": 16.0, &"light_smooth": true, &"mist_billows": 1, &"air_share": 0.5, &"floor_motes": 0.0, &"floor_shimmer": false},
+	Level.MEDIUM: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 2, &"air_share": 0.75, &"floor_motes": 0.5, &"floor_shimmer": true},
+	Level.HIGH: {&"light_cell": 8.0, &"light_smooth": true, &"mist_billows": 3, &"air_share": 1.0, &"floor_motes": 1.0, &"floor_shimmer": true},
 }
 
 ## The level and its row's numbers (`_init`). Read only.
@@ -27,6 +29,8 @@ var light_cell: float = 0.0
 var light_smooth: bool = false
 var mist_billows: int = 0
 var air_share: float = 0.0
+var floor_motes: float = 0.0
+var floor_shimmer: bool = false
 
 
 ## The level a step cheaper than `at` (LOW stays LOW), and a step dearer (HIGH stays HIGH).
@@ -67,3 +71,5 @@ func _init(at: Level = DEFAULT_LEVEL) -> void:
 	light_smooth = row[&"light_smooth"]
 	mist_billows = row[&"mist_billows"]
 	air_share = row[&"air_share"]
+	floor_motes = row[&"floor_motes"]
+	floor_shimmer = row[&"floor_shimmer"]

@@ -35,6 +35,8 @@ extends Node
 ##   (what the bodies' shadows fall away from), and `spots_written` counts each new set.
 ## - **Carried lights** (docs/milestones/atmosphere.md, A): spot rows their owner writes each frame
 ##   (gameplay/feel/carried_lights.gd) and hands over (`light_carried`).
+## - **The floor's lights** (docs/milestones/floor-look.md): live water's and steam's glow, spot rows
+##   the floor's look writes each frame (gameplay/feel/cover_lights.gd) and hands over (`light_floor`).
 ## - **Light blocked** (docs/milestones/atmosphere.md, C): every light but the shots' and runes'
 ##   (SHOTS_BLOCKED) is stopped by up to MAX_BLOCKERS boxes handed over by `set_blockers`.
 ## - **What draws by the light** (docs/milestones/atmosphere.md, B): every reader is handed the grid
@@ -170,6 +172,8 @@ var _flash_rows: Array[PackedFloat32Array] = [PackedFloat32Array(), PackedFloat3
 var _flash_count: PackedInt32Array = PackedInt32Array([0, 0, 0])
 var _carried_rows: PackedFloat32Array = PackedFloat32Array()
 var _carried_count: int = 0
+var _floor_rows: PackedFloat32Array = PackedFloat32Array()
+var _floor_count: int = 0
 ## The live beams lit this frame (`light_beam`): each one's path, points, reach and colour, and how
 ## many; let go once read.
 var _beam_paths: Array[PackedVector3Array] = []
@@ -424,6 +428,8 @@ func _light_grid(count: int) -> void:
 	_spots_lit = _no_rows
 	_carried_rows = _no_rows
 	_carried_count = 0
+	_floor_rows = _no_rows
+	_floor_count = 0
 	for i in _beams_lit:
 		_beam_paths[i] = _no_path
 	_beams_lit = 0
@@ -440,7 +446,7 @@ func _fill_view_of(view: int) -> void:
 
 
 ## Every light of this frame on the views `first` to `first` + `views` - 1: the shots' and runes'
-## batches, the flashes, the cues, the spots, the carried lights and the beams, in that order. Reads
+## batches, the flashes, the cues, the spots, the carried lights, the floor's and the beams, in that order. Reads
 ## only what `_light_grid` gathered; writes only those views' cells.
 func _fill_views(first: int, views: int) -> void:
 	for b in _batches_lit:
@@ -454,6 +460,8 @@ func _fill_views(first: int, views: int) -> void:
 		grid.add_rows(_spots_lit, _spot_count, ROWS_SPOT, 1.0, 0.0, _now, true, first, views)
 	if _carried_count > 0:
 		grid.add_rows(_carried_rows, _carried_count, ROWS_SPOT, 1.0, 0.0, _now, true, first, views)
+	if _floor_count > 0:
+		grid.add_rows(_floor_rows, _floor_count, ROWS_SPOT, 1.0, 0.0, _now, true, first, views)
 	for i in _beams_lit:
 		grid.add_beam(_beam_paths[i], _beam_points[i], _beam_reach[i], _beam_colour[i], first, views)
 
@@ -619,6 +627,18 @@ func set_room_tints(rects: PackedVector4Array, tints: PackedVector4Array, count:
 func light_carried(rows: PackedFloat32Array, count: int) -> void:
 	_carried_rows = rows
 	_carried_count = clampi(count, 0, rows.size() / STRIDE)
+
+
+## The floor's lights this frame (live water, steam: `cover_lights.gd`): `count` spot rows of `rows`,
+## read at the next draw and let go then.
+func light_floor(rows: PackedFloat32Array, count: int) -> void:
+	_floor_rows = rows
+	_floor_count = clampi(count, 0, rows.size() / STRIDE)
+
+
+## How many of the floor's lights are lit this frame (for tests).
+func floor_count() -> int:
+	return _floor_count
 
 
 ## How many carried lights are lit this frame (for tests).

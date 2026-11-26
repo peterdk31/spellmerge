@@ -36,6 +36,16 @@ const QUALITY_MODES: Dictionary[String, int] = {"low": EffectsSetting.LOW, "medi
 ## The row each scenario's effects were drawn at, by label ("Low", "Medium", "High"; the shipped
 ## benchmark's table shows it).
 var effects_drawn: Dictionary[String, String] = {}
+## `--lake`: a big lake beside each wizard (the floor's look, docs/milestones/floor-look.md), wet
+## again every LAKE_WATER seconds and struck by lightning every LAKE_STRIKE (live, spent, wet), so the
+## floor's drawing, lights and motes are in every frame measured.
+const LAKE_OFFSET := Vector2(96.0, 0.0)
+const LAKE_RADIUS: float = 72.0
+const LAKE_WATER: float = 3.0
+const LAKE_STRIKE: float = 2.0
+var _lake: bool = false
+var _lake_water: float = 0.0
+var _lake_strike: float = 0.0
 
 
 func _init() -> void:
@@ -124,7 +134,37 @@ func _start_play(scenario: Dictionary) -> void:
 				if setter != &"" and _feel.has_method(setter):
 					_feel.call(setter, false)
 					print("BENCH: play frames %s: %s off" % [scenario["label"], part])
+	_lake = (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--lake")
+	_lake_water = 0.0
+	_lake_strike = LAKE_STRIKE
+	if _lake:
+		print("BENCH: play frames %s: a lake beside each wizard" % scenario["label"])
 	if _feel != null and _feel.has_method(&"set_mote_cap"):
 		var taken: int = int(_feel.call(&"set_mote_cap", int(scenario.get("motes", MoteCap.DEFAULT_DESKTOP))))
 		print("BENCH: play frames %s: mote ring %d rows" % [scenario["label"], taken])
 	super(scenario)
+
+
+## `--lake`: each wizard's lake watered and struck on its clock (`delta` seconds on).
+func _process(delta: float) -> void:
+	super(delta)
+	if not _lake or not _active:
+		return
+	_lake_water -= delta
+	_lake_strike -= delta
+	var events: Node = get_tree().root.get_node_or_null("Events")
+	if events == null:
+		return
+	for each in _wizards:
+		if not is_instance_valid(each):
+			continue
+		var wizard := each as Node2D
+		var middle: Vector2 = wizard.global_position + LAKE_OFFSET
+		if _lake_water <= 0.0:
+			events.emit_signal(&"floor_touched", -1, &"water", middle, LAKE_RADIUS, 0)
+		if _lake_strike <= 0.0:
+			events.emit_signal(&"floor_touched", -1, &"lightning", middle, 0.0, 0)
+	if _lake_water <= 0.0:
+		_lake_water = LAKE_WATER
+	if _lake_strike <= 0.0:
+		_lake_strike = LAKE_STRIKE

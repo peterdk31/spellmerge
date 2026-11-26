@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The field carrier (docs/milestones/field.md, the owner's design of 2026-11-26): a still circle that
 ## hits nothing and catches every shot that comes into it (anyone's, an enemy's too), draws it in and
 ## grows with it, then lets them all go at once when it ends, each the way it came in and with the
-## field's cards; at most HOLD_MOST a field; Growth widening it; its own shot wearing none of the cards
+## field's cards; no most it holds or grows to (the room's size bounds it); Growth widening it; its own shot wearing none of the cards
 ## it gives; its own payloads not caught.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -199,13 +199,18 @@ func test_a_shot_that_goes_through_it_in_one_step_is_caught() -> void:
 	check_equal(_fields().held_count(), 1, "it caught the shot that went through it")
 
 
-func test_a_field_holds_at_most_its_cap() -> void:
+func test_a_field_holds_every_shot_and_grows_to_the_room_at_most() -> void:
 	_arena = ArenaScript.new(root)
 	_cast_field(["field"])
 	var pm: ManagerScript = _arena.projectiles
 	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
-	for n in CarrierField.HOLD_MOST + 10:
+	var many: int = 300
+	for n in many:
 		pm.spawn(0, centre - Vector2(FIELD.radius + 5.0, 0.0), Vector2(300.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
 	_arena.run(0.3)
-	check_equal(_fields().held_count(), CarrierField.HOLD_MOST, "it holds its cap and lets the rest through")
-	check(pm.get_radius_of(_fields().field_slot(0)) <= FIELD.radius * CarrierField.GROW_MOST + 0.01, "and grows no more than its most")
+	check_equal(_fields().held_count(), many, "it holds every shot that came in (no most)")
+	var radius: float = pm.get_radius_of(_fields().field_slot(0))
+	check(radius > FIELD.radius + 100.0, "and grew with them (%.1f)" % radius)
+	check(radius <= maxf(pm.room_size(), FIELD.radius) + 0.01, "never past the room's size (%.1f)" % radius)
+	_arena.run(FIELD.lifetime)
+	check_equal(_fields().held_count(), 0, "its burst let every one go")

@@ -5,9 +5,14 @@ extends "res://tests/support/suite.gd"
 ## that came in (outside before the step, inside after or through it), and natively within FIELD_BUDGET_US a step
 ## (the GDScript fallback's time is printed, not held).
 ##
+## - **What held shots cost** (the owner, 2026-11-26: "No limits"): one field holding HELD shots, its
+##   step (drawing every one in) and its burst (letting every one go with its cards) each within
+##   HELD_BUDGET_US, for 500 and 2000.
+##
 ## The numbers are printed (`BUDGET:` lines) for the PR. Real time is read here, in a test, never in
 ## the game.
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const NativeScript := preload("res://core/native/native.gd")
 
 const SHOTS: int = 2048
@@ -18,6 +23,10 @@ const STEPS: int = 30
 ## about 150 us a step with 2048 shots and 16 fields on the 4-core machine it was written on,
 ## 2026-11-26: see the BUDGET lines).
 const FIELD_BUDGET_US: int = 1500
+## The held shots' counts and their budget, a step or a burst, in GDScript (2000 held measured about
+## 1.8 ms to draw in and 10.5 ms to burst, 2026-11-26; generous for a shared machine).
+const HELD: Array[int] = [500, 2000]
+const HELD_BUDGET_US: int = 60000
 
 
 func _manager(native: bool) -> Array:
@@ -87,3 +96,30 @@ func test_no_field_costs_nothing() -> void:
 	root.add_child(m)
 	check_equal(m.shots_into_fields(PackedInt32Array(), 0), 0, "with no field the pass hands back nothing and runs no loop")
 	m.free()
+
+
+func test_held_shots_cost_within_their_budget() -> void:
+	for many: int in HELD:
+		var arena := ArenaScript.new(root)
+		arena.projectiles.set_cap(many + 64)
+		arena.install_cards(0, 0, ["fire", "field"])
+		check(arena.cast(0, 0), "the field is cast")
+		arena.run(DT)
+		var fields: CarrierField = CarrierField.of(arena.spells)
+		var centre: Vector2 = arena.projectiles.get_position_of(fields.field_slot(0))
+		for n in many:
+			var way: Vector2 = Vector2.from_angle(TAU * float(n) / float(many))
+			arena.projectiles.spawn(0, centre - way * 40.0, way * 300.0, 3.0, 1.0, ManagerScript.LAYER_ENEMY)
+		arena.run(0.2)
+		check_equal(fields.held_count(), many, "%d held" % many)
+		var start: int = Time.get_ticks_usec()
+		fields.step(DT)
+		var held_us: int = Time.get_ticks_usec() - start
+		arena.projectiles.remove_by_tag(arena.projectiles.get_tag_of(fields.field_slot(0)))
+		start = Time.get_ticks_usec()
+		fields.step(DT)
+		var burst_us: int = Time.get_ticks_usec() - start
+		check_equal(fields.held_count(), 0, "%d let go" % many)
+		print("BUDGET: a field holding %d shots: a step %d us, its burst %d us" % [many, held_us, burst_us])
+		check(held_us < HELD_BUDGET_US and burst_us < HELD_BUDGET_US, "%d held within %d us (%d, %d)" % [many, HELD_BUDGET_US, held_us, burst_us])
+		arena.free_all()

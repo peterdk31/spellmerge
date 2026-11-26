@@ -60,8 +60,8 @@
   - a falling shot in the air;
   - a rune, a pool and a wall, which stand still and so never come in;
   - a shot another field holds, which is stopped.
-- **At most 48 a field** (`HOLD_MOST`); past that, shots go through it untouched.
-- **It grows** 1.5 px of radius a shot caught (`GROW_PER_SHOT`), up to 2.5 times its card's radius (`GROW_MOST`: 80 px for a plain field, at 32 shots). Growth grows it further over time. A wider field catches more.
+- **No most** (the owner, 2026-11-26: "No limits"): a field holds every shot that comes in. Its rows grow by doubling and are walked once a step and once at the burst, so nothing is allocated a step once grown.
+- **It grows** 1.5 px of radius a shot caught (`GROW_PER_SHOT`), with no most but the room's size, the most any shot is (as Growth keeps it): at that a field covers the room, catches all that moves in it, and is drawn clipped by the screen. Growth grows it further over time. A wider field catches more.
 - **The burst:**
   - when: the step after its shot ends (its life out, switched off, its caster gone);
   - every shot it holds leaves from its middle (just outside its own radius) along its kept way, at the speed it had;
@@ -75,10 +75,10 @@
 
 | | |
 | --- | --- |
-| radius | 32 (64 px at 2x: a cell's width either way of its middle), growing to 80 |
+| radius | 32 (64 px at 2x: a cell's width either way of its middle), growing 1.5 a shot, up to the room's size |
 | `ray_length` | 72 (its middle, ahead of the hand) |
 | lifetime | 3 s (the burst's moment; Slow holds longer) |
-| holds | at most 48 shots; 1.5 px of radius a shot |
+| holds | every shot that comes in (no most) |
 | mana | 18; wind-down 0.5 s; complexity 3 |
 | damage | 0.1 (the least a card has; it hits nothing) |
 
@@ -90,7 +90,7 @@
 - The GDScript stays as the reference and the fallback.
 - `tests/core/test_native_kernel.gd` compares the two to the bit: the pairs and their order, on straight, circling, homing, falling and stopped shots, through still, growing and circling fields, with stale rows in the list.
 
-Nothing runs while no field is open. Holding, drawing in and the burst are GDScript, at most `HOLD_MOST` shots a field.
+Nothing runs while no field is open. Holding, drawing in and the burst are GDScript: measured, a field holding 500 shots takes 0.4 ms a step and 2.7 ms to burst, one holding 2000 takes 1.8 ms a step and 10.5 ms to burst (its burst is one step: each shot set up with its cards), held by the same test.
 
 `tests/core/test_field_budget.gd` holds the cost: 2048 shots against 16 fields a step, natively within its budget (about 150 us a step measured; the GDScript fallback's 5 ms is printed, not held). It is printed as `BUDGET:` lines.
 
@@ -113,7 +113,7 @@ It rolls no dice and reads no clock but `delta`. Its angles go through `DMath` (
   - an enemy's shot is caught and sent on at the caster with the field's frost;
   - a shot keeps more of a card than the field gives;
   - a shot through it in one step is caught;
-  - the cap;
+  - every shot is held, with no most, and the field grows to the room's size at most;
   - its own shot wears none of its cards but Growth;
   - its own payload is not caught;
   - an enemy shot with a shield or deflect leaves the field be.

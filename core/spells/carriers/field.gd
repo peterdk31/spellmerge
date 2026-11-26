@@ -13,16 +13,14 @@ extends Carrier
 ## Split, Orbit, its triggers and its end are the shots' own. Each step the manager's field pass
 ## (`shots_into_fields`, natively `ShotKernel.field_pass`) hands back the shots that came into a field;
 ## this carrier holds each (a local stop: its life waits), keeping only the way it came in, in WAYS
-## steps (no position), and draws it in toward the middle step by step. A field holds at most
-## HOLD_MOST shots; past that, shots go through it untouched.
-
-## How many shots one field holds at most.
-const HOLD_MOST: int = 48
+## steps (no position), and draws it in toward the middle step by step. A field holds as many as come
+## (the owner, 2026-11-26: "No limits"); its rows grow by doubling (Packed arrays), never a step's
+## allocation once grown, and its burst and its drawing in walk them once.
 ## How many ways a held shot's way in is kept to (a byte: 32 steps round).
 const WAYS: int = 32
-## Pixels a field's radius grows with each shot it takes, up to GROW_MOST times its card's.
+## Pixels a field's radius grows with each shot it takes, with no most (the owner: "No limits"; the
+## manager keeps any shot's radius within the room, `set_field_radius`).
 const GROW_PER_SHOT: float = 1.5
-const GROW_MOST: float = 2.5
 ## A held shot is drawn in to the middle by this share of the way left each step.
 const DRAW_IN: float = 0.2
 ## How far short of a wall a field cast at one lies (pixels).
@@ -33,7 +31,7 @@ const DERIVED: Array[StringName] = [&"_fields_now"]
 
 ## The live fields: each one's slot, its shot's birth (`ProjectileManager.get_seq_of`), where its
 ## middle is (kept each step, for the burst after its shot is gone), its card's radius and how many
-## shots it holds, in the order they were cast. A row whose slot ended, or holds another shot, lets
+## shots it holds (for its burst's look), in the order they were cast. A row whose slot ended, or holds another shot, lets
 ## its shots go at the next step and is dropped.
 var _fd_slot: PackedInt32Array = PackedInt32Array()
 var _fd_seq: PackedInt64Array = PackedInt64Array()
@@ -175,10 +173,10 @@ func _burst_ended() -> void:
 
 
 ## The shot `shot` came into field row `row`: held where it is (its life waits until the burst),
-## keeping the way it was going; the field grows. A full field lets it through untouched.
+## keeping the way it was going; the field grows.
 func _take(shot: int, row: int) -> void:
 	var manager := kit.projectiles
-	if not manager.is_alive(shot) or _fd_held[row] >= HOLD_MOST:
+	if not manager.is_alive(shot):
 		return
 	var field: int = _fd_slot[row]
 	if not manager.freeze_shot(shot, manager.get_life_of(field) + 1.0):
@@ -192,8 +190,7 @@ func _take(shot: int, row: int) -> void:
 	_hd_field.append(_fd_seq[row])
 	_hd_way.append(posmod(roundi(DMath.angle(going) / TAU * float(WAYS)), WAYS))
 	_fd_held[row] += 1
-	var now: float = manager.get_radius_of(field)
-	manager.set_field_radius(field, minf(now + GROW_PER_SHOT, maxf(_fd_radius[row] * GROW_MOST, now)))
+	manager.set_field_radius(field, manager.get_radius_of(field) + GROW_PER_SHOT)
 	_shown(&"field_through", at, going, manager.get_radius_of(shot), field)
 
 
@@ -217,32 +214,36 @@ func _draw_in() -> void:
 
 
 ## Field row `row` bursts: every shot it holds leaves from its middle the way it came in, at the speed
-## it had, and takes the field's cards (`_give`). Its look (`field_burst`).
+## it had, and takes the field's cards (`_give`). Its look (`field_burst`). The held rows are walked
+## once, the rest kept in their order.
 func _burst(row: int) -> void:
 	var manager := kit.projectiles
 	var spell: CompiledSpell = kit.spell_of(manager.get_tag_of(_fd_slot[row])) if manager.get_seq_of(_fd_slot[row]) == _fd_seq[row] else null
 	var at: Vector2 = _fd_at[row]
 	var released: int = 0
-	var h: int = 0
-	while h < _hd_slot.size():
+	var kept: int = 0
+	for h in _hd_slot.size():
 		if _hd_field[h] != _fd_seq[row]:
-			h += 1
+			_hd_slot[kept] = _hd_slot[h]
+			_hd_seq[kept] = _hd_seq[h]
+			_hd_field[kept] = _hd_field[h]
+			_hd_way[kept] = _hd_way[h]
+			kept += 1
 			continue
 		var shot: int = _hd_slot[h]
-		var seq: int = _hd_seq[h]
-		var way: Vector2 = DMath.from_angle(float(_hd_way[h]) * TAU / float(WAYS))
-		_hd_slot.remove_at(h)
-		_hd_seq.remove_at(h)
-		_hd_field.remove_at(h)
-		_hd_way.remove_at(h)
-		if not manager.is_alive(shot) or manager.get_seq_of(shot) != seq:
+		if not manager.is_alive(shot) or manager.get_seq_of(shot) != _hd_seq[h]:
 			continue
+		var way: Vector2 = DMath.from_angle(float(_hd_way[h]) * TAU / float(WAYS))
 		var speed: float = manager.get_velocity_of(shot).length()
 		manager.pass_shot(shot, at + way * (manager.get_radius_of(shot) + 1.0), way * speed)
 		manager.release_shot(shot)
 		if spell != null:
 			_give(shot, spell)
 		released += 1
+	_hd_slot.resize(kept)
+	_hd_seq.resize(kept)
+	_hd_field.resize(kept)
+	_hd_way.resize(kept)
 	if released > 0 and kit.events != null:
 		var tint: Color = spell.tint if spell != null else Color.WHITE
 		kit.events.cue_shown.emit(-1, &"field_burst", at, Vector2.RIGHT, _fd_radius[row] + GROW_PER_SHOT * float(released), tint, 0)

@@ -32,16 +32,33 @@ The shared services every other area stands on.
 - `save/`: `SaveFile`, `user://save.cfg` only. `story/`: `StoryValidator`.
 - `base/`: data resources and shared readers: the card kinds (`CarrierCard`, `ElementBase`, `ModifierBase`, `TriggerBase`, `MulticastBase`), `StaffBase`, `EnemyBase`, `PropBase`, `RoomBase`, `RunDefinition`, `MoteKind`, `Palette`, ...; each has `problems()` for the content checks.
 - `spells/`: `Spells` autoload (`SpellRuntime`): `compile_staff`, `staff_view`, `install_staff`, `cast_staff`, `cast_ready`, `next_cast_sense`, `component_*`, `hit_profile(tag)`, `look_of`. Carriers live in `spells/carriers/` and answer `traits()`; they reach the runtime only through `CarrierKit`, and `spells.gd` names no carrier (docs/CARRIERS.md; `tests/core/test_card_rules.gd`). `SpellValidator` (`tests/content/spells/test_validators.gd`), `SpellTag`, `SpellLimits` (pacing only), `CastSense`.
-- `projectiles/`: `Projectiles` autoload (below), `RoomGrid` (`grid()`: walls, holes, footprints; `walk_body`), `HitBatch`, `Batches`, `ShaderWarmup`.
+- `projectiles/`: `Projectiles` autoload (below) and its jobs, `RoomGrid` (`grid()`: walls, holes, footprints; `walk_body`), `HitBatch`, `Batches`, `ShaderWarmup`.
 - `pools/`: `pool.gd`, fixed size, never grows; for nodes and effects only.
 
 ## The projectile manager
 
 Rows in packed arrays, stepped by the Tick (`step`). `spawn`, `add_target`, `ray`, `sweep`, `strike`, `threat`, `nearest_target`, `targets_in`, `set_cap`. Events (`projectile_hit`, `projectile_expired`, `shot_ended`, ...) name the shot's slot last. The hit-work budget is work units, never time. Tests: `tests/core/test_projectiles_kit.gd`, `test_hit_budget.gd`, `test_draw_regions.gd`, `test_body_walk.gd`.
 
+Its code is split by job; its state is not. `projectile_manager.gd` holds every member (the state, DERIVED, REFS, VIEW, in their order), every constant the native kernels check, the public API (a moved function keeps a one-line wrapper there, so no caller changes), the lifecycle (`set_cap`, `clear`, `begin_run`, `rebuild_derived`), `step`, and a shot's end and its events (`_kill`, `_expire`, `_send_hit`). Each job is a script of its own, an `Object` the manager makes and frees (`_job_<name>`, DERIVED):
+
+| Job | Script | What |
+|---|---|---|
+| rows | `projectile_rows.gd` | a shot's row written at spawn, the batch spawn, the cap's drop |
+| targets | `projectile_targets.gd` | registered bodies, their grid, `nearest_target`, `targets_in` |
+| moves | `projectile_moves.gd` | the common and trail passes, behaviour lists and passes, orbits, homing |
+| hits | `projectile_hits.gd` | the hit pass, the hit test, the targets a shot remembers, the merged hits |
+| walls | `projectile_walls.gd` | wall bodies, solid shots, what a shot does at a wall |
+| guards | `projectile_guards.gd` | deflect, block, shots in a wedge, `threat`, shields |
+| places | `projectile_places.gd` | portal gates, fields, `shot_places`, `pass_shot` |
+| rays | `projectile_rays.gd` | `ray`, `sweep`, `strike` and a beam's path |
+| batches | `projectile_batches.gd` | the MultiMesh batches, card bodies, the heads' mesh |
+| draw | `projectile_draw.gd` | `update_draw`, motes and tails, the row codes |
+
+A job reads the manager's arrays through members of its own of the same names, aliases of the manager's (`link`: a packed array shared, never a copy), so its code reads as the manager's did and loops as fast; scalars and calls go through `pm`. The manager links its jobs again whenever its arrays may have been replaced (`_link_jobs`: after a snapshot's restore and a run's renew); its own code only ever resizes them. A member something outside the manager replaces whole (`step_profile`, the benchmarks') is never aliased: `pm.step_profile`.
+
 ### How to add a shot behaviour
 
-All in `projectile_manager.gd`: (1) its numbers per slot, a packed array sized in `set_cap`, reset in `_spawn_row`; (2) `set_<name>(slot, ...)` calls `_join(slot, B_<NAME>)` (`_leave` to switch off); (3) `B_<NAME>` in the order (renumber, raise `BEHAVIOURS`, and `AFTER_HITS` if before the hits), its pass at that index of `BEHAVIOUR_PASSES`, a line in the order comment; (4) `_pass_<name>(list, first, count, delta)`, copied from `_pass_spiral` or `_pass_homing`: never sends an event, ends a shot (mark `S_EXPIRE`/`S_GONE`) or changes a list; calls `_wait(slot, B_<NAME>)` before reading what a hit handler may change. Add a test like `_test_spiral_weaves_round_its_line` and the setter's call in `Spells._apply_travel`.
+(1) Its numbers per slot: a packed array in `projectile_manager.gd`, sized in `set_cap`, reset in `ProjectileRows._write_row`, and named in `ProjectileMoves`' members and DERIVED where its pass reads it; (2) `set_<name>(slot, ...)` in the manager calls `_job_moves._join(slot, B_<NAME>)` (`_leave` to switch off); (3) `B_<NAME>` in the order (renumber, raise `BEHAVIOURS`, and `AFTER_HITS` if before the hits), its pass at that index of `BEHAVIOUR_PASSES`, a line in the order comment; (4) `_pass_<name>(list, first, count, delta)` in `projectile_moves.gd`, copied from `_pass_spiral` or `_pass_homing`: never sends an event, ends a shot (mark `S_EXPIRE`/`S_GONE`) or changes a list; calls `_wait(slot, B_<NAME>)` before reading what a hit handler may change. Add a test like `_test_spiral_weaves_round_its_line` and the setter's call in `Spells._apply_travel`.
 
 ## The shot shaders
 

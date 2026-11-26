@@ -53,7 +53,7 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## commands with `quick_bind_requested` and `quick_use_requested`, `InputFrame.VERSION` 12, and the
 ## players' loadouts' quick-use slots, the d-pad's quick-use; 20: the frames' commands with
 ## `sigil_put_requested` and `sigil_take_requested`, `InputFrame.VERSION` 13, and the players'
-## loadouts' staffs' sigils, staff-language L4).
+## loadouts' staffs' sigils and the rule `bag_sigils`, staff-language L4).
 ## A replay of another format is refused.
 const FORMAT: int = 20
 const FOLDER: String = "user://replays/"

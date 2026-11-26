@@ -209,7 +209,7 @@ Look look_of(vec3 c, float who, float z, vec3 b, float s, bool particles) {
 // The look an instance colour carries (see above), with the core colour `c`.
 Look look_from_color(vec4 color, vec3 c, float s, bool particles) {
 	float red = floor(color.r * 255.0 + 0.5);
-	return look_of(c, mod(red, 4.0), max(floor(red / 4.0), 1.0), floor(color.gba * 255.0 + 0.5), s, particles);
+	return look_of(c, mod(red, 4.0), max(floor(red / 4.0), 1.0), floor(color.gba * LOOK_CHANNEL + 0.5), s, particles);
 }
 
 // A number in [0, 1) from three numbers and the shot's seed: the same on every machine.

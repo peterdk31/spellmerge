@@ -73,7 +73,7 @@ const HF_LIVE: float = 1.0
 ## palette materials' shades (shadow, base, light), and the look bits.
 const P_BASE: PackedFloat64Array = [0.231, 0.451, 0.788, 0.851, 0.278, 0.478, 0.247, 0.561, 0.310, 0.541, 0.310, 0.769, 0.651, 0.541, 0.165]
 const P_LIGHT: PackedFloat64Array = [0.498, 0.753, 0.941, 0.961, 0.604, 0.722, 0.561, 0.831, 0.416, 0.788, 0.604, 0.941, 0.890, 0.812, 0.420]
-const MATERIALS: int = 7
+const MATERIALS: int = 8
 const SHADES: PackedFloat64Array = [
 	0.561, 0.176, 0.165, 0.878, 0.349, 0.184, 1.0, 0.635, 0.235,
 	0.722, 0.502, 0.122, 0.949, 0.761, 0.188, 1.0, 0.953, 0.651,
@@ -82,11 +82,15 @@ const SHADES: PackedFloat64Array = [
 	0.247, 0.420, 0.063, 0.706, 0.910, 0.165, 0.933, 1.0, 0.651,
 	0.639, 0.624, 0.722, 0.831, 0.816, 0.878, 0.957, 0.945, 0.918,
 	0.059, 0.290, 0.267, 0.118, 0.612, 0.549, 0.435, 0.863, 0.753,
+	0.129, 0.102, 0.118, 0.290, 0.216, 0.161, 0.722, 0.541, 0.243,
 ]
 const ENEMY_PLAYER: int = 4
-const KIND_COUNT: int = 22
-const ENEMY_RAMP: int = 23
-const EXACT: int = 24
+const KIND_COUNT: int = 23
+const ENEMY_RAMP: int = 29
+const EXACT: int = 30
+## A look channel's bits (ProjectileManager.LOOK_CHANNEL_BITS): a row's look is n / LOOK_CHANNEL.
+const LOOK_BITS: int = 10
+const LOOK_CHANNEL: float = 1023.0
 const PALETTE_MOST: int = 4
 ## The most boxes that block light (LightBlockers.MAX; the kernel's checked against it).
 const BLOCKERS_MOST: int = LightBlockersScript.MAX
@@ -540,13 +544,13 @@ func _lamp(cx: float, cy: float, hx: float, hy: float, wx: float, wy: float, r: 
 func glow_of(rows: PackedFloat32Array, at: int, own_infusions: bool) -> Vector3:
 	var red: float = floorf(rows[at + 8] * 255.0 + 0.5)
 	var who: int = int(fmod(red, 4.0))
-	var b0: int = int(floorf(rows[at + 9] * 255.0 + 0.5))
-	var b1: int = int(floorf(rows[at + 10] * 255.0 + 0.5))
-	var b2: int = int(floorf(rows[at + 11] * 255.0 + 0.5))
+	var b0: int = int(floorf(rows[at + 9] * LOOK_CHANNEL + 0.5))
+	var b1: int = int(floorf(rows[at + 10] * LOOK_CHANNEL + 0.5))
+	var b2: int = int(floorf(rows[at + 11] * LOOK_CHANNEL + 0.5))
 	return look_glow(rows[at + 12], rows[at + 13], rows[at + 14], who, b0, b1, b2, own_infusions)
 
 
-## A look's glow: core colour (cr, cg, cb), player ramp `who` (0-3), look bits in three bytes.
+## A look's glow: core colour (cr, cg, cb), player ramp `who` (0-3), look bits in three channels of LOOK_BITS.
 func look_glow(cr: float, cg: float, cb: float, who: int, b0: int, b1: int, b2: int, own_infusions: bool) -> Vector3:
 	var player: int = ENEMY_PLAYER if _bit_set(b0, b1, b2, ENEMY_RAMP) else who
 	var mid := Vector3.ZERO
@@ -612,11 +616,11 @@ static func _mix(a: Vector3, b: Vector3, t: float) -> Vector3:
 	return Vector3(float(a.x) + (float(b.x) - float(a.x)) * t, float(a.y) + (float(b.y) - float(a.y)) * t, float(a.z) + (float(b.z) - float(a.z)) * t)
 
 
-## Whether look bit `look` (1 to 24) is set in the three bytes.
+## Whether look bit `look` (1 to 30) is set in the three channels (LOOK_BITS each).
 static func _bit_set(b0: int, b1: int, b2: int, look: int) -> bool:
 	var bit: int = look - 1
-	var byte: int = b0 if bit < 8 else (b1 if bit < 16 else b2)
-	return (byte >> (bit % 8)) & 1 == 1
+	var channel: int = b0 if bit < LOOK_BITS else (b1 if bit < 2 * LOOK_BITS else b2)
+	return (channel >> (bit % LOOK_BITS)) & 1 == 1
 
 
 static func _flag_set(flags: float, f: float) -> bool:

@@ -12,3 +12,4 @@ complexity = 2
 icon = ExtResource("2_icon")
 damage_scale = 0.6
 tint = Color(0.2901961, 0.21568628, 0.16078432, 1)
+look_id = &"slick"

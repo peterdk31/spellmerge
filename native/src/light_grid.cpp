@@ -46,14 +46,17 @@ constexpr int64_t LG_ROWS_SHOT = 0, LG_ROWS_RUNE = 1, LG_ROWS_FLASH = 2, LG_ROWS
 constexpr double LG_SHOT_STRENGTH = 0.9, LG_RUNE_STRENGTH = 0.55, LG_SHOT_REACH = 26.0, LG_SHOT_REACH_ZOOM = 6.0;
 constexpr double LG_SPECK_REACH = 14.0, LG_RUNE_REACH = 1.5, LG_FLASH_FROM = 0.02, LG_FLASH_SPAN = 0.42;
 constexpr double LG_SPOT_RATE = 7.0, LG_HF_LIVE = 1.0;
-constexpr int64_t LG_MATERIALS = 7, LG_ENEMY_PLAYER = 4, LG_KIND_COUNT = 22, LG_ENEMY_RAMP = 23, LG_EXACT = 24;
+constexpr int64_t LG_MATERIALS = 8, LG_ENEMY_PLAYER = 4, LG_KIND_COUNT = 23, LG_ENEMY_RAMP = 29, LG_EXACT = 30;
+// A look channel's bits (LightGrid.LOOK_BITS, ProjectileManager.LOOK_CHANNEL_BITS).
+constexpr int64_t LG_LOOK_BITS = 10;
+constexpr double LG_LOOK_CHANNEL = 1023.0;
 constexpr int64_t LG_PALETTE_MOST = 4, LG_BLOCKERS_MOST = 32;
 // The most views a grid has (LightGrid.VIEWS_MOST): a call's views by default.
 constexpr int64_t LG_VIEWS_MOST = 4;
 constexpr double LG_INFUSION_MARK = 128.0 / 255.0;
 const double LG_P_BASE[15] = {0.231, 0.451, 0.788, 0.851, 0.278, 0.478, 0.247, 0.561, 0.310, 0.541, 0.310, 0.769, 0.651, 0.541, 0.165};
 const double LG_P_LIGHT[15] = {0.498, 0.753, 0.941, 0.961, 0.604, 0.722, 0.561, 0.831, 0.416, 0.788, 0.604, 0.941, 0.890, 0.812, 0.420};
-const double LG_SHADES[63] = {
+const double LG_SHADES[72] = {
 	0.561, 0.176, 0.165, 0.878, 0.349, 0.184, 1.0, 0.635, 0.235,
 	0.722, 0.502, 0.122, 0.949, 0.761, 0.188, 1.0, 0.953, 0.651,
 	0.122, 0.439, 0.502, 0.310, 0.839, 0.863, 0.769, 0.965, 0.949,
@@ -61,6 +64,7 @@ const double LG_SHADES[63] = {
 	0.247, 0.420, 0.063, 0.706, 0.910, 0.165, 0.933, 1.0, 0.651,
 	0.639, 0.624, 0.722, 0.831, 0.816, 0.878, 0.957, 0.945, 0.918,
 	0.059, 0.290, 0.267, 0.118, 0.612, 0.549, 0.435, 0.863, 0.753,
+	0.129, 0.102, 0.118, 0.290, 0.216, 0.161, 0.722, 0.541, 0.243
 };
 
 // The members read: C++ name, GDScript member, type.
@@ -252,8 +256,8 @@ Vector3 mix3(const Vector3 &a, const Vector3 &b, double t) {
 
 bool bit_set(int64_t b0, int64_t b1, int64_t b2, int64_t look) {
 	const int64_t bit = look - 1;
-	const int64_t byte = bit < 8 ? b0 : (bit < 16 ? b1 : b2);
-	return ((byte >> (bit % 8)) & 1) == 1;
+	const int64_t channel = bit < LG_LOOK_BITS ? b0 : (bit < 2 * LG_LOOK_BITS ? b1 : b2);
+	return ((channel >> (bit % LG_LOOK_BITS)) & 1) == 1;
 }
 
 Vector3 look_glow(double cr, double cg, double cb, int64_t who, int64_t b0, int64_t b1, int64_t b2, bool own_infusions, Grid &gr) {
@@ -300,9 +304,9 @@ Vector3 look_glow(double cr, double cg, double cb, int64_t who, int64_t b0, int6
 Vector3 glow_of(const float *row, Grid &gr) {
 	const double red = std::floor((double)row[8] * 255.0 + 0.5);
 	const int64_t who = (int64_t)std::fmod(red, 4.0);
-	const int64_t b0 = (int64_t)std::floor((double)row[9] * 255.0 + 0.5);
-	const int64_t b1 = (int64_t)std::floor((double)row[10] * 255.0 + 0.5);
-	const int64_t b2 = (int64_t)std::floor((double)row[11] * 255.0 + 0.5);
+	const int64_t b0 = (int64_t)std::floor((double)row[9] * LG_LOOK_CHANNEL + 0.5);
+	const int64_t b1 = (int64_t)std::floor((double)row[10] * LG_LOOK_CHANNEL + 0.5);
+	const int64_t b2 = (int64_t)std::floor((double)row[11] * LG_LOOK_CHANNEL + 0.5);
 	return look_glow(row[12], row[13], row[14], who, b0, b1, b2, false, gr);
 }
 
@@ -478,14 +482,14 @@ PackedStringArray LightKernel::check_light_grid(Object *object) const {
 			(double)object->get("SPOT_RATE") == LG_SPOT_RATE && (double)object->get("HF_LIVE") == LG_HF_LIVE &&
 			(int64_t)object->get("MATERIALS") == LG_MATERIALS && (int64_t)object->get("ENEMY_PLAYER") == LG_ENEMY_PLAYER &&
 			(int64_t)object->get("KIND_COUNT") == LG_KIND_COUNT && (int64_t)object->get("ENEMY_RAMP") == LG_ENEMY_RAMP &&
-			(int64_t)object->get("EXACT") == LG_EXACT && (int64_t)object->get("PALETTE_MOST") == LG_PALETTE_MOST &&
+			(int64_t)object->get("EXACT") == LG_EXACT && (int64_t)object->get("LOOK_BITS") == LG_LOOK_BITS && (int64_t)object->get("PALETTE_MOST") == LG_PALETTE_MOST &&
 			(double)object->get("INFUSION_MARK") == LG_INFUSION_MARK && (int64_t)object->get("BLOCKERS_MOST") == LG_BLOCKERS_MOST &&
 			(int64_t)object->get("VIEWS_MOST") == LG_VIEWS_MOST;
 	const PackedFloat64Array shades = object->get("SHADES");
 	const PackedFloat64Array base = object->get("P_BASE");
 	const PackedFloat64Array light = object->get("P_LIGHT");
-	same = same && shades.size() == 63 && base.size() == 15 && light.size() == 15;
-	for (int64_t i = 0; same && i < 63; i++) {
+	same = same && shades.size() == LG_MATERIALS * 9 && base.size() == 15 && light.size() == 15;
+	for (int64_t i = 0; same && i < LG_MATERIALS * 9; i++) {
 		same = shades[i] == LG_SHADES[i];
 	}
 	for (int64_t i = 0; same && i < 15; i++) {

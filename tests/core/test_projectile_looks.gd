@@ -49,7 +49,7 @@ func look_at(node: MultiMeshInstance2D, i: int) -> Array[int]:
 	var buffer: PackedFloat32Array = node.multimesh.buffer
 	var at: int = i * ManagerScript.DRAW_STRIDE + 8
 	var red: int = roundi(buffer[at] * 255.0)
-	var look: int = roundi(buffer[at + 1] * 255.0) | (roundi(buffer[at + 2] * 255.0) << 8) | (roundi(buffer[at + 3] * 255.0) << 16)
+	var look: int = ManagerScript.look_of_channels(buffer[at + 1], buffer[at + 2], buffer[at + 3])
 	return [red % 4, red / 4, look] as Array[int]
 
 
@@ -82,8 +82,8 @@ func test_hops_and_wake_are_kinds_that_pack_and_emit() -> void:
 	check(not ManagerScript.look_has(look, ManagerScript.LOOK_HOPS - 1), "its neighbour is not")
 	check(ManagerScript.LOOK_WAKE < ManagerScript.LOOK_COUNT, "both kinds are inside the look range")
 	check(ManagerScript.LOOK_COUNT - 1 <= ManagerScript.LOOK_MAX_KINDS, "and inside what the instance data holds")
-	var later: Array[int] = [ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE, ManagerScript.LOOK_WEIGHT, ManagerScript.LOOK_RIPPLE, ManagerScript.LOOK_CURL, ManagerScript.LOOK_ZIG, ManagerScript.LOOK_DOUBLE, ManagerScript.LOOK_CONVERGE, ManagerScript.LOOK_DRIFT, ManagerScript.LOOK_DROPS]
-	check(later.back() == ManagerScript.LOOK_COUNT - 1, "drops (water) is the last kind, below the enemy ramp flag (kind 23)")
+	var later: Array[int] = [ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE, ManagerScript.LOOK_WEIGHT, ManagerScript.LOOK_RIPPLE, ManagerScript.LOOK_CURL, ManagerScript.LOOK_ZIG, ManagerScript.LOOK_DOUBLE, ManagerScript.LOOK_CONVERGE, ManagerScript.LOOK_DRIFT, ManagerScript.LOOK_DROPS, ManagerScript.LOOK_SLICK]
+	check(later.back() == ManagerScript.LOOK_COUNT - 1, "slick (oil) is the last kind, below the enemy ramp flag (kind 29)")
 	for kind: int in later:
 		check((ManagerScript.EMITTING_MASK >> (kind - 1)) & 1 == 1, "kind %d gives off particles" % kind)
 
@@ -147,10 +147,10 @@ func test_a_shot_of_no_actor_is_drawn_as_an_enemys_bolt() -> void:
 func test_the_instance_colour_keeps_every_hat_ramps_bytes() -> void:
 	for ramp in 4:
 		for zoom in [1, 4, 15, 63]:
-			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 5, 12])) | (1 << 23)
+			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 5, 12, ManagerScript.LOOK_SLICK])) | (1 << 29)
 			var data: Color = ManagerScript.look_color(ramp, zoom, look)
 			check_equal(roundi(data.r * 255.0), ramp + zoom * 4, "ramp %d at zoom %d: red is ramp + zoom x 4" % [ramp, zoom])
-			check_equal(roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16), look, "and the look's bytes, Feel's EXACT included, are as they were")
+			check_equal(ManagerScript.look_of_channels(data.g, data.b, data.a), look, "and the look's bits, Feel's EXACT included, are as they were")
 
 
 func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
@@ -158,13 +158,14 @@ func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 	var data: Color = ManagerScript.look_color(ActorsScript.RAMP_ENEMY, 2, look)
 	check_equal(roundi(data.r * 255.0), 2 * 4, "the enemy ramp takes ramp 0's place in red")
 	check_equal(ManagerScript.look_color(ActorsScript.NONE, 2, look), data, "no ramp draws as the enemy ramp")
-	var bits: int = roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16)
+	var bits: int = ManagerScript.look_of_channels(data.g, data.b, data.a)
 	check_equal(bits, look | ManagerScript.LOOK_ENEMY_RAMP, "with the enemy ramp's flag beside its kinds")
 	check_equal(ManagerScript.ramp_look(1, look | ManagerScript.LOOK_ENEMY_RAMP), look, "a hat ramp never carries the flag")
 	check(1 << (ManagerScript.LOOK_COUNT - 2) < ManagerScript.LOOK_ENEMY_RAMP, "no particle kind reaches the flag")
-	check_equal(ManagerScript.LOOK_ENEMY_RAMP, 1 << 22, "the flag is kind 23, below Feel's EXACT (kind 24)")
+	check_equal(ManagerScript.LOOK_ENEMY_RAMP, 1 << 28, "the flag is kind 29, below Feel's EXACT (kind 30), the top of the look's 30")
 	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
-	check(palette.code.contains("const float ENEMY_RAMP = 23.0;"), "the shaders read the same flag")
+	check(palette.code.contains("const float ENEMY_RAMP = 29.0;"), "the shaders read the same flag")
+	check(palette.code.contains("const float LOOK_CHANNEL = 1023.0;") and palette.code.contains("const float LOOK_BITS = %d.0;" % ManagerScript.LOOK_CHANNEL_BITS), "and the same channels")
 	check(palette.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the hats'")
 	check(palette.code.contains("vec3(0.651, 0.541, 0.165))"), "whose base is Blight ochre (#a68a2a), last in P_BASE")
 	var look_code: ShaderInclude = load("res://core/projectiles/shot_look.gdshaderinc")
@@ -647,6 +648,29 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the pool")
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_share, 1.0, "and the births thin by it")
+
+
+## Regression (the review of the widened look): a beam's and a swing's look comes as an int, and
+## four shaders split it in bytes of 8 after the channels became 10 bits, so every kind past 8 read
+## wrong. Every shader splits it with `look_channels`, the include's one place.
+func test_a_looks_int_is_split_by_its_channels_everywhere() -> void:
+	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
+	check(palette.code.contains("vec3 look_channels(int look)"), "the include splits a look int")
+	for path: String in ["res://core/projectiles/shot_beam.gdshaderinc", "res://core/projectiles/shot_swing.gdshaderinc", "res://content/spells/carriers/beam/beam.gdshader", "res://content/spells/carriers/swing/swing.gdshader"]:
+		var code: String = FileAccess.get_file_as_string(path)
+		check(code.contains("look_channels("), "%s splits its look by the channels" % path)
+		check(not code.contains("_look & 255)"), "%s keeps no byte split" % path)
+
+
+## Regression (the same review): a birth's look float lost the low bits of a look with a flag (a
+## float is whole only to 2^24, the flags sit at 28 and 29); its flags ride in its ramp float.
+func test_a_births_flags_and_layers_come_back_whole() -> void:
+	for ramp: int in [-1, 0, 3, 4, 7]:
+		for flags: int in [0, ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.LOOK_ENEMY_RAMP << 1, ManagerScript.LOOK_ENEMY_RAMP | (ManagerScript.LOOK_ENEMY_RAMP << 1)]:
+			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 9, 17, ManagerScript.LOOK_SLICK])) | flags
+			var births := PackedFloat32Array([ManagerScript.birth_ramp(ramp, look), ManagerScript.birth_look(look)])
+			check_equal(ManagerScript.birth_ramp_of(births[0]), ramp, "the ramp %d with flags %d" % [ramp, flags])
+			check_equal(ManagerScript.birth_look_of(births[0], births[1]), look, "and the whole look")
 
 
 ## ART2: a shot's core is drawn at the art's detail (docs/STYLE.md, "The picture and the art's

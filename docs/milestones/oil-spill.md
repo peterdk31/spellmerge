@@ -45,7 +45,7 @@
 | `status_id` | none | its point is the floor (as Mend has none: it heals; Oil coats) |
 | `damage_scale` | 0.6 | a coating, not a blow: an oil bolt is a weak bolt |
 | `tint` | Oil's base | a new palette material, below |
-| `look_id` | none | every free look is a modifier's (`test_original_looks`: no modifier shares a look with an infusion); a look of its own (drips that hang and fall) is a new `LOOK_*`, its shader branch and its rate: left to the spells' 64-px art pass (ART2). Its shots read by their tint, the darkest of the infusions |
+| `look_id` | `slick` | drips that hang and fall, the sheen catching the light; its own look, once the look slots were widened (the owner's answer 4 below) |
 | `complexity` | 2 | a card for a second staff or a teammate |
 
 - **A new palette material, Oil** (docs/STYLE.md: new element colours are added when their spells are built): a dark umber with an amber sheen, `#211a1e`, `#4a3729`, `#b88a3e`. Far from Wood's reds and Blight's ochre in its base, the darkest base of the palette (a slick reads as a hole in the floor's light).
@@ -129,7 +129,7 @@ Three new surfaces (`CoverState.FlatSurface`: OIL, FIRE, SCORCH; a branch each i
 1. **Water and frost on burning oil:** they put it out (the flames go out, the oil is left to be lit again), as they put out burning grass; a fire still catching too (built).
 2. **Lightning and oil:** lightning does not light oil; fire is the one match (built).
 3. **Oil on a body:** nothing (built). A later card could make an oiled body burn longer.
-4. **Oil's particle look** (on #948): widen the look slots so Oil's shots get a look of their own (sheen and drips, at real 64-px detail): the next PR, after this one. Until then its shots read by their tint (`test_infusion_colours` skips it).
+4. **Oil's particle look** (on #948): widen the look slots so Oil's shots get a look of their own (sheen and drips). **Built (the PR after #948):** a look channel of the shots' instance colour carries 10 bits instead of 8 (`ProjectileManager.LOOK_CHANNEL_BITS`, n / 1023: a MultiMesh colour channel keeps ten bits whole, measured on the web's renderer, 1024 of 1024 values; the desktop's stores floats), so the look holds 30: kinds 1 to 28 and the two flags at the top (the enemy ramp, kind 29; Feel's EXACT, kind 30). Oil's look is kind 23, `slick`: a heavy drip that hangs under the shot, stretches to a string and falls, its top catching the light (`shot_particle.gdshaderinc`), and its motes, `content/motes/oil_drip.tres`. Oil is the eighth palette material the shots' and the light's nearest-material match know. Mirrored to the bit in the native kernels (`shot_kernel.cpp`'s look colour, `light_grid.cpp`) and the light grid's compute shader; `test_projectile_looks`, `test_light_grid` and `test_native_kernel` hold them.
 5. **The flames' look** (on #948): ART2 redraws them later; they stay as built here.
 
 **Field (Part 3, in parallel):** a field is a still shot that touches no floor of its own, so Spill is wasted on it; whichever of the two lands second adds the field's new trait (`GIVES`) to Spill's "not" (`test_card_rules` names it).

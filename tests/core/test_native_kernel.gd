@@ -786,8 +786,8 @@ func _drive(side: int, step: int) -> void:
 		if slot % 4 == 1:
 			# A card's light (card-looks phase 1b): written into the row's free floats on both sides.
 			m.set_light(slot, 0.25 + 0.25 * float(slot % 7), 0.5 + 0.25 * float(slot % 5))
-		# Any look bits, the enemy ramp's flag among them (`ramp_look`), so a new kind is covered too.
-		m.set_look(slot, rng.randi() & ((1 << ManagerScript.LOOK_MAX_KINDS) - 1) if rng.randf() < 0.6 else 0)
+		# Any kinds' bits (the enemy ramp's flag comes from the ramp, `ramp_look`), so a new kind is covered too.
+		m.set_look(slot, rng.randi() & ((1 << (ManagerScript.LOOK_COUNT - 1)) - 1) if rng.randf() < 0.6 else 0)
 		if rng.randf() < 0.4:
 			m.set_core(slot, Color(rng.randf(), rng.randf(), rng.randf()))
 		match kind:

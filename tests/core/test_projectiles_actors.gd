@@ -281,11 +281,11 @@ func test_a_wizard_draws_in_its_hat_ramp_and_an_enemy_in_the_enemy_batch() -> vo
 	check_equal(mgr.drawn_enemy, 1, "the enemy's in the enemy batch")
 	var hat: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	var red: int = roundi(hat[8] * 255.0)
-	var hat_bits: int = roundi(hat[11] * 255.0) << 16
+	var hat_bits: int = ManagerScript.look_of_channels(hat[9], hat[10], hat[11])
 	check_equal(red % 4, 1, "the wizard at id 8 (seat 1) draws in hat ramp 1")
 	check_equal(hat_bits & ManagerScript.LOOK_ENEMY_RAMP, 0, "without the enemy ramp's flag")
 	var enemy: PackedFloat32Array = mgr._enemy_node.multimesh.buffer
-	var bits: int = roundi(enemy[9] * 255.0) | (roundi(enemy[10] * 255.0) << 8) | (roundi(enemy[11] * 255.0) << 16)
+	var bits: int = ManagerScript.look_of_channels(enemy[9], enemy[10], enemy[11])
 	check(roundi(enemy[8] * 255.0) % 4 == 0 and (bits & ManagerScript.LOOK_ENEMY_RAMP) != 0, "the enemy's shot has the enemy ramp's flag")
 
 
@@ -308,7 +308,7 @@ func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
 	check_equal(node.multimesh.visible_instance_count, 1, "the bolt in the enemy shot batch")
 	# A shot in flight is drawn as its head.
 	kinds.append(roundi((1.0 - buffer[15]) * ManagerScript.KIND_STEPS))
-	var bits: int = roundi(buffer[9] * 255.0) | (roundi(buffer[10] * 255.0) << 8) | (roundi(buffer[11] * 255.0) << 16)
+	var bits: int = ManagerScript.look_of_channels(buffer[9], buffer[10], buffer[11])
 	check_equal(bits & ~ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "the bolt keeps its cards' look")
 	kinds.sort()
 	check_equal(kinds, [ManagerScript.KIND_BOLT, ManagerScript.KIND_RUNE] as Array[int], "each its own body")

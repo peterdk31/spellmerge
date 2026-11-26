@@ -269,8 +269,8 @@ const FLASH_TABLE_CODE: int = 15
 ## The codes of the kinds drawn by shaders of their own, by their `draw`.
 const DRAW_KINDS: Dictionary = {&"shell": KIND_SHELL, &"fireball": KIND_FIREBALL, &"arc": KIND_ARC}
 ## The look bit that makes a flash take its colour exactly (a reaction's own colour) instead
-## of the palette material it is nearest (kind 24 in the shader).
-const EXACT: int = 1 << 23
+## of the palette material it is nearest (kind 30 in the shader, the bit past the enemy ramp's).
+const EXACT: int = ProjectileManagerScript.LOOK_ENEMY_RAMP << 1
 ## Another staff on show plays the cue `staff_swap` (S6, item 9) along the new staff, following the
 ## body.
 const STAFF_SWAP: StringName = &"staff_swap"

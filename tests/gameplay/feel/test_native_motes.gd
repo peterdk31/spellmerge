@@ -114,10 +114,12 @@ func _births(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		given[b + ProjectilesScript.SPARK_BACK_X] = back.x
 		given[b + ProjectilesScript.SPARK_BACK_Y] = back.y
 		given[b + ProjectilesScript.SPARK_KIND] = kinds[rng.randi_range(0, kinds.size() - 1)]
-		given[b + ProjectilesScript.SPARK_RAMP] = rng.randi_range(-1, 5)
-		# Every other birth of a spell of several infusions (layers 1 to 3).
+		# Every other birth of a spell of several infusions (layers 1 to 3); its flags ride in its ramp
+		# float (`ProjectileManager.birth_ramp`).
 		var infusions: int = rng.randi_range(0, 7) if n % 2 == 0 else 0
-		given[b + ProjectilesScript.SPARK_LOOK] = (1 << rng.randi_range(0, 4)) | infusions | flags[rng.randi_range(0, flags.size() - 1)]
+		var look: int = (1 << rng.randi_range(0, 4)) | infusions | flags[rng.randi_range(0, flags.size() - 1)]
+		given[b + ProjectilesScript.SPARK_RAMP] = ProjectilesScript.birth_ramp(rng.randi_range(-1, 5), look)
+		given[b + ProjectilesScript.SPARK_LOOK] = ProjectilesScript.birth_look(look)
 		for c in 3:
 			given[b + ProjectilesScript.SPARK_CORE + c] = rng.randf()
 		given[b + ProjectilesScript.SPARK_TAG] = rng.randi_range(0, 7)

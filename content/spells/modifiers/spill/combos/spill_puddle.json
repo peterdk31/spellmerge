@@ -1,0 +1,13 @@
+{
+	"id": "spill_puddle",
+	"name": "Puddle",
+	"does": "A Spill water bolt splashes a wide puddle where it hits one imp, and the imp beside it, which the bolt missed, stands in the water and is soaked.",
+	"floor": true,
+	"casts": [
+		{"staff": 0, "cards": ["water", "spill", "bolt"]}
+	],
+	"imps": [[100, 0], [95, 24]],
+	"seconds": 1.5,
+	"needs": "spill",
+	"checks": [{"kind": "status", "imps": [1], "status": "soak"}]
+}

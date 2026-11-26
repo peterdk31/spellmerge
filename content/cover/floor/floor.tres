@@ -137,13 +137,151 @@ reach = 2.0
 height = 8.0
 colours = Array[StringName]([&"bone"])
 
+[sub_resource type="Resource" id="dry_oil"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"oil"
+then = &"oiling"
+
+[sub_resource type="Resource" id="oiling_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.25
+then = &"oiled"
+
+[sub_resource type="Resource" id="oiled_oil"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"oil"
+then = &"oiled"
+
+[sub_resource type="Resource" id="oiled_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"catching"
+
+[sub_resource type="Resource" id="oiled_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 30.0
+then = &"soaking"
+
+[sub_resource type="Resource" id="soaking_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.5
+then = &"dry"
+
+[sub_resource type="Resource" id="catching_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"doused"
+
+[sub_resource type="Resource" id="catching_frost"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"frost"
+then = &"doused"
+
+[sub_resource type="Resource" id="catching_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.3
+then = &"burning"
+
+[sub_resource type="Resource" id="burning_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"doused"
+
+[sub_resource type="Resource" id="burning_frost"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"frost"
+then = &"doused"
+
+[sub_resource type="Resource" id="burning_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 6.0
+then = &"burning_down"
+
+[sub_resource type="Resource" id="burning_down_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.5
+then = &"scorched"
+
+[sub_resource type="Resource" id="scorched_oil"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"oil"
+then = &"oiling"
+
+[sub_resource type="Resource" id="scorched_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 10.0
+then = &"scorch_fading"
+
+[sub_resource type="Resource" id="scorch_fading_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.5
+then = &"dry"
+
+[sub_resource type="Resource" id="doused_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.35
+then = &"oiled"
+
+[sub_resource type="Resource" id="burning_embers"]
+script = ExtResource("4_motes")
+kind = &"ember"
+rate = 2.0
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 30.0
+reach = 3.0
+height = 10.0
+colours = Array[StringName]([&"fire", &"spark"])
+
+[sub_resource type="Resource" id="burning_smoke"]
+script = ExtResource("4_motes")
+kind = &"smoke"
+rate = 1.0
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 30.0
+reach = 2.0
+height = 12.0
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="doused_smoke"]
+script = ExtResource("4_motes")
+kind = &"smoke"
+rate = 2.0
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 40.0
+reach = 2.0
+height = 8.0
+colours = Array[StringName]([&"stone"])
+
 [sub_resource type="Resource" id="dry"]
 script = ExtResource("2_state")
 state_id = &"dry"
 frames = PackedInt32Array()
 sway = 0.0
 bend = 0.0
-triggers = Array[ExtResource("3_trigger")]([SubResource("dry_water")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("dry_water"), SubResource("dry_oil")])
 
 [sub_resource type="Resource" id="wetting"]
 script = ExtResource("2_state")
@@ -304,6 +442,162 @@ flat_trace_seconds = 3.0
 flat_motion = 2
 triggers = Array[ExtResource("3_trigger")]([SubResource("steam_after")])
 
+[sub_resource type="Resource" id="oiling"]
+script = ExtResource("2_state")
+state_id = &"oiling"
+frames = PackedInt32Array()
+animation_frames = 4
+animation_fps = 16
+sway = 0.0
+bend = 0.0
+flat_material = &"oil"
+flat_surface = 4
+flat_motion = 1
+triggers = Array[ExtResource("3_trigger")]([SubResource("oiling_after")])
+
+[sub_resource type="Resource" id="oiled"]
+script = ExtResource("2_state")
+state_id = &"oiled"
+frames = PackedInt32Array()
+animation_frames = 6
+animation_fps = 4
+animation_loops = true
+sway = 0.0
+bend = 0.0
+flat_material = &"oil"
+flat_surface = 4
+triggers = Array[ExtResource("3_trigger")]([SubResource("oiled_oil"), SubResource("oiled_fire"), SubResource("oiled_after")])
+
+[sub_resource type="Resource" id="soaking"]
+script = ExtResource("2_state")
+state_id = &"soaking"
+frames = PackedInt32Array()
+animation_frames = 4
+sway = 0.0
+bend = 0.0
+flat_material = &"oil"
+flat_surface = 4
+flat_trace = &"oil"
+flat_trace_seconds = 3.0
+flat_motion = 2
+triggers = Array[ExtResource("3_trigger")]([SubResource("soaking_after")])
+
+[sub_resource type="Resource" id="catching"]
+script = ExtResource("2_state")
+state_id = &"catching"
+frames = PackedInt32Array()
+animation_frames = 4
+animation_fps = 16
+sway = 0.0
+bend = 0.0
+flat_material = &"fire"
+flat_spark = &"spark"
+flat_under_surface = 4
+flat_surface = 5
+flat_glow = &"fire"
+flat_glow_strength = 0.45
+flat_motion = 4
+flat_under = &"oil"
+status = &"burn"
+status_strength = 3.0
+status_duration = 2.0
+status_every = 0.5
+spreads = &"fire"
+spread_chance = 8.0
+triggers = Array[ExtResource("3_trigger")]([SubResource("catching_water"), SubResource("catching_frost"), SubResource("catching_after")])
+
+[sub_resource type="Resource" id="burning"]
+script = ExtResource("2_state")
+state_id = &"burning"
+frames = PackedInt32Array()
+animation_frames = 6
+animation_fps = 12
+animation_loops = true
+sway = 0.0
+bend = 0.0
+motes = Array[ExtResource("4_motes")]([SubResource("burning_embers"), SubResource("burning_smoke")])
+flat_material = &"fire"
+flat_spark = &"spark"
+flat_surface = 5
+flat_glow = &"fire"
+flat_glow_strength = 0.45
+status = &"burn"
+status_strength = 3.0
+status_duration = 2.0
+status_every = 0.5
+strike_element = &"fire"
+strike_damage = 2.0
+spreads = &"fire"
+spread_chance = 8.0
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_water"), SubResource("burning_frost"), SubResource("burning_after")])
+
+[sub_resource type="Resource" id="burning_down"]
+script = ExtResource("2_state")
+state_id = &"burning_down"
+frames = PackedInt32Array()
+animation_frames = 4
+animation_fps = 8
+sway = 0.0
+bend = 0.0
+flat_material = &"fire"
+flat_spark = &"spark"
+flat_under_surface = 6
+flat_surface = 5
+flat_glow = &"fire"
+flat_glow_strength = 0.45
+flat_motion = 2
+flat_under = &"stone"
+status = &"burn"
+status_strength = 3.0
+status_duration = 2.0
+status_every = 0.5
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_down_after")])
+
+[sub_resource type="Resource" id="scorched"]
+script = ExtResource("2_state")
+state_id = &"scorched"
+frames = PackedInt32Array()
+animation_frames = 4
+animation_fps = 2
+sway = 0.0
+bend = 0.0
+flat_material = &"stone"
+flat_spark = &"spark"
+flat_surface = 6
+triggers = Array[ExtResource("3_trigger")]([SubResource("scorched_oil"), SubResource("scorched_after")])
+
+[sub_resource type="Resource" id="doused"]
+script = ExtResource("2_state")
+state_id = &"doused"
+frames = PackedInt32Array()
+animation_frames = 4
+animation_fps = 12
+sway = 0.0
+bend = 0.0
+motes = Array[ExtResource("4_motes")]([SubResource("doused_smoke")])
+flat_material = &"fire"
+flat_spark = &"spark"
+flat_under_surface = 4
+flat_surface = 5
+flat_motion = 2
+flat_under = &"oil"
+triggers = Array[ExtResource("3_trigger")]([SubResource("doused_after")])
+
+[sub_resource type="Resource" id="scorch_fading"]
+script = ExtResource("2_state")
+state_id = &"scorch_fading"
+frames = PackedInt32Array()
+animation_frames = 4
+sway = 0.0
+bend = 0.0
+flat_material = &"stone"
+flat_spark = &"spark"
+flat_surface = 6
+flat_trace = &"stone"
+flat_trace_seconds = 3.0
+flat_motion = 2
+triggers = Array[ExtResource("3_trigger")]([SubResource("scorch_fading_after")])
+
 [resource]
 script = ExtResource("1_kind")
 id = &"floor"
@@ -316,4 +610,4 @@ fills_floor = true
 look = 1
 tufts_per_cell = 1
 sway = 0.0
-states = Array[ExtResource("2_state")]([SubResource("dry"), SubResource("wetting"), SubResource("wet"), SubResource("drying"), SubResource("live"), SubResource("spent"), SubResource("freezing"), SubResource("ice"), SubResource("thawing"), SubResource("steam")])
+states = Array[ExtResource("2_state")]([SubResource("dry"), SubResource("wetting"), SubResource("wet"), SubResource("drying"), SubResource("live"), SubResource("spent"), SubResource("freezing"), SubResource("ice"), SubResource("thawing"), SubResource("steam"), SubResource("oiling"), SubResource("oiled"), SubResource("soaking"), SubResource("catching"), SubResource("burning"), SubResource("burning_down"), SubResource("scorched"), SubResource("doused"), SubResource("scorch_fading")])

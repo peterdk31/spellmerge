@@ -226,7 +226,7 @@ func _end_slam(at: int, finished: bool) -> void:
 	_sl_hit[at] = null
 	_sl_struck[at].clear()
 	if finished and spell != null and impact.is_finite():
-		kit.blast(spell, tag, actor, impact)
+		kit.land(spell, tag, actor, impact)
 		if spell.fires_on(TriggerBase.Event.EXPIRE):
 			kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, impact, _sl_dir[at], null)
 	kit.shot_ended(tag)

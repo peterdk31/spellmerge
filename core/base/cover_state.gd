@@ -59,10 +59,16 @@ enum FlatMotion { STILL, GROW, SHRINK, CRACKLE, GROW_IN }
 ## its base and glints; WATER a rim of its light inside its lower right edge and ripples that shimmer;
 ## ICE a raised sheet, lit along its upper left edge, cracks of its shadow, a shine of its light that
 ## catches the spell light (brighter where the floor is lit) and twinkles; STEAM wisps of `flat_spark`
-## rising off it, thinning as it goes. A new kind of surface (oil's sheen, a fire's flames) is a new
-## row here and a branch of the shader's `surface`.
-enum FlatSurface { PLAIN, WATER, ICE, STEAM }
+## rising off it, thinning as it goes; OIL a dark slick lying in the floor, its sheen (thin streaks of
+## its light) drifting; FIRE flames over it, tongues of Fire rising from its lower edge that flicker
+## every frame, Spark's light at their roots; SCORCH soot and cracks, with embers (Fire's light) that
+## wink out over its first seconds (docs/milestones/oil-spill.md). A new kind of surface is a new row
+## here and a branch of the shader's `surface`.
+enum FlatSurface { PLAIN, WATER, ICE, STEAM, OIL, FIRE, SCORCH }
 @export var flat_surface: FlatSurface = FlatSurface.PLAIN
+## The detail drawn on `flat_under` while it shows (water's under ice; oil under a fire catching or put
+## out, SCORCH's soot under a fire burning down): WATER, OIL or SCORCH.
+@export var flat_under_surface: FlatSurface = FlatSurface.WATER
 ## The light its cells give into the spell light while shown (live water's Arc, steam's warm Bone):
 ## the palette material whose light shade it is, and how bright (0 to 1) at a lit patch's middle;
 ## eased in as a cell begins to show it and out as it ends (Feel's `cover_lights.gd`). Empty: none.

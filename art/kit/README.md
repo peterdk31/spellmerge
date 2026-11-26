@@ -14,7 +14,7 @@ The source files of the art starter kit (docs/PLAN.md, "Art and music"): what an
 
 | File | What it is |
 | --- | --- |
-| `spellmerge.gpl.txt` | The 52 colours as a GIMP palette (`.gpl` files can't be added to the repository, so it carries a `.txt` ending: the kit zip ships it as `spellmerge.gpl`; if you use it from the repository, rename it). Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape. |
+| `spellmerge.gpl.txt` | The 55 colours as a GIMP palette (`.gpl` files can't be added to the repository, so it carries a `.txt` ending: the kit zip ships it as `spellmerge.gpl`; if you use it from the repository, rename it). Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape. |
 | `palette.hex.txt` | The same colours, one lower-case hex value per line, no `#`, outline first. Imports in Lospec-style palette loaders and Photoshop-like tools that read hex lists. |
 | `grid_32.svg` | A 32×32 grid template shown at 16×. Guide lines: Outline-coloured border = the cell; Spark-yellow lines = the centre; Fire-orange line = where a character's feet stand (about 2–3 px above the bottom); light-blue square = the 1 px empty border to leave where you can (blue is only a guide colour here, not a player marker). |
 | `grid_64.svg` | The 64×64 grid for art at 2x detail (one 32-unit cell, two art pixels a world unit; docs/STYLE.md, "The picture and the art's detail"), shown at 8×: the art pixels' lines, the world's pixels every 2 of them, and the same guides as `grid_32.svg` (the feet line 4–6 art px above the bottom). Export as `<name>@2x.png` or `.svg`. |

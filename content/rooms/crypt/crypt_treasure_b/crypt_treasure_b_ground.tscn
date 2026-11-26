@@ -53,7 +53,7 @@ z_index = -2
 texture_filter = 1
 texture = ExtResource("1_floor")
 centered = false
-metadata/ground_inputs = "67567d2b413233ec"
+metadata/ground_inputs = "bf994b0eb01b5ef4"
 
 [node name="Glow" type="Sprite2D" parent="."]
 material = SubResource("GlowAdd")

@@ -90,6 +90,15 @@ signal map_pick_changed(player: int, room: int)
 ## `&""`), the slot is let go. `body` as `staff_change_requested`'s. A command: heard by player at the
 ## next tick's start, which binds it (`quick_bound`) or says `inventory_refused`.
 signal quick_bind_requested(player: int, slot: int, bag: StringName, id: StringName, body: int)
+## Sender: hud (the inventory, staff-language L4). A command: `player` puts the sigil `id` from their
+## sigils bag on their staff number `staff` (as `staff_change_requested`'s), from the body its menu
+## showed (`body`, `Actor.key`). Heard by player at the next tick's start, which puts it on
+## (`Inventory.put_sigil`) or says `inventory_refused` (no such sigil, three on it already, that one on it already).
+signal sigil_put_requested(player: int, staff: int, id: StringName, body: int)
+## Sender: hud (the inventory, staff-language L4). A command: `player` takes the sigil `id` off their
+## staff number `staff` into the sigils bag, as `sigil_put_requested`. Heard by player
+## (`Inventory.take_sigil`), which takes it off or says `inventory_refused`.
+signal sigil_take_requested(player: int, staff: int, id: StringName, body: int)
 ## Sender: hud (a d-pad arm pressed in play, the map shut; the owner, 2026-11-20). `player` uses one of
 ## the item bound to their quick-use slot `slot`. A command: heard by player at the next tick's start,
 ## which uses it as `bag_use_requested` does, or says `inventory_refused` (none left, down, not needed).
@@ -466,6 +475,10 @@ signal revive_progress(player: int, progress: float)
 signal player_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float)
 ## Sender: player. The whole-number mana of staff `staff` (0-3) of `player`'s own wizard changed, or the wizard appeared: that staff's own pool (owner, 2026-11-01). Heard by the builder (the viewed staff's bar and mana shares).
 signal staff_mana_changed(player: int, staff: int, mana: float, max_mana: float)
+## Sender: player. Staff `staff` (0-3) of `player`'s shown body has a sigil that began (`on`) or stopped
+## holding, so it casts by itself (staff-language L4; `Caster.sigil_holds`), or the body appeared. Heard
+## by hud (the corner panel's staff row glows).
+signal staff_sigils_live(player: int, staff: int, on: bool)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.

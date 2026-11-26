@@ -177,6 +177,8 @@ func problems() -> PackedStringArray:
 			if phase.staffs[k] == null:
 				found.append("%s: phase %d staff %d is empty." % [id, at, k])
 				continue
+			if not phase.staffs[k].sigils.is_empty():
+				found.append("%s: phase %d's staff %d has sigils; a phase's staffs carry none yet (staff-language L4)." % [id, at, k])
 			for line: String in phase.staffs[k].problems():
 				found.append("%s: phase %d staff %d: %s" % [id, at, k, line])
 	return found

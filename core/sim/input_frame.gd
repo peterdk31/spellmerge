@@ -38,8 +38,9 @@ extends RefCounted
 ## `room_reroll_requested` added, the rerolls' X, the owner's of 2026-11-19; 11: `room_reroll_requested`
 ## gone with the room rerolls and `map_teleport_requested` added, a teleport from the Y map, the
 ## owner's of 2026-11-19; 12: `quick_bind_requested` and `quick_use_requested` added, the d-pad's
-## quick-use slots, the owner's of 2026-11-20).
-const VERSION: int = 12
+## quick-use slots, the owner's of 2026-11-20; 13: `sigil_put_requested` and `sigil_take_requested`
+## added, a sigil put on a staff and taken off, staff-language L4).
+const VERSION: int = 13
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -85,6 +86,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"reward_reroll_requested",
 	&"map_teleport_requested",
 	&"quick_bind_requested", &"quick_use_requested",
+	&"sigil_put_requested", &"sigil_take_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -103,6 +105,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i",
 	"i",
 	"issi", "i",
+	"isi", "isi",
 ]
 
 var seat: int = 0

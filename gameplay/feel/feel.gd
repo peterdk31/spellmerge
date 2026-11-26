@@ -863,6 +863,7 @@ func _link_jobs() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		# The jobs are plain objects (a call into one costs less than into a counted one): freed with it.
+		# This comes after `_exit_tree`, which must call no job.
 		_job_flashes.free()
 		_job_cues.free()
 		_job_hits.free()

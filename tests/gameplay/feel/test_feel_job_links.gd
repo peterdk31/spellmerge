@@ -68,7 +68,7 @@ func test_the_aliases_stay_feels_own_through_ready_and_a_frame() -> void:
 
 ## A linked member is one Feel never assigns whole (its own code only resizes, fills or clears it):
 ## otherwise a job's alias would keep the old one. Every assignment in feel.gd and the jobs is looked
-## for by its name.
+## for by its name (`x = `, `x += `, `self.x = `, `set(&"x", ...)`).
 func test_no_linked_member_is_assigned_whole() -> void:
 	var sources: Array[String] = ["res://gameplay/feel/feel.gd"]
 	for name: StringName in JOBS:
@@ -78,7 +78,7 @@ func test_no_linked_member_is_assigned_whole() -> void:
 		for member: StringName in (JOBS[name] as Script).get_script_constant_map()["LINKED"]:
 			if member != &"feel" and not String(member).begins_with("_job_"):
 				linked[member] = true
-	var assign := RegEx.create_from_string("(?:^|[^\\w.])(?:feel\\.)?(\\w+)\\s*=[^=]")
+	var assign := RegEx.create_from_string("(?:^|[^\\w.])(?:feel\\.|self\\.)?(\\w+)\\s*(?:\\+|-)?=[^=]|set\\(&?\"(\\w+)\"")
 	for path: String in sources:
 		var text: String = FileAccess.get_file_as_string(path)
 		var number: int = 0
@@ -88,13 +88,14 @@ func test_no_linked_member_is_assigned_whole() -> void:
 			if code.strip_edges().begins_with("var ") or code.strip_edges().begins_with("static var ") or code.strip_edges().begins_with("const "):
 				continue
 			for found: RegExMatch in assign.search_all(code):
-				var member: String = found.get_string(1)
+				var member: String = found.get_string(1) if found.get_string(1) != "" else found.get_string(2)
 				check(not linked.has(StringName(member)), "%s:%d assigns %s whole, which a job links" % [path, number, member])
 
 
 ## Nor do the tests and screenshots that reach into Feel put their own in a linked member's place
 ## (`set("_name", ...)`, `feel._name = ...`): the job would keep drawing from Feel's old one. A member
-## they do replace is read through `feel` (`_flash_offset`).
+## they do replace is read through `feel` (`_flash_offset`). Every script of the tests, the benchmarks
+## and the content is looked through.
 func test_no_test_puts_its_own_in_a_linked_members_place() -> void:
 	var linked: Array[String] = []
 	for name: StringName in JOBS:
@@ -102,15 +103,22 @@ func test_no_test_puts_its_own_in_a_linked_members_place() -> void:
 			if member != &"feel" and not String(member).begins_with("_job_"):
 				linked.append(String(member))
 	var files: Array[String] = []
-	for folder: String in ["res://tests/gameplay/feel", "res://tests/screenshots", "res://tests/benchmark", "res://bench"]:
-		for file: String in DirAccess.get_files_at(folder):
-			if file.ends_with(".gd"):
-				files.append(folder.path_join(file))
+	for folder: String in ["res://tests", "res://bench", "res://content"]:
+		_scripts_under(folder, files)
 	for path: String in files:
 		var text: String = FileAccess.get_file_as_string(path)
 		for member: String in linked:
-			for put: String in ["set(\"%s\"" % member, "set(&\"%s\"" % member, ".%s = " % member]:
+			for put: String in ["set(\"%s\"" % member, "set(&\"%s\"" % member, ".%s = " % member, ".%s += " % member]:
 				check(not text.contains(put), "%s puts its own %s in Feel's place (%s), which a job links" % [path, member, put])
+
+
+## Every .gd file under `folder`, its subfolders' too, into `into`.
+func _scripts_under(folder: String, into: Array[String]) -> void:
+	for file: String in DirAccess.get_files_at(folder):
+		if file.ends_with(".gd"):
+			into.append(folder.path_join(file))
+	for sub: String in DirAccess.get_directories_at(folder):
+		_scripts_under(folder.path_join(sub), into)
 
 
 func test_feel_frees_its_jobs() -> void:

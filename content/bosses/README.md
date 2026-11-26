@@ -12,34 +12,25 @@ A boss is an enemy (content/enemies/README.md) with `boss = true`: **data, with 
 - **Stats:** `stats`, an `ActorStats` sub-resource (core/base/actor_stats.gd): `power`, `mass`, `spell_scale` (size, never reach), `resist_burn`, `resist_chill`, `resist_gust`, `resist_hex`, `resist_static`, `resist_possess`. A phase may set its own (`EnemyPhase.stats`; null keeps the last).
 - **Lore:** one line, at most 60 characters; `Registry.validate_story` checks it. Add its name and story to docs/STORY.md in the same PR.
 - **Staffs:** `StaffCards` sub-resources of its `.tres`, never files in `content/wizard/staffs/`. Each `StaffBase` has `slots`, `wind_up` (the telegraph), `cooldown` (up to 30 s), `first_wait`, its mana, and player card ids in slot order. Moment cues: `wind_cue`, `move_cue`, `cast_cue`, `wall_cue`.
-- **Moves** are its cards' (dash, Lumber, Plow, ...): a dash's pass is its hurt shape times `radius_mult`, never times `spell_scale`; keep it inside what the body's art shows. Nothing about a move is the boss's own.
+- **Moves** are its cards': a dash's pass is its hurt shape × `radius_mult`, never × `spell_scale`; keep it inside the body's art.
 - **Profile:** `profile`, an `AIProfile` sub-resource (never in `content/enemies/profiles/`): `aim_lock`, `turns`. Running up for a long move and walking round props are the AI's.
 - **Phases:** `phases`, `EnemyPhase`: a condition (`health_below` or `after_seconds`), once, in order; protected for `transition`; then its `staffs` (list all, including ones that stay), `stats`, `profile`, `look` (`PhaseLook`: texture, face style, `face_row`, size, `parts`, `motes`, `motes_on`, `sound`, `cue`), `intensity`.
 - **Adds:** `EnemyPhase.adds` (`EnemyAdds`, core/base/enemy_adds.gd): `enemy` (a `content/enemies/` id, never a boss), `count`, `per_player`, `every`, `wave_count`, `wave_per_player`, `cap`, `cap_per_player`, `at`. They crumble when the boss dies.
 - **Scene:** an actor like an enemy's: `Health`, `Hurtbox`, `Contact`, `Mover`, `Footprint`, `Caster`, `AIController`, `CreatureLook` (`full_speed`, `hops`), `Sprite`, `Face`. `Stats` is added by the body from its data.
 - **Sounds:** its cues are `content/cues/` files with a prefix of its own (cues must sit in `content/cues`); each names a sound id whose recipe is `audio/sfx/<id>/`. A cue's `held` part lasts as long as its moment. `death_sound` replaces `boss_death`'s.
 - **Intro:** `boss_intro`, a `BossIntro` sub-resource (core/base/boss_intro.gd; docs/milestones/boss-intro.md): `portrait` (three 96×96 frames, or 192×192 at `@2x`: rest, mean, eyes), `lines` (at most three, at most 60 characters, the boss alone speaking), `accent` (a docs/STYLE.md ramp), `dark_cue`, `reveal_cue`. Checked by `BossIntro.problems`.
-- **Music:** `music`, a `MusicTrack` sub-resource (core/base/music_track.gd): layers `stacked` or entries; each phase raises the intensity.
+- **Music:** `music`, a `MusicTrack` (core/base/music_track.gd); each phase raises the intensity.
 - **Room (optional):** a `boss` kind room in its biome, in a folder of its own (`content/rooms/<biome>/boss_<id>/`). The fight must work in any room.
 
 ### Its look
 
-A **layered body**: its `Sprite` shows no art and holds `BodyPart` nodes (gameplay/actor/body_part.gd) in a tree (`position` is the pivot, `offset` places the art, `show_behind_parent`). Numbers: `lean`, `lag`, `swish`, `swish_rate`, `squash`, `sway`, `wall_squash`, `shudder`, `tap`, `taps`, `tap_every`, `fling`, `carries_face`; `pose_frames` per `BodyPose.Pose` (IDLE, WINDUP, MOVE, WALL, HURT, CAST, TRANSITION). Its face is its own: `Face` names a `FaceArt` (core/base/face_art.gd) with its own eye and brow sheets in the shared layout. On death the parts fly apart (gameplay/feel/remnants.gd). All of it is drawn only. A one-sprite boss still works.
+A **layered body**: its `Sprite` shows no art and holds `BodyPart` nodes (gameplay/actor/body_part.gd) in a tree (`position` is the pivot, `offset` places the art, `show_behind_parent`). Numbers (`lean`, `lag`, `swish`, `squash`, `sway`, `shudder`, `tap`, `fling`, `carries_face`, ...); `pose_frames` per `BodyPose.Pose` (IDLE, WINDUP, MOVE, WALL, HURT, CAST, TRANSITION). Its face is its own: `Face` names a `FaceArt` (core/base/face_art.gd) with its own eye and brow sheets in the shared layout. On death the parts fly apart (gameplay/feel/remnants.gd). All of it is drawn only. A one-sprite boss still works.
 
 Reviewed in play: `tests/screenshots/shot_boss_looks.gd` films every boss's poses (`boss_<id>_<clip>`, `boss_<id>_sheet`): `ci/build/build.sh --quick --screenshots` with `SHOTS_ONLY=shot_boss_looks`.
 
 ### What is still engine work
 
-A boss needing one of these needs the general piece built in the shared engine first:
-
-| Kind of boss | The general piece it needs first |
-| --- | --- |
-| Several bodies | Bodies that share health or a phase, and a fight that ends when all are down |
-| Parts and weak spots | Bodies attached to a body, each with its own health and hit shape |
-| Changes the arena | Rooms whose layout changes in play, and floors that hurt |
-| Too big for the screen | A body the camera and the room frame differently |
-| Hurt only after an action | Invulnerability by a condition |
-| Fights with the players' own builds | Reading another body's cards |
+A boss needing one of these needs the general piece built in the shared engine first, for every enemy: several bodies sharing health or a phase; attached parts with their own health; an arena that changes in play; a body bigger than the screen; invulnerability by a condition; reading another body's cards.
 
 ## Contract
 

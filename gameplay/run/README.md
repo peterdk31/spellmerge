@@ -17,8 +17,7 @@ Run lifecycle: start, seed, the biome map, and later the end and the summary scr
 ## The biome map
 
 - **`BiomeMap`** (`biome_map.gd`): one biome as a continuous world: rooms (template id, place on the 32 px grid, mirroring, kind), bridges (walkway template, place, mirroring, `bridge_ends`), runes (`add_rune`), each room's depth (`work_out_depths`). Plain packed rows, hashed and snapshotted as is; a joining machine never makes its own.
-- API: `problems(shapes)`, `room_scales`, `enemies_of`, `fill_room`, `style`, `not_made`, `is_made`, `room_elites`, `elites_of`, `reward_type_of`, `type_room`, `neighbours`, `joins_of`.
-- Test maps: `tests/support/biome_maps.gd`.
+- API: `problems(shapes)`, `room_scales`, `enemies_of`, `fill_room`, `style`, `not_made`, `is_made`, `elites_of`, `reward_type_of`, `neighbours`, `joins_of`. Test maps: `tests/support/biome_maps.gd`.
 
 ## The biome generator
 
@@ -56,9 +55,7 @@ A rune counts as a join wherever joins are read. `rule_problems` names a seam or
 
 ## Tests
 
-- `tests/gameplay/run/test_run.gd`: map from the seed, fights told first, renewed per run, state, Flow laying it, players, unlocks.
-- `tests/gameplay/run/test_biome_map.gd`: map rules, depths, copies, plain state.
-- `tests/gameplay/run/test_biome_generator.gd` (on `tests/support/made_up_biome.gd`): every style sound over many seeds, determinism, fill, scaling, the crypt made (`test_the_crypt_is_made`), `test_every_bridge_meets_two_rooms_and_every_doorway_has_a_bridge`, `test_the_crypt_s_secret_rooms_take_every_way`, `test_the_styles_lean_toward_extra_entrances`.
+`tests/gameplay/run/test_run.gd`, `test_biome_map.gd`, `test_biome_generator.gd` (on `tests/support/made_up_biome.gd`: every style over many seeds, the crypt, bridges and doorways, secret ways).
 
 ```sh
 tools/check.sh

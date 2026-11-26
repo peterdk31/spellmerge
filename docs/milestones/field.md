@@ -79,8 +79,8 @@ The field carrier's rows (each field's slot and birth, each held shot's slot, bi
   - **the enemy's shot:** an enemy bolt through the caster's frost field chills the caster.
 - Screenshots (`tests/screenshots/`): a field changing shots, an enemy's shot through a player's field.
 
-## Open questions for the owner
+## The owner's answers (2026-11-26)
 
-1. **Growth widens the field** (as a portal's gates) rather than being given to shots, as foundations.md's table had it. A growth given to shots would make every bolt through it swell; say if that is wanted instead.
-2. **Blast and Split work on it** (a blast where it ends, more fields), as on a portal, where foundations.md listed them as doing nothing. One rule for every carrier that lasts.
-3. **A field's own payloads do not take it** (born inside, they never come in). The other way would make `timer · bolt` in a fire field fire burning bolts.
+1. **Growth grows the field itself** (as a portal's gates), not the shots.
+2. **Blast and Split work on a field** (a blast where it ends, more fields), as on a portal.
+3. **A field's own payloads do not take it** (born inside, they never come in).

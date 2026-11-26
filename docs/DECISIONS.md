@@ -6,7 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 - **The owner** (2026-11-26): build the field (docs/milestones/foundations.md, "fields"; builds 5 to 8), and (2026-11-25, open point 4) a field serves enemies' shots too: one rule.
 - **How:** docs/milestones/field.md. A still shot that hits nothing (`ProjectileManager.set_field`); the manager's field pass (`shots_into_fields`, natively `ShotKernel.field_pass`, mirrored to the bit) hands back the shots that came into a field each step, and the carrier gives them its cards, at least the field's of each. A new carrier trait, `GIVES`, in the needs of the behaviours a field gives.
-- **Chosen while building (open with the owner, in the PR):** Growth widens the field rather than being given; Blast and Split work on it as on a portal; a field's own payloads do not take it.
+- **The owner's answers (2026-11-26):** Growth grows the field itself rather than being given; Blast and Split work on it as on a portal; a field's own payloads do not take it.
 - **Measured** (this container, 2026-11-26): the field pass with 2048 shots and 16 fields, about 150 us a step natively (5.6 ms in the GDScript fallback, for a build without the module); nothing runs while no field is open.
 
 ## 2026-11-25: more detailed art: 64x64 a cell in a 1280x720 picture (owner; ART0)

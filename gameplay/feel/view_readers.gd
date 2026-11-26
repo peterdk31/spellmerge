@@ -369,6 +369,11 @@ func _follow(copy: CanvasItem, item: CanvasItem, view: int) -> void:
 				into.multimesh = batch.multimesh
 			if into.texture != batch.texture:
 				into.texture = batch.texture
+		var sprite := item as Sprite2D
+		if sprite != null:
+			var onto := copy as Sprite2D
+			if onto.texture != sprite.texture:
+				onto.texture = sprite.texture
 	var control := item as Control
 	if control != null:
 		var to := copy as Control

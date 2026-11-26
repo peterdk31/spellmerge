@@ -73,7 +73,7 @@ The owner's decision of 2026-11-21 (confirmed 2026-11-25; docs/STYLE.md, "The pi
 4. **List it** in its folder's `assets.json` (or `art/manifest.json`) with origin, tool and prompt (no living artists or franchises), as before.
 5. **Look at it in the game**, at the resting zoom 1 (every art pixel shows) and zoomed out as the camera holds a spread party (0.8 down to 0.5): a one-pixel line breaks there now and then (one art pixel in five is left out at 0.8), so lines that must read even then are two art pixels. `tests/screenshots/shot_art_detail.gd` shows the curl beside a 1x staff in play, at zoom 1 and at 0.8; copy it for a side by side of your sprite. Add the screenshots to the PR.
 
-**Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename; raise `CoverFlat.DETAIL` to `ArtDetail.DETAIL` and the shader works its shapes out in art pixels at twice the resolution (edges, corners, insets, glints whole art pixels), then retune its looks.
+**Drawn by a shader** (the flat floor states, `gameplay/feel/cover_flat.gdshader`): no file to rename. Done for the floor (docs/milestones/floor-look.md, 2026-11-25): `CoverFlat.DETAIL` is `ArtDetail.DETAIL`, and the shader works its shapes and details out in art pixels at 64 px a cell (rounded, wobbling edges, ripples, cracks, shine, wisps: whole art pixels); a new state's look is its `CoverState.flat_*` data.
 
 A generator may draw it (palette colours; an SVG of rects, one a run along a row, as `tests/core/test_svg_art.gd` wants, or a PNG when the rects would pass the 1 MB limit: the curl's head sheet): `tools/staff_art.py` draws the curl's head at 16 drawn directions and its face from shape rules, `tools/pixel_grid.py` draws from a grid of characters at any size.
 

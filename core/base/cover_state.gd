@@ -52,6 +52,24 @@ enum FlatMotion { STILL, GROW, SHRINK, CRACKLE }
 @export var flat_under: StringName = &""
 ## CRACKLE: the material of its sparks (&"arc").
 @export var flat_spark: StringName = &""
+## The detail drawn on its surface (look only; the floor's look, docs/milestones/floor-look.md): PLAIN
+## its base and glints; WATER a rim of its light inside its lower right edge and ripples that shimmer;
+## ICE a raised sheet, lit along its upper left edge, cracks of its shadow, a shine of its light that
+## catches the spell light (brighter where the floor is lit) and twinkles; STEAM wisps of `flat_spark`
+## rising off it, thinning as it goes. A new kind of surface (oil's sheen, a fire's flames) is a new
+## row here and a branch of the shader's `surface`.
+enum FlatSurface { PLAIN, WATER, ICE, STEAM }
+@export var flat_surface: FlatSurface = FlatSurface.PLAIN
+## The light its cells give into the spell light while shown (live water's Arc, steam's warm Bone):
+## the palette material whose light shade it is, and how bright (0 to 1) at a lit patch's middle;
+## eased in as a cell begins to show it and out as it ends (Feel's `cover_lights.gd`). Empty: none.
+@export var flat_glow: StringName = &""
+@export_range(0.0, 1.0) var flat_glow_strength: float = 0.0
+## The mark it leaves on a cell when it ends in a state not drawn (dried water's damp, steam's
+## scorch): a sparse speckle of this material's shadow, thinning away in 4 steps over
+## `flat_trace_seconds` of Feel's clock (look only: the cell is dry). Empty: none.
+@export var flat_trace: StringName = &""
+@export_range(0.25, 10.0) var flat_trace_seconds: float = 2.0
 
 @export_group("On a body standing in it")
 ## The status it gives a body standing in it (&"burn", &"chill"; a `ElementBase.status_id`), asked as

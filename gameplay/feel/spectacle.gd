@@ -188,6 +188,8 @@ var shade: Color = Color.WHITE
 ## The lights the wizards carry at their staff tips (atmosphere A), written each frame while the
 ## light is on. Read only.
 var carried_lights: CarriedLightsScript = CarriedLightsScript.new()
+## The floor's looks that read the light (`read_floor`), handed to every light made.
+var _floor_readers: Array[ShaderMaterial] = []
 ## What blocks the light (atmosphere C): the room's standing walls (from `room_built`) and the props
 ## that block light, handed to the spell light whenever they change while it is on. Read only.
 var blockers: LightBlockersScript = LightBlockersScript.new()
@@ -1190,6 +1192,32 @@ func _quality_on_light() -> void:
 	light.set_grid_smooth(quality.light_smooth)
 
 
+## The floor's looks (`cover_flat.gd`'s materials) read the light from now on, in place of the last
+## ones (ice catches it; docs/milestones/floor-look.md).
+func read_floor(materials: Array[ShaderMaterial]) -> void:
+	if light != null:
+		for at in _floor_readers.size():
+			light.read_by(_floor_key(at), null)
+	_floor_readers = materials.duplicate()
+	_bind_floor()
+
+
+func _bind_floor() -> void:
+	if light != null:
+		for at in _floor_readers.size():
+			light.read_by(_floor_key(at), _floor_readers[at])
+
+
+static func _floor_key(at: int) -> StringName:
+	return StringName("floor_%d" % at)
+
+
+## The floor's lights this frame (`cover_lights.gd`'s rows), for the light's next draw.
+func light_floor(rows: PackedFloat32Array, count: int) -> void:
+	if light != null:
+		light.light_floor(rows, count)
+
+
 ## The "Dynamic lighting" setting (once "Spell light"): on makes the light buffer and its rect, off frees them (no nodes).
 ## Returns the setting.
 func set_spell_light(on: bool) -> bool:
@@ -1215,6 +1243,7 @@ func _make_light(on: bool) -> void:
 		add_child(light)
 		_quality_on_light()
 		light.use_views(_split_views, _split_downscale, _void_blank.has_area())
+		_bind_floor()
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
 	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own

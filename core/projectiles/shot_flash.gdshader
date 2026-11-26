@@ -44,10 +44,9 @@ render_mode blend_premul_alpha;
 uniform sampler2D flash_table : filter_nearest;
 
 const float GRID = 24.0;
-// The flash's pixels a world pixel: it is drawn at the art's detail (ArtDetail.DETAIL; docs/STYLE.md,
-// "The picture and the art's detail"; ART2). Its kinds' numbers (content/flashes) stay in world
-// pixels: every one that measures pixels is read times this (`px_curve`).
-const float FLASH_DETAIL = 2.0;
+// The flash is drawn at the art's detail, ART_DETAIL of its pixels a world pixel (shot_palette.gdshaderinc;
+// docs/STYLE.md, "The picture and the art's detail"; ART2). Its kinds' numbers (content/flashes) stay
+// in world pixels: every one that measures pixels is read times it (`px_curve`).
 // How a kind is drawn (FlashTable.DRAW_CODES).
 const float D_SHAPE = 0.0;
 const float D_CLOUDS = 1.0;
@@ -133,11 +132,11 @@ float curve(int row, int c, float a, float z, int given, float fallback) {
 }
 
 // A curve that measures pixels (a reach, a width, a place), in the flash's own pixels: art pixels,
-// FLASH_DETAIL a world pixel (ART2), so its lines are an art pixel thin and its shapes as big in the
+// ART_DETAIL a world pixel (ART2), so its lines are an art pixel thin and its shapes as big in the
 // world as they were. Below 0 (none) stays below 0.
 float px_curve(int row, int c, float a, float z, int given, float fallback) {
 	float v = curve(row, c, a, z, given, fallback);
-	return v < 0.0 ? v : v * FLASH_DETAIL;
+	return v < 0.0 ? v : v * ART_DETAIL;
 }
 
 // The shade `n` of look `L` (FlashTable.SHADE_CODES: 0 white-hot, 1 light, 2 base, 3 shadow; below
@@ -160,7 +159,7 @@ void vertex() {
 	bool poof = draw == D_CLOUDS;
 	bool quake = draw == D_CRACKS;
 	// The square in pixels, and where its pixel 0 is.
-	vec2 size = vec2(GRID) * z * FLASH_DETAIL;
+	vec2 size = vec2(GRID) * z * ART_DETAIL;
 	vec2 o = size * 0.5;
 	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
 	// corner in UV.y (kind + 0.25 or 0.75).
@@ -193,8 +192,8 @@ void vertex() {
 		vec4 column = vec4(-1.0, 0.0, 0.0, 0.0);
 		if (wide >= 0.0) {
 			// The most it is long, from its foot (a falling streak), below 0 for none.
-			float top = curve(row, C_COLUMN_TOP, a, z, given, 0.0) * FLASH_DETAIL;
-			float foot = curve(row, C_COLUMN_FOOT, a, z, given, 0.0) * FLASH_DETAIL;
+			float top = curve(row, C_COLUMN_TOP, a, z, given, 0.0) * ART_DETAIL;
+			float foot = curve(row, C_COLUMN_FOOT, a, z, given, 0.0) * ART_DETAIL;
 			float longest = px_curve(row, C_COLUMN_LENGTH, a, z, given, -1.0);
 			column = vec4(floor(wide + 0.5), longest >= 0.0 ? max(foot - longest, top) : top, foot, quad == Q_SHAPE ? curve(row, C_COLUMN_DOTTED, a, z, given, 0.0) : 0.0);
 		}
@@ -216,10 +215,10 @@ void vertex() {
 			k0 = vec4(L.glow, 1.0);
 		} else if (quake) {
 			// The cracks: their reach, the age and seed, and the ramp they cool down.
-			reach = QUAKE_REACH * z * FLASH_DETAIL;
+			reach = QUAKE_REACH * z * ART_DETAIL;
 			shown = true;
 			m = M_CRACK;
-			a0 = vec4(QUAKE_REACH * z * FLASH_DETAIL, a, s, 0.0);
+			a0 = vec4(QUAKE_REACH * z * ART_DETAIL, a, s, 0.0);
 			a2 = vec4(L.lo, 0.0);
 			k0 = vec4(L.hot, 1.0);
 			k1 = vec4(L.hi, 1.0);
@@ -235,7 +234,7 @@ void vertex() {
 			float rays = px_curve(row, C_RAYS, a, z, given, -1.0);
 			a3 = vec4(px_curve(row, C_STAR, a, z, given, -1.0), rays, rays >= 0.0 ? px_curve(row, C_RAYS_INNER, a, z, given, 0.0) : 0.0, px_curve(row, C_DOTS, a, z, given, -1.0));
 			float spiral = px_curve(row, C_SPIRAL, a, z, given, -1.0);
-			a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z, given, 0.0) : 0.0, kind_head.w * z * FLASH_DETAIL, counts.x + counts.y * 16.0 + counts.w * 512.0);
+			a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z, given, 0.0) : 0.0, kind_head.w * z * ART_DETAIL, counts.x + counts.y * 16.0 + counts.w * 512.0);
 			reach = max(max(max(arm, disc), ring >= 0.0 ? ring + 1.0 : -1.0), max(max(a3.x, a3.y > a3.z ? a3.y + 1.0 : -1.0), max(a3.w >= 0.0 ? a3.w + 2.0 : -1.0, a4.x)));
 			shown = reach >= 0.0 || column.x >= 0.0;
 			m = M_SHAPE;
@@ -260,8 +259,8 @@ void vertex() {
 	} else if (quad == Q_CLOUD && poof) {
 		// A staff's poof: four bone clouds along the staff, biggest at 35%, dotted as they go.
 		float swell = a < 0.35 ? a / 0.35 : 1.0 - (a - 0.35) / 0.65;
-		vec2 c = vec2((slot - 1.5) * 6.0, (hash_seeded(slot, 17.0, 31.0, s) - 0.5) * 3.0) * z * 0.5 * FLASH_DETAIL;
-		float reach = ((2.5 + 1.5 * hash_seeded(slot, 18.0, 31.0, s)) * swell * z * 0.5 + 0.5) * FLASH_DETAIL;
+		vec2 c = vec2((slot - 1.5) * 6.0, (hash_seeded(slot, 17.0, 31.0, s) - 0.5) * 3.0) * z * 0.5 * ART_DETAIL;
+		float reach = ((2.5 + 1.5 * hash_seeded(slot, 18.0, 31.0, s)) * swell * z * 0.5 + 0.5) * ART_DETAIL;
 		shown = true;
 		m = M_CLOUD;
 		q_lo = floor(c - reach) - 1.0;
@@ -295,7 +294,7 @@ void vertex() {
 // Dotted a world pixel at a time (two art pixels each way), so a dotted part keeps its dots when
 // the camera zooms out and an art pixel is less than a pixel of the picture.
 bool dotted(vec2 d) {
-	return mod(floor(d.x / FLASH_DETAIL) + floor(d.y / FLASH_DETAIL), 2.0) == 0.0;
+	return mod(floor(d.x / ART_DETAIL) + floor(d.y / ART_DETAIL), 2.0) == 0.0;
 }
 
 void fragment() {
@@ -329,7 +328,7 @@ void fragment() {
 		// The ring two art pixels wide (a world pixel: it reads zoomed out), its outer pixel on the
 		// lower right a shade down (ART2); it frays a world pixel's way round at a time.
 		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 1.7 : 1.0)) {
-			float bucket = floor(atan(d.y, d.x) * v0.w / (2.0 * FLASH_DETAIL));
+			float bucket = floor(atan(d.y, d.x) * v0.w / (2.0 * ART_DETAIL));
 			if (hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
 				colour = r > v0.w && d.x + d.y > 0.0 ? c2 : c1;
 			}
@@ -339,13 +338,13 @@ void fragment() {
 		bool turned = v3.x >= 0.0 || v3.y > v3.z || v3.w >= 0.0 || v4.x >= 0.0;
 		float turn = turned ? atan(d.y, d.x) : 0.0;
 		float round_r = turned ? length(d) : 0.0;
-		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot a world pixel (FLASH_DETAIL
+		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot a world pixel (ART_DETAIL
 		// art pixels each way), a plus of them from zoom 2 (v1.w 128 or more).
 		if (v3.w >= 0.0) {
 			float n = max(mod(v1.w, 128.0), 1.0);
 			float at = round(turn / 6.2832 * n) / n * 6.2832;
 			vec2 dot_at = round(vec2(cos(at), sin(at)) * v3.w);
-			vec2 off = abs(floor((d - dot_at) / FLASH_DETAIL));
+			vec2 off = abs(floor((d - dot_at) / ART_DETAIL));
 			if (off.x + off.y <= (v1.w >= 128.0 ? 1.0 : 0.0)) {
 				colour = c1;
 			}
@@ -365,7 +364,7 @@ void fragment() {
 			float at = round(turn / 6.2832 * n) / n * 6.2832;
 			float along = round_r * cos(turn - at);
 			if (abs(round_r * sin(turn - at)) < 0.5 && along >= v3.z && along <= v3.y) {
-				colour = along < v3.z + 2.0 * FLASH_DETAIL ? c0 : (along > v3.y - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
+				colour = along < v3.z + 2.0 * ART_DETAIL ? c0 : (along > v3.y - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
 			}
 		}
 		// A star of mod(v4.w, 16) points out to v3.x: its reach narrows between the points.
@@ -383,7 +382,7 @@ void fragment() {
 		float span = max(v2.z - v2.y, 1.0);
 		float up = clamp((d.y - v2.y) / (span * 0.35), 0.0, 1.0);
 		float half_w = floor(v2.x * (0.35 + 0.65 * up) + 0.5);
-		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && (v2.w < 0.5 || mod(floor(d.y / FLASH_DETAIL), 2.0) == 0.0) && !(up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25)) {
+		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && (v2.w < 0.5 || mod(floor(d.y / ART_DETAIL), 2.0) == 0.0) && !(up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25)) {
 			float e = abs(d.x);
 			colour = e <= max(floor(half_w * 0.4), 0.0) ? c0 : (e < half_w || half_w < 1.0 ? c1 : c2);
 		}
@@ -394,7 +393,7 @@ void fragment() {
 	} else {
 		// A quake's cracks, on a floor seen flat: the crack nearest the pixel's way (one of
 		// QUAKE_CRACKS round about, each turned and as long as its hash says, v0.x at most), its
-		// line measured in whole world pixels (FLASH_DETAIL art pixels each), jagged every 4, 2 wide near the middle with a dark
+		// line measured in whole world pixels (ART_DETAIL art pixels each), jagged every 4, 2 wide near the middle with a dark
 		// rim (cut into the floor), dotted at the tip. They open at once, white-hot (c0), cool
 		// from the tips in through c1, c2, v2 to dark stone, and crumble away.
 		float s = v0.z;
@@ -407,13 +406,13 @@ void fragment() {
 		u /= flat_len;
 		float along = dot(d, u);
 		float reach = v0.x * flat_len * (0.6 + 0.4 * hash_seeded(k, 51.0, 31.0, s)) * min(a / 0.04, 1.0);
-		float rung = max(along, 0.0) / (4.0 * FLASH_DETAIL);
+		float rung = max(along, 0.0) / (4.0 * ART_DETAIL);
 		float jag = mix(hash_seeded(k, floor(rung), 52.0, s), hash_seeded(k, floor(rung) + 1.0, 52.0, s), fract(rung)) - 0.5;
-		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0 * FLASH_DETAIL) * 0.5);
-		float wide = (along < reach * 0.4 ? 1.0 : 0.6) * FLASH_DETAIL;
-		bool inside = along > 1.5 * FLASH_DETAIL && along <= reach && (along < reach * 0.8 || dotted(d));
+		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0 * ART_DETAIL) * 0.5);
+		float wide = (along < reach * 0.4 ? 1.0 : 0.6) * ART_DETAIL;
+		bool inside = along > 1.5 * ART_DETAIL && along <= reach && (along < reach * 0.8 || dotted(d));
 		bool crack = inside && side < wide;
-		bool rim = inside && !crack && side < wide + FLASH_DETAIL && along < reach * 0.6;
+		bool rim = inside && !crack && side < wide + ART_DETAIL && along < reach * 0.6;
 		bool kept = a < 0.7 || hash_seeded(d.x, d.y, 53.0, s) > (a - 0.7) / 0.3;
 		float heat = a * 1.5 + along / max(reach, 1.0) * 0.4;
 		vec3 rgb = heat < 0.12 ? c0.rgb : (heat < 0.3 ? c1.rgb : (heat < 0.5 ? c2.rgb : (heat < 0.7 ? v2.rgb : STONE_SHADOW)));

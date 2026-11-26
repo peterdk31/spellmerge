@@ -4,7 +4,7 @@
 // docs/milestones/card-looks.md) includes it and keeps every fix to it, until the card replaces
 // the include with code of its own. The including file has `shader_type` and `render_mode`.
 
-// The core is drawn at the art's detail (HEAD_DETAIL art pixels a world unit: ArtDetail.DETAIL, 64 px
+// The core is drawn at the art's detail (ART_DETAIL art pixels a world unit: ArtDetail.DETAIL, 64 px
 // a 32-unit cell; docs/STYLE.md, "The picture and the art's detail"; ART2), a shaded bead lit from the
 // top-left: white-hot over its upper-left half (it is a light: shots outshine the floor, docs/STYLE.md
 // "Readability"), its body in the light shade, its rim on the lower right in the base shade (and, from
@@ -18,7 +18,6 @@
 #define HEAD_BODY(q) length(q)
 #define HEAD_RAY(a, r, reach) ((a.x == 0.0 || a.y == 0.0) && a.x + a.y > r && a.x + a.y <= reach)
 #endif
-const float HEAD_DETAIL = 2.0;
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
@@ -87,8 +86,8 @@ void vertex() {
 			at += vec2(-fly.y, fly.x) * (triangle(sim_time * 3.0 + L.seed * 0.25) > 0.0 ? 1.0 : 0.0);
 		}
 		// Its middle art pixel (it moves by art pixels, half world units), in art pixels.
-		vec2 px = floor(at * HEAD_DETAIL);
-		vec2 mid_world = (px + 0.5) / HEAD_DETAIL;
+		vec2 px = floor(at * ART_DETAIL);
+		vec2 mid_world = (px + 0.5) / ART_DETAIL;
 		if (quad == Q_LIGHT) {
 			m = M_GLOW;
 			// A speck's light is a smaller one.
@@ -108,12 +107,12 @@ void vertex() {
 			// from its middle.
 			float r = speck ? 0.0 : 0.6 + 0.9 * z;
 			float reach = speck ? 0.0 : 2.0 * z + 0.5;
-			float half_size = (reach + 2.0) / HEAD_DETAIL;
+			float half_size = (reach + 2.0) / ART_DETAIL;
 			q_lo = mid_world - half_size;
 			q_hi = mid_world + half_size;
 			a0 = vec4(px, speck ? -1.0 : r, reach);
 			if (bit_set(b, L_STREAKS)) {
-				a1 = vec4(at, at - fly * (2.0 + z)) * HEAD_DETAIL;
+				a1 = vec4(at, at - fly * (2.0 + z)) * ART_DETAIL;
 				q_lo = min(q_lo, min(at, at - fly * (2.0 + z)) - 1.0);
 				q_hi = max(q_hi, max(at, at - fly * (2.0 + z)) + 1.0);
 			}
@@ -160,9 +159,9 @@ bool on_line(vec2 P, vec2 a, vec2 b, out float along) {
 
 void fragment() {
 	vec2 P = world;
-	// The art pixel (HEAD_DETAIL a world unit) and its middle, in world units.
-	vec2 A = floor(P * HEAD_DETAIL);
-	vec2 c = (A + 0.5) / HEAD_DETAIL;
+	// The art pixel (ART_DETAIL a world unit) and its middle, in world units.
+	vec2 A = floor(P * ART_DETAIL);
+	vec2 c = (A + 0.5) / ART_DETAIL;
 	vec4 colour = vec4(0.0);
 	if (mode < M_GLOW + 0.5) {
 		// A round light (v0 its middle, the dark it casts and how far; v1 two falloffs).

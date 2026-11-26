@@ -674,14 +674,14 @@ func test_a_births_flags_and_layers_come_back_whole() -> void:
 
 
 ## ART2: a shot's core is drawn at the art's detail (docs/STYLE.md, "The picture and the art's
-## detail"): in art pixels, HEAD_DETAIL a world unit (ArtDetail's), moving by them, its box holding
+## detail"): in art pixels, ART_DETAIL a world unit (ArtDetail's), moving by them, its box holding
 ## its rays; pierce's line is drawn for a speck too and over the shadow edge; the bolt reshapes it
 ## with its own measure and rays.
 func test_a_shot_core_is_drawn_at_the_arts_detail() -> void:
 	var include: String = FileAccess.get_file_as_string("res://core/projectiles/shot_head.gdshaderinc")
-	check(include.contains("const float HEAD_DETAIL = %d.0;" % ArtDetail.DETAIL), "HEAD_DETAIL is ArtDetail.DETAIL")
-	check(include.contains("vec2 px = floor(at * HEAD_DETAIL);") and include.contains("vec2 A = floor(P * HEAD_DETAIL);"), "its middle and its pixels are art pixels")
-	check(include.contains("float half_size = (reach + 2.0) / HEAD_DETAIL;"), "its box holds its rays and its edge, in world units")
+	check(not include.contains("const float HEAD_DETAIL"), "it reads the one ART_DETAIL (shot_palette), tied to ArtDetail.DETAIL there")
+	check(include.contains("vec2 px = floor(at * ART_DETAIL);") and include.contains("vec2 A = floor(P * ART_DETAIL);"), "its middle and its pixels are art pixels")
+	check(include.contains("float half_size = (reach + 2.0) / ART_DETAIL;"), "its box holds its rays and its edge, in world units")
 	var fragments: String = include.get_slice("// ---- Fragments ----", 1)
 	var line: int = fragments.find("on_line(A + 0.5")
 	var edge: int = fragments.find("shadow edge, on the lower right")
@@ -699,3 +699,14 @@ func test_the_shot_shaders_sample_art_pixels() -> void:
 	for path: String in ["shot_blast.gdshader", "shot_arc.gdshader", "shot_still.gdshader", "shot_beam.gdshaderinc", "shot_swing.gdshaderinc", "shot_portal.gdshaderinc", "shot_orbit.gdshaderinc"]:
 		var code: String = FileAccess.get_file_as_string("res://core/projectiles/" + path)
 		check(code.contains("art_centre("), "%s samples art pixels" % path)
+
+
+## ART2: the carriers' own look shaders (beam, swing, familiar, swap) sample art pixels too.
+func test_the_carriers_look_shaders_sample_art_pixels() -> void:
+	for id: String in ["beam", "swing", "familiar", "swap"]:
+		var code: String = FileAccess.get_file_as_string("res://content/spells/carriers/%s/%s.gdshader" % [id, id])
+		check(code.contains("art_centre("), "the %s card's look samples art pixels" % id)
+	var beam: String = FileAccess.get_file_as_string("res://content/spells/carriers/beam/beam.gdshader")
+	check(beam.contains("float band = floor(edge - x);"), "the beam's bands keep their world widths on the art grid")
+	var familiar: String = FileAccess.get_file_as_string("res://content/spells/carriers/familiar/familiar.gdshader")
+	check(familiar.contains("vec2 dw = floor(d + 0.5);") and familiar.contains("float t = floor(tn.x + 0.5);"), "the familiar's glint, eyes and tail stay on their world pixels")

@@ -100,11 +100,14 @@ void vertex() {
 			k0 = vec4(hue, 1.0);
 		} else {
 			// The bead: its body's radius in art pixels (a speck's is its middle pixel and the
-			// three right and down of it, one world pixel), its rays a pixel more each zoom past it;
+			// three right and down of it, one world pixel), its rays to as far as the old `+` reached;
 			// pierce lengthens it along the flight with a one-pixel line; void's is a dark heart
 			// ringed in pink.
-			float r = speck ? 0.0 : 1.5 + 1.1 * z;
-			float reach = speck ? 0.0 : r + 1.0 + z;
+			// As big as the old `+` (the owner, 2026-11-26: the new detail at the old size, about
+			// as wide as the hit): 2z + 1 world pixels across, its rays' tips 2z + 0.5 art pixels
+			// from its middle.
+			float r = speck ? 0.0 : 0.6 + 0.9 * z;
+			float reach = speck ? 0.0 : 2.0 * z + 0.5;
 			float half_size = (reach + 2.0) / HEAD_DETAIL;
 			q_lo = mid_world - half_size;
 			q_hi = mid_world + half_size;
@@ -181,7 +184,7 @@ void fragment() {
 			colour = lit < 0.5 ? c0 : c1;
 		} else if (!speck && d <= v0.z) {
 			// The body: the highlight up and left of the middle, the rim's lower right in the base.
-			bool white = all(equal(q, vec2(0.0))) || (d <= v0.z - 1.0 && lit <= 0.0);
+			bool white = all(equal(q, vec2(0.0))) || (d <= max(v0.z - 1.0, 1.0) && lit <= 0.0);
 			white = c3.a < 0.75 ? d <= max(v0.z - 2.0, 0.0) : white;
 			colour = white ? c0 : (d > v0.z - 1.0 && lit > 0.0 ? c2 : c1);
 		} else if (!speck && HEAD_RAY(a, v0.z, v0.w)) {

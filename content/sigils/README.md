@@ -4,7 +4,7 @@ A sigil is an inventory item put on a whole staff, not a card in it (docs/milest
 
 ## Contract
 
-- **One folder each:** `<id>/` with `<id>.tres` (a `SigilBase`, `core/base/sigil_base.gd`), its `icon.svg` (16 by 16) and its `assets.json`. Deleting one is deleting its folder (and its lines in the reward tables and any enemy's staff entry).
+- **One folder each:** `<id>/` with `<id>.tres` (a `SigilBase`, `core/base/sigil_base.gd`), its `icon@2x.svg` (32 by 32 art pixels, `icon`) and `icon.svg` (16 by 16, `icon_small` for the HUD's small cells; both drawn by `tools/icon_art.py`) and its `assets.json`. Deleting one is deleting its folder (and its lines in the reward tables and any enemy's staff entry).
 - **`SigilBase`** (an `ItemContent`): `id` (the folder name), `display_name`, `description`, `icon`, `when` (a condition of `SigilBase.WHENS`: `hurt`, `close`), `amount` (a share of its holder's most health for `hurt`, pixels for `close`) and `words` (what the HUD says after "Casts by itself"). `problems()` must be empty. A new condition is a name in `WHENS` and a line in `Caster.sigil_holds`.
 
 | Sigil | Its staff casts by itself while |

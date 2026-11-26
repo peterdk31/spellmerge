@@ -923,6 +923,12 @@ func component_icon(id: StringName) -> Texture2D:
 	return component.icon if component != null else null
 
 
+## Card `id`'s 1x icon (`icon_small`, the HUD's small cells), null for none.
+func component_icon_small(id: StringName) -> Texture2D:
+	var component: SpellComponent = _component(id)
+	return component.icon_small if component != null else null
+
+
 ## Card `id`'s icon for a cell `side` layout pixels across: its 1x icon in a cell too small for its
 ## 2x one (`IconDetail.fitting`).
 func component_icon_for(id: StringName, side: float) -> Texture2D:

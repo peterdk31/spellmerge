@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
+			"tier": "good",
 			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
-			"prompt": "The icon at 1x for the HUD's small cells, 16x16 art pixels: A dark drop of oil over the slick it makes, a small flame lit at its edge. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The oil icon at 1x for the HUD's small cells, 16x16 art pixels: A dark drop of oil over the slick it makes, a small flame lit at its edge. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/elements/oil/icon@2x.svg",

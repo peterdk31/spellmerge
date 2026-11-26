@@ -23,7 +23,7 @@ static func of(kind: StringName, id: StringName, registry: RegistryScript, spell
 		if spells != null:
 			look["name"] = spells.component_name(id)
 			look["icon"] = spells.component_icon(id)
-			look["icon_small"] = spells.component_icon_for(id, 0.0)
+			look["icon_small"] = spells.component_icon_small(id)
 			look["description"] = spells.component_description(id)
 	else:
 		var content: Resource = content_of(kind, id, registry)

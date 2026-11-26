@@ -52,10 +52,11 @@ def _bolt(ox: float = 0.0, oy: float = 0.0, s: float = 1.0) -> list[tuple[float,
 
 
 def atom() -> list[Part]:
-    """A tiny bright speck flying up and right, a thin trail behind it."""
+    """A tiny bright speck flying up and right, a thin trail of sparks behind it."""
     return [
-        rod((2.0, 10.5), (10.0, 7.2), 0.55, 0.9, material="Bone", seam=False),
-        ball((11.8, 6.5), 1.9, 1.9, material="Spark", glint=True),
+        rod((2.4, 11.6), (5.0, 10.2), 0.4, material="Spark", seam=False),
+        rod((6.0, 9.6), (9.2, 7.8), 0.45, material="Spark", seam=False),
+        ball((11.6, 6.6), 2.0, 2.0, material="Spark", glint=True),
     ]
 
 
@@ -96,12 +97,14 @@ def decoy() -> list[Part]:
 
 
 def familiar() -> list[Part]:
-    """A round little spirit with two eyes, a wisp of tail under it."""
+    """A round little spirit with two eyes and two small horns, hovering."""
     return [
-        poly([(6.2, 12.0), (9.8, 12.0), (8.6, 15.2), (7.6, 13.8)], bevel=0.5, material="Bone"),
-        ball((8.0, 8.0), 5.8, 5.2, material="Bone", glint=True),
-        ball((6.0, 7.4), 0.8, 1.2, colour=OUTLINE),
-        ball((10.0, 7.4), 0.8, 1.2, colour=OUTLINE),
+        poly([(3.6, 5.6), (4.2, 1.6), (6.6, 4.4)], bevel=0.4, material="Bone"),
+        poly([(12.4, 5.6), (11.8, 1.6), (9.4, 4.4)], bevel=0.4, material="Bone"),
+        ball((8.0, 8.6), 6.0, 5.4, material="Bone", glint=True),
+        ball((6.0, 8.0), 0.8, 1.2, colour=OUTLINE),
+        ball((10.0, 8.0), 0.8, 1.2, colour=OUTLINE),
+        box(4.4, 14.4, 11.6, 15.0, bevel=0.2, material="Stone", seam=False),
     ]
 
 
@@ -340,17 +343,22 @@ def blast() -> list[Part]:
 
 
 def bounce() -> list[Part]:
-    """A shot leaving a wall it struck."""
+    """A shot leaving a wall it struck: its path bent at the wall."""
     return [
-        box(1.2, 1.0, 3.6, 15.0, bevel=0.6, material="Stone", surface="speckle"),
-        rod((4.4, 12.0), (9.0, 7.8), 0.5, material="Spark", seam=False),
-        _shot((11.4, 5.6), 2.6),
+        box(1.0, 1.0, 3.4, 15.0, bevel=0.6, material="Stone", surface="speckle"),
+        rod((13.0, 14.0), (4.4, 8.4), 0.5, material="Spark", seam=False),
+        rod((4.4, 8.4), (10.4, 3.4), 0.5, material="Spark", seam=False),
+        _shot((12.0, 2.8), 2.2),
     ]
 
 
 def chain() -> list[Part]:
-    """Two links of a chain, joined: a shot that goes on to the next."""
-    return [ring((5.0, 8.0), 3.6, 1.8, material="Bone"), ring((11.0, 8.0), 3.6, 1.8, material="Bone")]
+    """Two oval links of a chain, one through the other, turned to the light."""
+    return [
+        ring((5.4, 9.6), 4.0, 2.2, material="Stone"),
+        ring((10.6, 6.4), 4.0, 2.2, material="Stone", glint=True),
+        rod((7.6, 11.2), (8.6, 10.6), 0.7, material="Stone", seam=True),
+    ]
 
 
 def charge() -> list[Part]:
@@ -605,8 +613,13 @@ def skyfall() -> list[Part]:
 
 
 def slow() -> list[Part]:
-    """A shot dragging a heavy trail of cold behind it."""
-    return [rod((1.6, 11.6), (6.0, 9.0), 1.2, material="Ice", seam=False), ball((9.6, 7.0), 5.0, 4.4, material="Ice", surface="streak", glint=True)]
+    """A snail creeping, its shell a spiral, its trail of slime behind."""
+    return [
+        poly([(1.2, 14.6), (13.4, 14.6), (15.0, 12.0), (13.4, 11.4), (11.4, 12.8), (2.4, 12.8)], bevel=0.6, material="Ice"),
+        rod((13.6, 11.6), (14.6, 8.6), 0.45, material="Ice", seam=False),
+        ball((7.2, 8.6), 5.2, 4.8, material="Ice", surface="streak", glint=True),
+        ring((7.2, 8.6), 2.6, 1.6, material="Ice", seam=False),
+    ]
 
 
 def sniper() -> list[Part]:
@@ -692,8 +705,12 @@ def on_any_cast() -> list[Part]:
 
 
 def on_block() -> list[Part]:
-    """A shot meeting a raised guard."""
-    return [_shot((4.0, 8.0), 2.2), box(9.0, 2.0, 13.4, 14.0, bevel=0.8, corner=0.6, material="Stone", glint=True)]
+    """A shot meeting a raised shield."""
+    return [
+        _shot((3.4, 8.0), 2.2),
+        poly([(8.2, 2.0), (15.0, 2.0), (15.0, 8.6), (11.6, 14.6), (8.2, 8.6)], bevel=1.0, material="Stone", glint=True),
+        poly([(10.2, 4.0), (13.0, 4.0), (13.0, 8.0), (11.6, 11.0), (10.2, 8.0)], bevel=0.3, material="Stone", seam=True),
+    ]
 
 
 def on_cast() -> list[Part]:
@@ -755,8 +772,14 @@ def on_recast() -> list[Part]:
 
 
 def on_wall() -> list[Part]:
-    """A shot about to meet a wall."""
-    return [_shot((4.0, 8.0), 2.2), box(10.0, 1.0, 14.8, 15.0, bevel=0.8, material="Stone", surface="speckle")]
+    """A shot about to meet a wall of bricks."""
+    parts: list[Part] = [_shot((3.4, 8.0), 2.2)]
+    for row, y in enumerate((1.0, 5.0, 9.0, 13.0)):
+        x0 = 9.0 if row % 2 == 0 else 10.8
+        parts.append(box(x0, y, 15.0, y + 3.0 if y < 13.0 else 15.0, bevel=0.6, material="Stone", surface="speckle", seed=row))
+        if row % 2 == 1:
+            parts.append(box(9.0, y, 10.6, min(y + 3.0, 15.0), bevel=0.5, material="Stone", seed=row + 4))
+    return parts
 
 
 def timer() -> list[Part]:
@@ -846,8 +869,9 @@ ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
 
 
 ## The icons whose 1x `icon.svg` (the HUD's small one, `icon_small`) is drawn here too, from the same
-## parts at one art pixel a world unit: cards made after the 1x icons were drawn by hand.
-SMALL_TOO: tuple[str, ...] = ("oil", "spill")
+## parts at one art pixel a world unit: cards made after the 1x icons were drawn by hand, and those whose
+## 1x icon used a player's colours (docs/STYLE.md, "Palette") or showed another thing (slow's snail).
+SMALL_TOO: tuple[str, ...] = ("oil", "spill", "mend", "field", "barrier", "shield", "slow")
 
 
 def _small(parts: Callable[[], list[Part]]) -> Canvas:

@@ -39,8 +39,10 @@ func test_only_a_view_drawn_afresh_every_frame_is_held_off() -> void:
 func test_a_view_added_later_is_held_off_from_the_next_frame() -> void:
 	var frames: DrawnFramesScript = _switch(false)
 	var split: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	# Two frames: the first may have had its end before the view came.
 	await process_frame
-	check(frames.held().has(split), "found as it was added, held off at the frame's end")
+	await process_frame
+	check(frames.held().has(split), "found as it was added, held off at a frame's end")
 
 
 func test_the_views_are_let_go_as_the_screen_is_drawn() -> void:
@@ -59,3 +61,26 @@ func test_a_drawn_switch_holds_nothing() -> void:
 	var frames: DrawnFramesScript = _switch(true)
 	await process_frame
 	check(frames.held().is_empty(), "every view drawn as the game set it")
+
+
+func test_a_view_updated_while_seen_is_drawn_every_frame_until_its_mode_changes() -> void:
+	var seen: SubViewport = _view(SubViewport.UPDATE_WHEN_VISIBLE, SubViewport.CLEAR_MODE_NEVER)
+	var frames: DrawnFramesScript = _switch(false)
+	check(frames.forced().has(seen), "drawn every frame while the screen draws nothing")
+	frames.drawing = true
+	check(frames.forced().has(seen), "still drawn every frame on a picture's frame")
+	frames.drawing = false
+	seen.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	await process_frame
+	await process_frame
+	check(not frames.forced().has(seen), "the game's own once it gives the view another mode")
+	check_equal(seen.render_target_update_mode, SubViewport.UPDATE_DISABLED, "the node keeps the game's mode")
+
+
+func test_a_held_view_that_is_freed_is_let_go_of() -> void:
+	var split: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	var frames: DrawnFramesScript = _switch(false)
+	split.free()
+	frames.drawing = true
+	frames.drawing = false
+	check(frames.held().is_empty(), "nothing held of a view that is gone")

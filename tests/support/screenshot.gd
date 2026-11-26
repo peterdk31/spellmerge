@@ -120,7 +120,7 @@ func settle(frames: int = -1) -> void:
 
 
 ## Waits until `condition` returns true, at most `frames` frames. Returns whether it did. Faster
-## than settling for a fixed count, since a software-rendered frame can take 30 ms.
+## than settling for a fixed count.
 func wait_for(condition: Callable, frames: int = 120) -> bool:
 	for i in frames:
 		if condition.call():

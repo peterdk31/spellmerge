@@ -169,6 +169,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	# Bone Husk strikes in reach): each is tried in turn until one is half-way through its windup.
 	# A foe that strikes in reach may hit the wizard while it is tried: its health is put back after.
 	var winding: Node2D = null
+	var tried: Array[Node2D] = []
 	var wizard_health: Health = (wizard as Actor).health
 	var health_was: float = wizard_health.health
 	for candidate: Node2D in alive:
@@ -178,14 +179,19 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 			break
 		candidate.global_position = was_at
 		(candidate as Actor).velocity = Vector2.ZERO
+		tried.append(candidate)
 	wizard_health.reset(health_was)
 	if winding == null:
 		fail("the imp is not winding up in enemy_windup")
 		return false
-	var hurt: Node2D = alive[1] if alive[0] == winding else alive[0]
+	# The hurt one a foe not tried, if there is one (a tried one may be mid-strike).
+	var hurt: Node2D = null
+	for other: Node2D in alive:
+		if other != winding and (hurt == null or tried.has(hurt) and not tried.has(other)):
+			hurt = other
 	for held: Node2D in [winding, hurt]:
 		held.process_mode = Node.PROCESS_MODE_INHERIT
-	winding.global_position = Vector2(200.0, 130.0)
+	# The winding one stays where it wound up (it may have walked to its band, its lane aimed from there).
 	hurt.global_position = Vector2(470.0, 130.0)
 	combat.call("hit", int(wizard.get("id")), hurt, 1)
 	hurt.call("step", 0.0)

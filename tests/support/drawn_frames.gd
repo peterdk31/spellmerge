@@ -15,6 +15,11 @@ extends Node
 ##
 ## What is skipped is cleared before every draw, so a frame drawn after any number of frames left
 ## off shows what a frame drawn every time would.
+##
+## A view updated only while it is seen (UPDATE_WHEN_VISIBLE, a SubViewport's default: the renderer
+## asks whether the screen used its picture the frame before, and the screen draws nothing between
+## pictures) is drawn every frame instead while this node is in the tree (`_forced`), so it neither
+## loses what it keeps nor shows a picture from before. The game has none today.
 
 ## The highest `process_priority`: this node's `_process` runs after every other's.
 const LAST: int = 2147483647
@@ -32,6 +37,8 @@ var _shown: bool = true
 var _views: Array[SubViewport] = []
 ## The views this node holds off at the renderer now.
 var _held: Array[SubViewport] = []
+## The views updated only while seen that this node has the renderer draw every frame.
+var _forced: Array[SubViewport] = []
 
 
 func _init() -> void:
@@ -52,7 +59,9 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	get_tree().node_added.disconnect(_on_added)
 	drawing = true
-	_apply()
+	for view: Variant in _forced:
+		_put_back(view)
+	_forced.clear()
 
 
 func _process(_delta: float) -> void:
@@ -61,7 +70,7 @@ func _process(_delta: float) -> void:
 
 
 func _on_added(node: Node) -> void:
-	if node is SubViewport:
+	if node is SubViewport and not _views.has(node):
 		_views.append(node as SubViewport)
 
 
@@ -80,23 +89,46 @@ func _apply() -> void:
 func _hold_views() -> void:
 	_let_go()
 	for i in range(_views.size() - 1, -1, -1):
-		var view: SubViewport = _views[i]
-		if not is_instance_valid(view):
+		if not is_instance_valid(_views[i]):
 			_views.remove_at(i)
 			continue
-		if view.is_inside_tree() and view.render_target_update_mode == SubViewport.UPDATE_ALWAYS and view.render_target_clear_mode == SubViewport.CLEAR_MODE_ALWAYS:
+		var view: SubViewport = _views[i]
+		if not view.is_inside_tree():
+			continue
+		var mode: SubViewport.UpdateMode = view.render_target_update_mode
+		if mode == SubViewport.UPDATE_ALWAYS and view.render_target_clear_mode == SubViewport.CLEAR_MODE_ALWAYS:
 			RenderingServer.viewport_set_update_mode(view.get_viewport_rid(), RenderingServer.VIEWPORT_UPDATE_DISABLED)
 			_held.append(view)
+		elif mode == SubViewport.UPDATE_WHEN_VISIBLE and not _forced.has(view):
+			RenderingServer.viewport_set_update_mode(view.get_viewport_rid(), RenderingServer.VIEWPORT_UPDATE_ALWAYS)
+			_forced.append(view)
+	# A forced view the game has since given another mode is the game's again.
+	for i in range(_forced.size() - 1, -1, -1):
+		if not is_instance_valid(_forced[i]) or _forced[i].render_target_update_mode != SubViewport.UPDATE_WHEN_VISIBLE:
+			_put_back(_forced[i])
+			_forced.remove_at(i)
 
 
 ## Every held view back, at the renderer, to the mode its node says.
 func _let_go() -> void:
-	for view: SubViewport in _held:
-		if is_instance_valid(view):
-			RenderingServer.viewport_set_update_mode(view.get_viewport_rid(), view.render_target_update_mode as RenderingServer.ViewportUpdateMode)
+	for view: Variant in _held:
+		_put_back(view)
 	_held.clear()
+
+
+## `view` back, at the renderer, to the mode its node says (nothing for one that is gone: the
+## renderer let go of it with the node). Untyped, as a freed view cannot be handed as a SubViewport.
+func _put_back(view: Variant) -> void:
+	if is_instance_valid(view):
+		var shown := view as SubViewport
+		RenderingServer.viewport_set_update_mode(shown.get_viewport_rid(), shown.render_target_update_mode as RenderingServer.ViewportUpdateMode)
 
 
 ## The views held off now (for tests).
 func held() -> Array[SubViewport]:
 	return _held.duplicate()
+
+
+## The views drawn every frame in place of while seen (for tests).
+func forced() -> Array[SubViewport]:
+	return _forced.duplicate()

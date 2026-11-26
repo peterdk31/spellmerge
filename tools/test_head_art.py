@@ -19,36 +19,63 @@ class HeadArtTest(unittest.TestCase):
     def test_the_sheets_are_what_the_rules_draw(self) -> None:
         self.assertEqual(head_art.main(["--check"]), 0, "run tools/head_art.py and commit its sheets")
 
-    def test_palette_only_and_the_player_colour_on_the_head_only(self) -> None:
-        palette = pixel_grid.palette()
+    def test_every_frame_palette_only_closed_and_clear_of_the_frame_edge(self) -> None:
+        palette = set(pixel_grid.palette())
         for name in head_art.HEADS:
             for ramp in range(4):
-                frame = head_art.head_frame(name, UP, ramp)
-                colours = {c for row in frame.pixels for c in row} - {None}
-                self.assertTrue(colours <= set(palette), f"{name}: palette colours only")
-                others = {c for r, shades in enumerate(RAMPS) if r != ramp for c in shades}
-                self.assertFalse(colours & others, f"{name}, ramp {ramp}: no other player's colour")
-                self.assertTrue(colours & set(RAMPS[ramp]), f"{name}, ramp {ramp}: its own colour on the head")
+                for direction in range(head_art.DIRECTIONS):
+                    p = head_art.head_frame(name, direction, ramp).pixels
+                    where = f"{name}, direction {direction}, ramp {ramp}"
+                    for y in range(SIZE):
+                        for x in range(SIZE):
+                            colour = p[y][x]
+                            if colour is None:
+                                continue
+                            self.assertIn(colour, palette, where)
+                            self.assertTrue(0 < x < SIZE - 1 and 0 < y < SIZE - 1, f"{where}: clear of the frame's edge")
+                            if colour == OUTLINE:
+                                continue
+                            # Closed eight ways: every drawn pixel's neighbours are drawn.
+                            for dy in (-1, 0, 1):
+                                for dx in (-1, 0, 1):
+                                    self.assertIsNotNone(p[y + dy][x + dx], f"{where}: ({x}, {y}) closed in")
 
-    def test_each_material_shows_three_shades_and_a_glint(self) -> None:
+    def test_the_player_colour_is_on_the_head_only(self) -> None:
         for name in head_art.HEADS:
-            colours = {c for row in head_art.head_frame(name, 14, 0).pixels for c in row}
+            for direction in range(head_art.DIRECTIONS):
+                frame = head_art.Frame(direction)
+                draw = head_art.HEADS[name]
+                for ramp in range(4):
+                    p = head_art.head_frame(name, direction, ramp).pixels
+                    others = {c for r, shades in enumerate(RAMPS) if r != ramp for c in shades}
+                    for y in range(SIZE):
+                        for x in range(SIZE):
+                            if p[y][x] in others:
+                                self.fail(f"{name}: another player's colour")
+                            if p[y][x] in RAMPS[ramp]:
+                                hit = draw(frame, (x + 0.5) / head_art.DETAIL, (y + 0.5) / head_art.DETAIL)
+                                self.assertIn(hit[0] if hit else None, (head_art.M_HEAD, head_art.M_DARK), f"{name}: ramp colour off the head at ({x}, {y})")
+
+    def test_the_base_shade_covers_most_of_the_head(self) -> None:
+        """docs/STYLE.md, "Light and shading": the base shade most, the light and the shadow its edges."""
+        for name in head_art.HEADS:
+            for direction in range(head_art.DIRECTIONS):
+                pixels = [c for row in head_art.head_frame(name, direction, 0).pixels for c in row]
+                shadow, base, light = (pixels.count(c) for c in RAMPS[0])
+                self.assertGreaterEqual(base, max(shadow, light), f"{name}, direction {direction}: {shadow}/{base}/{light}")
+
+    def test_each_material_shows_three_shades_and_a_small_glint(self) -> None:
+        for name in head_art.HEADS:
+            pixels = [c for row in head_art.head_frame(name, 14, 0).pixels for c in row]
+            colours = set(pixels)
             self.assertTrue(set(WOOD) <= colours, f"{name}: the wood in its three shades")
             self.assertTrue(set(RAMPS[0]) <= colours, f"{name}: the head in its three shades")
             self.assertTrue(colours & set(SPARK), f"{name}: gold")
-            self.assertIn(BONE[2], colours, f"{name}: a glint")
+            self.assertTrue(1 <= pixels.count(BONE[2]) <= 8, f"{name}: a glint, a spot not a blob")
 
-    def test_the_outline_is_closed_and_one_art_pixel(self) -> None:
-        for name in head_art.HEADS:
-            frame = head_art.head_frame(name, 2, 1)
-            p = frame.pixels
-            for y in range(SIZE):
-                for x in range(SIZE):
-                    if p[y][x] is None or p[y][x] == OUTLINE:
-                        continue
-                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                        nx, ny = x + dx, y + dy
-                        self.assertTrue(0 <= nx < SIZE and 0 <= ny < SIZE and p[ny][nx] is not None, f"{name}: ({x}, {y}) is closed in")
+    def test_an_unknown_head_is_refused(self) -> None:
+        with self.assertRaises(SystemExit):
+            head_art.main(["--check", "nosuch"])
 
     def test_the_grip_is_on_the_shaft_and_the_head_keeps_its_reach(self) -> None:
         gx, gy = int(head_art.GRIP[0] * head_art.DETAIL), int(head_art.GRIP[1] * head_art.DETAIL)

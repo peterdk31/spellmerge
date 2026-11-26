@@ -82,20 +82,34 @@ class Redraw2xTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             redraw_2x.read_svg('<svg width="2" height="2"><rect x="0" y="0" width="1" height="1" fill="#14121f" opacity="0.5"/></svg>')
 
-    def test_the_detail_pass_lights_and_shades_edges_and_folds_cloth(self) -> None:
-        stone = ("#2b2840", "#4a4663", "#7a7694")
-        rows = ["#" * 14] + ["#" + "s" * 12 + "#" for _ in range(12)] + ["#" * 14]
-        colours = {"#": OUTLINE, "s": stone[1]}
+    def _block(self, base: str) -> "redraw_2x.Canvas":
+        rows = ["#" * 8] + ["#" + "s" * 6 + "#" for _ in range(6)] + ["#" * 8]
+        colours = {"#": OUTLINE, "s": base}
         rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{colours[c]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
-        src = redraw_2x.read_svg(f'<svg width="14" height="14">{rects}</svg>')
-        out = redraw_2x.redraw(src, smooth=False, detailed=True)
-        inside = [(x, y) for y in range(out.height) for x in range(out.width) if out.pixels[y][x] in stone]
+        return redraw_2x.read_svg(f'<svg width="8" height="8">{rects}</svg>')
+
+    def test_the_detail_pass_lights_and_shades_the_edges_of_the_base_only(self) -> None:
+        wood = ("#3d2a2e", "#7a4a35", "#b27a4a")
+        plain = redraw_2x.redraw(self._block(wood[1]), smooth=False)
+        out = redraw_2x.redraw(self._block(wood[1]), smooth=False, detailed=True)
+        inside = [(x, y) for y in range(out.height) for x in range(out.width) if out.pixels[y][x] in wood]
         top_left = min(inside, key=lambda p: p[0] + p[1])
         bottom_right = max(inside, key=lambda p: p[0] + p[1])
-        self.assertEqual(out.pixels[top_left[1]][top_left[0]], stone[2], "the top-left edge lit")
-        self.assertEqual(out.pixels[bottom_right[1]][bottom_right[0]], stone[0], "the bottom-right edge shaded")
-        folds = [x for x in range(out.width) if out.pixels[out.height - 6][x] == stone[0]]
-        self.assertGreaterEqual(len(folds), 3, "the cloth's lower part falls in folds")
+        self.assertEqual(out.pixels[top_left[1]][top_left[0]], wood[2], "the top-left edge lit")
+        self.assertEqual(out.pixels[bottom_right[1]][bottom_right[0]], wood[0], "the bottom-right edge shaded")
+        middle = (out.width // 2, out.height // 2)
+        self.assertEqual(out.pixels[middle[1]][middle[0]], wood[1], "the middle stays the base")
+        for y in range(out.height):
+            for x in range(out.width):
+                if plain.pixels[y][x] != wood[1]:
+                    self.assertEqual(out.pixels[y][x], plain.pixels[y][x], "only the base shade changes")
+
+    def test_stone_is_never_shaded_down_to_its_shadow(self) -> None:
+        stone = ("#2b2840", "#4a4663", "#7a7694")
+        out = redraw_2x.redraw(self._block(stone[1]), smooth=False, detailed=True)
+        colours = {c for row in out.pixels for c in row}
+        self.assertNotIn(stone[0], colours, "Stone shadow is the floor's (docs/STYLE.md, Readability)")
+        self.assertIn(stone[2], colours, "its lit edge all the same")
 
     def test_a_target_not_named_at_2x_is_refused(self) -> None:
         with self.assertRaises(SystemExit):

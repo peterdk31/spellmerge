@@ -18,7 +18,7 @@ its palette colours and its silhouette, and is drawn finer in two ways:
     tools/redraw_2x.py IN.svg OUT@2x.svg   # an SVG of rects, one a run along a row
     tools/redraw_2x.py IN.svg OUT@2x.png   # an indexed PNG, for a sheet whose rects would pass 1 MB
     tools/redraw_2x.py --blocky IN OUT     # no smoothing: small round shapes (a small face)
-    tools/redraw_2x.py --detail IN OUT     # and new detail: one-pixel edge light and shadow, folds
+    tools/redraw_2x.py --detail IN OUT     # and new detail: one-pixel edge light and shadow
 
 Standard library only. Delete the 1x file after by hand (renaming its `.import`, art/README.md step
 2), so the 2x file is the art from then on: redraw it by hand or with a generator, not by running
@@ -167,17 +167,16 @@ def materials() -> dict[str, tuple[str, int]]:
     return out
 
 
-# Cloth: the materials a robe is made of, which take folds.
-CLOTH = ("Stone",)
-FOLD_EVERY = 6
+# Materials a character never shades down to their shadow (docs/STYLE.md, "Readability": Stone
+# shadow is the floor's), so their edge on the bottom right stays the base.
+NO_SHADOW = ("Stone",)
 
 
 def detail(src: Canvas) -> Canvas:
     """New detail at the 2x picture's own pixels (the owner, 2026-11-26: real detail, not a 2x):
     every part's base shade gets a one-art-pixel lit edge where it meets something else on its top
     or left and a shaded one on its bottom or right (a rounder form than the 1x shading's two-pixel
-    bands), and cloth falls in folds: a shadow crease every FOLD_EVERY art pixels down its lower
-    part, lit on its left. Decided from the picture as it was, all at once."""
+    bands; Stone keeps its base there, NO_SHADOW). Decided from the picture as it was, all at once."""
     shades = materials()
     p = src.pixels
     out = Canvas(src.width, src.height)
@@ -204,12 +203,8 @@ def detail(src: Canvas) -> Canvas:
                 continue
             if material(x - 1, y) != name or material(x, y - 1) != name:
                 out.pixels[y][x] = recolour(colour, 2)
-            elif material(x + 1, y) != name or material(x, y + 1) != name:
+            elif name not in NO_SHADOW and (material(x + 1, y) != name or material(x, y + 1) != name):
                 out.pixels[y][x] = recolour(colour, 0)
-            elif name in CLOTH and x % FOLD_EVERY == 3 and material(x, y - 3) == name and material(x, y - 6) == name:
-                out.pixels[y][x] = recolour(colour, 0)
-            elif name in CLOTH and x % FOLD_EVERY == 2 and material(x + 1, y - 3) == name and material(x + 1, y - 6) == name:
-                out.pixels[y][x] = recolour(colour, 2)
     return out
 
 
@@ -225,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("target", type=Path)
     parser.add_argument("--blocky", action="store_true", help="double without smoothing (small round shapes)")
-    parser.add_argument("--detail", action="store_true", help="add detail at the finer pixels: edge light and shadow, cloth folds")
+    parser.add_argument("--detail", action="store_true", help="add detail at the finer pixels: one-pixel edge light and shadow")
     args = parser.parse_args(argv)
     if "@2x" not in args.target.stem:
         parser.error("the target's name ends in @2x (ArtDetail)")

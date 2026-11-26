@@ -18,7 +18,7 @@ its rects would be over the 1 MB limit):
 - `art/kit/golden_staff@2x.svg`: the golden example at 2x, the three layered as the game does.
 
     tools/staff_art.py           # writes the head sheet and the golden example
-    tools/staff_art.py --check   # fails when an SVG differs from what the rules draw
+    tools/staff_art.py --check   # fails when a file differs from what the rules draw
 
 Shapes are worked out at each pixel's middle, in world units times DETAIL; a shape's light and
 shadow come from its edges facing the top left and the bottom right; every outline is one art

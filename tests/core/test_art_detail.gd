@@ -76,4 +76,22 @@ func test_the_wizard_draws_a_2x_head_and_face() -> void:
 		var layer := child as Sprite2D
 		if layer != null:
 			check_equal(layer.scale, Vector2(0.5, 0.5), "a 2x face layer at half")
+	# A staff may still bring a face of its own (StaffBase.face; none of the player's does since
+	# 2026-11-26): worn as it is shown, at its own sheets' detail, and the shared face after.
+	var own_face := FaceArt.new()
+	own_face.eyes = Face.EYES_SHEET
+	own_face.brows = Face.BROWS_SHEET
+	own_face.frame = Face.FRAME
+	own_face.eyes_origin = Face.EYES_ORIGIN
+	own_face.brows_origin = Face.BROWS_ORIGIN
+	face.wear_art(own_face)
+	var layers: Array[Texture2D] = face.layer_textures()
+	check(layers.size() == 2 and layers[0] == own_face.eyes and layers[1] == own_face.brows, "the face wears the staff's own sheets")
+	for child: Node in face.get_children():
+		var layer := child as Sprite2D
+		if layer != null:
+			check_equal(layer.scale, Vector2(0.5, 0.5), "its own 2x face layer at half")
+	face.wear_art(null)
+	layers = face.layer_textures()
+	check(layers.size() == 2 and layers[0] != own_face.eyes, "and the shared page again")
 	wizard.get_parent().remove_child(wizard)

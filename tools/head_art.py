@@ -19,8 +19,8 @@ Every shaft is Wood shaded as a round rod, with grain lines along it; gold is Sp
 metal, with a glint. Shapes are worked out at each art pixel's middle in world units (the 48x48
 sheet's layout, grip (24, 27), times DETAIL); a pixel's shade is its surface normal against the
 light from the top-left (three shades a material, the light shade's brightest spots a glint); the
-outline round the outside is one art pixel. Each head keeps its 1x silhouette and size, so its
-`tip` and `butt` hold; the star and the cog stay upright whichever way the staff points, the
+outline round the outside is one art pixel. Each head keeps its 1x shape family and about its size,
+so its `tip` and `butt` hold; the star and the cog stay upright whichever way the staff points, the
 crystal and the moon turn with it (as the 1x sheets).
 
     tools/head_art.py           # writes content/wizard/staffs/<head>/head@2x.png
@@ -54,7 +54,7 @@ _N = math.sqrt(sum(c * c for c in _L))
 LIGHT = (_L[0] / _N, _L[1] / _N, _L[2] / _N)
 # n . LIGHT below SHADOW_BELOW is the shadow shade, above LIGHT_ABOVE the light, above GLINT_ABOVE
 # a glint (on the materials that shine).
-SHADOW_BELOW = 0.45
+SHADOW_BELOW = 0.28
 LIGHT_ABOVE = 0.76
 GLINT_ABOVE = 0.965
 
@@ -91,7 +91,7 @@ class Frame:
         self.way = (math.cos(angle), math.sin(angle))
         # Across: the side facing up (upright, the left), as the curl's.
         across = (self.way[1], -self.way[0])
-        if across[1] > 1e-6 or (abs(across[1]) <= 1e-6 and across[0] > 0.0):
+        if across[1] > 1e-6:
             across = (-across[0], -across[1])
         self.across = across
 
@@ -178,14 +178,14 @@ def crystal(frame: Frame, wx: float, wy: float) -> Hit | None:
             upper = u >= mid
             sv = abs(side) / wide
             # Three facets a side: the face (|v| small) and the two flanks.
-            nu = 0.55 if upper else -0.75
+            nu = 0.5 if upper else -0.35
             if sv < 0.28:
                 nv = 0.0
                 part = 10 if upper else 11
             else:
-                nv = 0.9 if side > 0 else -0.9
+                nv = 1.2 if side > 0 else -1.2
                 part = (12 if side > 0 else 13) + (0 if upper else 2)
-            normal = frame.to_screen(nu, nv, 1.0)
+            normal = frame.to_screen(nu, nv, 2.0)
             # The ridges between facets catch the light: a thin bright line down the face's edges.
             if 0.22 < sv < 0.34 and upper:
                 return (M_HEAD, normal, part, "ridge")
@@ -208,14 +208,17 @@ def moon(frame: Frame, wx: float, wy: float) -> Hit | None:
     if r <= outer and math.hypot(du - push, dv) > inner:
         # Shaded as the ball the crescent is cut from.
         z = math.sqrt(max(0.0, 1.0 - (r / outer) ** 2))
-        normal = frame.to_screen(du / outer, dv / outer, z + 0.1)
+        normal = frame.to_screen(du / outer * 0.6, dv / outer * 0.6, z + 0.55)
         # Craters: shallow dishes, their normals turned in (lit on the far side).
         for cu, cv, cr in ((-1.9, 2.2, 0.9), (-3.0, -0.6, 0.75), (-1.2, -2.6, 0.7)):
             d = math.hypot(du - cu, dv - cv)
             if d <= cr:
                 k = d / cr
-                n = frame.to_screen(-(du - cu) / cr * 1.2, -(dv - cv) / cr * 1.2, 0.5 + 0.3 * (1 - k))
-                return (M_HEAD, n, 21, RAMPS_SHADE[min(_shade_of(n), 1)])
+                # A dish: its wall toward the light in shadow, the far wall's rim lit.
+                to = frame.to_screen(du - cu, dv - cv, 0.0)
+                toward = to[0] * LIGHT[0] + to[1] * LIGHT[1]
+                shade = 0 if toward > 0.1 else (2 if k > 0.6 and toward < -0.3 else 1)
+                return (M_HEAD, normal, 21, RAMPS_SHADE[shade])
         # The cut edge, facing the tip, a shade down: the crescent's inner rim.
         if math.hypot(du - push, dv) <= inner + 0.55:
             return (M_HEAD, frame.to_screen(-(du - push), -dv, 1.4), 22, None)
@@ -244,10 +247,10 @@ def star(frame: Frame, wx: float, wy: float) -> Hit | None:
         sx = 1.0 if dx > 0 else -1.0
         sy = 1.0 if dy > 0 else -1.0
         if ax >= ay:
-            normal = _unit(sx * 0.35, sy * 0.95, 1.0)
+            normal = _unit(sx * 0.2, sy * 0.5, 1.0)
             part = 32 + (0 if sy < 0 else 1) + (0 if sx < 0 else 2)
         else:
-            normal = _unit(sx * 0.95, sy * 0.35, 1.0)
+            normal = _unit(sx * 0.5, sy * 0.2, 1.0)
             part = 36 + (0 if sy < 0 else 1) + (0 if sx < 0 else 2)
         return (M_HEAD, normal, part, None)
     along, side = frame.local(wx, wy)
@@ -317,8 +320,8 @@ def _colour(hit: Hit, ramp: int) -> str:
     if material == M_HEAD:
         if override == "ridge":
             return RAMPS[ramp][2]
-        if level > GLINT_ABOVE:
-            return BONE[2]
+        # No glint from the shading on the head: a bevel facing the light would be a white arc;
+        # `_glint` puts one small one on it.
         return RAMPS[ramp][shade]
     # A hole's lit far wall.
     return RAMPS[ramp][0]
@@ -339,15 +342,25 @@ def head_frame(name: str, direction: int, ramp: int) -> Canvas:
             if hit is None:
                 continue
             canvas.pixels[py][px] = _colour(hit, ramp)
-            # Where the head sits on the wood (or the wood on the gold), the lower part takes a
-            # dark seam, so the parts read apart.
-            if hit[0] == M_WOOD:
+            # Where the head sits on the wood or the gold, the lower part takes a dark seam, so the
+            # parts read apart.
+            if hit[0] in (M_WOOD, M_GOLD):
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     nx, ny = px + dx, py + dy
                     if 0 <= nx < size and 0 <= ny < size:
                         other = hits[ny][nx]
                         if other is not None and other[0] == M_HEAD:
                             canvas.pixels[py][px] = OUTLINE
+    # The head's edge facing away from the light (bottom right) a shade down where the shading
+    # left it the base, so even a head turned full to the light has its shadow edge.
+    for py in range(size - 1):
+        for px in range(size - 1):
+            hit = hits[py][px]
+            if hit is None or hit[0] != M_HEAD or canvas.pixels[py][px] != RAMPS[ramp][1]:
+                continue
+            right, below = hits[py][px + 1], hits[py + 1][px]
+            if (right is None or right[0] != M_HEAD) and (below is None or below[0] != M_HEAD):
+                canvas.pixels[py][px] = RAMPS[ramp][0]
     _glint(canvas, hits, ramp)
     staff_art._outline(canvas, [[hits[y][x] is not None for x in range(size)] for y in range(size)])
     return canvas
@@ -392,6 +405,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="write nothing; fail when a sheet differs")
     parser.add_argument("heads", nargs="*", help="only these heads (default: all)")
     args = parser.parse_args(argv)
+    unknown = [name for name in args.heads if name not in HEADS]
+    if unknown:
+        parser.error(f"no such head: {', '.join(unknown)} (the heads: {', '.join(HEADS)})")
     status = 0
     for path, draw in files().items():
         if args.heads and path.parent.name not in args.heads:

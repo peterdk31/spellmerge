@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/field/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator, outline worked out from the shape)",
+			"prompt": "A 16x16 icon for the Field card: a pale blue ring seen at a slant, filled dark, with a small bright knot of caught shots bursting at its middle, a 1 px closed outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

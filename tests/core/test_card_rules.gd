@@ -96,6 +96,11 @@ const CROWD: float = 16.0
 const COURIER_AT: Vector2 = Vector2(60.0, -60.0)
 const COURIER_AIM: float = 24.0
 const COURIER_STEP: int = 0
+## Where the teammate stands that sends a shot through a carrier that gives its cards to what comes
+## into it (a field): behind the wizard and a little to the side, its shot to the target on the line
+## coming into the field (where its reach puts it, or short of a wall) a step before any wall (a shot
+## that comes in and meets a wall in one step ends there before the field catches it).
+const FIELD_COURIER_AT: Vector2 = Vector2(-40.0, -16.0)
 ## How far behind the target on the line the enemy shooter stands.
 const SHOOTER_BEHIND: float = 70.0
 ## The wizard casts when an enemy shot is this much further than its carrier's reach.
@@ -398,6 +403,10 @@ static func reach(carrier_card: CarrierCard) -> float:
 		&"portal":
 			# Its exit: what stands there goes through to the mouth.
 			return carrier_card.ray_length
+		&"field":
+			# Past it: what stands there is where the shots through it go on to, and a wall at a share
+			# of it stands past where the field's middle is, or the field lies short of it.
+			return carrier_card.ray_length + carrier_card.radius * 2.0
 	return -1.0
 
 
@@ -812,6 +821,11 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		# sends a plain shot into it a moment after the cast.
 		var shot: Array[StringName] = [_shot.id]
 		world.add_courier(COURIER_AT, shot, COURIER_AT.direction_to(Vector2(COURIER_AIM, 0.0)), COURIER_STEP)
+	if Carriers.of(carrier_card.carrier).has(CarrierTraits.GIVES):
+		# A carrier that gives its cards to the shots it lets go (a field) acts on what comes into
+		# it: a teammate sends a plain shot into it, aimed on at the target on the line.
+		var shot: Array[StringName] = [_shot.id]
+		world.add_courier(FIELD_COURIER_AT, shot, FIELD_COURIER_AT.direction_to(Vector2(r, 0.0)), COURIER_STEP)
 	if scene.get("hurt", false):
 		for step in HURT_STEPS:
 			world.hurt_wizard_at(step, 1)

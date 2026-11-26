@@ -162,7 +162,8 @@ func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 
 func test_homing_on_a_carrier_card_it_cannot_steer_is_wasted_and_changes_nothing() -> void:
 	for carrier_card in _carrier_cards():
-		if Carriers.of(carrier_card.carrier).steers():
+		# A field gives its homing to the shots it lets go (docs/milestones/field.md).
+		if Carriers.of(carrier_card.carrier).steers() or Carriers.of(carrier_card.carrier).gives_cards():
 			continue
 		var staff: CompiledStaff = StaffKit.compile(_spells, [&"homing", carrier_card.id] as Array[StringName])
 		check(staff.wasted.has(0), "homing on a %s is listed as wasted" % carrier_card.id)

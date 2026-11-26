@@ -148,34 +148,34 @@ enum Stack { ADD, MULTIPLY, CHANCE }
 ## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
 const RULES: Dictionary = {
 	Behaviour.NONE: {},
-	Behaviour.HOMING: {"needs": {"any": CarrierTraits.STEERS}},
+	Behaviour.HOMING: {"needs": {"any": CarrierTraits.STEERS | CarrierTraits.GIVES}},
 	# What a blast strikes is the carrier's hit (rules R4 F2), so the hit cards work with one too.
 	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
-	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
+	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS | CarrierTraits.GIVES}},
 	Behaviour.BLAST: {},
 	# Kept on: a carrier that lasts, or one cast anew while held (a spray pours on; the owner,
 	# 2026-11-16: "Hold should work like for a beam").
 	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS | CarrierTraits.REPEATS_HELD, "not": CarrierTraits.MOVES_CASTER}},
 	# It pushes what casts the carrier back: a body or a shot (at runtime; a point has nothing to push).
 	Behaviour.RECOIL: {},
-	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
+	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE | CarrierTraits.GIVES}},
 	Behaviour.ECHO: {},
-	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES}},
+	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.GIVES}},
 	Behaviour.HEAVY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "stacks": Stack.MULTIPLY},
 	Behaviour.SIPHON: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
-	Behaviour.STICKY: {"needs": {"any": CarrierTraits.MOVES}},
+	Behaviour.STICKY: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.GIVES}},
 	Behaviour.MAGNET: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}},
-	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE | CarrierTraits.AOE}},
-	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE}},
+	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE | CarrierTraits.AOE | CarrierTraits.GIVES}},
+	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE | CarrierTraits.GIVES}},
 	# Another firing aimed the other way: nothing to turn on a carrier that is not aimed (`AOE`).
 	Behaviour.MIRROR: {"needs": {"not": CarrierTraits.AOE}},
 	Behaviour.GROWTH: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.MULTIPLY},
 	Behaviour.RELAY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	# A shot flies home; a ring that grows from its cast point (a Pulse) shrinks back to it.
-	Behaviour.RETURN: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.AOE}},
+	Behaviour.RETURN: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.AOE | CarrierTraits.GIVES}},
 	Behaviour.ZAP: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.CHANCE},
 	Behaviour.POSSESS: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
-	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
+	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS | CarrierTraits.GIVES}},
 	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
 	Behaviour.PULL: {"needs": {"any": CarrierTraits.HITS}},
 	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
@@ -197,7 +197,7 @@ const RULES: Dictionary = {
 	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_ALONG}},
 	# Its elements touch the floor wider where it lands: a carrier that makes a body or a gate lands
 	# nothing of its own (a decoy's, a familiar's, a portal's shots are their payloads' or others').
-	Behaviour.SPILL: {"needs": {"not": CarrierTraits.SPAWNS | CarrierTraits.GATES, "infused": true}},
+	Behaviour.SPILL: {"needs": {"not": CarrierTraits.SPAWNS | CarrierTraits.GATES | CarrierTraits.GIVES, "infused": true}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

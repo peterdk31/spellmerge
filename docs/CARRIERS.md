@@ -34,6 +34,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
 | `AOE` | Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? Not aimed: scatter, mirror and nova turn nothing there and the AI reads it as an area round its caster; it goes out as a shot does: Return and Ghost work on it. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, spray, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
+| `GIVES` | Does it give its cards to the shots it lets go (a field, docs/milestones/field.md)? The behaviours a field gives name it in their needs (Homing, Linger, Bounce, Ghost, Spiral, Return, Sticky, Shield, Deflect); its own shot wears none of them but Growth (`Carrier.gives_cards`, `Spells._travel_shots`). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)
@@ -295,6 +296,17 @@ struck; the screenshot `shot_staff_alignment` (`ci/build/build.sh --quick --scre
 them, a white cross on each tip and a red ring on each point struck. A card asks for nothing: it is
 found because it lands. While a hit holds the caster (a local stop), the body shows the moment of
 the hit, not the step before (`Actor.step`).
+
+### Fields: circles that catch shots and let them go
+
+A field (`field.gd`, docs/milestones/field.md) is a still shot of the projectile manager that hits
+nothing (`set_field`: no hit layers, so no guard or threat test meets it). The manager's field pass
+(`shots_into_fields`, natively `ShotKernel.field_pass`, the same to the bit) hands back each shot whose
+middle went from outside a field's circle to inside it (or through it) in the last step; the carrier
+holds it (a local stop), keeps only its way in (32 steps), draws it in and grows the field, and when
+the field ends sends every shot it holds out along its way, giving each the field's cards (`_give`:
+its infusion through `CarrierKit.infuse_shot`, its homing and its behaviours, at least the field's of
+each). Its numbers shape the field itself. No other carrier knows of it.
 
 ### Portals: gates in the world
 

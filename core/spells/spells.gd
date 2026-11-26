@@ -1786,6 +1786,14 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 ## `_apply_travel` for each of the first `count` shots in `slots` (-1 for none), the spell's
 ## behaviours read once.
 func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) -> void:
+	if _carrier_of(spell).gives_cards():
+		# A field (docs/milestones/field.md) gives its cards to the shots that come into it and
+		# wears none of them itself, but Growth, which widens it.
+		var widens: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
+		for n in count:
+			if slots[n] >= 0 and widens > 1.0:
+				projectiles.set_growth(slots[n], widens)
+		return
 	var homing: bool = spell.homing_range > 0.0
 	var returns: bool = spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0
 	var curve: bool = spell.has_speed_curve()

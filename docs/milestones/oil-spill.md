@@ -59,7 +59,7 @@
 - `mana_mult` 1.25, `complexity` 2, `look_id` `ripple`.
 - **It needs an infusion on its carrier**: with no element nothing touches the floor, so Spill alone is wasted. A new key of a needs row, `"infused": true` (`ModifierBase.RULES`, `Carrier.works`), read by the compiler as `on reaction`'s `or_infused` is.
 
-**What Spill does on each carrier** (docs/CARRIERS.md, "needs": `{"not": SPAWNS | GATES, "infused": true}`):
+**What Spill does on each carrier** (docs/CARRIERS.md, "needs": `{"not": SPAWNS | GATES | GIVES, "infused": true}`; a field, which touches no floor and gives its cards to the shots it lets go, docs/milestones/field.md, has it wasted):
 
 | Carrier | Where it lands, with Spill |
 | --- | --- |

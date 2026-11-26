@@ -197,7 +197,7 @@ const RULES: Dictionary = {
 	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_ALONG}},
 	# Its elements touch the floor wider where it lands: a carrier that makes a body or a gate lands
 	# nothing of its own (a decoy's, a familiar's, a portal's shots are their payloads' or others').
-	Behaviour.SPILL: {"needs": {"not": CarrierTraits.SPAWNS | CarrierTraits.GATES, "infused": true}},
+	Behaviour.SPILL: {"needs": {"not": CarrierTraits.SPAWNS | CarrierTraits.GATES | CarrierTraits.GIVES, "infused": true}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

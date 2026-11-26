@@ -153,7 +153,7 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int, walled: bool = fa
 	kit.cast_as(caster, kit.projectiles.get_seq_of(caster) if caster >= 0 else 0)
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.cast_done()
-	kit.blast(spell, tag, actor, at)
+	kit.land(spell, tag, actor, at)
 	for event: int in WALL_THEN_EXPIRE if walled else EXPIRE_ONLY:
 		for trigger in spell.triggers:
 			if trigger.event == event:

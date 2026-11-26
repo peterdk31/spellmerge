@@ -55,7 +55,7 @@ How to redraw a sprite at 64×64: art/README.md, "Redrawing a sprite at 64x64".
 
 ## Palette
 
-52 colours: one outline colour and seventeen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
+55 colours: one outline colour and eighteen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
 
 | Material | Shadow | Base | Light | Use |
 | --- | --- | --- | --- | --- |
@@ -72,6 +72,7 @@ How to redraw a sprite at 64×64: art/README.md, "Redrawing a sprite at 64x64".
 | **Mana** | `#161c55` | `#2c3aa8` | `#6f86f0` | Mana itself, seen moving (a siphon's mana knocked off a body and back into the staff; the owner, 2026-11-16: "mana should be dark blue"): a deep ultramarine, bluer and darker than Player 1's blue so it never reads as a player's |
 | **Arc** | `#3f6b10` | `#b4e82a` | `#eeffa6` | Lightning spells and the static charge: an acid lime, apart from Spark's gold, the players' greens and Ice's cyan |
 | **Leaf** | `#2f4022` | `#5b7233` | `#a0ad55` | Grass, moss and other growth on the floor (ground cover): a dull olive, darker and yellower than Player 3's green and far duller than Arc's lime |
+| **Oil** | `#211a1e` | `#4a3729` | `#b88a3e` | Oil on the floor and the Oil card (docs/milestones/oil-spill.md): a dark umber slick with an amber sheen, the darkest base of the palette, browner than Stone and far darker than Wood's and Blight's |
 | **Blight** (ochre) | `#4d3f12` | `#a68a2a` | `#e3cf6b` | Enemies' spells: where a player's colour shows in a shot, an enemy's shows this (the owner, 2026-10-27). A dull ochre, darker than Spark's gold and far from the four player hues |
 | **Player 1** (blue) | `#1d3a6b` | `#3b73c9` | `#7fc0f0` | Player 1's robe, hat, panel and markers |
 | **Player 2** (rose) | `#7a2347` | `#d9477a` | `#f59ab8` | Player 2 |

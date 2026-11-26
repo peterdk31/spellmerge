@@ -1,6 +1,6 @@
 # The floor's first slice: water, ice and lightning on bare floor
 
-**Status (2026-11-25): built (this PR).** Part 1's first slice of [foundations.md](foundations.md) ("a floor that answers"), with the owner's answers to its open points (2026-11-25). Oil, Spill and the oiled, burning and scorched states are the next PR (Part 2's first one), not this one.
+**Status (2026-11-25): built (this PR).** Part 1's first slice of [foundations.md](foundations.md) ("a floor that answers"), with the owner's answers to its open points (2026-11-25). Oil, Spill and the oil states came next: [oil-spill.md](oil-spill.md).
 
 ## What the players see
 

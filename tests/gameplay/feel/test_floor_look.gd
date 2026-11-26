@@ -54,6 +54,42 @@ func test_the_states_name_their_looks() -> void:
 	check(FLOOR.states[_state(&"drying")].flat_trace != &"", "a puddle leaves its damp")
 
 
+## Oil's states (docs/milestones/oil-spill.md): the slick, its fire and the scorch it leaves.
+func test_the_oil_states_name_their_looks() -> void:
+	check(FLOOR.states.size() <= CoverFlatScript.STATES, "every state of the floor fits the shader's (%d of %d)" % [FLOOR.states.size(), CoverFlatScript.STATES])
+	for id: StringName in [&"oiling", &"oiled", &"soaking"]:
+		check_equal(FLOOR.states[_state(id)].flat_surface, CoverState.FlatSurface.OIL, "%s is oil" % id)
+		check_equal(FLOOR.states[_state(id)].flat_material, &"oil", "in Oil (%s)" % id)
+	for id: StringName in [&"catching", &"burning", &"burning_down", &"doused"]:
+		check_equal(FLOOR.states[_state(id)].flat_surface, CoverState.FlatSurface.FIRE, "%s is fire" % id)
+	check_equal(FLOOR.states[_state(&"scorched")].flat_surface, CoverState.FlatSurface.SCORCH, "scorched is soot")
+	check_equal(FLOOR.states[_state(&"burning")].flat_glow, &"fire", "burning glows Fire")
+	check_equal(FLOOR.states[_state(&"oiled")].flat_glow, &"", "oil gives no light")
+	check_equal(FLOOR.states[_state(&"catching")].flat_under, &"oil", "a fire catching creeps over the oil")
+	check_equal(FLOOR.states[_state(&"catching")].flat_under_surface, CoverState.FlatSurface.OIL, "drawn as oil")
+	check_equal(FLOOR.states[_state(&"burning_down")].flat_under_surface, CoverState.FlatSurface.SCORCH, "burning down onto soot")
+	check(FLOOR.states[_state(&"scorched")].flat_trace != &"", "the scorch fades as a mark")
+	check(FLOOR.states[_state(&"soaking")].flat_trace != &"", "oil leaves its stain")
+	check(not FLOOR.states[_state(&"burning")].motes.is_empty(), "burning gives off embers and smoke")
+
+
+func test_burning_oil_lights_a_patch_in_fire() -> void:
+	var laid := _layout()
+	var flat := _flat(laid)
+	var lights: CoverLightsScript = CoverLightsScript.new()
+	for cell: int in [0, 1, 8, 9]:
+		flat.show_cell(cell, laid.columns, _state(&"oiled"), 0.5)
+	lights.begin()
+	flat.write_lights(lights, 1.0)
+	check_equal(lights.count, 0, "oil lights nothing")
+	for cell: int in [0, 1, 8, 9]:
+		flat.show_cell(cell, laid.columns, _state(&"burning"), 1.0)
+	lights.begin()
+	flat.write_lights(lights, 1.0 + CoverLightsScript.EASE_SECONDS * 1.01)
+	check_equal(lights.count, 1, "the burning patch lights")
+	check(absf(lights.rows[SpellLightScript.SPOT_ROW_STRENGTH] - FLOOR.states[_state(&"burning")].flat_glow_strength) < 0.001, "at its glow")
+
+
 func test_a_glow_named_badly_is_a_problem() -> void:
 	var kind := FLOOR.duplicate(true) as CoverKind
 	kind.states[_state(&"live")].flat_glow = &"no_such"

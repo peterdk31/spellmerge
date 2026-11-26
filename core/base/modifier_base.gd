@@ -120,6 +120,12 @@ enum Behaviour {
 	## a flying shot it passes more (a battering ram, `SpellLimits.PLOW_MOST`) and never hits a body it carries again.
 	## All of it is `core/spells/plow.gd`; the pin and the shove are Combat's. Strength unused (1).
 	PLOW,
+	## Every touch of the floor the carrier makes where it lands (a shot's or a ray's end, a blast, a
+	## pulse's ring, a pool) is `behaviour_strength` pixels wider (more cards add); a carrier that only
+	## passes over the floor (a dash, a swing, a beam) touches that wide where it lands
+	## (`CarrierKit.spill`). Its passing touches stay one cell each. It changes the floor only, never
+	## what it hits (docs/milestones/oil-spill.md). Nothing with no infusion: nothing then touches.
+	SPILL,
 }
 
 
@@ -135,6 +141,8 @@ enum Stack { ADD, MULTIPLY, CHANCE }
 ##   these; "or_cards": a card with one of these behaviours on the carrier does instead (what a
 ##   blast strikes is the carrier's hit, rules R4 F2). None: it works on every carrier (numbers,
 ##   blast, echo, mirror, nova: a move and its mirror add up to none, rules R4 F1).
+##   "infused": true: it does something only with an infusion on the carrier (a spill: an element is
+##   what touches the floor).
 ## - "stacks": a `Stack` (ADD when missing).
 ## A card names its behaviour by its name (`behaviour_id`), so a behaviour added or taken out never
 ## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
@@ -187,6 +195,9 @@ const RULES: Dictionary = {
 	# Something that moves along a way carries what it hits: a shot that flies, or a dash's body
 	# (`MOVES_ALONG`: not a teleport, over at once). A blast's hits move nothing (rules R4 F2).
 	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_ALONG}},
+	# Its elements touch the floor wider where it lands: a carrier that makes a body or a gate lands
+	# nothing of its own (a decoy's, a familiar's, a portal's shots are their payloads' or others').
+	Behaviour.SPILL: {"needs": {"not": CarrierTraits.SPAWNS | CarrierTraits.GATES, "infused": true}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

@@ -90,6 +90,11 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 	if found > 0:
 		kit.strike(spell, tag, actor, found, _struck, from, chain, prev, spell.echo_hit if kit.is_echo(spell) else null)
 	_struck.clear()
+	# It pours on the floor: along its middle, and over its cone's end (wider with Spill; one with a
+	# blast touches as its blast does, not twice: docs/milestones/oil-spill.md).
+	kit.pass_floor(spell, tag, actor, origin, end)
+	if spell.behaviour(ModifierBase.Behaviour.BLAST) <= 0.0:
+		kit.touch_floor(spell, actor, end, got * DMath.tan(half_angle(spell)) * 0.5, tag)
 	kit.blast(spell, tag, actor, end)
 	if spell.fires_on(TriggerBase.Event.EXPIRE):
 		kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, end, heading, null)

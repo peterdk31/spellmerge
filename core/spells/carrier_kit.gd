@@ -385,6 +385,17 @@ func touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float, t
 	_rt._touch_floor(spell, actor, at, radius, tag)
 
 
+## A carrier of `spell` that touched no floor of its own where it ends landed at `at` (a dash's end,
+## a teleport's arrival, a swing's tip, a slam's impact, a spray's or a beam's end): its `blast`, and
+## with none, its Spill touches the floor round it (nothing without either; a blast's touch is
+## already as wide, docs/milestones/oil-spill.md).
+func land(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
+	if spell != null and spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:
+		_rt._blast(spell, tag, actor, at)
+	else:
+		_rt._spill(spell, actor, at, tag)
+
+
 ## Each element of `spell` passes over the floor along `from` to `to` (`floor_passed`, the floor's
 ## first slice, docs/milestones/floor.md): a dash's way, a swing's tip, a beam's end, each step.
 func pass_floor(spell: CompiledSpell, tag: int, actor: int, from: Vector2, to: Vector2) -> void:

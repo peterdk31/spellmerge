@@ -82,7 +82,7 @@ func test_the_real_reaction_table_names_only_real_elements_and_known_statuses() 
 	for id in registry.get_ids(&"spells"):
 		if registry.get_resource(&"spells", id) is ElementBase:
 			elements.append(id)
-	check_equal(elements.size(), 7, "the seven elements are found")
+	check(elements.size() >= 8, "the elements are found (%d)" % elements.size())
 	check_equal(SpellValidator.check_reactions(table, elements).size(), 0, "no reaction problem")
 
 

@@ -130,7 +130,7 @@ func test_burning_it_gives_off_embers_and_smoke() -> void:
 	for look: MoteSource in burning.motes:
 		check_equal(_kit.look.motes.stream_problems(look), PackedStringArray(), "%s is a sound cover stream" % look.kind)
 		kinds.append(look.kind)
-	check_equal(kinds, [&"ember", &"smoke"] as Array[StringName], "embers and smoke")
+	check_equal(kinds, [&"fire_speck", &"fire_smoke"] as Array[StringName], "fire specks and smoke (ART2)")
 	var cell: int = _kit.cell(3, 3)
 	_kit.touch(&"fire", _kit.middle(cell))
 	_kit.steps(1)

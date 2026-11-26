@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dfxa35uysmqvi"
-path="res://.godot/imported/icon.svg-ffd055a3f614265ecbaf2c554d7883b9.ctex"
+path="res://.godot/imported/icon@2x.svg-aa180d98d47b0d75c3b813af9a9140a4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/potions/vigor/icon.svg"
-dest_files=["res://.godot/imported/icon.svg-ffd055a3f614265ecbaf2c554d7883b9.ctex"]
+source_file="res://content/potions/vigor/icon@2x.svg"
+dest_files=["res://.godot/imported/icon@2x.svg-aa180d98d47b0d75c3b813af9a9140a4.ctex"]
 
 [params]
 

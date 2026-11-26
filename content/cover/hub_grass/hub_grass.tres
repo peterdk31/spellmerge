@@ -140,7 +140,7 @@ then = &"rest"
 
 [sub_resource type="Resource" id="catching_embers"]
 script = ExtResource("4_motes")
-kind = &"ember"
+kind = &"fire_speck"
 rate = 2.0
 from = 2
 at = Vector2(0, 5)
@@ -152,7 +152,7 @@ colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="burning_embers"]
 script = ExtResource("4_motes")
-kind = &"ember"
+kind = &"fire_speck"
 rate = 4.0
 from = 2
 at = Vector2(0, 3)
@@ -164,7 +164,7 @@ colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="burning_smoke"]
 script = ExtResource("4_motes")
-kind = &"smoke"
+kind = &"fire_smoke"
 rate = 1.5
 from = 2
 at = Vector2(0, 2)
@@ -176,7 +176,7 @@ colours = Array[StringName]([&"stone"])
 
 [sub_resource type="Resource" id="smouldering_smoke"]
 script = ExtResource("4_motes")
-kind = &"smoke"
+kind = &"fire_smoke"
 rate = 1.0
 from = 2
 at = Vector2(0, 3)

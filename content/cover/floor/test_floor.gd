@@ -353,3 +353,25 @@ func test_water_puts_out_a_fire_still_catching() -> void:
 	_kit.touch(&"water", _kit.middle(cell))
 	_kit.steps(1)
 	check_equal(_kit.state_of(cell), &"doused", "put out")
+
+
+## ART2 (the owner, 2026-11-26: fire mostly from motes): a burning floor gives off fire specks,
+## smoke and cinders, catching specks, and burning down smoke and cinders.
+func test_a_burning_floor_is_mostly_motes() -> void:
+	var floor_kind: CoverKind = load("res://content/cover/floor/floor.tres") as CoverKind
+	var wanted: Dictionary = {&"catching": [&"fire_speck"], &"burning": [&"fire_speck", &"fire_smoke", &"cinder"], &"burning_down": [&"fire_smoke", &"cinder"]}
+	for state_id: StringName in wanted:
+		var at: int = floor_kind.state_at(state_id) if floor_kind != null else -1
+		check(at >= 0, "the floor has the state %s" % state_id)
+		if at < 0:
+			continue
+		var state: CoverState = floor_kind.states[at]
+		var kinds: Array[StringName] = []
+		for source in state.motes:
+			kinds.append(source.kind)
+		check_equal(kinds, wanted[state_id] as Array[StringName], "%s gives off its motes" % state_id)
+	for id: String in ["fire_speck", "fire_smoke", "cinder", "soot"]:
+		var kind: MoteKind = load("res://content/motes/%s.tres" % id) as MoteKind
+		check(kind != null and kind.detail() == 2 and kind.problems().is_empty(), "%s is a fine kind drawn at 2x" % id)
+	for id: String in ["fire_speck", "cinder", "soot"]:
+		check((load("res://content/motes/%s.tres" % id) as MoteKind).statuses.has(&"burn"), "a burning body gives off %s" % id)

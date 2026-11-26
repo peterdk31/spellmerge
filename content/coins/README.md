@@ -4,7 +4,7 @@ Coins are a stacked inventory item (the owner, 2026-11-19: "Coins are stacked in
 
 ## Contract
 
-- `coin/` holds `coin.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon.svg` (16 by 16) and its `assets.json`. `problems()` must be empty.
+- `coin/` holds `coin.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `assets.json`. `problems()` must be empty.
 - A reward table names coins by their kind and id (`kind = &"coin"`, `id = &"coin"`, `count` of them; content/rewards).
 
 ## Allowed files

@@ -239,28 +239,64 @@ when = 1
 seconds = 0.35
 then = &"oiled"
 
-[sub_resource type="Resource" id="burning_embers"]
+[sub_resource type="Resource" id="burning_specks"]
 script = ExtResource("4_motes")
-kind = &"ember"
-rate = 2.0
+kind = &"fire_speck"
+rate = 6.0
 from = 2
 at = Vector2(0, 0)
 size = Vector2(14, 14)
-spread = 30.0
+spread = 50.0
 reach = 3.0
-height = 10.0
+height = 3.0
 colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="burning_smoke"]
 script = ExtResource("4_motes")
-kind = &"smoke"
+kind = &"fire_smoke"
+rate = 1.5
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 40.0
+reach = 2.0
+height = 8.0
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="burning_cinders"]
+script = ExtResource("4_motes")
+kind = &"cinder"
 rate = 1.0
 from = 2
 at = Vector2(0, 0)
 size = Vector2(14, 14)
-spread = 30.0
+spread = 90.0
+reach = 3.0
+height = 10.0
+colours = Array[StringName]([&"fire"])
+
+[sub_resource type="Resource" id="catching_specks"]
+script = ExtResource("4_motes")
+kind = &"fire_speck"
+rate = 3.0
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 50.0
+reach = 3.0
+height = 2.0
+colours = Array[StringName]([&"fire", &"spark"])
+
+[sub_resource type="Resource" id="dying_smoke"]
+script = ExtResource("4_motes")
+kind = &"fire_smoke"
+rate = 3.0
+from = 2
+at = Vector2(0, 0)
+size = Vector2(14, 14)
+spread = 40.0
 reach = 2.0
-height = 12.0
+height = 6.0
 colours = Array[StringName]([&"stone"])
 
 [sub_resource type="Resource" id="doused_smoke"]
@@ -486,6 +522,7 @@ triggers = Array[ExtResource("3_trigger")]([SubResource("soaking_after")])
 script = ExtResource("2_state")
 state_id = &"catching"
 frames = PackedInt32Array()
+motes = Array[ExtResource("4_motes")]([SubResource("catching_specks")])
 animation_frames = 4
 animation_fps = 16
 sway = 0.0
@@ -515,7 +552,7 @@ animation_fps = 12
 animation_loops = true
 sway = 0.0
 bend = 0.0
-motes = Array[ExtResource("4_motes")]([SubResource("burning_embers"), SubResource("burning_smoke")])
+motes = Array[ExtResource("4_motes")]([SubResource("burning_specks"), SubResource("burning_smoke"), SubResource("burning_cinders")])
 flat_material = &"fire"
 flat_spark = &"spark"
 flat_surface = 5
@@ -535,6 +572,7 @@ triggers = Array[ExtResource("3_trigger")]([SubResource("burning_water"), SubRes
 script = ExtResource("2_state")
 state_id = &"burning_down"
 frames = PackedInt32Array()
+motes = Array[ExtResource("4_motes")]([SubResource("dying_smoke"), SubResource("burning_cinders")])
 animation_frames = 4
 animation_fps = 8
 sway = 0.0

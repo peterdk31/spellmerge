@@ -38,6 +38,10 @@ var look_layers: PackedInt32Array:
 		return LookNames.layers_of(look_ids)
 	set(value):
 		look_ids = LookNames.names_of(value)
+## The statuses (their ids: `burn`) a body gives this kind off while it has one, in the status's
+## colours, in place of its card's motes (ART2: a burning body smokes and throws specks and cinders,
+## where a fire shot sheds embers). A status no kind names gives off its card's motes.
+@export var statuses: Array[StringName] = []
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
 ## Given off along every dash's path (its speed streaks; docs/milestones/spell-spectacle-2.md,

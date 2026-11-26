@@ -1,0 +1,66 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"fire_smoke"
+gravity = -14.0
+drag = 2.5
+bounce = 0.0
+wobble = 4.0
+wobble_rate = 1.8
+glow = 0.0
+shade_from = 1
+shape = "
+#
+
+##
+##
+
+###
+###
+###
+
+#.#
+...
+#.#
+
+#..
+..#
+"
+shape_2x = "
+o#
+##
+
+.o#.
+o###
+####
+.##.
+
+..o##.
+.o####
+o#####
+######
+.####.
+..##..
+
+..##..
+.####.
+.##.#.
+...#..
+
+.#....
+....#.
+#.....
+...#..
+"
+shape_play = "life"
+shape_rate = 8.0
+shape_turns = false
+count = 3
+speed = Vector2(2.0, 8.0)
+up = Vector2(10.0, 24.0)
+life = Vector2(1.2, 2.2)
+spread = 50.0
+height = 6.0

@@ -744,16 +744,19 @@ func _drawn_motes() -> void:
 	births.clear()
 
 
-## A status's motes (spell spectacle 2, S6 item 11): `count` motes of the element card `card`'s
+## A status's motes (spell spectacle 2, S6 item 11): `count` motes of the kinds status `status` names (`MoteKind.statuses`; ART2), else the element card `card`'s
 ## kinds (those that name it, else those of its look layer `layer`), each from a random point of
 ## an oval `reach` pixels round `at` (a character), drifting out STATUS_DRIFT pixels and a little
 ## up (STATUS_UP of its kind's own), cooling from the exact colour `core`. One of many a frame: a
 ## hit of the statuses' own group (`hit_shares.gd`), so it leaves the moments' rows alone and
 ## never takes a staff's share.
-func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core: Color, count: int) -> void:
+func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core: Color, count: int, status: StringName = &"") -> void:
 	if count <= 0 or not motes_on() or not at.is_finite():
 		return
-	var found: PackedInt32Array = pool.kinds_of_card(card)
+	# The status's own kinds (a burn's smoke, specks and cinders), else its card's, else its layer's.
+	var found: PackedInt32Array = pool.kinds_of_status(status) if status != &"" else PackedInt32Array()
+	if found.is_empty():
+		found = pool.kinds_of_card(card)
 	if found.is_empty():
 		found = pool.kinds_of_layer(layer)
 	if found.is_empty() or not (_hit_on if _hit_held else pool.open_hit(HitSharesScript.STATUSES)):

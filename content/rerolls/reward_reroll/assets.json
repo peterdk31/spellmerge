@@ -1,13 +1,13 @@
 {
 	"assets": [
 		{
-			"path": "content/rerolls/reward_reroll/icon.svg",
+			"path": "content/rerolls/reward_reroll/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (hand-written SVG rects)",
-			"prompt": "A 16x16 icon of a card with a star on it and a turning arrow beside it, void shades from docs/STYLE.md with a 1 px outline. Only non-overlapping rect elements, whole-number coordinates."
+			"tier": "good",
+			"tool": "tools/pickup_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "A 16x16-unit pickup icon drawn at 2x detail (32x32 art pixels): a face-down violet card with a four-point star and a turning arrow over its corner. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

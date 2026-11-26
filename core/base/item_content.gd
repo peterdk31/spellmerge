@@ -17,7 +17,7 @@ extends Resource
 @export var display_name: String = ""
 ## What it says it does, for people (a reward's card, the inventory).
 @export_multiline var description: String = ""
-## Its icon (16 by 16, drawn 2x on a reward's card).
+## Its icon (16 by 16 world units: at 2x detail a 32 by 32 `icon@2x.svg`, ArtDetail; drawn 2x on a reward's card).
 @export var icon: Texture2D = null
 
 

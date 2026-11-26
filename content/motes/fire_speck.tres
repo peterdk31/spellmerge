@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"fire_speck"
+statuses = Array[StringName]([&"burn"])
+gravity = -34.0
+drag = 1.5
+bounce = 0.0
+wobble = 3.0
+wobble_rate = 6.0
+glow = 0.8
+shade_from = 0
+shape = "
+o
+
+o
+
+#
+
+.
+"
+shape_2x = "
+o
+
+o
+#
+
+#
+
+.
+"
+shape_play = "loop"
+shape_rate = 10.0
+shape_turns = false
+count = 3
+speed = Vector2(4.0, 16.0)
+up = Vector2(20.0, 45.0)
+life = Vector2(0.4, 0.9)
+spread = 70.0
+height = 4.0

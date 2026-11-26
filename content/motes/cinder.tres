@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"cinder"
+statuses = Array[StringName]([&"burn"])
+gravity = 60.0
+drag = 2.0
+bounce = 0.2
+wobble = 1.5
+wobble_rate = 4.0
+glow = 0.3
+shade_from = 1
+shape = "
+#
+
+#
+
+#
+"
+shape_2x = "
+o
+
+o#
+
+#
+#
+"
+shape_play = "pick"
+shape_rate = 8.0
+shape_turns = false
+count = 2
+speed = Vector2(6.0, 18.0)
+up = Vector2(10.0, 30.0)
+life = Vector2(0.6, 1.2)
+spread = 90.0
+height = 10.0

@@ -1267,3 +1267,13 @@ func test_the_spells_kinds_are_drawn_at_2x() -> void:
 		check(kind != null and kind.detail() == 2, "%s has its 2x shape" % id)
 		if kind != null:
 			check_equal(kind.problems(), PackedStringArray(), "%s's shapes are fine" % id)
+
+
+## ART2: a status names its own kinds (`MoteKind.statuses`): a burning body gives them off in place of
+## its card's (a fire shot's embers stay the shot's).
+func test_a_status_gives_off_its_own_kinds() -> void:
+	var soot := _kind(&"soot_test")
+	soot.statuses = [&"burn"] as Array[StringName]
+	var motes: MotesScript = _pool(1024, [_kind(&"first", 0), soot])
+	check_equal(motes.kinds_of_status(&"burn"), PackedInt32Array([1]), "the burn's kinds")
+	check_equal(motes.kinds_of_status(&"chill"), PackedInt32Array(), "a status no kind names: none")

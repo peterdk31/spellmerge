@@ -205,3 +205,16 @@ func test_a_falls_streak_is_its_length_above_its_foot() -> void:
 			var longest: float = FlashTableScript.value_at(fall, &"column_length", a, float(z))
 			var old_top: float = maxf(foot - 8.0 * z, 1.0 - 12.0 * z)
 			check(is_equal_approx(maxf(foot - longest, top), old_top), "its top at age %.3f zoom %d" % [a, z])
+
+
+## ART2: a flash is drawn at the art's detail: its own pixels are art pixels (FLASH_DETAIL a world
+## pixel, ArtDetail's), its kinds' numbers in world pixels read times it; its dots and rings stay a
+## world pixel (they read zoomed out); its lower-right edge a shade below its second shade.
+func test_a_flash_is_drawn_at_the_arts_detail() -> void:
+	var code: String = (load("res://core/projectiles/shot_flash.gdshader") as Shader).code
+	check(code.contains("const float FLASH_DETAIL = %d.0;" % ArtDetail.DETAIL), "FLASH_DETAIL is ArtDetail.DETAIL")
+	check(code.contains("vec2 size = vec2(GRID) * z * FLASH_DETAIL;"), "its square is in art pixels")
+	for measure: String in ["C_ARM", "C_DISC", "C_RING", "C_STAR", "C_RAYS", "C_DOTS", "C_SPIRAL", "C_COLUMN_WIDTH", "C_GLOW_RING_REACH", "C_GLOW_MIDDLE_REACH"]:
+		check(code.contains("px_curve(row, %s," % measure), "%s is read in art pixels" % measure)
+	check(code.contains("bool dotted(vec2 d)") and code.contains("floor((d - dot_at) / FLASH_DETAIL)"), "its dots a world pixel each")
+	check(code.contains("min(second + 1.0, 3.0)"), "its lower-right edge a shade below its second shade")

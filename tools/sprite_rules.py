@@ -32,7 +32,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import staff_art  # noqa: E402
-from staff_art import BONE, OUTLINE, Canvas  # noqa: E402
+from staff_art import OUTLINE, Canvas  # noqa: E402
 
 DETAIL = staff_art.DETAIL
 ROOT = staff_art.ROOT
@@ -40,7 +40,7 @@ ROOT = staff_art.ROOT
 _L = (-0.55, -0.62, 0.56)
 _N = math.sqrt(sum(c * c for c in _L))
 LIGHT = (_L[0] / _N, _L[1] / _N, _L[2] / _N)
-SHADOW_BELOW = 0.28
+SHADOW_BELOW = 0.22
 LIGHT_ABOVE = 0.76
 
 Vec3 = tuple[float, float, float]
@@ -128,7 +128,7 @@ def rod(a: Point, b: Point, r: float, r_end: float | None = None, **kw: object) 
         if 0.0 < t < 1.0:
             s = across / radius
             dx, dy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
-            return Hit(unit(-dy * s * 1.4, dx * s * 1.4, 0.55), t * length, s)
+            return Hit(unit(-dy * s * 1.0, dx * s * 1.0, 0.75), t * length, s)
         return Hit(unit((x - cx) / radius * 1.2, (y - cy) / radius * 1.2, 0.6), t * length, across / radius)
 
     return Part(test, **kw)  # type: ignore[arg-type]
@@ -143,7 +143,9 @@ def ball(c: Point, rx: float, ry: float, lean: float = 0.8, **kw: object) -> Par
         if d2 > 1.0:
             return None
         z = math.sqrt(max(0.0, 1.0 - d2))
-        return Hit(unit(dx * lean, dy * lean, z + 0.35), x - c[0], y - c[1])
+        # u along its longer axis, v across it (-1 to 1), as a rod's.
+        upright = ry >= rx
+        return Hit(unit(dx * lean, dy * lean, z + 0.35), (y - c[1]) if upright else (x - c[0]), dx if upright else dy)
 
     return Part(test, **kw)  # type: ignore[arg-type]
 
@@ -167,7 +169,10 @@ def box(x0: float, y0: float, x1: float, y1: float, bevel: float = 0.55, corner:
                 return None
         sides = ((x - x0, (-1.0, 0.0)), (x1 - x, (1.0, 0.0)), (y - y0, (0.0, -1.0)), (y1 - y, (0.0, 1.0)))
         depth, normal = min(sides, key=lambda s: s[0])
-        return Hit(_bevel(normal, depth, bevel), x - x0, y - y0)
+        # u along its longer side, v across it (-1 to 1), as a rod's, so a surface runs with it.
+        if y1 - y0 >= x1 - x0:
+            return Hit(_bevel(normal, depth, bevel), y - y0, (x - (x0 + x1) / 2.0) / ((x1 - x0) / 2.0))
+        return Hit(_bevel(normal, depth, bevel), x - x0, (y - (y0 + y1) / 2.0) / ((y1 - y0) / 2.0))
 
     return Part(test, **kw)  # type: ignore[arg-type]
 
@@ -216,8 +221,9 @@ def ring(c: Point, r_out: float, r_in: float, **kw: object) -> Part:
     return Part(test, **kw)  # type: ignore[arg-type]
 
 
-def mask(rows: list[list[list[int]]], ox: float = 0.0, oy: float = 0.0, apex: Point | None = None, **kw: object) -> Part:
-    """A silhouette kept from 1x art (with its outline): `rows[y]` the runs [from, to) of x it covers, placed at
+def mask(rows: list[list[list[int]]], ox: float = 0.0, oy: float = 0.0, apex: Point | None = None, inset: bool = True, **kw: object) -> Part:
+    """A silhouette kept from 1x art (with its outline; `inset` false: runs with none, such as a
+    flame's tongue): `rows[y]` the runs [from, to) of x it covers, placed at
     (ox, oy). Its facing is a bundle's: strands fanning from `apex` (above it), each round across,
     the whole a little rounder at its sides; u is the strand coordinate, v how far down it is."""
     height = len(rows)
@@ -234,11 +240,12 @@ def mask(rows: list[list[list[int]]], ox: float = 0.0, oy: float = 0.0, apex: Po
             return None
         # The runs include the 1x outline: inset half a unit, so the one-art-pixel outline drawn
         # round the fill lands where the 1x outline was.
-        if not any(a + 0.5 <= lx < b - 0.5 for a, b in rows[row]):
+        pad = 0.5 if inset else 0.0
+        if not any(a + pad <= lx < b - pad for a, b in rows[row]):
             return None
-        if not (0 <= row - 1 and any(a <= lx < b for a, b in rows[row - 1]) or ly - row >= 0.5):
+        if inset and not (0 <= row - 1 and any(a <= lx < b for a, b in rows[row - 1]) or ly - row >= 0.5):
             return None
-        if not (row + 1 < height and any(a <= lx < b for a, b in rows[row + 1]) or ly - row < 0.5):
+        if inset and not (row + 1 < height and any(a <= lx < b for a, b in rows[row + 1]) or ly - row < 0.5):
             return None
         u = math.atan2(lx - tip[0], ly - tip[1]) * 80.0
         phase = (u * DETAIL / 2.0) % 1.0 - 0.5
@@ -277,8 +284,9 @@ def _surface(part: Part, hit: Hit, shade: int, ax: int, ay: int) -> int:
         if abs(lane - round(lane)) < 0.18 and _hash(round(lane), int(hit.u * DETAIL / 3.0), part.seed) % 5 != 0:
             return shade - 1 if shade > 0 else 1
     elif s == "board":
-        # A board's grain runs across the picture (u is x, v is y).
-        if (int(hit.v * DETAIL) + (1 if _hash(int(hit.u * DETAIL / 5.0), int(hit.v * DETAIL), part.seed) % 7 == 0 else 0)) % 3 == 0 and _hash(int(hit.u * DETAIL / 4.0), int(hit.v * DETAIL), part.seed) % 4 != 0:
+        # A plank: grain lines along it, closer than a rod's, each broken now and then.
+        lane = (hit.v + 1.0) * 3.6
+        if abs(lane - round(lane)) < 0.2 and _hash(round(lane), int(hit.u * DETAIL / 4.0), part.seed) % 4 != 0:
             return shade - 1 if shade > 0 else 1
     elif s == "pores":
         if _hash(ax, ay, part.seed) % 19 == 0:
@@ -310,9 +318,11 @@ def _surface(part: Part, hit: Hit, shade: int, ax: int, ay: int) -> int:
         # Straw: a strand every few art pixels, each its own shade, a dark line between some.
         strand = int(math.floor(hit.u * DETAIL / 2.0))
         h = _hash(strand, 7, part.seed)
-        if h % 6 == 0:
-            return 0
-        return max(0, min(2, shade + (1 if h % 3 == 0 else (-1 if h % 3 == 1 else 0))))
+        if h % 11 == 0:
+            return shade - 1 if shade > 0 else 1
+        if h % 5 == 0:
+            return min(2, shade + 1)
+        return shade
     return shade
 
 
@@ -375,9 +385,11 @@ def draw(parts: list[Part], width: int, height: int, outline: bool = True) -> Ca
                 if index not in glints or level > glints[index][0]:
                     glints[index] = (level, px, py)
     for index, (_level, px, py) in glints.items():
-        canvas.pixels[py][px] = BONE[2]
+        # Its own light shade (never another material's: docs/STYLE.md), Bone's own a white glint.
+        light = PALETTE[parts[index].material][2] if parts[index].colour is None else parts[index].colour
+        canvas.pixels[py][px] = light
         if py > 0 and which[py - 1][px] == index:
-            canvas.pixels[py - 1][px] = BONE[2]
+            canvas.pixels[py - 1][px] = light
     # Seams: a pixel beside one of a part drawn over it (a later one, with a seam) goes dark.
     seams: list[tuple[int, int]] = []
     for py in range(h):

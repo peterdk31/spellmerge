@@ -6,8 +6,8 @@
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
-			"tool": "Claude (drawn by tools/enemy_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART1's hand redraw at 2x detail, 2026-11-26)",
-			"prompt": "At 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, keeping its 1x silhouette, size and frames: The Storm Fork: a trident, its three tines tipped with lightning, a spike of it below. Drawn part by part, each a rod, a ball, a bevelled box or polygon (or, for the straw, its 1x outline filled with strands): lit from the top-left in three shades of its material, the base the most, with its material's surface (wood grain along each piece, bone pores and cracks, a leaf's vein, a flame's bright core, ice streaks, glints on gold, ice and glass), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque."
+			"tool": "Claude (drawn by tools/enemy_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART1's redraw at 2x detail, 2026-11-26)",
+			"prompt": "At 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game, about its 1x silhouette, size and frames: The Storm Fork: a trident, its three tines tipped with lightning, a spike of it below. Drawn part by part, each a rod, a ball, a bevelled box or polygon (or, for the straw, its 1x outline and tuft splits filled with strands): lit from the top-left in three shades of its material, the base the most on wood, leaf, gold, stone and bone, with its material's surface where it has one (wood grain along each piece, bone pores and cracks, a leaf's vein, a flame's bright core, ice streaks, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque."
 		}
 	]
 }

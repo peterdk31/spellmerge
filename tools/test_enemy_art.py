@@ -46,18 +46,37 @@ class EnemyArtTest(unittest.TestCase):
                             inside = 0 <= ny < picture.height and 0 <= nx < picture.width
                             self.assertTrue(inside and p[ny][nx] is not None, f"{path.name}: ({x}, {y}) closed in")
 
-    def test_every_body_is_64_art_pixels_and_shows_its_materials_in_three_shades(self) -> None:
+    def test_every_body_is_64_art_pixels_with_its_wood_in_three_shades(self) -> None:
         for name, parts in enemy_art.SPRITES.items():
             picture = sr.draw(parts(), 32, 32)
             self.assertEqual((picture.width, picture.height), (64, 64), name)
-            colours = [c for row in picture.pixels for c in row if c is not None]
-            wood = sr.PALETTE["Wood"]
-            if any(c in wood for c in colours):
-                self.assertTrue(all(c in colours for c in wood), f"{name}: its wood in three shades")
-            # The base shade covers more of the wood than either other (docs/STYLE.md).
-            counts = [colours.count(c) for c in wood]
-            if sum(counts) > 60:
-                self.assertGreaterEqual(counts[1], min(counts[0], counts[2]), f"{name}: {counts}")
+            colours = {c for row in picture.pixels for c in row}
+            self.assertTrue(set(sr.PALETTE["Wood"]) <= colours, f"{name}: its wood in three shades")
+
+    def test_the_base_shade_covers_the_most(self) -> None:
+        """docs/STYLE.md, "Light and shading": a material's base covers most of it, its light and
+        shadow the edges (a glowing material, Fire, Arc, Void, and the face's pale sheets aside)."""
+        for path, draw in enemy_art.files().items():
+            if path.name.startswith("eyes"):
+                continue
+            colours = [c for row in draw().pixels for c in row if c is not None]
+            for material in ("Wood", "Leaf", "Spark", "Stone", "Bone"):
+                counts = [colours.count(c) for c in sr.PALETTE[material]]
+                if sum(counts) > 60:
+                    self.assertGreaterEqual(counts[1], max(counts[0], counts[2]), f"{path.name}, {material}: {counts}")
+
+    def test_the_bristle_frames_keep_their_strands(self) -> None:
+        """Smooth (docs/STYLE.md): a strand keeps its shade from one frame to the next, so the
+        head sways rather than shimmers: frames 0 and 1 agree on most of the pixels both fill."""
+        frames = [sr.draw(enemy_art.broom_head(f), 88, 32) for f in (0, 1)]
+        both = same = 0
+        for y in range(64):
+            for x in range(176):
+                a, b = frames[0].pixels[y][x], frames[1].pixels[y][x]
+                if a is not None and b is not None and OUTLINE not in (a, b):
+                    both += 1
+                    same += a == b
+        self.assertGreater(same / both, 0.6, f"{same} of {both}")
 
     def test_the_broom_keeps_its_1x_silhouettes_and_frames(self) -> None:
         shapes = json.loads((enemy_art.BROOM / "silhouettes.json").read_text(encoding="utf-8"))
@@ -67,6 +86,10 @@ class EnemyArtTest(unittest.TestCase):
             drawn = {(x // 2, y // 2) for y in range(64) for x in range(176) if picture.pixels[y][x] is not None}
             kept = {(x, y) for y, row in enumerate(shapes["head"][frame]) for a, b in row for x in range(a, b)}
             self.assertGreater(len(drawn & kept) / len(kept | drawn), 0.9, f"head frame {frame}: its 1x outline")
+            burning = sr.draw(enemy_art.broom_head(frame, True), 88, 32)
+            drawn = {(x // 2, y // 2) for y in range(64) for x in range(176) if burning.pixels[y][x] is not None}
+            kept = {(x, y) for y, row in enumerate(shapes["head_burning"][frame]) for a, b in row for x in range(a, b)}
+            self.assertGreater(len(drawn & kept) / len(kept | drawn), 0.85, f"burning frame {frame}: its 1x outline, flames and all")
         self.assertEqual((enemy_art.broom_eyes().width, enemy_art.broom_eyes().height), (480, 32), "ten looks by two rows of 48x16")
         self.assertEqual((enemy_art.broom_brows().width, enemy_art.broom_brows().height), (240, 32), "five moods by two rows")
         self.assertEqual((enemy_art.broom_portrait().width, enemy_art.broom_portrait().height), (576, 192), "three 192x192 frames")

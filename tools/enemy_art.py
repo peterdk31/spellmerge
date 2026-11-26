@@ -40,7 +40,7 @@ def _mirror(points: list[tuple[float, float]], axis: float) -> list[tuple[float,
 def _pedestal() -> list[Part]:
     """A dummy's stone foot: a low slab, wider at the floor."""
     return [
-        poly([(11.6, 26.4), (21.4, 26.4), (24.6, 29.0), (24.6, 30.0), (8.4, 30.0), (8.4, 29.0)], material="Stone", surface="speckle", bevel=0.7),
+        poly([(11.6, 26.4), (21.4, 26.4), (24.6, 29.0), (24.6, 30.5), (8.4, 30.5), (8.4, 29.0)], material="Stone", surface="speckle", bevel=0.7),
     ]
 
 
@@ -66,7 +66,7 @@ def ember_imp() -> list[Part]:
 def splinter() -> list[Part]:
     """The Splinter: a split shard of wood, two prongs at its top, two snapped twigs."""
     return [
-        rod((16.6, 17.6), (16.5, 28.6), 1.9, 0.5, material="Wood", surface="grain", seed=2),
+        rod((16.6, 17.6), (16.5, 28.0), 1.9, 1.1, material="Wood", surface="grain", seed=2),
         rod((15.6, 18.0), (15.3, 14.4), 0.8, 0.35, material="Wood", surface="grain"),
         rod((17.6, 18.0), (17.7, 13.4), 0.8, 0.35, material="Wood", surface="grain"),
         rod((15.2, 21.6), (12.9, 22.7), 0.75, 0.35, material="Wood"),
@@ -80,7 +80,7 @@ def storm_fork() -> list[Part]:
         rod((16.5, 10.0), (16.5, 25.6), 2.0, material="Wood", surface="grain", seed=3),
         box(10.4, 8.6, 22.6, 11.0, corner=0.8, material="Wood", surface="board"),
     ]
-    for x0, x1, top in ((10.5, 13.0, 3.6), (15.0, 18.0, 2.8), (20.0, 22.5, 3.6)):
+    for x0, x1, top in ((10.5, 13.5, 3.6), (14.5, 18.5, 2.8), (19.5, 22.5, 3.6)):
         parts.append(box(x0, top, x1, 10.0, corner=0.6, material="Wood", surface="grain"))
     for cx, top, w in ((11.75, 0.6, 1.4), (16.5, -0.6, 1.7), (21.25, 0.6, 1.4)):
         parts.append(poly([(cx - w, 4.2), (cx - 0.3, top + 1.6), (cx, top), (cx + 0.4, top + 1.4), (cx + w, 4.2)], material="Arc", surface="streak", glint=True, seam=False))
@@ -112,7 +112,7 @@ def bone_scepter() -> list[Part]:
         rod((16.5, 17.5), (16.5, 26.8), 2.0, material="Wood", surface="grain", seed=8),
         ball((16.5, 9.2), 9.0, 7.4, lean=0.6, material="Bone", surface="pores", cracks=[[(21.6, 3.8), (22.4, 5.2)]]),
         poly([(8.8, 12.0), (24.2, 12.0), (23.0, 15.4), (20.6, 16.8), (12.4, 16.8), (10.0, 15.4)], material="Bone", surface="pores", seam=False),
-        box(9.6, 7.6, 23.4, 13.4, corner=0.8, bevel=0.9, material="Void", glint=True),
+        box(9.6, 7.6, 23.4, 13.4, corner=0.8, material="Void", colour=PALETTE["Void"][0]),
     ]
     for x in (12.0, 14.0, 16.0, 18.0, 20.0):
         parts.append(box(x - 0.1, 16.4, x + 1.1, 18.0, corner=0.3, material="Bone"))
@@ -127,10 +127,10 @@ def spitter() -> list[Part]:
     leaf = dict(material="Leaf", surface="vein")
     return [
         rod((16.4, 14.0), (16.4, 28.4), 1.6, 1.1, material="Wood", surface="grain", seed=9),
-        rod((14.0, 25.4), (19.0, 26.4), 0.9, material="Skin", seam=True),
-        rod((14.6, 27.8), (18.2, 28.6), 0.8, material="Skin"),
-        rod((22.6, 15.2), (10.2, 18.6), 1.9, 1.2, **leaf),  # type: ignore[arg-type]
-        rod((22.2, 21.4), (10.2, 24.0), 2.0, 1.2, **leaf),  # type: ignore[arg-type]
+        rod((14.4, 25.6), (18.6, 26.2), 0.8, material="Wood"),
+        rod((15.0, 27.9), (18.0, 28.5), 0.7, material="Wood"),
+        rod((21.8, 15.4), (10.4, 18.4), 1.3, 0.8, **leaf),  # type: ignore[arg-type]
+        rod((21.6, 21.6), (10.4, 23.8), 1.3, 0.8, **leaf),  # type: ignore[arg-type]
         rod((14.8, 13.0), (16.6, 15.4), 1.1, material="Skin"),
         poly([(11.6, 8.6), (20.6, 8.6), (20.6, 10.6), (16.0, 11.4), (15.6, 14.4), (13.0, 14.4), (12.0, 11.4)], material="Skin", bevel=0.7),
         poly([(9.4, 9.0), (9.6, 5.4), (11.2, 3.6), (14.6, 3.4), (20.8, 3.6), (22.4, 5.0), (23.4, 7.4), (21.4, 8.4), (12.6, 8.6), (11.2, 10.6)], material="Leaf", surface="vein", bevel=0.8),
@@ -150,7 +150,7 @@ def crypt_mite() -> list[Part]:
     """The Crypt Mite: a round wooden beetle, its shell split down the middle, six thin legs and a
     bone sting."""
     legs: list[Part] = []
-    for start, end in (((11.6, 18.6), (9.6, 16.8)), ((11.0, 21.4), (8.0, 20.2)), ((11.2, 24.2), (8.2, 23.4))):
+    for start, end in (((11.8, 18.8), (10.4, 17.4)), ((11.0, 21.4), (8.8, 20.4)), ((11.2, 24.0), (9.0, 23.4))):
         for a, b in ((start, end), (_mirror([start], 16.0)[0], _mirror([end], 16.0)[0])):
             legs.append(rod(a, b, 0.3, colour=OUTLINE, seam=False))
     shell = dict(material="Wood", surface="grain")
@@ -172,7 +172,7 @@ def bone_husk() -> list[Part]:
         ball((13.8, 25.6), 2.4, 2.2, **bone),  # type: ignore[arg-type]
         ball((19.2, 25.6), 2.4, 2.2, **bone),  # type: ignore[arg-type]
         ball((16.5, 25.2), 3.6, 2.4, seam=False, **bone),  # type: ignore[arg-type]
-        rod((16.5, 15.0), (16.5, 24.0), 3.0, cracks=[[(15.6, 22.0), (16.4, 23.0), (16.0, 24.0)], [(16.4, 17.6), (16.0, 18.6)]], **bone),  # type: ignore[arg-type]
+        rod((16.5, 15.0), (16.5, 24.0), 2.6, cracks=[[(15.6, 22.0), (16.4, 23.0), (16.0, 24.0)], [(16.4, 17.6), (16.0, 18.6)]], **bone),  # type: ignore[arg-type]
         box(12.4, 18.6, 20.6, 20.6, corner=0.5, material="Wood", surface="board"),
         ball((12.6, 6.6), 3.6, 2.6, **bone),  # type: ignore[arg-type]
         ball((20.4, 6.6), 3.6, 2.6, **bone),  # type: ignore[arg-type]
@@ -201,8 +201,8 @@ def training_dummy() -> list[Part]:
     """The training dummy: a post with a crossbar and a painted target, a stone foot."""
     return [
         *_pedestal(),
-        rod((16.5, 3.6), (16.5, 27.0), 2.0, material="Wood", surface="grain", seed=11),
-        box(8.4, 8.4, 24.6, 11.0, corner=0.8, material="Blight", surface="board"),
+        rod((16.5, 5.8), (16.5, 27.0), 2.0, material="Wood", surface="grain", seed=11),
+        box(8.4, 8.4, 24.6, 11.0, corner=0.8, material="Wood", surface="board", seed=17),
         ball((16.5, 16.0), 5.4, 4.8, lean=0.5, material="Bone", surface="pores"),
         ring((16.5, 16.0), 3.6, 2.4, material="Fire"),
         ball((16.5, 16.0), 1.4, 1.3, material="Spark", glint=True),
@@ -235,12 +235,21 @@ def broom_binding() -> list[Part]:
     return [
         box(1.6, 2.4, 38.4, 10.4, corner=0.4, material="Wood", surface="board", cracks=[[(34.4, 4.2), (35.4, 6.2), (35.0, 8.4)]], seed=13),
         box(2.4, 0.6, 37.6, 3.0, corner=0.9, material="Bone", surface="rivets"),
-        box(1.6, 9.8, 38.4, 12.6, corner=1.0, material="Bone", surface="rivets"),
+        box(1.6, 9.8, 38.4, 13.0, corner=1.0, material="Bone", surface="rivets"),
     ]
 
 
 def _bristles(rows: list[list[list[int]]], seed: int, ox: float = 0.0, oy: float = 0.0) -> Part:
-    return mask(rows, ox, oy, material="Spark", surface="strands", seed=seed)
+    """Straw in `rows`: strands fanning from above its own top middle, so in every frame of a
+    strip a strand keeps its shade and moves with its frame's shape."""
+    top = next((row for row in rows if row), [[0, 1]])
+    middle = (top[0][0] + top[-1][1]) / 2.0
+    return mask(rows, ox, oy, apex=(middle, -40.0), material="Spark", surface="strands", seed=seed)
+
+
+def _lines(rows: list[list[list[int]]]) -> Part:
+    """The splits between its tufts, kept from the 1x art: dark lines."""
+    return mask(rows, inset=False, colour=OUTLINE, seam=False)
 
 
 def _minus(rows: list[list[list[int]]], cut: list[list[list[int]]]) -> list[list[list[int]]]:
@@ -271,7 +280,7 @@ def _burning(straw: Part, line: float) -> Part:
             return None
         return straw.test(x, y)
 
-    return Part(test, material="Spark", surface="strands", seed=straw.seed + 7, seam=False)
+    return Part(test, material="Spark", surface="strands", seed=straw.seed, seam=False)
 
 
 def broom_head(frame: int, burning: bool = False) -> list[Part]:
@@ -279,19 +288,22 @@ def broom_head(frame: int, burning: bool = False) -> list[Part]:
     its 1x silhouette; burning, the straw aflame, its tips glowing, flames licking up at its edges."""
     shapes = _silhouettes()
     plain = shapes["head"][frame]
-    straw = _bristles(plain, 20 + frame)
+    straw = _bristles(plain, 20)
+    lines = _lines(shapes["head_lines"][frame])
     if not burning:
-        return [straw]
-    flames = _minus(shapes["head_burning"][frame], plain)
-    fire = _bristles(plain, 30 + frame)
+        return [straw, lines]
+    # Its flames, one world unit in from the frame's edges so the outline round them fits.
+    flames = [[[max(a, 1), min(b, 87)] for a, b in row if min(b, 87) > max(a, 1)] if 1 <= y <= 30 else [] for y, row in enumerate(_minus(shapes["head_burning"][frame], plain))]
+    fire = _bristles(plain, 20)
     fire.material = "Fire"
-    return [fire, _burning(straw, 23.0), mask(flames, material="Fire", surface="flame", seam=False)]
+    return [fire, _burning(straw, 23.0), lines, mask(flames, inset=False, material="Fire", surface="flame", seam=False)]
 
 
 def _eye(look: tuple[int, int], cx: float, inner: float, angry: bool, shut: bool) -> list[Part]:
     """One heavy-lidded eye, 7x6 world units round `cx` (`inner`: +1 its inner side is right)."""
     x0, x1 = cx - 3.5, cx + 3.5
-    parts: list[Part] = [box(x0, 0.5, x1, 6.5, corner=1.6, bevel=0.8, material="Bone")]
+    # The white pale (Bone light, for the game to tint), shaded at its bottom-right rim.
+    parts: list[Part] = [box(x0, 0.5, x1, 6.5, corner=1.6, bevel=0.8, material="Bone"), box(x0 + 0.6, 0.5, x1 - 0.9, 5.7, corner=1.2, material="Bone", colour=PALETTE["Bone"][2], seam=False)]
     if shut:
         parts.append(box(x0, 0.5, x1, 6.5, corner=1.6, material="Bone", colour=PALETTE["Bone"][0]))
         parts.append(rod((x0 + 0.8, 4.4), (x1 - 0.8, 4.4), 0.35, colour=OUTLINE, seam=False))
@@ -318,29 +330,35 @@ def broom_eyes() -> Canvas:
     return sheet
 
 
-# A brow's top at its outer and inner ends, and how high it arches, a mood each (Face.Mood).
-BROW_MOODS = ((2.2, 2.2, 0.6), (1.4, 1.6, 0.8), (1.2, 3.6, 0.0), (0.8, 4.6, 0.0), (3.6, 1.2, 0.2))
+# A brow's top at its outer and inner ends, and how high it arches, a mood each (Face.Mood):
+# neutral, raised (high and arched), angry (down to the middle), furious (more), worried (up).
+BROW_MOODS = ((2.4, 2.2, 0.4), (0.9, 1.0, 1.0), (1.2, 3.4, 0.0), (0.8, 4.2, 0.0), (3.6, 1.2, 0.3))
+# How thick a brow is at its outer and its inner end: bushy toward the middle of the face.
+BROW_THICK = (1.6, 3.0)
 
 
 def _brow(outer: float, inner: float, arch: float, material: str, mirror: bool) -> list[Part]:
-    """A bushy brow from x 0.6 (outer) to 9.4 (inner), 2.4 thick, three tufts on top."""
+    """A bushy brow from x 0.6 (outer) to 9.4 (inner), tapering from its inner end, its top edge
+    ragged with three tufts, its hair in strokes along it."""
     def top(x: float) -> float:
         t = (x - 0.6) / 8.8
-        return outer + (inner - outer) * t - arch * math.sin(t * math.pi)
+        # Below the frame's top row, so the outline round it fits.
+        return max(0.6, outer + (inner - outer) * t - arch * math.sin(t * math.pi))
 
-    points = [(0.6 + 8.8 * i / 8.0, top(0.6 + 8.8 * i / 8.0)) for i in range(9)]
-    under = [(x, y + 2.4 - 0.5 * math.sin((x - 0.6) / 8.8 * math.pi)) for x, y in reversed(points)]
+    xs = [0.6 + 8.8 * i / 8.0 for i in range(9)]
+    points = [(x, top(x)) for x in xs]
+    under = [(x, top(x) + BROW_THICK[0] + (BROW_THICK[1] - BROW_THICK[0]) * (x - 0.6) / 8.8) for x in reversed(xs)]
     shape = points + under
     tufts = []
-    for x in (2.4, 5.0, 7.6):
+    for x in (2.6, 5.2, 7.8):
         y = top(x)
         # A tuft stops short of the frame's top, so the outline round it fits.
-        tufts.append([(x - 0.9, y + 0.4), (x + 0.4, max(y - 1.0, 0.6)), (x + 0.9, y + 0.4)])
+        tufts.append([(x - 0.9, y + 0.5), (x + 0.5, max(y - 0.9, 0.6)), (x + 1.0, y + 0.5)])
     if mirror:
         shape = _mirror(shape, 10.5)
         tufts = [_mirror(tuft, 10.5) for tuft in tufts]
-    hair = dict(material=material, surface="strands")
-    return [poly(shape, bevel=0.6, **hair)] + [poly(tuft, bevel=0.4, seam=False, **hair) for tuft in tufts]  # type: ignore[arg-type]
+    hair = dict(material=material)
+    return [poly(shape, bevel=0.5, **hair)] + [poly(tuft, bevel=0.4, seam=False, **hair) for tuft in tufts]  # type: ignore[arg-type]
 
 
 def broom_brows() -> Canvas:
@@ -397,8 +415,9 @@ def _portrait_rest() -> list[Part]:
     shapes = _silhouettes()
     return [
         _bristles(shapes["portrait_rest_straw"], 30),
+        _lines(shapes["portrait_rest_straw_lines"]),
         rod((43.6, 21.6), (52.2, 50.6), 5.0, material="Wood", surface="grain", seed=15),
-        rod((45.0, 26.0), (47.6, 33.4), 5.2, material="Bone", surface="wrap"),
+        rod((45.0, 26.0), (47.6, 33.4), 4.9, material="Bone", surface="wrap"),
         ring((40.5, 11.8), 7.2, 3.6, material="Stone", surface="speckle"),
         ball((40.5, 11.8), 3.7, 3.7, colour=OUTLINE, seam=False),
         *_binding_face(50.4, False),

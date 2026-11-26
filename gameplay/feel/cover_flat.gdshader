@@ -411,10 +411,10 @@ vec4 oil(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int t
 // Fire on the floor (ART2; the owner, 2026-11-26: "too chunky ... a completely new direction":
 // the fire is mostly motes, its smoke, specks and cinders given off by the state, content/cover).
 // Drawn here, low and thin at the art's detail: the fire's bed (`shadow`) glowing in patches of
-// `base` that flicker a step at a time (each patch 3 art pixels, new every flicker), a few pixels
-// of `light` in them, and small tongues an art pixel wide: one a block of 4 x 6 world px (each row
-// of blocks shifted by its own hash), half the blocks with one, its height 2 to 5 art pixels new
-// every flicker, its root white-hot (it is danger), `heart` above it, `light` and its tip `base`;
+// `base` that flicker a step at a time (a few, 2 art pixels each, new every flicker), one in five of
+// `light`, and small tongues an art pixel wide: one a block of 4 x 6 world px (each row of blocks
+// shifted by its own hash), a third of the blocks with one, its height 2 to 5 art pixels new every
+// flicker, a tall one's root white-hot (it is danger), `heart` above it, `light` and its tip `base`;
 // now and then an ember of `heart` in the bed.
 vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicker, int d) {
 	int w = 4 * d;
@@ -429,13 +429,13 @@ vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicke
 	int up = tall - 1 - l.y;
 	int cx = 1 + int((still >> 9u) % uint(max(w - 2, 1)));
 	int height = 2 + int(now % 4u);
-	if (still % 2u == 0u && l.x == cx && up < height) {
-		return up == 0 ? white_hot : (up == 1 ? heart : (up < height - 1 ? light : base));
+	if (still % 3u == 0u && l.x == cx && up < height) {
+		return up == 0 ? (height >= 4 ? white_hot : heart) : (up == 1 ? heart : (up < height - 1 ? light : base));
 	}
-	// The bed: patches of 3 art pixels glowing a step at a time.
-	uint patch = pixel_hash(px / 3 + ivec2(flicker * 7, flicker * 3), 59);
-	if (patch % 10u < 3u) {
-		return pixel_hash(px, 61) % 7u == 0u ? light : base;
+	// The bed: a few small glows, 2 art pixels each, a step at a time.
+	uint patch = pixel_hash(px / 2 + ivec2(flicker * 7, flicker * 3), 59);
+	if (patch % 16u == 0u) {
+		return pixel_hash(px / 2, 61) % 5u == 0u ? light : base;
 	}
 	return pixel_hash(px + ivec2(flicker, 0), 53) % uint(61 * d * d) == 0u ? heart : shadow;
 }

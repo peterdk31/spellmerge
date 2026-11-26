@@ -5,6 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## not depend on the frame rate.
 
 
+const TickScript := preload("res://core/sim/tick.gd")
 const SAVE_PATH: String = "user://shot_intro_save.cfg"
 const MOMENTS: Array = [[1.5, "intro_walk_in"], [5.0, "intro_oops"], [6.6, "intro_fall"], [7.9, "intro_thud"], [11.0, "intro_obviously"], [12.6, "intro_home_is_up_there"]]
 

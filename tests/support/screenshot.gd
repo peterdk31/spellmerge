@@ -44,7 +44,7 @@ const SCREEN := Vector2(640.0, 360.0)
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const PinnedRun := preload("res://bench/pinned_run.gd")
 const DrawnFramesScript := preload("res://tests/support/drawn_frames.gd")
-const TickScript := preload("res://core/sim/tick.gd")
+const _SHOT_TICK := preload("res://core/sim/tick.gd")
 ## The room a shot's run plays while `pin_room` is on.
 const PINNED_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
@@ -82,7 +82,7 @@ func _initialize() -> void:
 	# never the real one: the camera's easing, the motes and the mist must not run ahead while a
 	# software renderer takes a tenth of a second a frame, nor stand still while a frame is not drawn.
 	if feel != null:
-		feel.set(&"fixed_view_delta", TickScript.DT)
+		feel.set(&"fixed_view_delta", _SHOT_TICK.DT)
 	await take()
 	if not _failed:
 		quit(0)

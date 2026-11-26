@@ -8,12 +8,11 @@ Run lifecycle: start, seed, the biome map, and later the end and the summary scr
 
 - **`run.gd`, the autoload `Run`:** on `run_begun(run_id, players)` (from Flow, after `Tick.begin_run` dealt the seed) it makes the biome map of run definition `run_id` (registry folder `runs`) once, with `BiomeGenerator.generate`, from `Registry.run_content()`, `Registry.run_shapes`, the run's chance (`Sim.found`) and its players. It then sends, in order: `run_stats_ruled`, one `run_room_filled(room, enemies, scale, group, refill_at, stagger, elites)` per room, then `run_biome_chosen(map)` (a copy), which Flow lays and plays.
 - Rooms hold layout only; what fights in a room is the map's.
-- **Scaling:** `BiomeMap.room_levels` / `level_of` (depth only; aim sharpens by it, never by player count) and `BiomeMap.room_scales` (`RunScaling.room_scale`: the definition's curve by depth up to `scale_depth`, times one per extra player). The scale grows the enemy budget (`RunScaling.scaled_budget`) and, through gameplay/difficulty (`run_room_scaled`), enemy and boss health. A wizard joining later plays the map as made.
+- **Scaling:** `BiomeMap.room_levels` / `level_of` (by depth only; more players never sharpen aim) and `room_scales` (`RunScaling.room_scale`, by depth and players) grow the budget (`RunScaling.scaled_budget`) and, via gameplay/difficulty (`run_room_scaled`), health. A later joiner plays the map as made.
 - **Pace:** `group`, `refill_at`, `stagger` come from the biome's `MapRules.spawning` (`SpawnRules`) via `RoomFill.pace`; send plain numbers in `run_room_filled`, never the Resource.
 - **State:** `map` (a `BiomeMap`) is run state, hashed and snapshotted; joins the Tick with no step, renewed at each run's start (`Tick.RUN_ORDER`). In the hub there is no map. Flow keeps its own copy (`BiomeWorld.map`).
 - **Unlocks:** the map is made by `RunDefinition.changed_by(sim.unlocks)`. Unlocks are the run start's (`Sim.unlocks`, from the host's save in the replay header), never this machine's save during a run. `unlocks_now` (the frames service's source, `Frames.set_unlocks_source`) gives only the save's flags some `RunDefinition.flags` names.
 - **No map:** an unknown definition or `BiomeMap.not_made` answers nothing, with a warning; Flow starts no run.
-- Gone: `RunMap`, `RunNode`, `RunGenerator`, `run_way_taken`, `RunMap.start_at`, `run_map_changed`. Don't bring them back.
 
 ## The biome map
 
@@ -23,12 +22,11 @@ Run lifecycle: start, seed, the biome map, and later the end and the summary scr
 
 ## The biome generator
 
-- **`BiomeGenerator.generate(definition, content, shapes, sim, players)`** (`biome_generator.gd`): a pure function to a `BiomeMap`; it reads no node. Steps are in the script's class doc: room count and `MapStyle`; kinds (`least`, `chance` up to `max_per_run`, by weight; boss deepest); the way (`way_share`, `fights_on_way`); rooms off it (`branch_chain`, `hub_pull`); loops (`loops`, `loop_pull`); extra entrances (step 5b, no roll; `entrance_pull` leans toward them; `joins_left` is 0 for a made map); the fill (`RoomFill`, elites by `elite_depth` / `elite_chance` / `elite_cards`, `RoomKind.FILL_ELITES`); reward types.
+- **`BiomeGenerator.generate(definition, content, shapes, sim, players)`** (`biome_generator.gd`): a pure function to a `BiomeMap`; it reads no node. Its steps (style, kinds, the way, rooms off it, loops, extra entrances, fill and elites, reward types) and their `MapRules` / `MapStyle` numbers are in the script's class doc. `joins_left` is 0 for a made map.
 - Rolls only through `sim.chance(&"biome_map", ...)` via `MapDice`; secret ways under `SECRET_PURPOSE`, reward types under `REWARD_PURPOSE`, each keyed and counted so no other roll shifts.
 - A seed with no placement retries (`ATTEMPTS`); a map not made, or a definition with problems (`RunDefinition.biome_problems`, `MapRules.biome_problems`), says why. `rule_problems(map, rules, content, shapes)` checks a made map.
 - Rules every map keeps: places on the 32 px grid; a template once per biome (start room excepted); slab `GAP` clear of other rooms; a bridge over its two rooms only; every bridge's two ends meet two sockets facing each other; every socket without a bridge stays lip; boss deepest; enough fights on every way to it; each kind at a depth it takes; a secret room is a dead end that no loop or extra entrance joins; locked and gated rooms keep one door.
-- **A reward room's type:** rooms of a kind with `RoomKind.typed_rewards` get a `RewardType` from the kind's `rewards` table (`BiomeGenerator.roll_type`), kept in `room_reward_items`, `room_reward_card_kinds`, `room_reward_elements`. Flow sends `room_rewards_due` and puts it on the layout (`RewardType.LAYOUT_META`).
-- **Chance rooms' slots:** rolled in line order, slots within `rooms_max` given to lines with the fewest chance rooms first (`_chance_order`).
+- **Reward types:** a kind with `RoomKind.typed_rewards` gets a `RewardType` (`roll_type`), kept in the map; Flow tells it with `room_rewards_due` (`RewardType.LAYOUT_META`).
 - **The crypt:** made from its own templates; its validator names nothing. `MapRules.start_only` makes the start room alone (a test's pinned room, `bench/pinned_run.gd`).
 
 ### Three ways into a secret room

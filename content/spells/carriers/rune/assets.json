@@ -1,6 +1,15 @@
 {
 	"assets": [
 		{
+			"path": "content/spells/carriers/rune/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The rune icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A gold rune stone, a diamond with a mark cut in it. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+		},
+		{
 			"path": "content/spells/carriers/rune/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",

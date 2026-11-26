@@ -17,8 +17,10 @@ const Z: int = 0
 ## units (a sheet at 2x detail has twice as many of its own pixels: ArtDetail).
 const HEAD_FRAME: Vector2 = Vector2(48.0, 48.0)
 const HEAD_GRIP: Vector2 = Vector2(24.0, 27.0)
-## A card's icon is drawn this big, in pixels.
-const ICON_SIZE: Vector2 = Vector2(12.0, 12.0)
+## A card's icon is drawn this big, in world units: its icon's own size (16 world units, 32 art pixels
+## at 2x detail), so at the cameras' resting zoom every art pixel of it is one pixel of the picture
+## (the owner, 2026-11-26: "draw floor cards bigger"; it was 12). Its pickup radius is the items'.
+const ICON_SIZE: Vector2 = Vector2(16.0, 16.0)
 ## How high it floats over its shadow, how far it bobs and how fast (a second each way).
 const LIFT: float = 6.0
 const BOB: float = 1.0

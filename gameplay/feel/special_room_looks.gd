@@ -29,7 +29,9 @@ const STAGE_FRAMES: float = 3.0
 ## How far an item and a key bob, and how fast.
 const BOB: float = 1.0
 const BOB_RATE: float = 1.2
-## An item's icon (drawn at most this big), how high over its spot, and its plinth.
+## An item's icon (drawn at most this big: its icon's own size, 16 world units, so at the cameras'
+## resting zoom every art pixel of a 2x icon is one pixel of the picture), how high over its spot,
+## and its plinth.
 const ICON: float = 16.0
 const ICON_LIFT: float = 22.0
 const PLINTH: Vector2 = Vector2(14.0, 5.0)

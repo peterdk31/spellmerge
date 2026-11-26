@@ -21,10 +21,12 @@ class PickupArtTest(unittest.TestCase):
     def test_every_icon_is_32_art_pixels_palette_only_and_closed(self) -> None:
         palette = set(pixel_grid.palette())
         for path, draw in pickup_art.files().items():
-            self.assertTrue(path.name.endswith("@2x.svg"), f"{path}: named for its detail")
+            big = path.name.endswith("@2x.svg")
+            self.assertTrue(big or path.name == "icon.svg", f"{path}: named for its detail")
             picture = draw()
             p = picture.pixels
-            self.assertEqual((picture.width, picture.height), (32, 32), path.parent.name)
+            side = 32 if big else 16
+            self.assertEqual((picture.width, picture.height), (side, side), path.name)
             colours = {c for row in p for c in row} - {None}
             self.assertTrue(colours <= palette, f"{path.parent.name}: palette colours only")
             self.assertFalse(colours & PLAYER, f"{path.parent.name}: no player colour")

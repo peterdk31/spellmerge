@@ -1,6 +1,15 @@
 {
 	"assets": [
 		{
+			"path": "content/spells/elements/lightning/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The lightning icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A bolt of lightning, its zigzag bevelled and glinting. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+		},
+		{
 			"path": "content/spells/elements/lightning/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",

@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator)",
-			"prompt": "A 16x16 icon for the Overcharge card: a gold lightning bolt with a small red spark beside it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The overcharge icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A bolt of power, its spill crackling off it. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/modifiers/overcharge/icon@2x.svg",

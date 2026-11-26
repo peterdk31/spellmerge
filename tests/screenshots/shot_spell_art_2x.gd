@@ -6,8 +6,8 @@ extends "res://tests/support/screenshot.gd"
 ## and an `x`), player 1's. The world is drawn ZOOM times bigger than the cameras' zoom 1 (every art
 ## pixel a 2 x 2 block of the picture at 4, where the camera shows it as one): `spell_art_heads`.
 ## Then the motes a spell, a hit or a cue throws (content/motes, each at its `shape_2x`), a burst of
-## each kind in a grid (two rows of ten, in the order of MOTE_KINDS), seen MOTE_TIMES after they were
-## thrown: `spell_art_motes_<n>`, at the same scale.
+## each kind in a grid (rows of ten, in the order of MOTE_KINDS), seen MOTE_TIMES after they were
+## thrown: `spell_art_motes_<n>`, at the same scale, taken first so no shot's own motes are among them.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -29,6 +29,7 @@ const MOTE_KINDS: Array[Array] = [
 	[&"tail_long", Color.WHITE], [&"tail_streak", Color.WHITE], [&"streak", Color.WHITE], [&"glob", Color(0.9, 1.0, 0.5)],
 	[&"drain", Color(0.2, 0.25, 0.7)], [&"bit", Color(0.8, 0.8, 0.85)], [&"ash", Color(0.8, 0.8, 0.85)], [&"dust", Color(0.8, 0.8, 0.85)],
 	[&"smoke", Color(0.8, 0.8, 0.85)], [&"ward", Color(0.6, 0.9, 1.0)], [&"rising", Color(1.0, 0.45, 0.2)], [&"seam", Color(1.0, 0.45, 0.2)],
+	[&"grit", Color(0.8, 0.8, 0.85)], [&"drip", Color(0.65, 0.2, 0.6)], [&"chip", Color(0.8, 0.8, 0.85)],
 ]
 const MOTE_TIMES: Array[float] = [0.04, 0.12, 0.3]
 const MOTE_BORN: float = 10.0
@@ -59,6 +60,7 @@ func take() -> void:
 	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN)
 	floor_sprite.z_index = -10
 	root.add_child(floor_sprite)
+	await _motes()
 	shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	shots.call("set_cap", 300)
 	var bolt_body: int = shots.call("register_body", BOLT.get("look_shader"), ManagerScript.MESH_HEAD) as int
@@ -80,8 +82,6 @@ func take() -> void:
 		fail("only %d shots were drawn" % int(shots.get("drawn")))
 		return
 	save(image, "spell_art_heads")
-	shots.call("clear")
-	await _motes()
 
 
 ## Each of MOTE_KINDS thrown once, up, at MOTE_TIMES.
@@ -101,9 +101,11 @@ func _motes() -> void:
 		if k < 0:
 			fail("there is no mote kind %s" % MOTE_KINDS[i][0])
 			return
-		var at := Vector2(24.0 + float(i % 10) * 30.0, 50.0 + float(i / 10) * 80.0)
+		var at := Vector2(24.0 + float(i % 10) * 30.0, 50.0 + float(i / 10) * 60.0)
 		motes.throw(k, at, Vector2.RIGHT, 0, MOTE_KINDS[i][1] as Color)
 	for n in MOTE_TIMES.size():
 		motes.step(MOTE_BORN + MOTE_TIMES[n])
 		await settle(3)
 		save(await grab(), "spell_art_motes_%d" % n)
+	motes.queue_free()
+	await settle(2)

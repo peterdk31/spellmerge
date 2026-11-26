@@ -1248,13 +1248,19 @@ func test_a_shape_at_2x_is_drawn_in_art_pixels() -> void:
 	check(not wrong.problems().is_empty(), "a 2x shape has as many frames as its 1x one")
 	wrong.shape_2x = "############\n\n#"
 	check(not wrong.problems().is_empty(), "and at most SHAPE_CELL art pixels a row")
+	var corner := _kind(&"corner")
+	corner.shape = "#"
+	corner.shape_2x = "#..........\n...........\n...........\n...........\n...........\n...........\n...........\n...........\n...........\n...........\n..........."
+	corner.shape_turns = true
+	check_equal(MotesScript.reach_of(corner), 7, "a turned 2x shape's corner reaches 7 art pixels (5 times the root of 2, rounded)")
 	wrong.shape_2x = "#x\n\n#"
 	check(not wrong.problems().is_empty(), "and only the shape's marks")
 
 
-## ART2: every kind that a spell, a hit or a cue throws is drawn at the art's detail.
+## ART2: every kind that a spell, a hit, a death or a cue throws is drawn at the art's detail (a
+## room's own, its dust and drips, are redrawn with the rooms).
 func test_the_spells_kinds_are_drawn_at_2x() -> void:
-	for id: String in ["spark", "ember", "fleck", "glimmer", "murk", "droplet", "wisp", "tail", "tail_long", "tail_streak", "streak", "glob", "drain", "bit", "ash", "dust", "smoke", "ward", "rising", "seam"]:
+	for id: String in ["spark", "ember", "fleck", "glimmer", "murk", "droplet", "wisp", "tail", "tail_long", "tail_streak", "streak", "glob", "drain", "bit", "grit", "drip", "chip", "ash", "dust", "smoke", "ward", "rising", "seam"]:
 		var kind: MoteKind = load("res://content/motes/%s.tres" % id) as MoteKind
 		check(kind != null and kind.detail() == 2, "%s has its 2x shape" % id)
 		if kind != null:

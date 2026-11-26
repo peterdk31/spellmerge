@@ -128,12 +128,12 @@ var look_layers: PackedInt32Array:
 @export_range(0.0, 32.0, 1.0) var height: float = 4.0
 
 
-## The most pixels a shape is across and down, and the most frames it has (the shader's
-## SHAPE_SIZE and the room in `Motes`' shape atlas).
+## The most pixels a 1x shape is across and down (`shape`; the shader's SHAPE_SIZE).
 const SHAPE_SIZE: int = 5
 ## The most art pixels a 2x shape is across and down (`shape_2x`): the side of a kind's square in
 ## `Motes`' shape atlas and the shader's SHAPE_CELL. A shape at 1x sits in the middle of it.
 const SHAPE_CELL: int = 11
+## The most frames a shape has (the room in `Motes`' shape atlas).
 const SHAPE_FRAMES: int = 8
 ## How `shape_play` is told to the shader.
 const SHAPE_PLAYS: Array[String] = ["life", "loop", "pick"]
@@ -154,19 +154,19 @@ func shape_frames() -> Array[PackedStringArray]:
 
 ## Art pixels a world unit its shape is drawn at: 2 when it has a `shape_2x`, else 1.
 func detail() -> int:
-	return 2 if not _frames_of(shape_2x).is_empty() else 1
+	return ArtDetail.DETAIL if not _frames_of(shape_2x).is_empty() else 1
 
 
 ## The frames of the shape it is drawn with (`shape_2x` at detail 2, else `shape`).
 func drawn_frames() -> Array[PackedStringArray]:
-	return _frames_of(shape_2x) if detail() == 2 else shape_frames()
+	return _frames_of(shape_2x) if detail() > 1 else shape_frames()
 
 
 ## Frame `frame` of the shape it is drawn with, as SHAPE_CELL x SHAPE_CELL art pixels (PIXEL_*), row
 ## by row, the mote's own art pixel in the middle (row and column SHAPE_CELL / 2): `shape_2x` at
 ## detail 2, else `shape` in the middle of the square.
 func cell_pixels(frame: int) -> PackedByteArray:
-	if detail() == 2:
+	if detail() > 1:
 		return _pixels_of(_frames_of(shape_2x), frame, SHAPE_CELL)
 	var small: PackedByteArray = shape_pixels(frame)
 	var pixels := PackedByteArray()
@@ -264,7 +264,7 @@ func _shape_problems() -> PackedStringArray:
 	if not SHAPE_PLAYS.has(shape_play):
 		found.append("%s: shape_play '%s' is not one of %s" % [id, shape_play, SHAPE_PLAYS])
 	found.append_array(_frames_problems(frames, SHAPE_SIZE, "shape"))
-	if detail() == 2:
+	if detail() > 1:
 		var fine: Array[PackedStringArray] = _frames_of(shape_2x)
 		if fine.size() != frames.size():
 			found.append("%s: shape_2x has %d frames, shape %d: one for each, in the same order" % [id, fine.size(), frames.size()])

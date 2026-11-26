@@ -83,7 +83,7 @@ void vertex() {
 		vec2 fly = length(way) > 0.01 ? normalize(way) : vec2(1.0, 0.0);
 		vec2 at = head;
 		if (bit_set(b, L_WEAVE)) {
-			// Homing weaves it a pixel either side.
+			// Homing weaves it a world pixel either side.
 			at += vec2(-fly.y, fly.x) * (triangle(sim_time * 3.0 + L.seed * 0.25) > 0.0 ? 1.0 : 0.0);
 		}
 		// Its middle art pixel (it moves by art pixels, half world units), in art pixels.
@@ -175,22 +175,24 @@ void fragment() {
 		float d = HEAD_BODY(q);
 		float lit = q.x + q.y;
 		float along;
-		if (v0.z < 0.0) {
+		bool speck = v0.z < 0.0;
+		if (speck && q.x >= 0.0 && q.y >= 0.0 && q.x < 2.0 && q.y < 2.0) {
 			// A speck: one world pixel, its highlight at the top-left.
-			colour = q.x >= 0.0 && q.y >= 0.0 && q.x < 2.0 && q.y < 2.0 ? (lit < 0.5 ? c0 : c1) : vec4(0.0);
-		} else if (d <= v0.z) {
+			colour = lit < 0.5 ? c0 : c1;
+		} else if (!speck && d <= v0.z) {
 			// The body: the highlight up and left of the middle, the rim's lower right in the base.
 			bool white = all(equal(q, vec2(0.0))) || (d <= v0.z - 1.0 && lit <= 0.0);
 			white = c3.a < 0.75 ? d <= max(v0.z - 2.0, 0.0) : white;
 			colour = white ? c0 : (d > v0.z - 1.0 && lit > 0.0 ? c2 : c1);
-		} else if (HEAD_RAY(a, v0.z, v0.w)) {
+		} else if (!speck && HEAD_RAY(a, v0.z, v0.w)) {
 			// A ray: light, its tip in the base.
 			colour = HEAD_RAY((a + step(vec2(0.5), a)), v0.z, v0.w) ? c1 : c2;
-		} else if (d <= v0.z + 1.0 && lit >= 1.0 && v0.z >= 3.0) {
+		} else if (v1.x < 1.0e6 && on_line(A + 0.5, v1.xy, v1.zw, along)) {
+			// Pierce's line (a speck's too), over the shadow edge.
+			colour = c1;
+		} else if (!speck && d <= v0.z + 1.0 && lit >= 1.0 && v0.z >= 3.0) {
 			// A big bead's shadow edge, on the lower right, outside its body.
 			colour = vec4(c3.rgb, 1.0);
-		} else if (v1.x < 1.0e6 && on_line(A + 0.5, v1.xy, v1.zw, along)) {
-			colour = c1;
 		}
 	}
 	// Only the box's pixels: the rest of the triangle is outside the quad.

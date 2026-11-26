@@ -10,7 +10,7 @@ extends Node2D
 ## The pool takes them when it is made and hands their numbers to the shader as a texture
 ## (`kind_table`: a row a kind, KIND_COLUMNS texels across; up to MAX_KINDS kinds, so content can
 ## grow with no shader edit) and their shapes' frames (`shape_atlas`, a texture of
-## MoteKind.SHAPE_SIZE squares, a kind's frames along a row), so a new kind, or a new shape, is a
+## MoteKind.SHAPE_CELL squares, a kind's frames along a row), so a new kind, or a new shape, is a
 ## new file. A spell's kinds come from its cards: those that name a card (`kinds_of_card`) and,
 ## for its other cards, those that name their look layers (`kinds_of_look`). The spectacle works
 ## a spell's out (`card_kinds.gd`, by the shot's tag) and hands them to `shed_kinds`; a shot with
@@ -256,7 +256,7 @@ var _table: RampTableScript = null
 ## The mark layer settled motes go to (null for none), and per kind the mark it leaves (-1 none).
 var _marks: MarksScript = null
 var _settle_marks: PackedInt32Array = PackedInt32Array()
-## The shapes' frames: SHAPE_SIZE squares, a kind's along its row (`shape_value`).
+## The shapes' frames: MoteKind.SHAPE_CELL squares, a kind's along its row (`shape_value`).
 var _shape_image: Image = null
 var _kind_image: Image = null
 var _material: ShaderMaterial = null
@@ -1126,7 +1126,7 @@ func _kind_of(buffer: PackedFloat32Array, i: int) -> int:
 ## one at 2x) (for tests).
 func shape_value(k: int, frame: int, x: int, y: int) -> int:
 	var cell: int = MoteKind.SHAPE_CELL
-	var inset: int = 0 if _kinds[k].detail() == 2 else (cell - MoteKind.SHAPE_SIZE) / 2
+	var inset: int = 0 if _kinds[k].detail() > 1 else (cell - MoteKind.SHAPE_SIZE) / 2
 	return roundi(_shape_image.get_pixel(frame * cell + x + inset, k * cell + y + inset).r * 2.0)
 
 
@@ -1139,14 +1139,16 @@ static func reach_of(kind: MoteKind) -> int:
 	var half: int = size / 2
 	var turns: int = 8 if kind.shape_turns else 1
 	var reach: int = 0
+	# Every pixel a turned shape can reach: a corner of the square turned 45 degrees and rounded.
+	var span: int = ceili(float(half) * sqrt(2.0)) + 1
 	for frame in kind.drawn_frames().size():
 		var pixels: PackedByteArray = kind.cell_pixels(frame)
 		for way in turns:
 			var angle: float = float(way) * 0.7854
 			var turn := Vector2(cos(angle), sin(angle))
 			# Every pixel a turned shape can reach (one more than the square's corner).
-			for dy in range(-half - 1, half + 2):
-				for dx in range(-half - 1, half + 2):
+			for dy in range(-span, span + 1):
+				for dx in range(-span, span + 1):
 					var q := Vector2(turn.x * dx + turn.y * dy, -turn.y * dx + turn.x * dy).round()
 					if absf(q.x) > half or absf(q.y) > half:
 						continue

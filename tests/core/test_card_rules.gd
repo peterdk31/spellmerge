@@ -99,7 +99,7 @@ const COURIER_STEP: int = 0
 ## Where the teammate stands that sends a shot through a carrier that gives its cards to what comes
 ## into it (a field): behind the wizard and a little to the side, its shot to the target on the line
 ## coming into the field (where its reach puts it, or short of a wall) a step before any wall (a shot
-## that comes in and meets a wall in one step ends there before it takes the field).
+## that comes in and meets a wall in one step ends there before the field catches it).
 const FIELD_COURIER_AT: Vector2 = Vector2(-40.0, -16.0)
 ## How far behind the target on the line the enemy shooter stands.
 const SHOOTER_BEHIND: float = 70.0
@@ -822,8 +822,8 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		var shot: Array[StringName] = [_shot.id]
 		world.add_courier(COURIER_AT, shot, COURIER_AT.direction_to(Vector2(COURIER_AIM, 0.0)), COURIER_STEP)
 	if Carriers.of(carrier_card.carrier).has(CarrierTraits.GIVES):
-		# A carrier that gives its cards to the shots that come into it (a field) acts on what goes
-		# through it: a teammate sends a plain shot through it, on to the target on the line.
+		# A carrier that gives its cards to the shots it lets go (a field) acts on what comes into
+		# it: a teammate sends a plain shot into it, aimed on at the target on the line.
 		var shot: Array[StringName] = [_shot.id]
 		world.add_courier(FIELD_COURIER_AT, shot, FIELD_COURIER_AT.direction_to(Vector2(r, 0.0)), COURIER_STEP)
 	if scene.get("hurt", false):

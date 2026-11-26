@@ -194,7 +194,7 @@ static func _has_one(has: Dictionary, behaviours: Array) -> bool:
 	return false
 
 
-## True when it gives its cards to the shots that come into it (`GIVES`, a field): its own shot
+## True when it gives its cards to the shots it lets go (`GIVES`, a field): its own shot
 ## wears none of them but Growth (`Spells._land_shots`), which widens it.
 func gives_cards() -> bool:
 	return has(GIVES)

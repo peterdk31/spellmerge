@@ -5041,6 +5041,15 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 	return found
 
 
+## The field in `slot` is `radius` pixels round from now on (it grows with the shots it holds; the
+## field carrier). Its Growth goes on from there. False for a dead slot or a bad radius.
+func set_field_radius(slot: int, radius: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or (_flags[slot] & F_FIELD) == 0 or not (radius > 0.0) or not is_finite(radius):
+		return false
+	_radius[slot] = radius
+	return true
+
+
 ## The `n`th shot the last field pass handed back (its slot), and the index of the field it came
 ## into in the list the pass was handed.
 func field_shot(n: int) -> int:

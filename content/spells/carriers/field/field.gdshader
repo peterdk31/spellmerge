@@ -2,9 +2,11 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A field, the circle that gives its cards (content/spells/carriers/field/: its card's own shot
-// shader, `CarrierCard.look_shader`; docs/milestones/field.md, "The look"; core/README.md, "The shot
-// shaders"): a ring of light on the floor at its hit size, two pixels wide, seen from above at a slant
+// A field, the circle that catches shots and lets them go in a burst (content/spells/carriers/field/:
+// its card's own shot shader, `CarrierCard.look_shader`; docs/milestones/field.md, "The look";
+// core/README.md, "The shot shaders"): a ring of light on the floor at its hit size (it grows with
+// the shots it holds, so the ring does), two pixels wide, its edge trembling a pixel in and out in
+// stepped frames, seen from above at a slant
 // (its card's `look_shape`), four short marks inside it pointing in, and a sparse shimmer of lit
 // pixels drifting round inside it, all by whole pixels. It opens in 4 frames (the ring steps out from
 // its middle to its edge over its card's `look_open`) and closes in 4 (the ring breaks into ever
@@ -66,6 +68,10 @@ vec4 field_look(vec2 uv) {
 	float dist = (el - 1.0) * el / gl;
 	float edge = max(abs(n.x), abs(n.y));
 	float round_at = fract(atan(e.y, e.x) / TAU + 0.25);
+	// The trembling edge: the ring steps a pixel in or out round its length, in 4 frames a loop at
+	// 12 a second, whole pixels.
+	float tremble = floor(1.6 * sin(round_at * TAU * 9.0 + frame_of(12.0) * 1.5708) + 0.5);
+	dist -= tremble * edge;
 	// Closing: the ring breaks into 8 arcs, each shorter a frame, gone at the fourth.
 	float keep = 1.0 - phase.y / 4.0;
 	bool shown = phase.y < 0.5 || fract(round_at * 8.0) < keep;

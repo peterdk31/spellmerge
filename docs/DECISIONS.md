@@ -2,12 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
-## 2026-11-26: the field: a carrier whose cards are its meaning, for every shot (owner decision; foundations Part 2)
+## 2026-11-26: the field catches every shot and lets them go in one burst (owner decisions; foundations Part 2)
 
-- **The owner** (2026-11-26): build the field (docs/milestones/foundations.md, "fields"; builds 5 to 8), and (2026-11-25, open point 4) a field serves enemies' shots too: one rule.
-- **How:** docs/milestones/field.md. A still shot that hits nothing (`ProjectileManager.set_field`); the manager's field pass (`shots_into_fields`, natively `ShotKernel.field_pass`, mirrored to the bit) hands back the shots that came into a field each step, and the carrier gives them its cards, at least the field's of each. A new carrier trait, `GIVES`, in the needs of the behaviours a field gives.
-- **The owner's answers (2026-11-26):** Growth grows the field itself rather than being given; Blast and Split work on it as on a portal; a field's own payloads do not take it.
-- **Measured** (this container, 2026-11-26): the field pass with 2048 shots and 16 fields, about 150 us a step natively (5.6 ms in the GDScript fallback, for a build without the module); nothing runs while no field is open.
+- **The owner** (2026-11-26): build the field (docs/milestones/foundations.md, "fields"; builds 5 to 8), with its design: "A circular field (vibrating edge) that sucks in every shot to its center, which then grows and grows based on how many shots are in. Then when it ends, it fires every shot out in one big burst in the opposite direction a shot has come in. No need to keep track of each shot's position, just the angles (rough)." Any shot, anyone's (open point 4, 2026-11-25: one rule); what leaves takes the field's cards; Growth grows the field; Blast and Split work on it; its own payloads are not caught.
+- **How:** docs/milestones/field.md. A still shot that hits nothing (`ProjectileManager.set_field`); the manager's field pass (`shots_into_fields`, natively `ShotKernel.field_pass`, mirrored to the bit) hands back the shots that came into a field each step; the carrier holds each (a local stop) with its way in kept in 32 steps, draws it in, grows the field (1.5 px a shot, to 2.5 times), and at the field's end sends them all out along their ways with its cards. At most 48 a field. A new carrier trait, `GIVES`.
+- **Measured** (this container, 2026-11-26): the field pass with 2048 shots and 16 fields, about 150 us a step natively (5 ms in the GDScript fallback, for a build without the module); nothing runs while no field is open.
 
 ## 2026-11-25: more detailed art: 64x64 a cell in a 1280x720 picture (owner; ART0)
 

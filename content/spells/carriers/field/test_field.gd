@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
-## The field carrier (docs/milestones/field.md): a still circle that hits nothing, whose cards every
-## shot that comes into it takes (anyone's, an enemy's too), once each time it comes in; the dam (its
-## Linger) holding shots until it ends, and letting them go early when it ends early; Growth widening
-## it; its own shot wearing none of the cards it gives; its own payloads not taking it.
+## The field carrier (docs/milestones/field.md, the owner's design of 2026-11-26): a still circle that
+## hits nothing and catches every shot that comes into it (anyone's, an enemy's too), draws it in and
+## grows with it, then lets them all go at once when it ends, each the way it came in and with the
+## field's cards; at most HOLD_MOST a field; Growth widening it; its own shot wearing none of the cards
+## it gives; its own payloads not caught.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FIELD: CarrierCard = preload("res://content/spells/carriers/field/field.tres")
@@ -62,91 +63,6 @@ func test_a_field_lies_ahead_and_hits_nothing() -> void:
 	check(not _arena.was_given(imp, &"burn"), "nor set burning")
 
 
-func test_a_shot_through_it_takes_its_infusion() -> void:
-	_arena = ArenaScript.new(root)
-	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
-	_cast_field(["fire", "field"])
-	_arena.install_cards(0, 1, ["bolt"])
-	check(_arena.cast(0, 1), "a plain bolt is fired through it")
-	_arena.run(1.5)
-	check(_arena.was_given(imp, &"burn"), "the imp beyond burns")
-
-
-func test_a_shot_takes_it_once_and_again_when_it_comes_back() -> void:
-	_arena = ArenaScript.new(root)
-	_cast_field(["bounce", "bounce", "field"])
-	var pm: ManagerScript = _arena.projectiles
-	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
-	var shot: int = pm.spawn(0, centre - Vector2(60.0, 0.0), Vector2(200.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY)
-	var came_in: int = 0
-	for step in 40:
-		_arena.run(STEP)
-		if pm.get_bounce_of(shot) > 0:
-			came_in += 1
-			pm.set_bounce(shot, 0)
-	check_equal(came_in, 1, "it took the field once on its way through")
-	# Back the other way: it comes in again.
-	pm.pass_shot(shot, centre + Vector2(60.0, 0.0), Vector2.LEFT)
-	pm._vel[shot] = Vector2(-200.0, 0.0)
-	for step in 40:
-		_arena.run(STEP)
-		if pm.get_bounce_of(shot) > 0:
-			came_in += 1
-			pm.set_bounce(shot, 0)
-	check_equal(came_in, 2, "and again when it came back into it")
-
-
-func test_what_it_gives_is_at_least_its_own() -> void:
-	_arena = ArenaScript.new(root)
-	_cast_field(["bounce", "ghost", "field"])
-	var pm: ManagerScript = _arena.projectiles
-	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
-	var shot: int = pm.spawn(0, centre - Vector2(60.0, 0.0), Vector2(200.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY)
-	pm.set_bounce(shot, 30)
-	_arena.run(0.4)
-	check(pm.has_flags(shot, ManagerScript.F_GHOST), "it came into the field (it took its ghost)")
-	check_equal(pm.get_bounce_of(shot), 30, "a shot with more bounces than the field keeps its own")
-
-
-func test_an_enemy_shot_takes_a_players_field() -> void:
-	_arena = ArenaScript.new(root)
-	var guard: Node2D = _arena.add_guard(0, Vector2.ZERO)
-	_cast_field(["frost", "field"])
-	_arena.shoot_at(Vector2(220.0, 0.0), Vector2.ZERO)
-	_arena.run(2.0)
-	check(_arena.was_given(guard, &"chill"), "the enemy's bolt took the frost and chilled the caster")
-
-
-func test_the_dam_holds_shots_until_it_ends() -> void:
-	_arena = ArenaScript.new(root)
-	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
-	_cast_field(["linger", "field"])
-	_arena.install_cards(0, 1, ["bolt"])
-	check(_arena.cast(0, 1), "a bolt is fired into it")
-	_arena.run(1.0)
-	check_equal(_fields().held_count(), 1, "the field holds it")
-	check_equal(_arena.lost(imp), 0, "it has not reached the imp")
-	_arena.run(FIELD.lifetime)
-	check_equal(_fields().field_count(), 0, "the field ended")
-	check_equal(_fields().held_count(), 0, "and let it go")
-	check(_arena.lost(imp) > 0, "it went on and hit the imp")
-
-
-func test_a_dam_ended_early_lets_its_shots_go() -> void:
-	_arena = ArenaScript.new(root)
-	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
-	_cast_field(["linger", "field"])
-	_arena.install_cards(0, 1, ["bolt"])
-	check(_arena.cast(0, 1), "a bolt is fired into it")
-	_arena.run(1.0)
-	check_equal(_fields().held_count(), 1, "the field holds it")
-	var tag: int = _arena.projectiles.get_tag_of(_fields().field_slot(0))
-	_arena.projectiles.remove_by_tag(tag)
-	_arena.run(1.0)
-	check_equal(_fields().held_count(), 0, "the shots it held are let go")
-	check(_arena.lost(imp) > 0, "and go on to hit the imp")
-
-
 func test_its_own_shot_wears_none_of_its_cards_but_growth() -> void:
 	_arena = ArenaScript.new(root)
 	_cast_field(["shield", "deflect", "homing", "growth", "field"])
@@ -159,16 +75,12 @@ func test_its_own_shot_wears_none_of_its_cards_but_growth() -> void:
 	check(pm.get_radius_of(slot) > FIELD.radius, "growth widens it (%.1f)" % pm.get_radius_of(slot))
 
 
-func test_its_own_payload_does_not_take_it() -> void:
+func test_its_own_payload_is_not_caught() -> void:
 	_arena = ArenaScript.new(root)
 	_cast_field(["fire", "timer", "field", "bolt"])
 	_arena.run(1.5)
-	var pm: ManagerScript = _arena.projectiles
-	var bolts: int = 0
-	for slot in _shots():
-		bolts += 1
-		check_equal(pm.get_core_of(slot), Color.WHITE, "a bolt its timer fired from its middle is plain")
-	check(bolts > 0, "its timer fired")
+	check(not _shots().is_empty(), "its timer fired")
+	check_equal(_fields().held_count(), 0, "the bolts born in its middle are not caught")
 
 
 func test_a_field_cast_at_a_wall_opens_short_of_it() -> void:
@@ -179,17 +91,6 @@ func test_a_field_cast_at_a_wall_opens_short_of_it() -> void:
 	check(at.x < 40.0, "it lies short of the wall (%s)" % at)
 	_arena.run(0.5)
 	check_equal(_fields().field_count(), 1, "and stays open")
-
-
-func test_a_shot_that_goes_through_it_in_one_step_takes_it() -> void:
-	_arena = ArenaScript.new(root)
-	_cast_field(["bounce", "field"])
-	var pm: ManagerScript = _arena.projectiles
-	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
-	# Faster than the field is wide in a step: before it, then past it.
-	var shot: int = pm.spawn(0, centre - Vector2(FIELD.radius + 10.0, 0.0), Vector2((FIELD.radius * 2.0 + 20.0) * 60.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
-	_arena.run(STEP)
-	check(pm.get_bounce_of(shot) > 0, "it took the field it went through")
 
 
 ## A field hits nothing and meets nothing: an enemy's shot that takes its shield or deflect does not
@@ -212,21 +113,99 @@ func test_an_enemy_shot_given_its_guard_leaves_the_field_be() -> void:
 		_arena = null
 
 
-func test_a_dam_that_ends_leaves_a_shot_to_another_that_holds_it() -> void:
+
+
+## Fires a plain bolt from the caster along +x, through a field ahead.
+func _bolt(staff: int = 1) -> void:
+	_arena.install_cards(0, staff, ["bolt"])
+	check(_arena.cast(0, staff), "a bolt is fired into it")
+
+
+func test_a_shot_is_caught_drawn_in_and_the_field_grows() -> void:
 	_arena = ArenaScript.new(root)
 	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
-	_cast_field(["linger", "field"])
-	_arena.run(3.0)
-	_arena.install_cards(0, 1, ["linger", "field"])
-	check(_arena.cast(0, 1), "a second dam on the first")
-	_arena.run(STEP)
-	_arena.install_cards(0, 2, ["bolt"])
-	check(_arena.cast(0, 2), "a bolt into both")
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var slot: int = _fields().field_slot(0)
+	var centre: Vector2 = pm.get_position_of(slot)
+	_bolt()
+	_arena.run(1.0)
+	check_equal(_fields().held_count(), 1, "the field holds the bolt")
+	var held: Array[int] = _shots()
+	check_equal(held.size(), 1, "one bolt alive")
+	check(pm.get_position_of(held[0]).distance_to(centre) < 1.0, "drawn in to its middle (%s)" % pm.get_position_of(held[0]))
+	check(pm.get_radius_of(slot) > FIELD.radius, "the field grew (%.1f)" % pm.get_radius_of(slot))
+	check_equal(_arena.lost(imp), 0, "the imp beyond is not hit while it holds the bolt")
+
+
+func test_it_bursts_when_it_ends_each_shot_the_way_it_came_with_its_cards() -> void:
+	_arena = ArenaScript.new(root)
+	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
+	_cast_field(["fire", "field"])
+	_bolt()
+	_arena.run(FIELD.lifetime - 0.2)
+	check_equal(_arena.lost(imp), 0, "nothing reaches the imp while the field lasts")
+	_arena.run(1.5)
+	check_equal(_fields().field_count(), 0, "the field ended")
+	check_equal(_fields().held_count(), 0, "and let the bolt go")
+	check(_arena.was_given(imp, &"burn"), "the bolt went on the way it came in, burning, and hit the imp beyond")
+
+
+func test_a_field_switched_off_early_bursts_then() -> void:
+	_arena = ArenaScript.new(root)
+	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
+	_cast_field(["field"])
+	_bolt()
+	_arena.run(1.0)
+	_arena.projectiles.remove_by_tag(_arena.projectiles.get_tag_of(_fields().field_slot(0)))
+	_arena.run(1.0)
+	check_equal(_fields().held_count(), 0, "the shots it held are let go")
+	check(_arena.lost(imp) > 0, "and go on to hit the imp")
+
+
+func test_an_enemy_shot_is_caught_and_sent_on_with_the_players_cards() -> void:
+	_arena = ArenaScript.new(root)
+	var guard: Node2D = _arena.add_guard(0, Vector2.ZERO)
+	_cast_field(["frost", "field"])
+	_arena.shoot_at(Vector2(220.0, 0.0), Vector2.ZERO)
+	_arena.run(1.0)
+	check_equal(_fields().held_count(), 1, "the enemy's bolt is caught")
+	_arena.run(FIELD.lifetime + 1.0)
+	check(_arena.was_given(guard, &"chill"), "it went on at the caster, frost, and chilled them")
+
+
+func test_a_shot_keeps_more_of_a_card_than_the_field_gives() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["bounce", "ghost", "field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	var shot: int = pm.spawn(0, centre - Vector2(60.0, 0.0), Vector2(200.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY)
+	pm.set_bounce(shot, 30)
 	_arena.run(0.5)
-	check_equal(_fields().held_count(), 2, "both dams hold it")
-	_arena.run(2.0)
-	check_equal(_fields().field_count(), 1, "the first dam ended")
-	check_equal(_fields().held_count(), 1, "the second still holds it")
-	check_equal(_arena.lost(imp), 0, "and it has not gone on")
-	_arena.run(3.0)
-	check(_arena.lost(imp) > 0, "it goes on when the second ends")
+	check_equal(_fields().held_count(), 1, "caught")
+	_arena.run(FIELD.lifetime)
+	check(pm.has_flags(shot, ManagerScript.F_GHOST), "it left with the field's ghost")
+	check_equal(pm.get_bounce_of(shot), 30, "and kept its own bounces, more than the field's")
+
+
+func test_a_shot_that_goes_through_it_in_one_step_is_caught() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	# Faster than the field is wide in a step: before it, then past it.
+	pm.spawn(0, centre - Vector2(FIELD.radius + 10.0, 0.0), Vector2((FIELD.radius * 2.0 + 20.0) * 60.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
+	_arena.run(STEP)
+	check_equal(_fields().held_count(), 1, "it caught the shot that went through it")
+
+
+func test_a_field_holds_at_most_its_cap() -> void:
+	_arena = ArenaScript.new(root)
+	_cast_field(["field"])
+	var pm: ManagerScript = _arena.projectiles
+	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
+	for n in CarrierField.HOLD_MOST + 10:
+		pm.spawn(0, centre - Vector2(FIELD.radius + 5.0, 0.0), Vector2(300.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
+	_arena.run(0.3)
+	check_equal(_fields().held_count(), CarrierField.HOLD_MOST, "it holds its cap and lets the rest through")
+	check(pm.get_radius_of(_fields().field_slot(0)) <= FIELD.radius * CarrierField.GROW_MOST + 0.01, "and grows no more than its most")

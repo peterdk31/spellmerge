@@ -1,10 +1,10 @@
 {
 	"id": "field_dam",
 	"name": "The dam",
-	"does": "A linger field holds every bolt fired into it until it ends: the imp beyond is untouched while the volley piles up.",
-	"casts": [{"staff": 0, "cards": ["linger", "field"]}, {"staff": 1, "cards": ["bolt"], "at": 0.3}, {"staff": 1, "cards": ["bolt"], "at": 1.0}],
+	"does": "A field holds every bolt fired into it while it lasts: the imp beyond is untouched while the volley piles up in it.",
+	"casts": [{"staff": 0, "cards": ["field"]}, {"staff": 1, "cards": ["bolt"], "at": 0.3}, {"staff": 1, "cards": ["bolt"], "at": 1.0}],
 	"imps": [[200, 0]],
 	"seconds": 2.5,
-	"needs": "linger",
+	"needs": "field",
 	"checks": [{"kind": "lost_at_most", "imps": [0], "max": 0}]
 }

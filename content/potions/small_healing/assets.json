@@ -1,13 +1,13 @@
 {
 	"assets": [
 		{
-			"path": "content/potions/small_healing/icon.svg",
+			"path": "content/potions/small_healing/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (hand-written SVG rects)",
-			"prompt": "A 16x16 icon of a small narrow glass vial with a brown cork, filled with red healing liquid and a white glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/pickup_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
+			"prompt": "A 16x16-unit pickup icon drawn at 2x detail (32x32 art pixels): a little upright corked vial of red healing draught. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

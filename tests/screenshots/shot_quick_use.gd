@@ -109,7 +109,7 @@ func take() -> void:
 func _relic_recharging(flow: Node, registry: Node) -> void:
 	var relic := RelicBase.new()
 	relic.id = &"shot_active_idol"
-	relic.icon = load("res://content/potions/vigor/icon.svg") as Texture2D
+	relic.icon = load("res://content/potions/vigor/icon@2x.svg") as Texture2D
 	relic.active_use = ItemUse.kept(10.0, 0.0, 4.0)
 	var added: bool = registry.call("add", &"relics", relic)
 	var wizard := flow.call("get_wizard", 2) as Actor

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dfdpw8dnuysl3"
-path="res://.godot/imported/icon.svg-e3016e250f09a6e59e5db8cbb285e829.ctex"
+uid="uid://bswivgr1vaejs"
+path="res://.godot/imported/icon@2x.svg-65e955bfc8f7ab02b6b3e95449f0321c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/keys/key/icon.svg"
-dest_files=["res://.godot/imported/icon.svg-e3016e250f09a6e59e5db8cbb285e829.ctex"]
+source_file="res://content/potions/max_health/icon@2x.svg"
+dest_files=["res://.godot/imported/icon@2x.svg-65e955bfc8f7ab02b6b3e95449f0321c.ctex"]
 
 [params]
 

@@ -44,6 +44,10 @@ render_mode blend_premul_alpha;
 uniform sampler2D flash_table : filter_nearest;
 
 const float GRID = 24.0;
+// The flash's pixels a world pixel: it is drawn at the art's detail (ArtDetail.DETAIL; docs/STYLE.md,
+// "The picture and the art's detail"; ART2). Its kinds' numbers (content/flashes) stay in world
+// pixels: every one that measures pixels is read times this (`px_curve`).
+const float FLASH_DETAIL = 2.0;
 // How a kind is drawn (FlashTable.DRAW_CODES).
 const float D_SHAPE = 0.0;
 const float D_CLOUDS = 1.0;
@@ -128,6 +132,14 @@ float curve(int row, int c, float a, float z, int given, float fallback) {
 	return mix(values.x, values.z, e) + mix(values.y, values.w, e) * z;
 }
 
+// A curve that measures pixels (a reach, a width, a place), in the flash's own pixels: art pixels,
+// FLASH_DETAIL a world pixel (ART2), so its lines are an art pixel thin and its shapes as big in the
+// world as they were. Below 0 (none) stays below 0.
+float px_curve(int row, int c, float a, float z, int given, float fallback) {
+	float v = curve(row, c, a, z, given, fallback);
+	return v < 0.0 ? v : v * FLASH_DETAIL;
+}
+
 // The shade `n` of look `L` (FlashTable.SHADE_CODES: 0 white-hot, 1 light, 2 base, 3 shadow; below
 // 0 none, black).
 vec3 shade_of(Look L, float n) {
@@ -148,7 +160,7 @@ void vertex() {
 	bool poof = draw == D_CLOUDS;
 	bool quake = draw == D_CRACKS;
 	// The square in pixels, and where its pixel 0 is.
-	vec2 size = vec2(GRID) * z;
+	vec2 size = vec2(GRID) * z * FLASH_DETAIL;
 	vec2 o = size * 0.5;
 	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
 	// corner in UV.y (kind + 0.25 or 0.75).
@@ -176,14 +188,14 @@ void vertex() {
 		// what it colours (with a margin), inside the square.
 		int given = int(texelFetch(flash_table, ivec2(2, row), 0).x + 0.5);
 		float metric = kind_head.y;
-		float ring = curve(row, C_RING, a, z, given, -1.0);
-		float wide = curve(row, C_COLUMN_WIDTH, a, z, given, -1.0);
+		float ring = px_curve(row, C_RING, a, z, given, -1.0);
+		float wide = px_curve(row, C_COLUMN_WIDTH, a, z, given, -1.0);
 		vec4 column = vec4(-1.0, 0.0, 0.0, 0.0);
 		if (wide >= 0.0) {
 			// The most it is long, from its foot (a falling streak), below 0 for none.
-			float top = curve(row, C_COLUMN_TOP, a, z, given, 0.0);
-			float foot = curve(row, C_COLUMN_FOOT, a, z, given, 0.0);
-			float longest = curve(row, C_COLUMN_LENGTH, a, z, given, -1.0);
+			float top = curve(row, C_COLUMN_TOP, a, z, given, 0.0) * FLASH_DETAIL;
+			float foot = curve(row, C_COLUMN_FOOT, a, z, given, 0.0) * FLASH_DETAIL;
+			float longest = px_curve(row, C_COLUMN_LENGTH, a, z, given, -1.0);
 			column = vec4(floor(wide + 0.5), longest >= 0.0 ? max(foot - longest, top) : top, foot, quad == Q_SHAPE ? curve(row, C_COLUMN_DOTTED, a, z, given, 0.0) : 0.0);
 		}
 		// The box round the middle it draws in (half its size), and a column's box beside it.
@@ -193,7 +205,7 @@ void vertex() {
 			// further than its two falloffs (falloff is 0 past its reach): none when they are 0.
 			bool lined = column.x >= 0.0;
 			float k = curve(row, C_GLOW, a, z, given, 1.0) * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0);
-			vec4 lit = vec4(curve(row, C_GLOW_RING, a, z, given, 0.0), curve(row, C_GLOW_RING_REACH, a, z, given, 1.0), curve(row, C_GLOW_MIDDLE, a, z, given, 0.0), curve(row, C_GLOW_MIDDLE_REACH, a, z, given, 1.0));
+			vec4 lit = vec4(curve(row, C_GLOW_RING, a, z, given, 0.0), px_curve(row, C_GLOW_RING_REACH, a, z, given, 1.0), curve(row, C_GLOW_MIDDLE, a, z, given, 0.0), px_curve(row, C_GLOW_MIDDLE_REACH, a, z, given, 1.0));
 			float centre = ring < 0.0 || lined ? 0.0 : ring;
 			reach = k > 0.0 ? max(lit.x > 0.0 ? centre + lit.y : -1.0, lit.z > 0.0 ? lit.w : -1.0) : -1.0;
 			shown = reach >= 0.0;
@@ -204,26 +216,26 @@ void vertex() {
 			k0 = vec4(L.glow, 1.0);
 		} else if (quake) {
 			// The cracks: their reach, the age and seed, and the ramp they cool down.
-			reach = QUAKE_REACH * z;
+			reach = QUAKE_REACH * z * FLASH_DETAIL;
 			shown = true;
 			m = M_CRACK;
-			a0 = vec4(QUAKE_REACH * z, a, s, 0.0);
+			a0 = vec4(QUAKE_REACH * z * FLASH_DETAIL, a, s, 0.0);
 			a2 = vec4(L.lo, 0.0);
 			k0 = vec4(L.hot, 1.0);
 			k1 = vec4(L.hi, 1.0);
 			k2 = vec4(L.mid, 1.0);
 		} else {
-			float arm = round(curve(row, C_ARM, a, z, given, -1.0));
-			float disc = curve(row, C_DISC, a, z, given, -1.0);
+			float arm = round(px_curve(row, C_ARM, a, z, given, -1.0));
+			float disc = px_curve(row, C_DISC, a, z, given, -1.0);
 			// The F4 parts: a star's reach, the rays' outer and inner ends, the dots' radius (a3); the
 			// spiral's reach, its turn, its gap (times the zoom), and the counts packed (points + 16
 			// rays + 512 arms; the dots' count in a1.w). At most 15 points (FlashKind.MAX_POINTS 12)
 			// and 31 rays (MAX_RAYS).
 			vec4 counts = texelFetch(flash_table, ivec2(1, row), 0);
-			float rays = curve(row, C_RAYS, a, z, given, -1.0);
-			a3 = vec4(curve(row, C_STAR, a, z, given, -1.0), rays, rays >= 0.0 ? curve(row, C_RAYS_INNER, a, z, given, 0.0) : 0.0, curve(row, C_DOTS, a, z, given, -1.0));
-			float spiral = curve(row, C_SPIRAL, a, z, given, -1.0);
-			a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z, given, 0.0) : 0.0, kind_head.w * z, counts.x + counts.y * 16.0 + counts.w * 512.0);
+			float rays = px_curve(row, C_RAYS, a, z, given, -1.0);
+			a3 = vec4(px_curve(row, C_STAR, a, z, given, -1.0), rays, rays >= 0.0 ? px_curve(row, C_RAYS_INNER, a, z, given, 0.0) : 0.0, px_curve(row, C_DOTS, a, z, given, -1.0));
+			float spiral = px_curve(row, C_SPIRAL, a, z, given, -1.0);
+			a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z, given, 0.0) : 0.0, kind_head.w * z * FLASH_DETAIL, counts.x + counts.y * 16.0 + counts.w * 512.0);
 			reach = max(max(max(arm, disc), ring >= 0.0 ? ring + 1.0 : -1.0), max(max(a3.x, a3.y > a3.z ? a3.y + 1.0 : -1.0), max(a3.w >= 0.0 ? a3.w + 2.0 : -1.0, a4.x)));
 			shown = reach >= 0.0 || column.x >= 0.0;
 			m = M_SHAPE;
@@ -246,8 +258,8 @@ void vertex() {
 	} else if (quad == Q_CLOUD && poof) {
 		// A staff's poof: four bone clouds along the staff, biggest at 35%, dotted as they go.
 		float swell = a < 0.35 ? a / 0.35 : 1.0 - (a - 0.35) / 0.65;
-		vec2 c = vec2((slot - 1.5) * 6.0, (hash_seeded(slot, 17.0, 31.0, s) - 0.5) * 3.0) * z * 0.5;
-		float reach = (2.5 + 1.5 * hash_seeded(slot, 18.0, 31.0, s)) * swell * z * 0.5 + 0.5;
+		vec2 c = vec2((slot - 1.5) * 6.0, (hash_seeded(slot, 17.0, 31.0, s) - 0.5) * 3.0) * z * 0.5 * FLASH_DETAIL;
+		float reach = ((2.5 + 1.5 * hash_seeded(slot, 18.0, 31.0, s)) * swell * z * 0.5 + 0.5) * FLASH_DETAIL;
 		shown = true;
 		m = M_CLOUD;
 		q_lo = floor(c - reach) - 1.0;
@@ -278,6 +290,12 @@ void vertex() {
 // Small on purpose (core/README.md, "The shot shaders"): a pixel only colours itself from what
 // its quad's vertices worked out. No loops, no look kinds.
 
+// Dotted a world pixel at a time (two art pixels each way), so a dotted part keeps its dots when
+// the camera zooms out and an art pixel is less than a pixel of the picture.
+bool dotted(vec2 d) {
+	return mod(floor(d.x / FLASH_DETAIL) + floor(d.y / FLASH_DETAIL), 2.0) == 0.0;
+}
+
 void fragment() {
 	vec2 d = floor(px);
 	vec4 colour = vec4(0.0);
@@ -294,7 +312,7 @@ void fragment() {
 		vec2 c = v0.xy;
 		float reach = v0.z;
 		float q = length(d - c);
-		if (q <= reach && (v0.w < 0.5 || mod(d.x + d.y, 2.0) == 0.0)) {
+		if (q <= reach && (v0.w < 0.5 || dotted(d))) {
 			vec2 side = (d - c) / max(reach, 1.0);
 			colour = vec4(side.x + side.y < -0.5 ? BONE_LIGHT : (q > reach - 1.0 && side.x + side.y > 0.3 ? BONE_SHADOW : BONE_BASE), 1.0);
 		}
@@ -303,13 +321,15 @@ void fragment() {
 		// v1.y (its hash salt v1.x, seed v1.z; a flat one a little thicker, so its top and bottom
 		// stay whole), a column v2 (white-hot c0 down its middle, dotted when v2.w is 1), a cross
 		// of arms v0.y (white-hot c0 in the middle).
-		if (v0.z >= 0.0 && r <= v0.z && mod(d.x + d.y, 2.0) == 0.0) {
+		if (v0.z >= 0.0 && r <= v0.z && dotted(d)) {
 			colour = c0;
 		}
-		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 0.85 : 0.5)) {
-			float bucket = floor(atan(d.y, d.x) * v0.w / 2.0);
+		// The ring two art pixels wide (a world pixel: it reads zoomed out), its outer pixel on the
+		// lower right a shade down (ART2); it frays a world pixel's way round at a time.
+		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 1.7 : 1.0)) {
+			float bucket = floor(atan(d.y, d.x) * v0.w / (2.0 * FLASH_DETAIL));
 			if (hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
-				colour = c1;
+				colour = r > v0.w && d.x + d.y > 0.0 ? c2 : c1;
 			}
 		}
 		// The F4 parts (flash kinds), round (whatever the metric): their way round from +x, and the
@@ -343,7 +363,7 @@ void fragment() {
 			float at = round(turn / 6.2832 * n) / n * 6.2832;
 			float along = round_r * cos(turn - at);
 			if (abs(round_r * sin(turn - at)) < 0.5 && along >= v3.z && along <= v3.y) {
-				colour = along < v3.z + 2.0 ? c0 : c1;
+				colour = along < v3.z + 2.0 ? c0 : (along > v3.y - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
 			}
 		}
 		// A star of mod(v4.w, 16) points out to v3.x: its reach narrows between the points.
@@ -352,7 +372,8 @@ void fragment() {
 			float sharp = pow(abs(cos(turn * n * 0.5)), 6.0);
 			float reach = v3.x * (0.22 + 0.78 * sharp);
 			if (round_r <= max(reach, 0.5)) {
-				colour = round_r <= max(v3.x * 0.3, 0.5) ? c0 : c1;
+				// Lit from the top-left: its rim on the lower right a shade down (ART2).
+				colour = round_r <= max(v3.x * 0.3, 0.5) ? c0 : (round_r > reach - 1.0 && d.x + d.y > 0.0 ? c2 : c1);
 			}
 		}
 		// A column narrows and frays into its top third; across, white-hot in its middle, then c1,
@@ -360,12 +381,13 @@ void fragment() {
 		float span = max(v2.z - v2.y, 1.0);
 		float up = clamp((d.y - v2.y) / (span * 0.35), 0.0, 1.0);
 		float half_w = floor(v2.x * (0.35 + 0.65 * up) + 0.5);
-		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && (v2.w < 0.5 || mod(d.y, 2.0) == 0.0) && !(up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25)) {
+		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && (v2.w < 0.5 || mod(floor(d.y / FLASH_DETAIL), 2.0) == 0.0) && !(up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25)) {
 			float e = abs(d.x);
 			colour = e <= max(floor(half_w * 0.4), 0.0) ? c0 : (e < half_w || half_w < 1.0 ? c1 : c2);
 		}
 		if (v0.y >= 0.0 && ((d.x == 0.0 && abs(d.y) <= v0.y) || (d.y == 0.0 && abs(d.x) <= v0.y))) {
-			colour = d.x == 0.0 && d.y == 0.0 ? c0 : c1;
+			// White-hot in the middle; the tips of its lower and right arms a shade down (ART2).
+			colour = d.x == 0.0 && d.y == 0.0 ? c0 : (max(abs(d.x), abs(d.y)) >= v0.y && d.x + d.y > 0.0 ? c2 : c1);
 		}
 	} else {
 		// A quake's cracks, on a floor seen flat: the crack nearest the pixel's way (one of
@@ -387,7 +409,7 @@ void fragment() {
 		float jag = mix(hash_seeded(k, floor(rung), 52.0, s), hash_seeded(k, floor(rung) + 1.0, 52.0, s), fract(rung)) - 0.5;
 		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0) * 0.5);
 		float wide = along < reach * 0.4 ? 1.0 : 0.6;
-		bool inside = along > 1.5 && along <= reach && (along < reach * 0.8 || mod(d.x + d.y, 2.0) == 0.0);
+		bool inside = along > 1.5 && along <= reach && (along < reach * 0.8 || dotted(d));
 		bool crack = inside && side < wide;
 		bool rim = inside && !crack && side < wide + 1.0 && along < reach * 0.6;
 		bool kept = a < 0.7 || hash_seeded(d.x, d.y, 53.0, s) > (a - 0.7) / 0.3;

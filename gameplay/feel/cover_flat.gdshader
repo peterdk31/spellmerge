@@ -407,18 +407,23 @@ vec4 oil(vec4 base, vec4 shadow, vec4 light, ivec2 px, int dist, bool low, int t
 	return sheen(px, t, d) ? light : base;
 }
 
-// Fire's flames: a tongue a block of 5 x 9 world px (each row of blocks shifted by its own hash), most
-// blocks lit: its middle hashed once, its height (3 to 9 world px) new every other flicker and a pixel
-// more or less every flicker, narrowing to its tip and leaning a pixel as it climbs. Its body `base`,
-// its inside `light`, its heart `heart` and its root white-hot, over `shadow` (the fire's bed) with
-// a few embers of `heart` in it.
+// Fire's flames (ART2: drawn at the art's detail, each tongue its own shape and light): a tongue a
+// block of 5 x 9 world px, each column of blocks lifted by its own hash and each row shifted by its
+// own, so the tongues never stand in ranks; most blocks lit: its middle hashed once, its height (3 to
+// 9 world px) new every other flicker and a pixel more or less every flicker. A tongue swells from
+// its root to its belly (a third of the way up) and narrows to a point, its tip curling a pixel or
+// two to its side as it climbs (the side new every other flicker). Lit from the top-left: its left
+// edge `light` an art pixel wide, its body `base`, its heart `heart` low in its middle and white-hot at the middle of its root alone. Now and then a lick of `base` tears off
+// above its tip. Over `shadow` (the fire's bed) with a few embers of `heart` in it.
 vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicker, int d) {
 	int w = 5 * d;
 	int tall = 9 * d;
-	int row = px.y / tall;
+	int column = px.x / w;
+	int y = px.y + int(pixel_hash(ivec2(column, 5), 39) % uint(tall / 2));
+	int row = y / tall;
 	int x = px.x + int(pixel_hash(ivec2(row, 3), 41) % uint(w));
 	ivec2 block = ivec2(x / w, row);
-	ivec2 l = ivec2(x - block.x * w, px.y - row * tall);
+	ivec2 l = ivec2(x - block.x * w, y - row * tall);
 	uint still = pixel_hash(block, 31);
 	uint slow = pixel_hash(block + ivec2(flicker / 2 * 7, flicker / 2 * 13), 43);
 	uint fast = pixel_hash(block + ivec2(flicker * 11, flicker * 5), 47);
@@ -427,23 +432,33 @@ vec4 flames(vec4 base, vec4 shadow, vec4 light, vec4 heart, ivec2 px, int flicke
 	}
 	int height = 3 * d + int(slow % uint(6 * d + 1)) + (int(fast % 3u) - 1) * d;
 	int up = tall - 1 - l.y;
-	if (up >= height) {
-		return shadow;
-	}
-	int lean = (int((still >> 6u) % 3u) - 1) * up / max(3 * d, 1);
 	int cx = d + int((still >> 9u) % uint(max(w - 2 * d, 1)));
-	int half_width = (2 * d * (height - up) + height - 1) / height;
-	int off = abs(l.x - cx - lean);
-	if (off > half_width) {
+	// The tip's curl: up to `bend` art pixels to its side at the tip, growing with the square of
+	// the height climbed.
+	float side = (slow >> 5u) % 2u == 0u ? -1.0 : 1.0;
+	float bend = float(d) * (1.0 + float((still >> 4u) % 2u));
+	float t = float(up) / float(max(height, 1));
+	float centre = float(cx) + side * bend * t * t;
+	float dx = float(l.x) + 0.5 - centre - 0.5;
+	if (up >= height) {
+		// A lick torn off above the tip, a short while each.
+		bool lick = fast % 4u == 0u && up >= height + d / 2 && up < height + d + d / 2 && abs(dx - side * bend) <= float(d) * 0.5;
+		return lick ? base : shadow;
+	}
+	// Its half width: swelling to its belly a third of the way up, then narrowing to a point.
+	float belly = float(d) * 2.1;
+	float half_width = t < 0.33 ? belly * (0.7 + 0.3 * t / 0.33) : belly * pow((1.0 - t) / 0.67, 0.8);
+	if (abs(dx) > half_width) {
 		return shadow;
 	}
-	if (up < d && off < half_width) {
+	if (up < d / 2 + 1 && abs(dx) < max(half_width * 0.3, 0.5)) {
 		return white_hot;
 	}
-	if (off < half_width - d / 2 && up < height / 3) {
+	if (abs(dx) < half_width * 0.34 && t < 0.28) {
 		return heart;
 	}
-	return off < half_width - d && up < height * 2 / 3 ? light : base;
+	// Its left edge lit an art pixel wide (from the top-left), the rest of it its base.
+	return dx < -(half_width - 1.0) && t < 0.75 ? light : base;
 }
 
 // Scorch's detail: soot (`shadow`) speckled with `base`, cracks, and embers of `ember` that wink out

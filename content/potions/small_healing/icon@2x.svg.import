@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c2ujimaqk8pgg"
-path="res://.godot/imported/icon.svg-22a14a1463f4437b1d3dd69de06c1fa0.ctex"
+uid="uid://lvlqd8p2mb34"
+path="res://.godot/imported/icon@2x.svg-856ce6968310bc115d035a622cbde9d4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/coins/coin/icon.svg"
-dest_files=["res://.godot/imported/icon.svg-22a14a1463f4437b1d3dd69de06c1fa0.ctex"]
+source_file="res://content/potions/small_healing/icon@2x.svg"
+dest_files=["res://.godot/imported/icon@2x.svg-856ce6968310bc115d035a622cbde9d4.ctex"]
 
 [params]
 

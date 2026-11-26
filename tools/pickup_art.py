@@ -67,10 +67,12 @@ def _shine(cx: float, cy: float, liquid: str) -> Part:
 
 
 def healing() -> list[Part]:
+    """A round glass flask of red healing draught with a corked pale glass neck."""
     return _flask([ball((8.0, 10.4), 4.9, 4.4, material="Fire", glint=True), _shine(5.6, 9.6, "Fire")], (6.6, 4.0, 9.4, 6.6), (6.2, 2.2, 9.8, 4.2))
 
 
 def large_healing() -> list[Part]:
+    """A large round glass flask of red healing draught with a corked neck."""
     return _flask([ball((8.0, 9.9), 6.2, 5.4, material="Fire", glint=True), _shine(4.8, 8.6, "Fire")], (6.4, 2.6, 9.6, 5.0), (6.1, 0.8, 9.9, 2.8))
 
 
@@ -88,6 +90,7 @@ def small_healing() -> list[Part]:
 
 
 def vigor() -> list[Part]:
+    """A round glass flask of lime-green vigor draught with a corked neck."""
     return _flask([ball((8.0, 10.4), 5.2, 4.7, material="Arc", glint=True), _shine(5.4, 9.4, "Arc")], (6.6, 3.8, 9.4, 6.4), (6.2, 2.0, 9.8, 4.0))
 
 
@@ -113,7 +116,13 @@ def files() -> dict[Path, Callable[[], Canvas]]:
         "vigor": ("content/potions/vigor", vigor),
         "reward_reroll": ("content/rerolls/reward_reroll", reward_reroll),
     }
-    return {ROOT / folder / "icon@2x.svg": (lambda p=parts: sr.draw(p(), SIZE, SIZE)) for folder, parts in every.values()}
+    out: dict[Path, Callable[[], Canvas]] = {}
+    for folder, parts in every.values():
+        out[ROOT / folder / "icon@2x.svg"] = lambda p=parts: sr.draw(p(), SIZE, SIZE)
+        # Its 1x icon (`icon_small`, the HUD's small cells) from the same parts (the owner, 2026-11-26).
+        out[ROOT / folder / "icon.svg"] = lambda p=parts: sr.draw_1x(p(), SIZE, SIZE)
+    return out
+
 
 
 def main(argv: list[str] | None = None) -> int:

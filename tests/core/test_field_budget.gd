@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## What fields cost (docs/milestones/field.md, "The cost, and where it runs"): the field pass
 ## (`ProjectileManager.shots_into_fields`, natively `ShotKernel.field_pass`) over SHOTS shots in flight
-## against FIELDS fields, each step. Each step hands back every shot at most once a field, only shots
-## that came in (outside before the step, inside after or through it), and natively within FIELD_BUDGET_US a step
+## against FIELDS fields, each step. Each step hands back every shot at most once, only shots in a
+## field (inside it after the step, or through it), and natively within FIELD_BUDGET_US a step
 ## (the GDScript fallback's time is printed, not held).
 ##
 ## - **What held shots cost** (the owner, 2026-11-26: "No limits"): one field holding HELD shots, its
@@ -64,15 +64,14 @@ func _field_cost(m: ManagerScript, fields: PackedInt32Array) -> float:
 		for n in count:
 			var slot: int = m.field_shot(n)
 			var field: int = fields[m.field_of(n)]
-			var key: int = slot * 1024 + m.field_of(n)
-			check(not seen.has(key), "step %d: shot %d handed back once a field" % [step, slot])
-			seen[key] = true
+			check(not seen.has(slot), "step %d: shot %d handed back once" % [step, slot])
+			seen[slot] = true
 			var centre: Vector2 = m.get_position_of(field)
 			var r: float = m.get_radius_of(field)
 			var from: Vector2 = m.get_prev_of(slot)
 			var to: Vector2 = m.get_position_of(slot)
 			var near: Vector2 = Geometry2D.get_closest_point_to_segment(centre, from, to)
-			check(near.distance_to(centre) <= r + 0.01 and from.distance_to(centre) > r - 0.01, "step %d: shot %d came into field %d" % [step, slot, field])
+			check(near.distance_to(centre) <= r + 0.01, "step %d: shot %d is in field %d" % [step, slot, field])
 	check(handed > STEPS, "shots came into fields (%d)" % handed)
 	return float(spent) / float(STEPS)
 

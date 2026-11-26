@@ -1,8 +1,9 @@
 class_name CarrierField
 extends Carrier
 ## A field (`&"field"`; docs/milestones/field.md; the owner's design of 2026-11-26): a round field on
-## the floor `ray_length` ahead (short of a wall) with a trembling edge. Every shot that comes into it,
-## anyone's (a teammate's, an enemy's, its caster's own: one rule), is pulled in to its middle and held
+## the floor `ray_length` ahead (short of a wall) with a trembling edge. Every shot in it, anyone's (a
+## teammate's, an enemy's, its caster's own: one rule), wherever it came from (flown in, cast or
+## spawned inside it, grown over; the owner, 2026-11-26), is pulled in to its middle and held
 ## there, and the field grows with every shot it holds. When it ends it lets them all go at once, one
 ## burst from its middle, each the way it was going when it came in (a shot that came in from the west
 ## going east leaves to the east), and each takes the field's cards as it leaves: its infusion, its
@@ -11,7 +12,8 @@ extends Carrier
 ##
 ## It is a still shot of the projectile manager that hits nothing (`set_field`), so its life, Hold,
 ## Split, Orbit, its triggers and its end are the shots' own. Each step the manager's field pass
-## (`shots_into_fields`, natively `ShotKernel.field_pass`) hands back the shots that came into a field;
+## (`shots_into_fields`, natively `ShotKernel.field_pass`) hands back the shots in a field (each once,
+## the first field's it is in, the oldest; never the field's own payloads, nor a still or held shot);
 ## this carrier holds each (a local stop: its life waits), keeping only the way it came in, in WAYS
 ## steps (no position), and draws it in toward the middle step by step. A field holds as many as come
 ## (the owner, 2026-11-26: "No limits"); its rows grow by doubling (Packed arrays), never a step's
@@ -28,6 +30,10 @@ const DRAW_IN: float = 0.2
 ## from its middle, so it still reads as one burst. About 1 ms of a step at this count
 ## (`tests/core/test_field_budget.gd`).
 const BURST_PER_STEP: int = 200
+## The local stop on a held shot (seconds): held until its field lets it go (`_burst` releases it,
+## `clear` ends it), never running out on its own, so a held shot is never caught again (the pass
+## passes a stopped shot by) however long its field is held open (Hold, Slow).
+const HELD_STOP: float = 1.0e9
 ## How far short of a wall a field cast at one lies (pixels).
 const WALL_GAP: float = 2.0
 
@@ -146,8 +152,9 @@ func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _dir
 
 # --- Each step ---------------------------------------------------------------------------------
 
-## The fields that ended burst (their held shots go); the held shots are drawn in; every shot that
-## came into a field in the manager's last step is held.
+## The fields that ended burst (their held shots go); the held shots are drawn in; every shot in a
+## live field after the manager's last step is held (a shot let go by a burst is in no field of its
+## own, which is gone; one let go inside another live field is that one's).
 func step(_delta: float) -> void:
 	if _fd_slot.is_empty():
 		return
@@ -191,14 +198,14 @@ func _burst_ended() -> void:
 		_fd_bursting.remove_at(i)
 
 
-## The shot `shot` came into field row `row`: held where it is (its life waits until the burst),
-## keeping the way it was going; the field grows.
+## The shot `shot` is in field row `row`: held where it is (its life waits until the burst), keeping
+## the way it was going (a shot at rest: the way from it to the middle); the field grows.
 func _take(shot: int, row: int) -> void:
 	var manager := kit.projectiles
 	if not manager.is_alive(shot):
 		return
 	var field: int = _fd_slot[row]
-	if not manager.freeze_shot(shot, manager.get_life_of(field) + 1.0):
+	if not manager.freeze_shot(shot, HELD_STOP):
 		return
 	var at: Vector2 = manager.get_position_of(shot)
 	var going: Vector2 = manager.get_velocity_of(shot)

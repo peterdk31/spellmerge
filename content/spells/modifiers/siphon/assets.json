@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator)",
-			"prompt": "A 16x16 icon for the Siphon card: a blue mana orb with a gold arrow streaming down into it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The siphon icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A flask drawing mana up out of a body. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/modifiers/siphon/icon@2x.svg",

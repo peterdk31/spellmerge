@@ -1,6 +1,15 @@
 {
 	"assets": [
 		{
+			"path": "content/spells/modifiers/pierce/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The pierce icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A spear head through a plate. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+		},
+		{
 			"path": "content/spells/modifiers/pierce/icon@2x.svg",
 			"origin": "ai",
 			"author": "Claude",

@@ -8,7 +8,7 @@ Every player starts a run with `start_reward_rerolls` of them (run stats, `RunSt
 
 ## Contract
 
-- The folder holds its `.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `assets.json`. `problems()` must be empty. The id is `RerollBase`'s; a new kind of reroll is engine work (its id in `ItemKinds.RULES`' `reroll` row and what spends it).
+- The folder holds its `.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `icon.svg` (16 by 16, `icon_small` for the HUD's small cells, from the same parts) and its `assets.json`. `problems()` must be empty. The id is `RerollBase`'s; a new kind of reroll is engine work (its id in `ItemKinds.RULES`' `reroll` row and what spends it).
 
 ## Allowed files
 

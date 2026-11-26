@@ -884,8 +884,8 @@ var _trail_y: PackedInt32Array = PackedInt32Array()
 ## and how many (`trail_count`). Written in place; the pass sizes it to the cap once.
 var _trail_out: PackedInt32Array = PackedInt32Array()
 var _trail_count: int = 0
-## Scratch: what the last field pass found (`shots_into_fields`): each shot that came into a field,
-## in slot order, and the index of that field in the list it was handed, in its order. Sized to the
+## Scratch: what the last field pass found (`shots_into_fields`): each shot in a field, in slot
+## order, and the index of that field in the list it was handed. Sized to the
 ## cap once; written in place.
 var _field_out: PackedInt32Array = PackedInt32Array()
 var _field_out_field: PackedInt32Array = PackedInt32Array()
@@ -4969,15 +4969,18 @@ func set_field(slot: int) -> bool:
 	return true
 
 
-## The field pass: the shots that came into one of the first `count` fields of `fields` (their slots;
-## a dead or stale one is passed by) in the last step: those whose middle was outside the field's
-## circle before the step and is inside it now, or went through it (a fast shot). Every shot that moved is seen, flying, circling or
-## homing, but a field, a stopped shot (a local stop, a linger's hold, a stuck one) and a falling one
-## in the air. Returns how many; `field_shot(n)` and `field_of(n)` say which, in slot order and, for
-## one shot, in the fields' order (at most the cap of them: a pair past it is dropped, the shot then
-## inside without having taken the field; more shots coming into fields in one step than the cap
-## holds shots is not a game that is played). The native kernel's `field_pass` is
-## this, to the bit; nothing is asked of it with no field.
+## The field pass: the shots in one of the first `count` fields of `fields` (their slots; a dead or
+## stale one is passed by) after the last step: every shot whose middle is inside a field's circle
+## now, wherever it came from (one that flew in, one cast, split or spawned inside it, one the field
+## grew over), or that went through it in the step (a fast shot). Every shot is seen, flying,
+## circling, homing or stopped by its speed, but a field, a still one (a rune, a pool, a wall), a
+## held one (a local stop: one a field holds; a linger's hold; a stuck one), a falling one in the air
+## and a field's own payload (a shot whose caster is that field's shot, `set_caster_shot`). A shot in
+## two fields is the first one's of them in `fields` (the oldest, for the field carrier). Returns how
+## many; `field_shot(n)` and `field_of(n)` say which, in slot order (at most the cap of them: a shot
+## past it is dropped, caught the next step; more shots in fields in one step than the cap holds
+## shots is not a game that is played). The native kernel's `field_pass` is this, to the bit;
+## nothing is asked of it with no field.
 func shots_into_fields(fields: PackedInt32Array, count: int) -> int:
 	count = mini(count, fields.size())
 	if count <= 0:
@@ -5011,14 +5014,16 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 		if _alive[slot] == 0:
 			continue
 		var flags: int = _flags[slot]
-		if (flags & F_FIELD) != 0:
+		if (flags & F_FIELD) != 0 or _motion[slot] == MOTION_STILL:
 			continue
 		var state: int = _state[slot]
-		if state == S_FROZEN or state == S_STUCK or state == S_HELD:
+		# Stopped: a local stop (`_freeze`), a linger's hold (`_hold`; its S_HELD is the hit pass's
+		# S_DONE by now), stuck.
+		if state == S_FROZEN or state == S_STUCK or state == S_HELD or _freeze[slot] > 0.0 or _hold[slot] > 0.0:
 			continue
 		var to: Vector2 = _pos[slot]
 		var from: Vector2 = _prev[slot]
-		if from == to or not from.is_finite() or not to.is_finite():
+		if not from.is_finite() or not to.is_finite():
 			continue
 		if not box.intersects(Rect2(from, Vector2.ZERO).expand(to), true):
 			continue
@@ -5028,17 +5033,20 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 			var field: int = fields[n]
 			if field < 0 or field >= _high or _alive[field] == 0 or (_flags[field] & F_FIELD) == 0:
 				continue
+			# A field's own payload (a Timer's bolt from its middle) is born in it: never its.
+			if _caster_slot[slot] == field and _caster_seq[slot] == _seq[field]:
+				continue
 			var centre: Vector2 = _pos[field]
 			var radius: float = _radius[field]
 			# A step that stays off the circle's box on one side never comes into it (most, at once).
 			if minf(from.x, to.x) > centre.x + radius or maxf(from.x, to.x) < centre.x - radius or minf(from.y, to.y) > centre.y + radius or maxf(from.y, to.y) < centre.y - radius:
 				continue
 			var within: float = radius * radius
-			if from.distance_squared_to(centre) <= within:
-				continue
 			if to.distance_squared_to(centre) > within:
 				# Not inside now: in only if it went through it in this step (a fast shot).
 				var way: Vector2 = to - from
+				if from == to:
+					continue
 				var t: float = clampf((centre - from).dot(way) / way.dot(way), 0.0, 1.0)
 				if (from + way * t).distance_squared_to(centre) > within:
 					continue
@@ -5047,6 +5055,8 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 			_field_out[found] = slot
 			_field_out_field[found] = n
 			found += 1
+			# In two fields at once, it is the first one's.
+			break
 	return found
 
 

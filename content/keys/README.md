@@ -4,7 +4,7 @@ Keys are a stacked inventory item beside the coins, in the currency bag (the own
 
 ## Contract
 
-- `key/` holds `key.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `assets.json`. `problems()` must be empty.
+- `key/` holds `key.tres` (`id`, `display_name`, `description`, `icon`: an `ItemContent`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `icon.svg` (16 by 16, `icon_small` for the HUD's small cells, from the same parts) and its `assets.json`. `problems()` must be empty.
 
 ## Allowed files
 

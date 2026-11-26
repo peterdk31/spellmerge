@@ -1,6 +1,6 @@
 # Oil and Spill: the floor that burns
 
-**Status (2026-11-26): building (this PR).** Part 1's second slice of [foundations.md](foundations.md) ("a floor that answers", the order's step 2), on the floor of [floor.md](floor.md) and its look of [floor-look.md](floor-look.md). Builds 2 and 3. With the owner's directions of 2026-11-25/26: everything touches the floor as it passes; a cell remembers who lit it; **Spill makes a shot touch a wide area where it lands** (a bigger splash); Oil "coats the floor where it lands. Burns long once lit."
+**Status (2026-11-26): built (this PR).** Part 1's second slice of [foundations.md](foundations.md) ("a floor that answers", the order's step 2), on the floor of [floor.md](floor.md) and its look of [floor-look.md](floor-look.md). Builds 2 and 3. With the owner's directions of 2026-11-25/26: everything touches the floor as it passes; a cell remembers who lit it; **Spill makes a shot touch a wide area where it lands** (a bigger splash); Oil "coats the floor where it lands. Burns long once lit."
 
 ## What the players see
 
@@ -9,7 +9,7 @@
 - **The fire road (build 3).** A dash with Oil lays a lane of oil behind its caster; a second staff (or a teammate) lights it: a wall of fire drawn by moving.
 - **It is the lighter's.** A burning cell's harm is the caster whose fire lit it (or whose fire the spread came from), not the one who poured the oil: its kills count for `on kill`, Siphon on the lighting spell pays, the run's numbers name the lighter.
 - **Spill: a bigger splash.** A carrier with Spill touches a wide circle of floor where it lands: a Spill water bolt makes a puddle 4 cells across where it hits; a Spill oil bolt a slick. It changes the floor only, never what it hits.
-- **Water and frost put an oil fire out** (proposed, an open question below): the flames go out and the oil is left, to be lit again.
+- **Water and frost put an oil fire out** (the owner, 2026-11-26): the flames go out and the oil is left, to be lit again.
 
 ## The new states of `floor`
 
@@ -31,7 +31,7 @@
 - **The fire touches its neighbours** (`spreads = fire`), so it does what fire does to each: oil catches, grass catches, a puddle's edge boils away (steam), ice thaws. One rule, the cover's own; no row names a neighbour's kind.
 - **Who lit it:** a fire's touch on oil makes the cell the fire's caster's (the touch that moves a cell sets its lighter, floor.md "Who lit it"); a spread hands it on; `doused` and `scorched` keep it, rest drops it.
 - **Danger:** `catching`, `burning` and `burning_down` harm (not `harmless`): the AI's look marks them and the enemies walk out and around. `oiled` gives nothing, so the AI does not see it.
-- **Lightning does not light oil** (proposed, an open question below): fire is the one match, and lightning stays the lake's.
+- **Lightning does not light oil** (the owner, 2026-11-26): fire is the one match, and lightning stays the lake's.
 - **Oil on water, on ice:** nothing (a cell holds one state; the oil is lost on the water). Oil on `scorched` lays new oil.
 
 ## The cards
@@ -76,7 +76,7 @@
 | swing | its tip, where the sweep ends |
 | slam | its impact point |
 | decoy, familiar, portal | nothing: they make a body or a gate, whose own cards are their payloads' (wasted, the builder shows it) |
-| field (Part 3, in parallel) | answered by the field's own traits: a field hits and touches nothing, so it is to be listed with the gates |
+| field (Part 3, in parallel) | nothing: a still shot that touches no floor of its own; its trait `GIVES` joins Spill's "not" with whichever lands second |
 
 ## The engine work
 
@@ -124,8 +124,10 @@ Three new surfaces (`CoverState.FlatSurface`: OIL, FIRE, SCORCH; a branch each i
 - **A burning field:** 400 oiled cells lit at once, the cover's step while all burn and spread (`test_floor_budget.gd`, printed; budget: under 4 ms a tick on a loaded CI machine).
 - **Spill's touch:** a 38 px touch is about 20 cells; 8 bolts of a Nova with Spill landing in one tick, the cover's step printed beside the first slice's.
 
-## Open questions for the owner
+## The owner's answers (2026-11-26)
 
-1. **Water and frost on burning oil:** proposed, they put it out (the flames go out, the oil is left to be lit again), as they put out burning grass. The other way: water spreads an oil fire (the real thing), frost does nothing.
-2. **Lightning and oil:** proposed, lightning does not light oil (fire is the one match). The other way: lightning lights it too.
-3. **Oil on a body:** nothing, as foundations.md proposed for the first build. A later card could make an oiled body burn longer.
+1. **Water and frost on burning oil:** they put it out (the flames go out, the oil is left to be lit again), as they put out burning grass; a fire still catching too (built).
+2. **Lightning and oil:** lightning does not light oil; fire is the one match (built).
+3. **Oil on a body:** nothing (built). A later card could make an oiled body burn longer.
+
+**Field (Part 3, in parallel):** a field is a still shot that touches no floor of its own, so Spill is wasted on it; whichever of the two lands second adds the field's new trait (`GIVES`) to Spill's "not" (`test_card_rules` names it).

@@ -17,19 +17,19 @@ extends Node2D
 ## world is the mockup's: one tall column 128 px wide (the tower room, the shaft, the crypt),
 ## drawn at PIXEL_SCALE under a camera that follows the first staff down. The background is drawn
 ## in code from docs/STYLE.md's palette; the wizard is the style N art (content/wizard/base/) in
-## a Blight hat (art/story/wizard_hat.svg: the villain wears no player colour); the staffs are
+## a Blight hat (art/story/wizard_hat@2x.svg: the villain wears no player colour); the staffs are
 ## the curl head sheet with the face sheets' eyes and brows (art/faces/), drawn here frame by
 ## frame rather than by `Face`, which needs an actor. The captions are here too, until
 ## content/story has a schema for cutscenes (M3).
 
 signal finished(skipped: bool)
 
-const WIZARD_IDLE: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
-const WIZARD_HAT: Texture2D = preload("res://art/story/wizard_hat.svg")
-const FAVOURITE: Texture2D = preload("res://art/story/favourite.svg")
+const WIZARD_IDLE: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
+const WIZARD_HAT: Texture2D = preload("res://art/story/wizard_hat@2x.svg")
+const FAVOURITE: Texture2D = preload("res://art/story/favourite@2x.svg")
 const STAFF_HEAD: Texture2D = preload("res://content/wizard/staffs/curl/head@2x.png")
-const EYES: Texture2D = preload("res://art/faces/eyes.svg")
-const BROWS: Texture2D = preload("res://art/faces/brows.svg")
+const EYES: Texture2D = preload("res://art/faces/eyes@2x.svg")
+const BROWS: Texture2D = preload("res://art/faces/brows@2x.svg")
 
 ## Seconds from start to end, for one to four players.
 const LENGTH: float = 14.5
@@ -71,7 +71,8 @@ const LANE_SPREAD: float = 3.5
 const FALL_ROCK: float = 0.35
 const FALL_ROCK_RATE: float = 7.0
 const FAVOURITE_HAND: Vector2 = Vector2(-5.0, 31.0)
-## The face on a staff: the eyes' anchor from the grip (the "Close" height) and the sheet frames.
+## The face on a staff: the eyes' anchor from the grip (the "Close" height) and the sheet frames,
+## in world units (a sheet at 2x detail has twice as many of its own pixels a frame: ArtDetail).
 const FACE_ANCHOR: Vector2 = Vector2(-5.0, -8.0)
 const FRAME: Vector2i = Vector2i(16, 8)
 const BLINK: int = 9
@@ -276,14 +277,20 @@ func _build() -> void:
 	_favourite = _sprite(FAVOURITE, 1, 1)
 	for i in _seats.size():
 		_staffs.append(_sprite(STAFF_HEAD, 16, 4))
-		_eyes.append(_sprite(EYES, EYES.get_width() / FRAME.x, EYES.get_height() / FRAME.y))
-		_brows.append(_sprite(BROWS, BROWS.get_width() / FRAME.x, BROWS.get_height() / FRAME.y))
+		_eyes.append(_sheet(EYES))
+		_brows.append(_sheet(BROWS))
 		_staff_at.append(Vector2.ZERO)
 	_caption = Label.new()
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_caption.position = Vector2(0.0, VIEW_TOP + VIEW_H * PIXEL_SCALE + 14.0)
 	_caption.size = Vector2(SCREEN.x, 32.0)
 	add_child(_caption)
+
+
+## A face sheet of FRAME frames (world units), as a sprite of its columns and rows.
+func _sheet(texture: Texture2D) -> Sprite2D:
+	var frame_px := Vector2i(ArtDetail.to_art(texture, Vector2(FRAME)))
+	return _sprite(texture, texture.get_width() / frame_px.x, texture.get_height() / frame_px.y)
 
 
 func _sprite(texture: Texture2D, columns: int, rows: int) -> Sprite2D:

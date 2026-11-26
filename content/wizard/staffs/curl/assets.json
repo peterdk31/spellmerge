@@ -1,24 +1,6 @@
 {
 	"assets": [
 		{
-			"path": "content/wizard/staffs/curl/brows@2x.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tier": "good",
-			"tool": "Claude (SVG rects drawn by tools/staff_art.py from shape rules, ART0's pilot of the 64x64 redraw, 2026-11-25)",
-			"prompt": "The Optimist's floating eyebrows at 2x detail for a 32x32-unit living staff drawn in 64x64 pixel art, 32x16 frames: five columns of moods (neutral, raised, angry, furious, worried) as dark strokes two pixels thick with one-pixel ends, eight pixels long, stepping between rows 0 and 7 above the eyes, the right brow mirrored. Only non-overlapping rect elements, whole-number coordinates, the outline colour from docs/STYLE.md."
-		},
-		{
-			"path": "content/wizard/staffs/curl/eyes@2x.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tier": "good",
-			"tool": "Claude (SVG rects drawn by tools/staff_art.py from shape rules, ART0's pilot of the 64x64 redraw, 2026-11-25)",
-			"prompt": "The Optimist's cartoon eye pair at 2x detail for a 32x32-unit living staff drawn in 64x64 pixel art, 32x16 frames: two round 10x14 eyes with a one-pixel dark rim, Bone light whites shaded Bone base toward the bottom right, a round dark pupil with a Bone light glint at its top left, looking in nine directions (two pixels a step), then a blink drawn as a closed, smiling lid. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
-		},
-		{
 			"path": "content/wizard/staffs/curl/head@2x.png",
 			"origin": "ai",
 			"author": "Claude",

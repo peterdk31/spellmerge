@@ -13,7 +13,8 @@ const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 
 ## Under the bodies (drawn before the world at the same z), over the floor's marks.
 const Z: int = 0
-## A frame of a staff's head sheet, and where its grip is in it (content/wizard/README.md).
+## A frame of a staff's head sheet, and where its grip is in it (content/wizard/README.md), in world
+## units (a sheet at 2x detail has twice as many of its own pixels: ArtDetail).
 const HEAD_FRAME: Vector2 = Vector2(48.0, 48.0)
 const HEAD_GRIP: Vector2 = Vector2(24.0, 27.0)
 ## A card's icon is drawn this big, in pixels.
@@ -87,7 +88,12 @@ func _draw() -> void:
 		var head: Texture2D = view.get("head") as Texture2D
 		var icon: Texture2D = view.get("icon") as Texture2D
 		if head != null:
-			draw_texture_rect_region(head, Rect2(Vector2(-HEAD_GRIP.x, -HEAD_GRIP.y - lift + 4.0), HEAD_FRAME), Rect2(Vector2.ZERO, HEAD_FRAME))
+			draw_texture_rect_region(head, Rect2(Vector2(-HEAD_GRIP.x, -HEAD_GRIP.y - lift + 4.0), HEAD_FRAME), head_region(head))
 		elif icon != null:
 			draw_texture_rect(icon, Rect2(Vector2(-ICON_SIZE.x * 0.5, -ICON_SIZE.y - lift + 4.0), ICON_SIZE), false)
 	draw_set_transform(Vector2.ZERO)
+
+
+## The frame of `head` (a head sheet) drawn for a staff on the ground: its first, in its own pixels.
+static func head_region(head: Texture2D) -> Rect2:
+	return Rect2(Vector2.ZERO, ArtDetail.to_art(head, HEAD_FRAME))

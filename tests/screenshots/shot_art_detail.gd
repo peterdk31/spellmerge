@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## The 1280 x 720 picture and mixed art (ART0, docs/STYLE.md, "The picture and the art's detail"):
-## the curl, redrawn at 2x detail (its head and the Optimist's face, drawn at half size), beside the
+## the curl, redrawn at 2x detail (its head and the shared face, drawn at half size), beside the
 ## star (32-unit art drawn twice as big until ART1 redrew it at 2x too), in play; the room around them (enemies, props, floor:
 ## today's art) with the curl in it, at the cameras' resting zoom, 1; and zoomed out to 0.8, as the
 ## camera holds a spread party.

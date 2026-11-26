@@ -82,6 +82,21 @@ class Redraw2xTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             redraw_2x.read_svg('<svg width="2" height="2"><rect x="0" y="0" width="1" height="1" fill="#14121f" opacity="0.5"/></svg>')
 
+    def test_the_detail_pass_lights_and_shades_edges_and_folds_cloth(self) -> None:
+        stone = ("#2b2840", "#4a4663", "#7a7694")
+        rows = ["#" * 14] + ["#" + "s" * 12 + "#" for _ in range(12)] + ["#" * 14]
+        colours = {"#": OUTLINE, "s": stone[1]}
+        rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{colours[c]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
+        src = redraw_2x.read_svg(f'<svg width="14" height="14">{rects}</svg>')
+        out = redraw_2x.redraw(src, smooth=False, detailed=True)
+        inside = [(x, y) for y in range(out.height) for x in range(out.width) if out.pixels[y][x] in stone]
+        top_left = min(inside, key=lambda p: p[0] + p[1])
+        bottom_right = max(inside, key=lambda p: p[0] + p[1])
+        self.assertEqual(out.pixels[top_left[1]][top_left[0]], stone[2], "the top-left edge lit")
+        self.assertEqual(out.pixels[bottom_right[1]][bottom_right[0]], stone[0], "the bottom-right edge shaded")
+        folds = [x for x in range(out.width) if out.pixels[out.height - 6][x] == stone[0]]
+        self.assertGreaterEqual(len(folds), 3, "the cloth's lower part falls in folds")
+
     def test_a_target_not_named_at_2x_is_refused(self) -> None:
         with self.assertRaises(SystemExit):
             redraw_2x.main(["in.svg", "out.svg"])

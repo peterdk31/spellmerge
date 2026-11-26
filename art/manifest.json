@@ -24,8 +24,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "good",
-      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: One 48x48 frame of the Favourite, the wizard's shiny new staff, pointing straight up: a Spark gold shaft with two Bone bands, a Bone blade-shaped head with an Ice gem and a Spark glint, the grip at (24, 27). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: One 48x48 frame of the Favourite, the wizard's shiny new staff, pointing straight up: a Spark gold shaft with two Bone bands, a Bone blade-shaped head with an Ice gem and a Spark glint, the grip at (24, 27). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
       "path": "art/story/wizard_hat@2x.svg",
@@ -33,8 +33,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "good",
-      "tool": "Claude (content/wizard/base/wizard_hat_p1.svg with the Player 1 ramp swapped for the Blight ramp by a script); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: The style N wizard's pointed hat (content/wizard/base/wizard_hat_p1.svg) in the Blight ramp, the enemies' colour, for the wizard, the villain of the intro, who wears no player colour. Only rect elements, palette colours from docs/STYLE.md."
+      "tool": "Claude (content/wizard/base/wizard_hat_p1.svg with the Player 1 ramp swapped for the Blight ramp by a script); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: The style N wizard's pointed hat (content/wizard/base/wizard_hat_p1.svg) in the Blight ramp, the enemies' colour, for the wizard, the villain of the intro, who wears no player colour. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/tilesets/crypt/floor.svg",
@@ -195,8 +195,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, each pixel doubled (no smoothing, to keep the small face's shapes) and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: A 4-frame idle strip (128x32) of style N from art/samples/n_dusk/body.svg: a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, the body only (no hat, no staff, no player colour). Frame 1 eyes open, frame 2 eyes closed (a blink), frames 3 and 4 the eyes glance one pixel left and right. The game adds the breathing as a 1 px bob. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, each pixel doubled (no smoothing, to keep the small face's shapes) and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: A 4-frame idle strip (128x32) of style N from art/samples/n_dusk/body.svg: a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, the body only (no hat, no staff, no player colour). Frame 1 eyes open, frame 2 eyes closed (a blink), frames 3 and 4 the eyes glance one pixel left and right. The game adds the breathing as a 1 px bob. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/wizard_hat_p1@2x.svg",
@@ -204,8 +204,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 1 ramp. The game draws it over the body strips and moves it with the body's bob. A copy of art/samples/hats_std/hat_p1.svg. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 1 ramp. The game draws it over the body strips and moves it with the body's bob. A copy of art/samples/hats_std/hat_p1.svg. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/wizard_hat_p2@2x.svg",
@@ -213,8 +213,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 2 (rose) ramp; a copy of art/samples/hats_std/hat_p2.svg. Only rect elements, palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 2 (rose) ramp; a copy of art/samples/hats_std/hat_p2.svg. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/wizard_hat_p3@2x.svg",
@@ -222,8 +222,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 3 (green) ramp; a copy of art/samples/hats_std/hat_p3.svg. Only rect elements, palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 3 (green) ramp; a copy of art/samples/hats_std/hat_p3.svg. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/wizard_hat_p4@2x.svg",
@@ -231,17 +231,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 4 (purple) ramp; a copy of art/samples/hats_std/hat_p4.svg. Only rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/staff@2x.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: A 32x32 wizard staff lying horizontally, pointing right: a Wood pole with a Skin fist on it (the hand, at pixel 14,16) and a gold Spark gem at the tip, 1px dark outline, light from the top. The game turns it along the aim and draws a player-colour gem over the tip. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail with new detail by tools/redraw_2x.py --detail (ART1, 2026-11-26)",
+      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right, and the robe's cloth falling in folds (a shadow crease every six pixels, lit on its left); palette colours only. The 1x art's prompt: The same hat as wizard_hat_p1.svg in the Player 4 (purple) ramp; a copy of art/samples/hats_std/hat_p4.svg. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/kit/golden_wizard.svg",
@@ -269,24 +260,6 @@
       "tier": "good",
       "tool": "Claude (SVG rects composited by a small script from the game's own sheets)",
       "prompt": "The golden example of an enemy, a stray: content/enemies/ember_imp/idle.svg (the Cinder Rod) with the stray eyes from art/faces/eyes.svg in fire's light shade #ffa23c and the angry brows from art/faces/brows.svg at its face anchor, as one 32x32 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_walk@2x.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, each pixel doubled (no smoothing, to keep the small face's shapes) and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: A 4-frame walk strip (128x32) of the same body as wizard_idle.svg (eyes open): the boots waddle between a wide stance, together, left boot out and right boot out. The game dips the body and hat one pixel on frames 1 and 3. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_dash@2x.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects); redrawn at 2x detail by tools/redraw_2x.py (ART1, 2026-11-25)",
-      "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, each pixel doubled (no smoothing, to keep the small face's shapes) and its outside outline one art pixel thick; palette colours only. The 1x art's prompt: A 2-frame dash strip (64x32) of the same body as wizard_idle.svg: frame 1 eyes open (the crouch), frame 2 eyes shut tight (the leap). The game crouches, lifts, stretches and leans it. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/elements/fire/icon.svg",

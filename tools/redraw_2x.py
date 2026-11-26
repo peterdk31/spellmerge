@@ -17,7 +17,8 @@ its palette colours and its silhouette, and is drawn finer in two ways:
 
     tools/redraw_2x.py IN.svg OUT@2x.svg   # an SVG of rects, one a run along a row
     tools/redraw_2x.py IN.svg OUT@2x.png   # an indexed PNG, for a sheet whose rects would pass 1 MB
-    tools/redraw_2x.py --blocky IN OUT     # no smoothing: small round shapes (the face sheets)
+    tools/redraw_2x.py --blocky IN OUT     # no smoothing: small round shapes (a small face)
+    tools/redraw_2x.py --detail IN OUT     # and new detail: one-pixel edge light and shadow, folds
 
 Standard library only. Delete the 1x file after by hand (renaming its `.import`, art/README.md step
 2), so the 2x file is the art from then on: redraw it by hand or with a generator, not by running
@@ -152,9 +153,71 @@ def double(src: Canvas) -> Canvas:
     return out
 
 
-def redraw(src: Canvas, smooth: bool = True) -> Canvas:
-    """`src` at 2x detail: smoothed (or doubled, `smooth` false), its outside outline one art pixel."""
-    return thin_outline(scale2x(src)) if smooth else double(src)
+MATERIAL_ROW = re.compile(r"^\| \*\*([^*]+)\*\*[^|]*\| `(#[0-9a-f]{6})` \| `(#[0-9a-f]{6})` \| `(#[0-9a-f]{6})` \|", re.M)
+
+
+def materials() -> dict[str, tuple[str, int]]:
+    """Each palette colour's material and shade (0 shadow, 1 base, 2 light), read from
+    docs/STYLE.md's table."""
+    style = (Path(__file__).resolve().parent.parent / "docs/STYLE.md").read_text(encoding="utf-8")
+    out: dict[str, tuple[str, int]] = {}
+    for name, *shades in MATERIAL_ROW.findall(style):
+        for shade, colour in enumerate(shades):
+            out[colour] = (name, shade)
+    return out
+
+
+# Cloth: the materials a robe is made of, which take folds.
+CLOTH = ("Stone",)
+FOLD_EVERY = 6
+
+
+def detail(src: Canvas) -> Canvas:
+    """New detail at the 2x picture's own pixels (the owner, 2026-11-26: real detail, not a 2x):
+    every part's base shade gets a one-art-pixel lit edge where it meets something else on its top
+    or left and a shaded one on its bottom or right (a rounder form than the 1x shading's two-pixel
+    bands), and cloth falls in folds: a shadow crease every FOLD_EVERY art pixels down its lower
+    part, lit on its left. Decided from the picture as it was, all at once."""
+    shades = materials()
+    p = src.pixels
+    out = Canvas(src.width, src.height)
+
+    def material(x: int, y: int) -> str | None:
+        colour = _at(p, x, y)
+        return shades[colour][0] if colour in shades else None
+
+    def recolour(colour: str, shade: int) -> str:
+        name = shades[colour][0]
+        for other, (n, s) in shades.items():
+            if n == name and s == shade:
+                return other
+        return colour
+
+    for y in range(src.height):
+        for x in range(src.width):
+            colour = p[y][x]
+            out.pixels[y][x] = colour
+            if colour is None or colour == OUTLINE or colour not in shades:
+                continue
+            name, shade = shades[colour]
+            if shade != 1:
+                continue
+            if material(x - 1, y) != name or material(x, y - 1) != name:
+                out.pixels[y][x] = recolour(colour, 2)
+            elif material(x + 1, y) != name or material(x, y + 1) != name:
+                out.pixels[y][x] = recolour(colour, 0)
+            elif name in CLOTH and x % FOLD_EVERY == 3 and material(x, y - 3) == name and material(x, y - 6) == name:
+                out.pixels[y][x] = recolour(colour, 0)
+            elif name in CLOTH and x % FOLD_EVERY == 2 and material(x + 1, y - 3) == name and material(x + 1, y - 6) == name:
+                out.pixels[y][x] = recolour(colour, 2)
+    return out
+
+
+def redraw(src: Canvas, smooth: bool = True, detailed: bool = False) -> Canvas:
+    """`src` at 2x detail: smoothed (or doubled, `smooth` false), its outside outline one art pixel,
+    and with `detailed` new detail at the finer pixels (`detail`)."""
+    out = thin_outline(scale2x(src)) if smooth else double(src)
+    return detail(out) if detailed else out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -162,10 +225,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("target", type=Path)
     parser.add_argument("--blocky", action="store_true", help="double without smoothing (small round shapes)")
+    parser.add_argument("--detail", action="store_true", help="add detail at the finer pixels: edge light and shadow, cloth folds")
     args = parser.parse_args(argv)
     if "@2x" not in args.target.stem:
         parser.error("the target's name ends in @2x (ArtDetail)")
-    art = redraw(read_svg(args.source.read_text(encoding="utf-8")), not args.blocky)
+    art = redraw(read_svg(args.source.read_text(encoding="utf-8")), not args.blocky, args.detail)
     if args.target.suffix == ".png":
         args.target.write_bytes(art.png())
     else:

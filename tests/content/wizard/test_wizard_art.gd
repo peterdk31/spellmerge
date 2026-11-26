@@ -112,19 +112,11 @@ func test_each_head_brings_a_tip_and_its_own_personality() -> void:
 		styles.append(staff.face_style)
 
 
-## The 64x64 redraw (ART0's pilot, ART1): every head is drawn at 2x detail; the curl wears its own
-## face (the Optimist's at 2x), the others the shared face, itself at 2x since ART1.
-func test_every_head_is_drawn_at_2x_and_the_curl_wears_a_face_of_its_own() -> void:
-	var staffs: Array[StaffBase] = _heads()
-	for staff in staffs:
+## The 64x64 redraw (ART0's pilot, ART1): every head is drawn at 2x detail and wears the one shared
+## face (the owner, 2026-11-26: the curl's own face removed), itself at 2x.
+func test_every_head_is_drawn_at_2x_and_wears_the_shared_face() -> void:
+	for staff in _heads():
 		if staff == null:
 			continue
 		check_equal(ArtDetail.of(staff.head), 2, "%s: its head at 2x detail" % staff.id)
-		if staff.id == &"curl":
-			check(staff.face != null and staff.face.problems().is_empty(), "curl: a face of its own that can be drawn")
-			if staff.face != null:
-				check_equal(ArtDetail.of(staff.face.eyes), 2, "curl: its eyes at 2x")
-				check_equal(ArtDetail.of(staff.face.brows), 2, "curl: its brows at 2x")
-				check_equal(staff.face.frame, Face.FRAME, "curl: its face's frames the shared ones' (both at 2x)")
-		else:
-			check(staff.face == null, "%s: the shared face" % staff.id)
+		check(staff.face == null, "%s: the shared face" % staff.id)

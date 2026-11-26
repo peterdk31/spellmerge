@@ -71,20 +71,9 @@ func test_the_wizard_draws_a_2x_head_and_face() -> void:
 	check_equal(sprite.scale, Vector2(0.5, 0.5), "drawn at half")
 	check_equal(sprite.offset, (Vector2(StaffLook.FRAME_SIZE, StaffLook.FRAME_SIZE) * 0.5 - StaffLook.GRIP) * 2.0, "its grip on the hand, in its own pixels")
 	check(sprite.get_rect().size * sprite.scale == Vector2(StaffLook.FRAME_SIZE, StaffLook.FRAME_SIZE), "a frame is 48 world pixels")
-	var curl: StaffBase = load("res://content/wizard/staffs/curl/curl.tres") as StaffBase
-	face.wear_art(curl.face)
-	var layers: Array[Texture2D] = face.layer_textures()
-	check(layers.size() == 2 and layers[0] == curl.face.eyes and layers[1] == curl.face.brows, "the face wears the curl's own sheets")
+	# The face: the shared sheets, at 2x since ART1, drawn at half.
 	for child: Node in face.get_children():
 		var layer := child as Sprite2D
 		if layer != null:
 			check_equal(layer.scale, Vector2(0.5, 0.5), "a 2x face layer at half")
-			check_equal(layer.hframes * layer.texture.get_width() / layer.hframes, layer.texture.get_width(), "whole frames")
-	face.wear_art(null)
-	layers = face.layer_textures()
-	check(layers.size() == 2 and layers[0] != curl.face.eyes, "and the shared sheets again")
-	for child: Node in face.get_children():
-		var layer := child as Sprite2D
-		if layer != null:
-			check_equal(layer.scale, Vector2(0.5, 0.5), "the shared face layer at half too (2x since ART1)")
 	wizard.get_parent().remove_child(wizard)

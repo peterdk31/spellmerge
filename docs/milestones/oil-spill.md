@@ -129,5 +129,7 @@ Three new surfaces (`CoverState.FlatSurface`: OIL, FIRE, SCORCH; a branch each i
 1. **Water and frost on burning oil:** they put it out (the flames go out, the oil is left to be lit again), as they put out burning grass; a fire still catching too (built).
 2. **Lightning and oil:** lightning does not light oil; fire is the one match (built).
 3. **Oil on a body:** nothing (built). A later card could make an oiled body burn longer.
+4. **Oil's particle look** (on #948): widen the look slots so Oil's shots get a look of their own (sheen and drips, at real 64-px detail): the next PR, after this one. Until then its shots read by their tint (`test_infusion_colours` skips it).
+5. **The flames' look** (on #948): ART2 redraws them later; they stay as built here.
 
 **Field (Part 3, in parallel):** a field is a still shot that touches no floor of its own, so Spill is wasted on it; whichever of the two lands second adds the field's new trait (`GIVES`) to Spill's "not" (`test_card_rules` names it).

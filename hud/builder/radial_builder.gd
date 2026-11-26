@@ -74,6 +74,10 @@ extends Control
 ## items I5): this builder lays its cards out on it and draws them, the inventory
 ## (`hud/menus/inventory/`, items I7) its bags and items.
 
+## Where the line of what a staff does by itself (its sigils) sits, under the ring, and its colour.
+const SIGIL_LINE_Y: float = 70.0
+const SIGIL_TEXT: Color = Color("#e08ad8")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -583,6 +587,20 @@ func hub_lines() -> PackedStringArray:
 	var lines := PackedStringArray([_staff_label(_viewed)])
 	lines.append_array(_number_lines(_numbers(_plan(_viewed)), {}))
 	return lines
+
+
+## What a staff's sigils make it do (staff-language L4), in words: "By itself when hurt, when close";
+## empty for a staff with none. The words are each sigil's own (`SigilBase.shown_words`).
+func sigil_line(plan: Dictionary) -> String:
+	var ids: Array = plan.get("sigils", [])
+	if ids.is_empty():
+		return ""
+	var registry: RegistryScript = get_node_or_null(^"/root/Registry") as RegistryScript
+	var words := PackedStringArray()
+	for id: Variant in ids:
+		var sigil: SigilBase = ItemKinds.content(ItemKinds.SIGIL, StringName(id), registry) as SigilBase
+		words.append(sigil.shown_words() if sigil != null else String(id))
+	return "By itself " + ", ".join(words)
 
 
 ## What the hub calls staff `staff`: "Staff 2" for the staff on RT (its hand's place, as the
@@ -1737,6 +1755,10 @@ func _draw_hub() -> void:
 		_text(line, center + Vector2(0.0, -13.0 + (at - 1) * LINE_STEP), WARN if line.ends_with("!") else MUTED, true)
 	# An empty bag says so; otherwise the hub asks for a card.
 	_text(NO_CARDS_TEXT if _menu.is_empty() else "Point", center + Vector2(0.0, 17.0), DIM, true)
+	# What the staff does by itself (staff-language L4), under the ring.
+	var by_itself: String = sigil_line(_plan(_viewed))
+	if by_itself != "":
+		_text(by_itself, center + Vector2(0.0, SIGIL_LINE_Y), SIGIL_TEXT, true)
 
 
 ## `text` cut with ".." to fit `width` pixels.

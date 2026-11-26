@@ -15,7 +15,8 @@ extends RefCounted
 ##   past it the rest of the shots are tested in the next step). Only benchmarks change it.
 ## - `fire_shots`: the shots one budget's trigger fires may make in one step
 ##   (`Spells.fire_shots_per_step`; past it a fire waits for the next step). Only benchmarks change it.
-## - `bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`, `bag_currency`: the capacity of each bag of an
+## - `bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`, `bag_currency`, `bag_sigils` (staff-language L4, after
+##   the others in a header): the capacity of each bag of an
 ##   inventory, in copies (items I4, docs/milestones/items.md; one rule per `ItemKinds.BAGS`
 ##   entry, named `bag_` and the bag's name). 0, the default: no limit. An inventory takes its
 ##   bags' at its start (`bag_capacity`); meta progression raises them later. Nothing limits the
@@ -56,9 +57,10 @@ const FIELDS: Array = [
 	[&"bag_potions", "potion bag", 0, MAX_BAG],
 	[&"bag_currency", "currency bag", 0, MAX_BAG],
 	[&"boss_intros", "boss intros", 0, 1],
+	[&"bag_sigils", "sigil bag", 0, MAX_BAG],
 ]
 ## The header's bytes: a 32-bit number for each of FIELDS.
-const BYTES: int = 36
+const BYTES: int = 40
 
 var shot_cap: int = ManagerScript.DEFAULT_CAP_DESKTOP
 var hit_work: int = ManagerScript.WORK_PER_STEP
@@ -69,6 +71,7 @@ var bag_relics: int = 0
 var bag_potions: int = 0
 var bag_currency: int = 0
 var boss_intros: int = 1
+var bag_sigils: int = 0
 
 ## Not state: this machine's rules.
 const DERIVED: Array[StringName] = [&"_machine"]

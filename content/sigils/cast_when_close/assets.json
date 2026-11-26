@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/sigils/cast_when_close/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator)",
+			"prompt": "A 16x16 icon for the Cast when Close sigil: a round teal seal with a gold wizard and a red foe side by side over a gold line, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

@@ -416,6 +416,7 @@ func _ready() -> void:
 		events.staff_changed.connect(_on_staff_changed)
 		events.inventory_announced.connect(_on_inventory_announced)
 		events.staff_mana_changed.connect(_on_staff_mana_changed)
+		events.staff_sigils_live.connect(_on_staff_sigils_live)
 		events.mana_reserved.connect(_on_mana_reserved)
 		events.cast_fizzled.connect(_on_cast_fizzled)
 		events.run_started.connect(_on_run_started)
@@ -895,7 +896,19 @@ func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 	for id: Variant in plan.get("cards", []):
 		var card: StringName = StringName(id)
 		icons.append(spells.component_icon(card) if spells != null and card != &"" else null)
-	_panels[player].set_staff_plan(staff, plan, icons)
+	# Its sigils' icons (staff-language L4), from their content, once here.
+	var sigil_icons: Array[Texture2D] = []
+	var registry: RegistryScript = get_node_or_null(^"/root/Registry") as RegistryScript
+	for id: Variant in plan.get("sigils", []):
+		var sigil: ItemContent = ItemKinds.content(ItemKinds.SIGIL, StringName(id), registry) as ItemContent
+		sigil_icons.append(sigil.icon if sigil != null else null)
+	_panels[player].set_staff_plan(staff, plan, icons, sigil_icons)
+
+
+## A staff's sigils began or stopped holding (staff-language L4): its row's sigils glow, or stop.
+func _on_staff_sigils_live(player: int, staff: int, on: bool) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_panels[player].set_sigils_live(staff, on)
 
 
 ## Each shown panel's staff rows get their staff's next cast and delay left from `Spells`

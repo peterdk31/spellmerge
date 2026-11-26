@@ -116,8 +116,7 @@ var _staffed: Actor = null
 
 
 ## The cards a staff holds to cast `card` (by its kind): a carrier alone, a trigger or a multicast
-## with plain carriers to fire or pull, a condition on a plain carrier with a plain cast after it,
-## anything else on a plain carrier.
+## with plain carriers to fire or pull, anything else on a plain carrier.
 static func staff_for(card: SpellComponent) -> Array[StringName]:
 	var out: Array[StringName] = [card.id]
 	if card is CarrierCard:
@@ -127,9 +126,6 @@ static func staff_for(card: SpellComponent) -> Array[StringName]:
 		carriers = 2
 	elif card is MulticastBase:
 		carriers = (card as MulticastBase).extra_draws + 1
-	elif card is ModifierBase and (card as ModifierBase).behaviour == ModifierBase.Behaviour.WHEN:
-		# A condition's cast may be skipped (staff-language L2): a plain cast after it always leaves.
-		carriers = 2
 	for i in carriers:
 		out.append(PLAIN)
 	return out

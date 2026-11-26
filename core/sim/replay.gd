@@ -51,9 +51,11 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## `InputFrame.VERSION` 10, the rerolls; 18: the frames' commands without `room_reroll_requested` and
 ## with `map_teleport_requested`, `InputFrame.VERSION` 11, the room rerolls gone; 19: the frames'
 ## commands with `quick_bind_requested` and `quick_use_requested`, `InputFrame.VERSION` 12, and the
-## players' loadouts' quick-use slots, the d-pad's quick-use).
+## players' loadouts' quick-use slots, the d-pad's quick-use; 20: the frames' commands with
+## `sigil_put_requested` and `sigil_take_requested`, `InputFrame.VERSION` 13, and the players'
+## loadouts' staffs' sigils and the rule `bag_sigils`, staff-language L4).
 ## A replay of another format is refused.
-const FORMAT: int = 19
+const FORMAT: int = 20
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the hub (online-lobby L1; the main

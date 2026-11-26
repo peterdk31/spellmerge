@@ -8,6 +8,10 @@ extends Resource
 @export var staff: StaffBase = null
 ## Card ids by slot (`&""` for an empty slot); no more than the staff's slots.
 @export var cards: Array[StringName] = []
+## Sigils on the staff (staff-language L4): it casts by itself while one holds, along the body's aim,
+## at its cooldown and mana. At most `SigilBase.MOST_A_STAFF`, no two the same, and only on a staff
+## that winds up (its telegraph warns before every cast it makes by itself).
+@export var sigils: Array[SigilBase] = []
 
 
 ## A new entry of `staff` holding `cards`.
@@ -33,6 +37,19 @@ func problems() -> PackedStringArray:
 			any = true
 	if not any:
 		found.append("It has no card.")
+	if not sigils.is_empty():
+		if staff.wind_up <= 0.0:
+			found.append("It has sigils but its staff has no wind-up, so it would cast by itself without a warning.")
+		if sigils.size() > SigilBase.MOST_A_STAFF:
+			found.append("It has %d sigils; at most %d." % [sigils.size(), SigilBase.MOST_A_STAFF])
+		var seen: Array[StringName] = []
+		for sigil: SigilBase in sigils:
+			if sigil == null:
+				found.append("It has an empty sigil.")
+			elif seen.has(sigil.id):
+				found.append("It has the sigil %s twice." % sigil.id)
+			else:
+				seen.append(sigil.id)
 	return found
 
 

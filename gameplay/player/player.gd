@@ -106,6 +106,9 @@ const NO_CARD: String = "You do not have that card."
 const NO_HAND: String = "You have no such hand."
 const NO_ROOM: String = "That bag is full."
 const NO_ITEM: String = "You do not have that."
+## Why a sigil is not put on a staff (staff-language L4).
+const SIGILS_FULL: String = "That staff holds three sigils already."
+const SIGIL_TWICE: String = "That staff has that sigil already."
 ## Why the inventory's use of a thing is refused (`bag_use_requested`): it is no potion, or a potion
 ## that only heals while the body is whole.
 const NO_USE: String = "That cannot be used."
@@ -124,10 +127,11 @@ const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
 	Inventory.Refusal.NO_ROOM: NO_ROOM, Inventory.Refusal.NO_ITEM: NO_ITEM,
 	Inventory.Refusal.NO_DROP: NO_DROP, Inventory.Refusal.NO_USE: NO_USE,
+	Inventory.Refusal.SIGILS_FULL: SIGILS_FULL, Inventory.Refusal.SIGIL_TWICE: SIGIL_TWICE,
 }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max"]
+const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max", &"_sent_sigils"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
 
@@ -152,6 +156,8 @@ var _sent_mana: int = -1
 var _sent_shown: int = -1
 ## What the last `staff_mana_changed` of each staff said (its whole mana; -1: not sent yet).
 var _sent_staff_mana: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+## Which staffs' sigils the last `staff_sigils_live` said hold, a bit a staff (-1: not sent yet).
+var _sent_sigils: int = -1
 var _sent_staff_max: PackedFloat32Array = PackedFloat32Array([-1.0, -1.0, -1.0, -1.0])
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
@@ -358,6 +364,7 @@ func _forget_sent() -> void:
 	_sent_mana = -1
 	_sent_shown = -1
 	_sent_staff_mana.fill(-1)
+	_sent_sigils = -1
 	_sent_staff_max.fill(-1.0)
 
 
@@ -380,6 +387,8 @@ func _bind_home(actor: Actor) -> void:
 		bus.listen(&"bag_use_requested", _on_bag_use_requested)
 		bus.listen(&"quick_bind_requested", _on_quick_bind_requested)
 		bus.listen(&"quick_use_requested", _on_quick_use_requested)
+		bus.listen(&"sigil_put_requested", _on_sigil_put_requested)
+		bus.listen(&"sigil_take_requested", _on_sigil_take_requested)
 
 
 ## Where the seat's mouse aims from: the hand of the body it drives (`Actor.aim_pivot`; items I8),
@@ -491,6 +500,15 @@ func announce_stats() -> void:
 				_sent_staff_mana[at] = whole
 				_sent_staff_max[at] = most
 				body.events.staff_mana_changed.emit(seat, at, float(whole), most)
+		var live: int = 0
+		for at in mini(caster.staff_count, STAFF_COUNT):
+			if caster.sigil_holds(at):
+				live |= 1 << at
+		if live != _sent_sigils:
+			for at in STAFF_COUNT:
+				if _sent_sigils < 0 or (live ^ _sent_sigils) & (1 << at) != 0:
+					body.events.staff_sigils_live.emit(seat, at, live & (1 << at) != 0)
+			_sent_sigils = live
 	var health: float = body.health.health if body.health != null else 0.0
 	var max_health: float = body.health.max_health if body.health != null else 0.0
 	var shown: int = caster.current if caster != null else 0
@@ -698,6 +716,32 @@ func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number
 	if inventory != null:
 		refusal = inventory.drop_staff(number) if number != Inventory.NO_STAFF else inventory.drop(bag, id)
 	_answer_inventory(refusal)
+
+
+## The inventory menu asked to put the sigil `id` on staff number `number` (staff-language L4):
+## `Inventory.put_sigil`, refused as it says.
+func _on_sigil_put_requested(player: int, number: int, id: StringName, body: int) -> void:
+	if player != seat:
+		return
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
+		return
+	var inventory: Inventory = _builder_inventory()
+	_answer_inventory(inventory.put_sigil(number, id) if inventory != null else Inventory.Refusal.NO_STAFF)
+
+
+## The inventory menu asked to take the sigil `id` off staff number `number` (staff-language L4):
+## `Inventory.take_sigil`, refused as it says.
+func _on_sigil_take_requested(player: int, number: int, id: StringName, body: int) -> void:
+	if player != seat:
+		return
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
+		return
+	var inventory: Inventory = _builder_inventory()
+	_answer_inventory(inventory.take_sigil(number, id) if inventory != null else Inventory.Refusal.NO_STAFF)
 
 
 ## The inventory menu asked to use one `id` of `bag` (the owner, 2026-11-19): an item with a use

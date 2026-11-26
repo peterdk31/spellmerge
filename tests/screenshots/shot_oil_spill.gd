@@ -92,12 +92,11 @@ func take() -> void:
 	if wizard == null:
 		return
 	home = wizard.global_position
-	# An oil bolt's trail, lit at its start: a line of fire (cast from a point of its own, wherever the
-	# wizard's mover keeps it).
-	var from: Vector2 = home + Vector2(-60.0, 40.0)
-	spells.call("install_staff", wizard.id, 3, spells.call("compile_staff", [&"oil", &"bolt"] as Array[StringName], STAFF))
-	await settle(10)
-	spells.call("cast_staff", wizard.id, 3, from, Vector2.RIGHT, 100.0)
+	# An oil trail, a cell wide, as an oil bolt passing leaves one (a touch every 16 px along its way),
+	# lit at its start: a line of fire.
+	var from: Vector2 = home + Vector2(-60.0, -70.0)
+	for n in 14:
+		_touch(&"oil", from + Vector2(16.0 * float(n), 0.0), 0.0)
 	await settle(90)
 	_touch(&"fire", from + Vector2(24.0, 0.0), 0.0)
 	await settle(45)

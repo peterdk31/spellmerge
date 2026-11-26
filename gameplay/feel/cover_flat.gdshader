@@ -241,64 +241,71 @@ int shine(ivec2 px, int d, bool wide) {
 	return 0;
 }
 
-// A twinkle: a + of light round a few pixels picked by a hash, played over 3 frames of an 8-frame cycle.
+// A twinkle: a + of light, an art pixel each arm, round a few art pixels picked by a hash, played over
+// 3 frames of an 8-frame cycle.
 bool twinkle(ivec2 px, int t, int d) {
-	ivec2 c = px / d;
 	bool lit = false;
 	for (int k = 0; k < 5; k++) {
 		ivec2 o = k == 0 ? ivec2(0) : (k == 1 ? ivec2(1, 0) : (k == 2 ? ivec2(-1, 0) : (k == 3 ? ivec2(0, 1) : ivec2(0, -1))));
-		uint h = pixel_hash(c + o, 11);
+		uint h = pixel_hash(px + o, 11);
 		int phase = (t + int((h >> 8u) % 8u)) % 8;
-		lit = lit || (h % 53u == 0u && (phase == 2 || (k == 0 && (phase == 1 || phase == 3))));
+		lit = lit || (h % uint(53 * d * d) == 0u && (phase == 2 || (k == 0 && (phase == 1 || phase == 3))));
 	}
 	return lit;
 }
 
-// Water's ripples: short dashes of its light, each growing and shrinking by a pixel a frame of a
-// 6-frame cycle from its own phase.
+// Water's ripples: dashes of its light an art pixel tall, a block of 7 x 4 world px each, each growing
+// and shrinking by an art pixel each side a frame of a 6-frame cycle from its own phase, with a second,
+// shorter dash under its middle at its widest (a ripple's two crests).
 bool ripple(ivec2 px, int t, int d) {
-	ivec2 q = px / d;
-	ivec2 block = ivec2(q.x / 7, q.y / 4);
-	ivec2 l = q - block * ivec2(7, 4);
+	ivec2 size = ivec2(7, 4) * d;
+	ivec2 block = px / size;
+	ivec2 l = px - block * size;
 	uint h = pixel_hash(block, 5);
-	if (h % 4u != 0u || l.y != int((h >> 4u) % 3u)) {
+	if (h % 3u != 0u) {
 		return false;
 	}
+	int y0 = int((h >> 4u) % uint(size.y - 1));
 	int phase = (t + int((h >> 8u) % 6u)) % 6;
-	int reach = phase < 3 ? phase : 6 - phase;
-	return abs(l.x - 3) < reach;
+	int reach = phase < 3 ? phase + 1 : 6 - phase;
+	int mid = size.x / 2;
+	if (l.y == y0) {
+		return abs(l.x - mid) < reach + 1;
+	}
+	return l.y == y0 + 1 && reach >= 3 && abs(l.x - mid) < 2;
 }
 
-// Live water's arcs: a zig-zag of the spark's light across a block of 12 world px, a new one a frame.
+// Live water's arcs: a zig-zag of the spark's light an art pixel thick (it steps a pixel up or down
+// each pixel along), across a block of 12 world px, a new one each frame.
 bool arc(ivec2 px, int frame, int d) {
-	ivec2 q = px / d;
-	ivec2 block = q / 12;
-	ivec2 l = q - block * 12;
+	int size = 12 * d;
+	ivec2 block = px / size;
+	ivec2 l = px - block * size;
 	uint h = pixel_hash(block + ivec2(frame * 17, frame * 31), 13);
-	if (h % 2u != 0u || l.x < 1 || l.x > 10) {
+	if (h % 2u != 0u || l.x < d || l.x >= size - d) {
 		return false;
 	}
-	int y0 = 3 + int((h >> 4u) % 6u);
-	int zig = ((l.x + int((h >> 8u) % 4u)) / 2) % 2;
-	return l.y == y0 + zig;
+	int y0 = 3 * d + int((h >> 4u) % uint(6 * d));
+	int run = 3 + int((h >> 8u) % 3u);
+	int at = (l.x + int((h >> 12u) % 8u)) % (run * 2);
+	return l.y == y0 + (at < run ? at : run * 2 - at) - run / 2;
 }
 
-// Steam's wisps: short rising strokes, a block of 6 x 10 world px each, `share` of 8 of the blocks
-// drawn, risen `rise` px.
+// Steam's wisps: rising strokes an art pixel wide, curling a pixel aside every few, a block of
+// 6 x 10 world px each, `share` of 8 of the blocks drawn, risen `rise` art px.
 bool wisp(ivec2 px, int rise, int share, int d) {
-	ivec2 q = px / d;
-	ivec2 block = ivec2(q.x / 6, 0);
-	int ly = (q.y + rise) % 10;
-	int column = (q.y + rise) / 10;
-	block.y = column;
-	uint h = pixel_hash(block, 17);
+	int w = 6 * d;
+	int tall = 10 * d;
+	int bx = px.x / w;
+	int ly = (px.y + rise) % tall;
+	uint h = pixel_hash(ivec2(bx, (px.y + rise) / tall), 17);
 	if (int(h % 8u) >= share) {
 		return false;
 	}
-	int y0 = int((h >> 4u) % 4u);
-	int len = 3 + int((h >> 7u) % 3u);
-	int x = 1 + int((h >> 10u) % 4u) + ((ly / 3) % 2);
-	return q.x - (q.x / 6) * 6 == x && ly >= y0 && ly < y0 + len;
+	int y0 = int((h >> 4u) % uint(tall / 2));
+	int len = 3 * d + int((h >> 7u) % uint(3 * d));
+	int x = d + int((h >> 10u) % uint(w - 3 * d)) + ((ly / 3) % 3 == 1 ? 1 : 0);
+	return px.x - bx * w == x && ly >= y0 && ly < y0 + len;
 }
 
 // Water's detail on interior pixel `px` (`dist` in from its edge, `low` its facing) in `base`, `shadow`
@@ -317,7 +324,7 @@ vec4 surface(int s, ivec2 px, int dist, bool low, int frame, int t, int d, vec2 
 	int kind = int(surfaces[s].x + 0.5);
 	int motion = int(motions[s].x + 0.5);
 	vec4 colour = fills[s];
-	if (pixel_hash(px / d, 0) % 31u == 0u && kind != 2) {
+	if (pixel_hash(px, 0) % uint(31 * d * d) == 0u && kind != 2) {
 		colour = glints[s];
 	}
 	if (kind == 1 || kind == 3) {
@@ -337,13 +344,13 @@ vec4 surface(int s, ivec2 px, int dist, bool low, int frame, int t, int d, vec2 
 				colour = white_hot;
 			} else if (band > 0) {
 				colour = glints[s];
-			} else if (twinkle(px, t, d) || (lit >= ICE_LIT && pixel_hash(px / d, 3) % 23u == 0u)) {
+			} else if (twinkle(px, t, d) || (lit >= ICE_LIT && pixel_hash(px, 3) % uint(23 * d * d) == 0u)) {
 				colour = lit >= ICE_BRIGHT ? white_hot : glints[s];
 			}
 		}
 	}
 	if (motion == 3) {
-		if (pixel_hash(px / d, frame + 1) % 41u == 0u || arc(px, frame, d)) {
+		if (pixel_hash(px, frame + 1) % uint(41 * d * d) == 0u || arc(px, frame, d)) {
 			colour = sparks[s];
 		}
 	}
@@ -398,7 +405,7 @@ void fragment() {
 			float age = view_time - here.g;
 			float seconds = max(surfaces[was].y, 0.25);
 			int step_of = int(floor(age / seconds * 4.0));
-			if (age < 0.0 || step_of >= 4 || int(pixel_hash(px / d, 21) % 24u) >= 4 - step_of) {
+			if (age < 0.0 || step_of >= 4 || int(pixel_hash(px, 21) % 24u) >= 4 - step_of) {
 				discard;
 			}
 			COLOR = traces[was];

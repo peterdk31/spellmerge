@@ -12,6 +12,8 @@
 - **The marks left.** Steam leaves a faint scorch (Stone's shadow) and a puddle that dried its damp (Water's shadow): a sparse speckle on the dry cell thinning away in 4 steps (3 s and 2 s).
 - **Motes, a few:** live water's sparks (1.5 a cell a second) and steam's smoke (2), through the cover's motes (`cover_motes.gd`: at most 48 a frame for all the cover, none far from the view).
 
+**Real 64-px detail** (the owner's standard of 2026-11-26: 64-px art is new hand-drawn detail, not a 2x upscale): every detail is worked out in single art pixels, never in 2x2 blocks: the edges' wobble and corners, ripples an art pixel tall with a second crest at their widest, arcs that step a pixel at a time, cracks and shine lines, glints, twinkles' arms, wisps an art pixel wide that curl, and the marks' speckle.
+
 ## How it is built (gameplay/feel, core/base)
 
 - **The look is data** (`CoverState`, view only): `flat_surface` (PLAIN, WATER, ICE, STEAM: the shader's `surface`), `flat_glow` and `flat_glow_strength` (the light it gives), `flat_trace` and `flat_trace_seconds` (the mark it leaves when it ends in a state not drawn). `CoverKind.problems` names a glow or mark of no palette material. **Part 2 slots in by data:** oiled, burning and scorched are new states with a surface each (a new `FlatSurface` row and a branch of the shader's `surface`), a glow (burning: Fire) and a mark (scorched: Stone).

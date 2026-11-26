@@ -134,6 +134,12 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 				found.append("%s is drawn over '%s', which is no material of the palette." % [named, state.flat_under])
 			if state.flat_spark != &"" and not Palette.has(state.flat_spark):
 				found.append("%s sparks in '%s', which is no material of the palette." % [named, state.flat_spark])
+			if state.flat_glow != &"" and not Palette.has(state.flat_glow):
+				found.append("%s glows in '%s', which is no material of the palette." % [named, state.flat_glow])
+			if state.flat_trace != &"" and not Palette.has(state.flat_trace):
+				found.append("%s leaves a mark of '%s', which is no material of the palette." % [named, state.flat_trace])
+			if state.flat_glow != &"" and state.flat_glow_strength <= 0.0:
+				found.append("%s glows in '%s' at no strength (flat_glow_strength)." % [named, state.flat_glow])
 		if state.strike_element != &"" and state.strike_damage <= 0.0:
 			found.append("%s strikes %s for no damage (strike_damage)." % [named, state.strike_element])
 		if state.strike_element != &"" and not elements.is_empty() and not elements.has(String(state.strike_element)):

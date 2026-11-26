@@ -533,6 +533,8 @@ var _spectacle: SpectacleScript = null
 ## connected biomes CB3b), at the floor marks' z, before the spectacle in the tree, so the marks lie
 ## over it.
 var _cover_rooms: CoverRoomsScript = null
+## The flat looks' version last handed to the light as readers (`CoverRooms.flats_version`).
+var _floor_readers_version: int = -1
 ## The room's ground, drawn again from its shape as it is laid out (`ground/ground_layout.gd`,
 ## connected biomes CB4).
 var _ground_layout: GroundLayoutScript = null
@@ -1230,6 +1232,13 @@ func step(real_delta: float) -> void:
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
 	_cover_rooms.step(_clock, _actor_table(), focus, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	# The floor's look reads the light and lights it (docs/milestones/floor-look.md).
+	if _cover_rooms.flats_version() != _floor_readers_version:
+		_floor_readers_version = _cover_rooms.flats_version()
+		var readers: Array[ShaderMaterial] = []
+		_cover_rooms.flat_materials(readers)
+		_spectacle.read_floor(readers)
+	_spectacle.light_floor(_cover_rooms.lights.rows, _cover_rooms.lights.count)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
 	_spectacle.hand_bodies(cover().bodies(), cover().body_count())
 	_profile_mark(3)
@@ -2912,6 +2921,8 @@ func set_effects_mode(mode: int) -> void:
 ## Auto's row).
 func _draw_effects_row(row: EffectsQualityScript.Level) -> void:
 	_spectacle.set_effects_quality(row)
+	if _cover_rooms != null:
+		_cover_rooms.set_floor_quality(_spectacle.quality.floor_motes, _spectacle.quality.floor_shimmer)
 	if events != null:
 		events.effects_row_changed.emit(EffectsQualityScript.setting_of(row))
 

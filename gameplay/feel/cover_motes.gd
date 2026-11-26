@@ -41,10 +41,15 @@ class Stream:
 	var owed: float = 0.0
 	var warned: bool = false
 	var named: String = ""
+	## Whether its kind is flat (the floor's), so the effects' row's `flat_share` scales its rate.
+	var flat: bool = false
 
 
 ## The ramp table the streams' colours are rows of (the spectacle's; null: no motes).
 var ramp_table: RampTableScript = null
+## The share of a flat kind's streams given off (the effects' row, EffectsQuality.floor_motes: none at
+## Low); tufted kinds' streams give off in full.
+var flat_share: float = 1.0
 ## Motes given off, all told (for tests).
 var given: int = 0
 
@@ -84,6 +89,7 @@ func lay(layout: CoverLayout) -> void:
 						group = _cells.size()
 						_cells.append(PackedInt32Array())
 					stream.group = group
+					stream.flat = kind.look == CoverKind.Look.FLAT
 					_streams.append(stream)
 			groups.append(group)
 		_group_of_state.append(groups)
@@ -164,7 +170,7 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 			for ramp: PackedColorArray in stream.look.ramps():
 				stream.sources.append(ramp_table.source(ramp))
 		# Owed no more than a frame's budget, so a long fire does not save motes up.
-		stream.owed = minf(stream.owed + stream.look.rate * float(cells.size()) * dt, float(MOST_A_FRAME))
+		stream.owed = minf(stream.owed + _rate_of(stream) * float(cells.size()) * dt, float(MOST_A_FRAME))
 		while stream.owed >= 1.0 and budget > 0:
 			stream.owed -= 1.0
 			var cell: int = cells[_rng.randi() % cells.size()]
@@ -185,8 +191,13 @@ func _owe_far(dt: float, pool: MotesScript) -> void:
 		if pool == null or ramp_table == null or cells.is_empty():
 			stream.owed = 0.0
 			continue
-		var owed: float = minf(stream.owed + stream.look.rate * float(cells.size()) * dt, float(MOST_A_FRAME))
+		var owed: float = minf(stream.owed + _rate_of(stream) * float(cells.size()) * dt, float(MOST_A_FRAME))
 		stream.owed = owed - floorf(owed)
+
+
+## A cell's rate of `stream` (a second), its flat kind's share taken.
+func _rate_of(stream: Stream) -> float:
+	return stream.look.rate * (flat_share if stream.flat else 1.0)
 
 
 ## One mote of kind `k` off `stream`, round the middle `middle` of a cell, into `pool`.

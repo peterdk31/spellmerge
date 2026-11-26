@@ -412,6 +412,18 @@ def draw(parts: list[Part], width: int, height: int, outline: bool = True) -> Ca
     return canvas
 
 
+def draw_1x(parts: list[Part], width: int, height: int) -> Canvas:
+    """`parts` drawn at one art pixel a world unit (a 1x icon from the same parts as its 2x one, for
+    the HUD's small cells; ART2): DETAIL set to 1 for the one drawing."""
+    global DETAIL
+    detail = DETAIL
+    DETAIL = 1
+    try:
+        return draw(parts, width, height)
+    finally:
+        DETAIL = detail
+
+
 def strip(frames: list[list[Part]], width: int, height: int) -> Canvas:
     """Frames side by side, each `width` x `height` world units."""
     out = Canvas(width * DETAIL * len(frames), height * DETAIL)

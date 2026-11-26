@@ -355,9 +355,9 @@ def bounce() -> list[Part]:
 def chain() -> list[Part]:
     """Two oval links of a chain, one through the other, turned to the light."""
     return [
-        ring((5.4, 9.6), 4.0, 2.2, material="Stone"),
-        ring((10.6, 6.4), 4.0, 2.2, material="Stone", glint=True),
-        rod((7.6, 11.2), (8.6, 10.6), 0.7, material="Stone", seam=True),
+        ring((5.4, 9.6), 4.0, 2.2, material="Bone"),
+        ring((10.6, 6.4), 4.0, 2.2, material="Bone", glint=True),
+        rod((7.6, 11.2), (8.6, 10.6), 0.7, material="Bone", seam=True),
     ]
 
 
@@ -394,10 +394,11 @@ def faster() -> list[Part]:
 
 
 def faster_casting() -> list[Part]:
-    """Two long chevrons, one behind the other, quicker still."""
+    """Three chevrons pressing right, one after another, quicker still."""
     return [
-        _arrow([(1.0, 1.4), (4.4, 1.4), (10.4, 8.0), (4.4, 14.6), (1.0, 14.6), (7.0, 8.0)], "Spark"),
-        _arrow([(6.6, 1.4), (10.0, 1.4), (15.2, 8.0), (10.0, 14.6), (6.6, 14.6), (11.8, 8.0)], "Spark"),
+        _arrow([(0.8, 2.6), (3.4, 2.6), (6.6, 8.0), (3.4, 13.4), (0.8, 13.4), (4.0, 8.0)], "Spark"),
+        _arrow([(5.2, 2.6), (7.8, 2.6), (11.0, 8.0), (7.8, 13.4), (5.2, 13.4), (8.4, 8.0)], "Spark"),
+        _arrow([(9.6, 2.6), (12.2, 2.6), (15.2, 8.0), (12.2, 13.4), (9.6, 13.4), (12.8, 8.0)], "Spark"),
     ]
 
 
@@ -724,8 +725,12 @@ def on_expire() -> list[Part]:
 
 
 def on_hit() -> list[Part]:
-    """A shot striking a mark."""
-    return [rod((1.6, 8.0), (7.0, 8.0), 0.9, material="Bone", seam=False), _shot((8.0, 8.0), 2.4), box(11.0, 1.4, 13.0, 14.6, bevel=0.5, material="Bone", glint=True)]
+    """A shot striking its mark: a burst where it lands."""
+    return [
+        rod((1.6, 8.0), (5.6, 8.0), 0.9, material="Bone", seam=False),
+        _shot((6.4, 8.0), 2.2),
+        poly(_star((11.6, 8.0), 4.0, 1.4, 4, -math.pi / 2), bevel=0.5, material="Spark", glint=True),
+    ]
 
 
 def on_hurt() -> list[Part]:
@@ -869,26 +874,14 @@ ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
 
 
 ## Every icon's 1x `icon.svg` (the HUD's small one, `icon_small`) is drawn here too, from the same parts
-## at one art pixel a world unit, so a card looks the same in a small cell and a big one (the owner,
-## 2026-11-26: "redraw the small 1x icons from the same parts", until the HUD is redrawn at 2x).
-SMALL_TOO: tuple[str, ...] = tuple(ICONS)
-
-
-def _small(parts: Callable[[], list[Part]]) -> Canvas:
-    """`parts` drawn at 1x (16 x 16): sprite_rules' detail set to 1 for the one drawing."""
-    detail = sr.DETAIL
-    sr.DETAIL = 1
-    try:
-        return sr.draw(parts(), SIZE, SIZE)
-    finally:
-        sr.DETAIL = detail
+## at one art pixel a world unit (`sprite_rules.draw_1x`), so a card looks the same in a small cell and
+## a big one (the owner, 2026-11-26: "redraw the small 1x icons from the same parts").
 
 
 def files() -> dict[Path, Callable[[], Canvas]]:
     out: dict[Path, Callable[[], Canvas]] = {folder / "icon@2x.svg": (lambda p=parts: sr.draw(p(), SIZE, SIZE)) for folder, parts in ICONS.values()}
-    for name in SMALL_TOO:
-        folder, parts = ICONS[name]
-        out[folder / "icon.svg"] = lambda p=parts: _small(p)
+    for folder, parts in ICONS.values():
+        out[folder / "icon.svg"] = lambda p=parts: sr.draw_1x(p(), SIZE, SIZE)
     return out
 
 

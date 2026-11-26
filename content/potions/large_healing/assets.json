@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
 			"tool": "tools/pickup_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
-			"prompt": "The large healing icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon:  Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The large healing icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A large round glass flask of red healing draught with a corked neck. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/potions/large_healing/icon@2x.svg",

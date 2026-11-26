@@ -4,7 +4,7 @@ A potion is an inventory item (the owner, 2026-11-19): a reward or a shop's shel
 
 ## Contract
 
-- **One folder each:** `<id>/` with `<id>.tres` (a `PotionBase`, `core/base/potion_base.gd`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `assets.json`. Deleting one is deleting its folder.
+- **One folder each:** `<id>/` with `<id>.tres` (a `PotionBase`, `core/base/potion_base.gd`), its `icon@2x.svg` (16 by 16 world units, 32 by 32 art pixels at 2x detail; drawn by `tools/pickup_art.py`, docs/STYLE.md "The picture and the art's detail") and its `icon.svg` (16 by 16, `icon_small` for the HUD's small cells, from the same parts) and its `assets.json`. Deleting one is deleting its folder.
 - **`PotionBase`** (an `ItemContent`): `id` (the folder name), `display_name`, `description` (what a reward's card and the inventory say of it), `icon`, and what a drink does (its use, `use_of`: consumed, no cooldown, so every potion is usable and binds to a d-pad arm): `heal` (health healed) and `more_most` (most health added, and as much health), through Combat (`health_gift_requested`). A drink that only heals is refused while the wizard is whole, so it is never wasted. `problems()` must be empty.
 - A reward table names a potion by its kind and id (`kind = &"potion"`, `id = &"healing"`; content/rewards).
 

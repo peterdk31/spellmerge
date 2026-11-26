@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
 			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
-			"prompt": "The faster casting icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: Two long chevrons, one behind the other, quicker still. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The faster casting icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: Three chevrons pressing right, one after another, quicker still. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/modifiers/faster_casting/icon@2x.svg",
@@ -16,7 +16,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
 			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
-			"prompt": "The faster casting icon, 16x16 world units drawn at 2x detail (32x32 art pixels): Two long chevrons, one behind the other, quicker still. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The faster casting icon, 16x16 world units drawn at 2x detail (32x32 art pixels): Three chevrons pressing right, one after another, quicker still. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

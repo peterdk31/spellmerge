@@ -22,7 +22,7 @@ class IconArtTest(unittest.TestCase):
         palette = set(pixel_grid.palette())
         for path, draw in icon_art.files().items():
             big = path.name.endswith("@2x.svg")
-            self.assertTrue(big or path.parent.name in icon_art.SMALL_TOO, f"{path}: named for its detail")
+            self.assertTrue(big or path.name == "icon.svg", f"{path}: named for its detail")
             picture = draw()
             p = picture.pixels
             side = 32 if big else 16

@@ -1,0 +1,140 @@
+> The history of [content/motes/README.md](../../content/motes/README.md): the full text of that file as it stood on 2026-11-26, before it was slimmed to a contract. Read it only when a question needs the reasons; the contract is the rule.
+
+# content/motes: kinds of motes
+
+A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws where things happen (docs/milestones/spell-spectacle.md, P1). A kind is one `MoteKind` file (`core/base/mote_kind.gd` documents every field), named `<id>.tres`; the registry finds it by its `id` under `motes`, so a new kind is a new file and no list is edited.
+
+## Contract
+
+- **Kinds come from the spells' cards** (docs/milestones/spell-spectacle-2.md, S2). A kind names the cards it is the motes of, by id (`cards`: a carrier card, an element or a modifier), or by their look (`look_ids`: the `look_id` of an element or modifier, by name, `core/base/look_names.gd`; `plain` for a shot with none). A card's motes are the kinds that name it by id; a card no kind names takes the kinds of its look. A shot sheds every kind of its spell's cards, its burst split between them, so a combination sheds a mix. A shot whose cards have none sheds the kinds of layer 0. A swing and a beam give off theirs the same way (a swing's sparks and a beam's splash are layer 0's, their card particles their cards'; S6 item 10), and a character with a status gives off its element card's round it (S6 item 11). The spell is found through the shot's tag (`gameplay/feel/card_kinds.gd`), so nothing is added to the shot; an enemy's shot, which has no spell, sheds by its look layers.
+- **A `surface` kind** belongs to no card: it is what a struck wall sheds. A room may name its own instead (`RoomBase.surface_kinds`: a wooden room's splinters).
+- **A `dash_path` kind** belongs to no card either: every dash gives it off along its path (its speed streaks; spell-spectacle-2.md, S5), in the dasher's colours, beside its cards' kinds.
+- **A `tail` kind** belongs to nothing else either: every flying shot lays its tail in one tail kind, by distance (about one every 2 px of its path, the projectile manager's `_lay_tail`), in the shot's own colours (a quarter of an infused shot's in its caster's), beside its cards' kinds (spell-spectacle-2.md, S5 step 4: tails as motes). Which one is the shot's own: each shot picks one of the tail kinds by its sequence (A, B, C: the first three by id; the owner, 2026-11-05: "keep all three and make the shots randomly pick one"), so a new tail kind beyond three is never laid until `TAIL_KINDS` grows. A tail mote barely moves, starts light and cools to shadow, so a tail cools where the shot was.
+- **A still card's own** (`CarrierCard.look_motes`, a list of `CardMoteStream`, core/base/card_mote_stream.gd: kind, rate, from where, how high, from when, how far apart; the owner, 2026-11-09: "use motes for everything you can"): a still carrier's shots give off each stream the card lists all the time while they stand, from the oval of the card's `look_shape` (`area`), its `rim`, its middle (`point`) or along their piece of a `row`, parting for a moment where a shot strikes (`gameplay/feel/still_motes.gd`, from a view of where the projectile manager draws them, `StillShotView`), coming in and thinning with `look_open` and `look_fade`, in the shot's colours, its infusions in turn, a share of them its infusions' own kinds.
+- **A kind may name nothing:** then it is thrown only where something names it, a cue's `motes` part (`{"part": &"motes", "kind": &"ash", "colours": &"surface"}`: the fireball's ash, in the colours of what burned) or a room's `surface_kinds`.
+- **A kind that falls can settle** (`settles`, a mark kind's id in `content/marks/`; docs/milestones/spell-spectacle.md, P2b): each of its motes leaves that mark in the floor mark layer where it comes to rest, in its own colours, once it lies still. Chips and frost's flecks settle as a `speck`, so debris stays on the floor after it has cooled. However it was thrown (a hit, a cue, a trail): a frost bolt's trail leaves specks where its flecks rest. In a flood at most `Motes.SETTLE_ROWS` settle a frame; the rest just fade.
+- **A kind may be lit only** (`lit_only`; docs/milestones/atmosphere.md, B): its motes are drawn only where light falls, reading the spell light's light buffer under each pixel (`gameplay/feel/mote.gdshader`): unseen in the dark, a shade brighter each step brighter the light, in the light's hue, coming in and going out through its shades over its life instead of cooling (never a pop). It is gone only from its shadow shade, so choose colours whose shadow reads on the room's floor (the hub's glimmers are Bone and Spark: Ice's dark shadow read as dirt on the grass), and its highlights ("o") are drawn as its body (a hotter pixel would skip a shade). It never settles, never glows (the light is its glow), and with the "Dynamic lighting" setting (once "Spell light") off it is not drawn at all. A room's air names one (`RoomBase.air`, content/rooms).
+- **A kind may be stirred** (`stirred`, 0 to 1; docs/milestones/atmosphere.md, E): its motes are drawn dragged along by the air a shot pulls past them and pushed out by a blast's wave, easing back to their own way (Feel's `stirs.gd`); its flight is its own. The air's dust and glimmers and the shafts' `falling_dust` are.
+- **No colours here.** A spell's motes cool through the shot's own ramp (its caster's colours or its card's tint, as the shot shaders pick them); a surface kind's through the room's wall colours (`RoomBase.surface_colors`, sampled from the room's art). A kind says only how many shades it skips at first (`shade_from`) and how strongly it glows while hot.
+- **Its shape is data too, drawn as text.** `shape` is a picture: one row a line, up to 5x5 pixels, centred on the mote (rows start at the left as written); `#` a pixel in its shade, `o` one in the shade hotter (a highlight), `.` none. Several frames are pictures apart by a blank line. In the inspector it is a text box; in the `.tres` it reads like this (fleck's: three plain frames, then a glint):
+
+  ```
+  shape = "
+  #
+
+  #
+
+  #
+
+  .o.
+  o#o
+  .o.
+  "
+  ```
+ **At the art's detail** (ART2; docs/STYLE.md, "The picture and the art's detail"): `shape_2x` is the same kind of picture at two art pixels a world unit, up to 11x11 (`MoteKind.SHAPE_CELL`), with as many frames as `shape` in the same order. When a kind has one it is what is drawn: the mote stands and moves on art pixels (half world units), and its reach and glow are counted in them (`MoteKind.detail`, the shader's `kind_table`). Draw it by hand for the kind, lit from the top-left (`o` on its upper left), never `shape` doubled; `shape` stays its look at one pixel a world unit, for a kind not yet redrawn. Every kind a spell, a hit, a death or a cue throws has one (`test_motes.gd`, "the spells' kinds are drawn at 2x"); a room's own (its dust and drips, `MoteSource`'s) are redrawn with the rooms.
+
+`shape_play` says how the frames go: `life` through them over its life (a streak that shortens as it slows), `loop` round them `shape_rate` a second (a flicker, a glint), `pick` one for each mote (mixed sizes). With `shape_turns` the shape turns with the way the mote flies (8 ways; +x of the shape is ahead). A new look is a new shape string, not a shader edit.
+- **The numbers** say how one flies (gravity on a fake height, drag along the floor, one bounce, a sway) and how a burst throws it (count, speed, spread, up, life, height). The shader is handed them when the pool is made, a row of a texture a kind (`kind_table`), so there is room for 256 kinds (`Motes.MAX_KINDS`) and a new kind needs no shader edit.
+- `tests/gameplay/feel/test_motes.gd` checks every file (`problems()`), and `tests/screenshots/shot_motes.gd` draws each element's motes and a wall's.
+
+| Kind | Look layers | What it is | Shape |
+|---|---|---|---|
+| `spark` | 0 (a shot with none), 5 (lightning) | fast and short, glowing | a streak along its flight that shortens over its life (`##o`, then `#o`, then `o`) |
+| `ember` | 1 (fire) | rises, sways and cools | a flickering pixel (`o`, `o`, `#`, `.` looping) |
+| `fleck` | 2 (frost) | falls, glints and lies; settles as a `speck` | a pixel that glints into a plus now and then |
+| `wisp` | 3 (storm) | blown along, swaying | a dash along its drift |
+| `murk` | 4 (void) | slow, sinking specks | a pixel or a 2x2 chunk |
+| `droplet` | 22 (water) | shaken off and falling, bouncing once | a drop that stretches as it falls and splashes (`#`, `o#`, `#.#` looping) |
+| `oil_drip` | 23 (slick: oil) | heavy, falling fast and dragged, no bounce | a dark drip, its top catching the light, stretching to a string as it falls (`o#`, `o##`, `.o##`) |
+| `glimmer` | 6 (mend) | drifts up softly, glowing | a plus that shrinks to a pixel |
+| `chip` | surface | knocked off a struck wall; bounces once and lies; settles as a `speck` | a pixel, or now and then a 2x2 chunk |
+| `grit` | card `heavy` | heavy's own: falls hard, bounces a little and lies (a demo of a card's own motes) | a pixel or two across |
+| `streak` | none (`dash_path`: every dash's path, S5) | a dash's speed streaks, flung back from beside the body in the dasher's colours, short and quick | a line along its flight (`##o`, then `#o`) |
+| `dust` | none (named by the `dash_start` cue) | kicked up off the floor where a dash leaves, in the room's colours; drifts and settles | a pixel |
+| `bit` | none (named by the `enemy_materialize` cue: spawn styles AS3) | square sparks thrown up round a body as it materializes, in the cue's colour (`enemy_materialize`'s: Arc's light shade), never glowing; arcs up and falls as it cools | a 2x2 square, then a pixel that blinks out |
+| `ash` | none (named by the `fireball` cue) | drifts up, sways and settles slowly, light at first and cooling grey, in the colours of what burned | a pixel, or two on a slant |
+| `glob` | none (named by the `pool_throw` cue) | a blob of liquid thrown in an arc, no drag, landing as its life ends (where the pool it was thrown at splashes in), in the spell's colours | a 2x2 or 2-pixel blob turning with its flight, or a pixel |
+| `drain` | none (named by the `siphon_drain` cue) | mana pulled back into a staff: no drag, rising a little (so it never lands), a slight sway, never glowing or cooling (a glow that fades on the way read as a comet flying the other way), reaching the staff tip as its life ends, in the colour its cue gives | a streak along its flight that lengthens as it goes (`o`, `#o`, `##o`), speeding into the staff |
+| `tail` | none (`tail`, A) | a shot's tail as single pixels, as the tail shader drew it: a thin line that cools where the shot was | a pixel |
+| `tail_streak` | none (`tail`, B, the default) | a shot's tail as short streaks along its way, overlapping into one line | a line along its way that shortens over its life (`###`, `##`, `#`) |
+| `tail_long` | none (`tail`, C) | a longer, smoky tail: lives twice as long, drifts up and sways | a pixel |
+| `rising` | none (named by still cards: `look_motes` of the pool and the rune, gameplay/feel/still_motes.gd) | given off all the time by a still carrier's shots while they stand: a pool's motes rising off its mire, a rune's off its ring once armed; climbs slowly, white-hot at first and cooling, twinkling | a pixel, now and then a hotter one, now and then a little plus |
+| `seam` | none (named by the wall's `look_motes`) | a wall's stream: rising straight off its seam a shield's spacing apart, distinct and dim (the ward's twinkle, less glow), climbing about a wall's height before it fades | a pixel, now and then a hotter one |
+| `drip` | none (named by the rune's `look_motes`) | light dripping off a rune's crystal once armed: shown at the crystal's foot, it falls straight to the floor and goes | a pixel, now and then a hotter one |
+| `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
+| `rim_ember` | none (named by a `MoteSource`: the hub's island edge, gameplay/feel/source_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the source's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
+| `pit_dust` | none (named by a `MoteSource`: the rim round a pit in a room's ground drawn from a shape, crypt rework CR2; tools/ground_shape.py, the edge style `crypt_pit`) | given off along a pit's lip: falls slowly into the pit, swaying a little, in the rim's own colours (stone, bone), no glow |
+| `falling_dust` | none (named by a `MoteSource`: the light shaft's, `content/rooms/decor/beam.tscn`, an area down its column; crypt rework CR3, built for the hub's HR4 too) | dust drifting down slowly through a shaft of light, swaying, lit a little (a faint glow), in Bone | a pixel, now and then gone (it twinkles as it turns in the light) |
+| `rim_drip` | none (named by a `MoteSource`: the drip lines under a room's ground drawn from a shape, hub rework HR2; tools/ground_shape.py) | given off along the bottom of the rock face under an edge: falls slowly away into the void, swaying a little, cooling through the source's ramps (the hub's: the band of the coast it hangs under) | a pixel with a fainter one below it, flickering |
+| `air_dust` | none (named by the crypt's air, `content/rooms/crypt/crypt_air.tres`: `RoomBase.air`) | lit only: dust hanging in a room's air, drifting a few px a second and swaying, seen only in a candle's pool, a wizard's carried light or a passing spell's, in Bone tinted by the light | a pixel |
+| `air_glimmer` | none (named by the hub's air, `content/rooms/hub/hub_air.tres`) | lit only: glimmers rising softly in the hub's air, seen round the wizards' staffs and the spells, in Bone and Spark | a pixel |
+| `void_drift` | none (named by the void's air, `gameplay/feel/presets/void_air.tres`: `Spectacle.void_air`) | not lit only: a sparse drift of single pixels in the black void between a biome's rooms and bridges, given off only outside them (the owner, 2026-11-19) | a pixel |
+| `smoke` | none (named by burning cover's state, `content/cover/hub_grass`: ground cover GC8) | rises slowly off burning cover and sways, starting a shade down (no white heat) and cooling dark, never glowing | a 2x2 puff that thins to a pixel over its life |
+
+## How to make something in the world give off motes
+
+The owner's rule (2026-11-09): motes are the world's magic building blocks, so almost everything gives some off. There are four ways, by what gives them off:
+
+| What gives them off | How | Where it is described |
+|---|---|---|
+| A thing that stands in the world: a room's art, a prop in one of its states | a **`MoteSource`** on a node (below) | here; `core/base/mote_source.gd` |
+| A still spell's shots (a wall, a pool, a rune) | its card's `look_motes`, a list of `CardMoteStream` | "A still card's own", above |
+| A moment (a hit, a blast, a cast) | a `motes` part of its cue | `core/base/cue_base.gd`, content/cues |
+| Ground cover in a state (burning grass's embers and smoke) | its state's `motes`, `MoteSource`s read as if each cell in that state were their node, their rate a cell's (never a mask nor a standing one) | content/cover/README.md; `gameplay/feel/cover_motes.gd` |
+
+### A `MoteSource`
+
+One stream of one kind of mote, given off all the time while its node is in the tree (`gameplay/feel/source_motes.gd` gives it off; nothing in the game reads it). A minimal one is a kind, a rate and a colour; every other number has a default:
+
+| Field | Default | What it is |
+|---|---|---|
+| `kind` | (none: required) | the mote kind, a file here (`ember`, `dust`, `glimmer`, `rim_ember`, ...) |
+| `rate` | 4 | motes a second from the whole source, at the "Particle amount" setting's Full (the setting thins it as every mote) |
+| `colours` | (none) | palette materials by name (`&"fire"`, `&"ice"`, `&"stone"`: docs/STYLE.md, `core/base/palette.gd`), one a mote at random, each cooling white-hot, light, base, shadow; never a player's colour nor Blight. Empty: the colours of its art (`mote_art`) |
+| `band_length` | 0 (at random) | a line only: its colours run in bands this many pixels long along it, in the order named and round again, instead of one a mote at random (the hub's coast: the seam a ground drawn from a shape is drawn in the same bands, content/edges) |
+| `from` | point | where its motes leave from, from its node: `point` (`at`), `line` (`points`, else the node's own `Line2D`; thrown outward, the left of the way the points run), `area` (a box `size` across round `at`), `rim` (an oval `size` across round `at`, thrown out from its middle), `mask` (the lit pixels of its art) |
+| `way`, `spread` | up, 120 degrees | the way a point's, a box's and a mask's motes are thrown, and how far round it |
+| `reach` | 6 px | how far a mote is thrown; its kind's own speed carries it no further |
+| `height` | 0 (its kind's) | how high over where it leaves from a mote shows (an ember over the coals) |
+| `spacing` | 0 (anywhere) | a grid on the world's pixels its places snap to (a row of drips) |
+| `start`, `stop` | 0, 0 (never) | seconds after its node appears that it starts and stops (a broken crate's dust for its first seconds) |
+| `stand`, `life` | off, 1.2 s | a mask only: a mote stands on every lit pixel instead, each cooling round over `life` in its own turn, so carvings twinkle (every pixel is drawn every frame: use it on a few dozen pixels, not a sprite's hundreds) |
+
+**On a room's art** (rooms carry no scripts): any `Node2D` in the group `mote_source`, the resource as its metadata `mote_source`, and for a mask (or its art's colours) the metadata `mote_art`, the path to a `Sprite2D`. The hub's island edge, `content/rooms/hub/hub.tscn`:
+
+```
+[sub_resource type="Resource" id="MoteSource_rim"]
+script = ExtResource("<core/base/mote_source.gd>")
+kind = &"rim_ember"
+rate = 172.8
+from = 1
+colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(...)
+metadata/mote_source = SubResource("MoteSource_rim")
+```
+
+In code, `MoteSource.put(node, source, art_path)` writes the same, before the node is added. **On a prop**, a source is a layer's (`PropLayer.motes`): content/props/README.md.
+
+**What to know:**
+- A source is read once, at the frame after its node appears, where the node is then: it does not follow a node that moves, nor a mask's sprite as it animates. A node that moves says so: `MoteSource.put(node, source, art, true)` (metadata `mote_follow`), and its motes then leave from where the node is each frame (not its turn nor its scale). A boss's phase look does this for its sparks (`PhaseLook.motes`, boss plan OB8).
+- Only sources within 64 px of the view give off (`VIEW_MARGIN`), so a room of hundreds costs what is on screen.
+- Its motes are of many a frame: in a crowded frame they give way to the hits and the moments first.
+- **Nothing fails silently.** A source that gives off nothing says so once in the log, naming its node (a problem in its data, nowhere to leave from, a kind that is not here), and `tests/content/test_mote_sources.gd` checks every source in every scene under content/ (its data, its kind, its art), found by folder; a prop's are checked with its looks (`tests/content/props/test_prop_data.gd`).
+- **Why a card's stream is not a `MoteSource`:** their numbers mean different things. A card's places are in its look shape scaled by each shot's size, its rate is a shot's (a wall of 300 pieces gives off 300 times as much), its height a share of the hit size, its start and stop on the shot's still clock, and its colours are its spell's, never named; a world's source is in pixels from its node, its rate the whole source's, its colours named. One class would hold fields each half ignores, or one name in two units. Where a place means the same it has the same name (`area`, `rim`, `point`; a card's `row`, a world's `line` and `mask` are their own), and both pick from the same shapes (`gameplay/feel/mote_places.gd`).
+- **A new kind of place** (`from`) is a value of `MoteSource.From`, a class in `gameplay/feel/mote_places.gd` (`read` once, `pick` each mote) and a line in its `make`; `source_motes.gd` names none of them.
+
+## Allowed files
+
+`.tres` and `.uid` files. Limit: 1 MB per file.
+
+## How to give a card motes of its own
+
+One new file: copy `grit.tres`, give it a new `id` and file name, put the card's id in `cards`, and change its numbers. The card's own file is not touched. A spell with that card sheds it (on a hit, at its end, off a wall, along its trail, and in its cues' `spell` parts) besides its other cards' kinds; every other card on the same look layer keeps that layer's.
+
+## Example to copy
+
+`ember.tres`: copy it, give it a new `id` and file name, name the look layers (or the cards) it is the motes of, and change its numbers.

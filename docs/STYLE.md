@@ -2,9 +2,7 @@
 
 The art rules for Spellmerge, written so a person, an agent or a script can check an asset against them. The vision is in [DESIGN.md](DESIGN.md) (pillar 4, "Readable chaos"); the plan is in [PLAN.md](PLAN.md) ("Art and music").
 
-**Status: chosen, not provisional.** Claude drafted this style in M1; on 2026-10-23 the owner picked the look from Claude's samples: style N, recorded in [DESIGN.md](DESIGN.md). On 2026-10-28 the owner made every character a living staff ([milestones/M2-living-staffs.md](milestones/M2-living-staffs.md)): a player is a floating staff with cartoon eyes and brows, an enemy (a stray) a meaner staff with glowing eyes; the style N wizard, robe and pointed hat, is now the villain. Everything else is redrawn in the same spirit, one area at a time, over later milestones. These rules are the ones art is reviewed against.
-
-**More detailed art** (the owner's decision of 2026-11-21, confirmed on 2026-11-25): sprites are redrawn at **64×64 for a 32-unit cell, at the same size on screen, in a 1280×720 picture**. The world keeps its 32-unit tiles and the simulation is untouched: art drawn at 2x detail is drawn at half its size, two art pixels a world unit. The HUD and the font are redrawn at 2x detail at the same size on screen. Everything is redrawn in this order: players and enemies, spells and effects, rooms and props, HUD and font. Until then today's art and redrawn art share the screen ("The picture and the art's detail"). The curl staff is the first redrawn (ART0, the pilot).
+**Status: chosen.** Every character is a living staff ([milestones/M2-living-staffs.md](milestones/M2-living-staffs.md)): a player a floating staff with cartoon eyes and brows, an enemy (a stray) a meaner staff with glowing eyes; the robed wizard is the villain. Art is redrawn at **64×64 a 32-unit cell, the same size on screen, in a 1280×720 picture** (the owner's decision of 2026-11-21), in this order: players and enemies, spells and effects, rooms and props, HUD and font; until then old and redrawn art share the screen ("The picture and the art's detail"). These rules are the ones art is reviewed against. History and reasons: [docs/history/STYLE.md](history/STYLE.md).
 
 ## The short version
 
@@ -15,40 +13,38 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 5. **Only palette colours.** No gradients, no blur, no antialiasing, no partial transparency.
 6. Four players on screen must stay readable: bold silhouettes, and the four player colours are never mistaken for each other.
 7. **Everything looks smooth.** Nothing changes its look in one jump: a change plays the frames between ("Smooth").
-8. **Rooms go further** (the owner, 2026-11-16: "Go past it. The style-guide should be updated"): a room's ground and light may use colours outside the palette, soft light, glow and gradients, drawn per pixel as PNGs (see "Rooms"). The characters, enemies, props, spells and UI keep rules 1 to 7.
+8. **Rooms go further:** a room's ground and light may use colours outside the palette, soft light, glow and gradients, drawn per pixel as PNGs (see "Rooms"). The characters, enemies, props, spells and UI keep rules 1 to 7.
 
 ## Rooms
 
-The hub (docs/milestones/hub-rework.md) and the crypt (docs/milestones/crypt-rework.md) are drawn past the rules above where it makes them look better. What a room may do, and what it still may not:
+A room drawn from a shape (the hub, the crypt) may go past the rules above:
 
-- **May:** a ground drawn per pixel from a shape (`tools/ground_shape.py`: content/rooms/README.md, "A room's ground from a shape") as PNGs, not rect-only SVGs; colours and shades outside the palette in its ground, its walls' art, its void and its light (a turf, a cool quiet stone, a deep dark); soft light and glow (a torch's or a candle's pool, a shaft of light from above, an edge's glow, a pit's cold breath); gradients in the void, a beam, a wall's top falling into the dark; organic lines everywhere, never a tile's straight edge where the eye goes (the owner, 2026-11-16).
-- **May not:** blur or fade what moves (rule 7 holds: a change of look is frames of whole pixels, never an alpha pulse); use a player's colours or Blight in the world (they mean a player and the enemies' spells); outshine the fight. A room's floor is one quiet value, quieter than every shot, enemy and wizard on it ("Readability"); its dark is at its walls and in its corners, never where the fight is.
+- **May:** a ground drawn per pixel from a shape (`tools/ground_shape.py`: content/rooms/README.md, "A room's ground from a shape") as PNGs, not rect-only SVGs; colours and shades outside the palette in its ground, its walls' art, its void and its light; soft light and glow (a torch's pool, a shaft of light, an edge's glow); gradients in the void, a beam, a wall's top falling into the dark; organic lines, never a tile's straight edge where the eye goes.
+- **May not:** blur or fade what moves (rule 7 holds: a change of look is frames of whole pixels, never an alpha pulse); use a player's colours or Blight in the world; outshine the fight. A room's floor is one quiet value, quieter than every shot, enemy and wizard on it ("Readability"); its dark is at its walls and in its corners, never where the fight is.
 - **Still:** the 32-unit grid for where things stand and how big they are, whole pixels (as drawn; on screen see "Smooth", "The default zoom 1 and whole pixels"), the pixel look, light from the top-left on what stands in the room (pillars, props), and the size and file rules (AGENTS.md).
 
-The tile rules below ("Floor tiles are flat", the golden floor and wall) are for tiled rooms and the tests' own stages; a room drawn from a shape follows this section.
+The tile rules below ("Floor tiles are flat", the golden floor and wall) are for tiled rooms and the tests' own stages.
 
 ## The 32-unit grid
 
-- A sprite or tile covers **32×32 world units**: 32×32 px for art not yet redrawn, **64×64 px for art drawn at 2x detail** ("The picture and the art's detail"). Bigger things (a boss, a wide prop) are a whole multiple: 64×64 units, 96×64 and so on (128×128 px, 192×128 px at 2x).
-- Characters stand on the lower half of the cell with their feet about 2–3 units above the bottom edge (4–6 px at 2x), so they overlap correctly in the top-down view. Leave 1 px of empty border where you can; the outline needs it.
+- A sprite or tile covers **32×32 world units**: 32×32 px for art not yet redrawn, **64×64 px for art drawn at 2x detail** ("The picture and the art's detail"). Bigger things are a whole multiple: 64×64 units, 96×64 and so on (128×128 px, 192×128 px at 2x).
+- Characters stand on the lower half of the cell with their feet about 2–3 units above the bottom edge (4–6 px at 2x). Leave 1 px of empty border where you can; the outline needs it.
 - Tiles fill the whole 32×32 cell and must repeat without a visible seam. **Floor tiles are flat**: Stone base with a few inner details (a crack, a joint) in Stone shadow or light, and nothing on the outer edge pixels. The top-left lit edge and bottom-right shaded edge apply only to **walls and raised props**.
 - Pixel positions are whole numbers of the art's own pixels. No half-pixel offsets, no rotation by angles other than 90°, no scaling other than whole multiples (and the half of 2x art, below).
 - Backgrounds are transparent (fully, never partly). Tiles are the exception: they are fully opaque.
 
 ## The picture and the art's detail
 
-The owner's decision of 2026-11-21, confirmed on 2026-11-25 (ART0 built it, after the owner weighed 960×540 with 48 px art and 640×360 laid out beside it): the game draws a **1280×720 picture** (project.godot), showing the same world as the 640×360 picture did, twice as finely. One place says it: `PictureGrid` (core/display/picture_grid.gd: the layout `SIZE` 640×360 times `PICTURE_SCALE`, k = 2), and one the art's detail (`ArtDetail.DETAIL`, d = 2: 64 px a 32-unit cell).
+The game draws a **1280×720 picture** (project.godot) of the same world the 640×360 picture showed, twice as finely (the owner's decision of 2026-11-21, confirmed 2026-11-25). `PictureGrid` (core/display/picture_grid.gd: layout `SIZE` 640×360 times `PICTURE_SCALE`, k = 2) says the picture; `ArtDetail.DETAIL` (core/display/art_detail.gd, d = 2) the art's detail.
 
-- **Stretched to the window by whole numbers, or by a fraction on a 1080p screen** (the owner's decision of 2026-11-25): the picture is drawn 1, 2 or 3 times (720p, 1440p, 4K) while a whole number fills the screen; where it would leave the screen mostly empty (the largest whole number filling less than 85% of its width or height: a 1920×1080 screen holds 1280×720 once, two thirds of it) it is stretched by the largest fraction that fits, its aspect kept and its pixels hard (nearest): 1080p shows it 1.5 times, each picture pixel 1 or 2 screen pixels, so 64 px art there has uneven rows of 1 or 2 screen pixels, which the owner accepts; 32 px art, two picture pixels an art pixel at zoom 1, stays even (3 screen pixels each). `Display.stretch_for` (core/display/display.gd) decides as the window's size changes.
-
-- **The world is unchanged.** Tiles are 32 units, rooms, bodies, hit circles and speeds are as they were, and nothing in the simulation knows the picture's size. The cameras' zoom 1 shows 640×360 of the world (they rest at 0.8, 800×450 of it).
-- **Two details of art, one rule** (`ArtDetail`, core/display/art_detail.gd): a texture whose file is named **`<name>@2x.<ext>`** (`head@2x.png`, `idle@2x.png`) has **2 art pixels a world unit** each way and is drawn at half its size; any other texture has 1 and is drawn at its size. Nothing else says it: no import option, no list. A texture made in the game from art (a `TexturePage` region, a baked floor) carries its source's detail. A sprite's frames, offsets, origins and grips are measured in its own art pixels, its place in the world in world units; its strips and frame counts are the same (a 6-frame strip at 2x is 384×64).
-- **The cameras rest at zoom 1** (the owner's decision of 2026-11-25, on ART0; 0.8 from 2026-11-23): 640×360 of the world, so every art pixel shows: today's art as a 2×2 block of the picture (nearest, whole pixels), art at 2x as one picture pixel. A room smaller than the picture is seen closer.
-- **Zoomed out to hold a party** (down to 0.5, before the screen splits) the world is resampled into the picture: today's art one or two picture pixels an art pixel, none left out down to zoom 0.5; art at 2x below one picture pixel an art pixel, so some art pixels are left out (one in five at 0.8, one in two at 0.5) and a one-pixel line can break while the party is spread.
-- **Whole pixels of the picture:** every sprite's place is snapped to the picture's whole pixels (`rendering/2d/snap/snap_2d_transforms_to_pixel`), so a sprite never shimmers inside itself as it moves; a 2x sprite moves by half world units, which are whole picture pixels at zoom 1 (`ArtDetail.snap` for a look that rounds its own places).
-- **What takes it:** sprites and sheets (`ArtDetail.fit`: the node's scale; a look's own stretch times it), faces (`Face`, `FaceArt` at any frame size, a staff's own face, `StaffBase.face`), the staff's head (`StaffLook`), `TexturePage` regions, a MultiMesh batch's quad (`ArtDetail.quad_size`; the cover's shader takes `art_detail`), the floor states drawn by a shader (`CoverFlat.DETAIL`, at 2x since the floor's look, docs/milestones/floor-look.md), and the baked floors (baked at the picture's scale, so their glow keeps its smoothness: `FloorBake.picture_scale`).
-- **The light, the mist and the air keep their own resolution:** the light is a grid of world cells, the mist and the tints are worked out a world pixel at a time ("Smooth"), whatever the picture.
-- **The screen's layers** (the HUD, the menus, the intro, the markers, the Y map, the split's dividers) are laid out in **layout pixels**, 640×360, and drawn at the picture's scale (`PictureGrid.fit_layer`), so they look the same size; HUD art redrawn at 2x detail goes in them as sprites do. Text is drawn at its whole-number size and scaled with its layer.
+- **Stretched to the window** by a whole number (1, 2, 3) while it fills the screen, else by the largest fraction that fits, aspect kept and pixels nearest (1080p shows it 1.5 times): `Display.stretch_for` (core/display/display.gd).
+- **The world is unchanged:** 32-unit tiles, rooms, bodies, hit circles and speeds; nothing in the simulation knows the picture's size. Zoom 1 shows 640×360 of the world.
+- **Two details of art, one rule** (`ArtDetail`): a texture named **`<name>@2x.<ext>`** has **2 art pixels a world unit** and is drawn at half its size; any other has 1. No import option, no list. A texture made from art (a `TexturePage` region, a baked floor) carries its source's detail. Frames, offsets, origins and grips are in the sprite's own art pixels; strips and frame counts are the same (a 6-frame strip at 2x is 384×64).
+- **The cameras rest at zoom 1:** every art pixel shows, today's art as a 2×2 block, art at 2x as one picture pixel. Zoomed out to hold a party (down to 0.5) the world is resampled and art at 2x loses some pixels, so a one-pixel line can break.
+- **Whole pixels of the picture:** every sprite's place is snapped to the picture's pixels (`rendering/2d/snap/snap_2d_transforms_to_pixel`); `ArtDetail.snap` for a look that rounds its own places.
+- **What takes it:** sprites and sheets (`ArtDetail.fit`), faces (`Face`, `FaceArt`, `StaffBase.face`), the staff's head (`StaffLook`), `TexturePage` regions, a MultiMesh batch's quad (`ArtDetail.quad_size`; the cover's shader takes `art_detail`), the floor states (`CoverFlat.DETAIL`), and the baked floors (`FloorBake.picture_scale`).
+- **The light, the mist and the air keep their own resolution:** the light is a grid of world cells, the mist and tints a world pixel at a time ("Smooth").
+- **The screen's layers** (HUD, menus, intro, markers, map, split dividers) are laid out in **layout pixels**, 640×360, and drawn at the picture's scale (`PictureGrid.fit_layer`); HUD art at 2x goes in them as sprites do. Text is drawn at its whole-number size and scaled with its layer.
 - **The palette is unchanged.** Every rule of this guide holds at 2x: the outline is one art pixel, at most 3 shades a material, light from the top-left, no partial transparency.
 
 How to redraw a sprite at 64×64: art/README.md, "Redrawing a sprite at 64x64".
@@ -86,9 +82,9 @@ The player colours belong to the players: enemies, props and tiles don't use the
 - Light comes from the **top-left**. On a rounded shape the highlight sits at the upper left, the shadow at the lower right.
 - Shade with the three shades of the material. The base shade covers most of the shape, the light shade the top-left edge and the shadow shade the bottom-right edge.
 - **No gradients, no dithering for smooth fades, no glow halos.** A glow is one or two flat rings in the light shade.
-- **The exception: spell shots glow** (the owner, 2026-10-27). The shot shaders (`core/projectiles/shot_*.gdshader`, one per kind: core/README.md, "The shot shaders") add a soft light in the shot's colour round its core and tail, added to what is below. It is the shader's, never baked into an asset: sprites, tiles and icons keep the rules above.
-- **The world may take light from spells** (the owner, 2026-11-04). Shots, blasts, beams and a room's torches light the floor, the walls and the bodies round them (spell light, `gameplay/feel/spell_light.gd`), in the light's own colour, in the steps the light's `bands` sets. The light is drawn by the game over the art, never baked into it: the art is drawn as it is, and a room's `ambient` only darkens it evenly.
-- **The exception: the floor mist is soft** (the owner, 2026-11-18; docs/milestones/atmosphere.md, F). A room's low mist (`RoomBase.mist`, drawn by `gameplay/feel/mist.gd`) alone may be soft and see-through: worked out a world pixel at a time, its see-through and its drift soft (not stepped), closing over frames. It is the game's, drawn over the floor and under every body, never baked into art; thin over a fight's middle, thicker at a room's edges and pits ("Readability"). Everything else keeps the pixel rules.
+- **The exception: spell shots glow.** The shot shaders (`core/projectiles/shot_*.gdshader`: core/README.md, "The shot shaders") add a soft light in the shot's colour round its core and tail. It is the shader's, never baked into an asset.
+- **The world may take light from spells:** shots, blasts, beams and torches light what is round them (`gameplay/feel/spell_light.gd`), in the light's colour and `bands`. Drawn by the game over the art, never baked in; a room's `ambient` only darkens evenly.
+- **The exception: the floor mist is soft.** A room's low mist (`RoomBase.mist`, `gameplay/feel/mist.gd`) alone may be soft and see-through, a world pixel at a time; drawn over the floor and under every body, never baked into art; thin over a fight's middle ("Readability").
 - **No baked drop shadow** under a sprite (it needs partial transparency). The game draws shadows.
 - Never mix shades of different materials on one surface to fake a fourth shade.
 
@@ -101,25 +97,25 @@ The player colours belong to the players: enemies, props and tiles don't use the
 ## Readability
 
 - A silhouette must read at 1× in solid black. Check it before adding detail.
-- Enemy telegraphs use Fire colours and are subtle (the owner, 2026-11-18; first "larger and brighter than anything else on screen"): a faint wash between dotted edges, fading in smoothly from the caster's end (a smooth gradient by the owner's word, the one exception here to whole-pixel steps), brightening only as the cast is about to leave.
+- Enemy telegraphs use Fire colours and are subtle: a faint wash between dotted edges, fading in smoothly from the caster's end (the one smooth gradient allowed), brightening only as the cast is about to leave.
 - Colour is never the only signal for who a player is; the HUD adds a number or a shape next to the colour.
-- Player sprites differ only in the player colour ramp. The ramp covers the staff's head (the curl's gem, the star, the crescent, the crystal; and the panel and markers) and nothing else: the shaft is Wood with a Spark grip wrap for every player, the eyes are Bone. Each head sheet has one row per player ramp (`content/wizard/staffs/<head>/head@2x.png`).
+- Player sprites differ only in the player colour ramp, which covers the staff's head (and the panel and markers) and nothing else: the shaft is Wood with a Spark grip wrap for every player, the eyes are Bone. Each head sheet has one row per player ramp (`content/wizard/staffs/<head>/head@2x.png`).
 - The four player base colours (`#3b73c9`, `#d9477a`, `#3f8f4f`, `#8a4fc4`) are the comparison set: any two must differ clearly in hue, and nothing else on screen may use a colour close to one of them.
 - Floors use only Stone base and light, with Stone shadow only for small inner details. Players and enemies don't use Stone shadow for their own surfaces, so a silhouette doesn't melt into the floor.
 
 ## The living staffs
 
-Every character is a body and a face (living staffs H2–H5; the code is `gameplay/actor/face.gd`):
+Every character is a body and a face (`gameplay/actor/face.gd`):
 
-- **The face** is two floating eyes and two floating brows on their own layers (`art/faces/eyes@2x.svg`, `art/faces/brows@2x.svg`, 16×8 world units a frame, 32×16 art pixels at 2x detail; drawn by `tools/face_art.py`), drawn over the body. No mouth. The game moves them: the eyes trail the body by a tenth of a second and the brows trail the eyes, at most 2 px each; a cast pops them up; blinks, glances and the odd raised brow are timed per character. Draw no face into a body sprite. A boss may wear a face of its own (boss plan OB9): its own eye and brow sheets in its folder, in the same layout (ten eye columns, nine looks and the blink; a brow a mood; a row a look of the face) at a frame size of its own, the eyes drawn pale for the game to tint.
+- **The face** is two floating eyes and two floating brows on their own layers (`art/faces/eyes@2x.svg`, `art/faces/brows@2x.svg`, 16×8 world units a frame; drawn by `tools/face_art.py`), drawn over the body. No mouth; the game moves them. Draw no face into a body sprite. A boss may wear its own eye and brow sheets in its folder, in the same layout (ten eye columns, nine looks and the blink; a brow a mood), eyes drawn pale for the game to tint.
 - **Brows carry the mood**, five shapes: neutral, raised, angry, furious, worried, 4 px each, 3 to 5 rows above the eyes. **Eyes carry the personality and the look**: round (the Optimist), round with a sparkle (the Show-off), heavy-lidded (the Dozer), narrow (the Sergeant); the pupils look one of nine ways.
-- **A player's body** is a head sheet: 48×48 frames, 16 columns of directions (clockwise from pointing right, 22.5° apart, each drawn, never rotated by the game, so the light stays top-left and an upright head stays upright), 4 rows of player ramps, the grip at (24, 27). The face sits 8 px above the grip ("Close"). It floats and bobs; it has no walk frames.
-- **A stray's body** is one 32×32 frame with no player colour; its eyes are drawn white and tinted in its element's light shade (a glow), with slit pupils, and its brows rest angry and turn furious while it winds up. Strays hop (the game lifts the sprite); players float, so the two read apart by motion.
+- **A player's body** is a head sheet: 48×48 frames, 16 columns of directions (clockwise from pointing right, 22.5° apart, each drawn, never rotated by the game), 4 rows of player ramps, the grip at (24, 27). The face sits 8 px above the grip ("Close"). It floats and bobs; it has no walk frames.
+- **A stray's body** is one 32×32 frame with no player colour; its eyes are drawn white and tinted in its element's light shade, with slit pupils, and its brows rest angry and turn furious while it winds up. Strays hop; players float.
 - **Silhouettes:** each head is its own shape family (spiral, spikes, solid curve, arrowhead), so four players read apart in black.
 
 ## Animation frame counts
 
-One animation is one horizontal strip: frame 1 at the left, each frame 32 px wide (64 at 2x detail), so a 6-frame animation is 192×32 (384×64 at 2x). File names end with the animation: `idle.png`, `walk.png`. Playback speed is set in the scene, not in the art. A pose that holds needs no more frames (held frames cost nothing), but a change of look is never a single frame ("Smooth", below).
+One animation is one horizontal strip: frame 1 at the left, each frame 32 px wide (64 at 2x detail), so a 6-frame animation is 192×32 (384×64 at 2x). File names end with the animation: `idle.png`, `walk.png`. Playback speed is set in the scene, not in the art. A held pose needs no more frames, but a change of look is never a single frame ("Smooth").
 
 | Animation | Frames | Loops | Speed | Notes |
 | --- | --- | --- | --- | --- |
@@ -135,32 +131,30 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 | Impact / spark | 4 | no | 20 fps | Over in 0.2 s |
 | Animated tile | 4 | yes | 4 fps | Optional (torches, water); still tiles are 1 frame |
 
-The table is a guide, and the living staffs need few of it: a player's body has no strips (a frame per direction, moved by the game) and a stray is one frame; the face's motion is code. The real values are the constants in `gameplay/player/staff_look.gd`, `gameplay/actor/face.gd` and `gameplay/ai/creature_look.gd`.
-
-A single still image has 1 frame and is a plain 32×32 file (64×64 at 2x, `<name>@2x`).
+The table is a guide; the living staffs need little of it (a player's body is a frame per direction, a stray one frame, the face's motion code). The real values are the constants in `gameplay/player/staff_look.gd`, `gameplay/actor/face.gd` and `gameplay/ai/creature_look.gd`. A single still image has 1 frame (32×32, or 64×64 at 2x, `<name>@2x`).
 
 ## Smooth
 
 Everything should look smooth (the owner, 2026-11-16). Nothing on screen changes its look in one jump:
 
-- **A change plays the frames between the two looks.** Grass catching fire, burning down, going out and growing back; a door opening; a prop breaking; a state of anything drawn. A change of look not in the table above has at least 3 frames, more when it takes longer than a quarter of a second (about one frame each 0.1 to 0.2 s).
-- **Stages hand over.** Each stage's last frame is the next stage's first look (or one step from it), so a chain of stages reads as one movement: the grass's burning ends as short flames, its smouldering starts from those stubs and ends as the ash.
-- **A thing keeps its own shape through a change.** A look drawn in variants (six grass tufts) has each variant's own strip for each stage, in the same order, so a tuft burns as itself rather than swapping to another tuft's flames.
-- **Pixels stay hard.** Smooth is in-between frames and motion by whole pixels, never sub-pixel blur, cross-fades or partial transparency ("Light and shading": no gradients, no dithering for smooth fades). The floor mist is an exception too ("Light and shading"). The spell light is worked out on a grid of world cells (8 px by default, gameplay/feel/light_grid.gd) and read a whole cell at a time, then cut into its bands; the mist is worked out a world pixel at a time however big the picture is, each world pixel whole. Neither is blurred up. **One jump the owner accepts** (2026-11-22, #907): the split screen's cheaper light, when the frame-time budget takes it or gives it back (seconds apart at the least, `SplitBudget`), changes every view's light cells from 8 to 16 px (and back) in one frame. **And a second** (2026-11-22, the "Effects" setting): a change of the effects' row (Low, Medium, High; chosen in the menu or by Auto as the frames run slow or fast, a few seconds apart at the least, gameplay/feel/effects_auto.gd) changes the light's cells, the mist's layers and the air's share in one frame.
-- **The default zoom 1 and whole pixels** (the owner's choice of 2026-11-25, on ART0: "rest the cameras at zoom 1.0", so every art pixel shows; it was 0.8 from 2026-11-23, docs/milestones/connected-biomes.md, "A steady camera"): at rest every art pixel is whole picture pixels (two each way for art not yet redrawn, one for art at 2x). Only while the camera zooms out to hold a spread party (down to 0.5) is the world resampled into the picture, art at 2x losing some of its pixels, which ones shifting as the camera eases ("The picture and the art's detail"). "Whole pixels" and "motion by whole pixels" in this guide hold for the art as it is drawn, the HUD and whatever is drawn in layout pixels (the edge markers), and the world at rest.
-- **Code that swaps a look** (a state's frames, a sprite's texture, a node shown or hidden) plays a change's frames or eases it; a test or the reviewer names one that pops. Ground cover does this by data: `CoverState.animation_frames`, `animation_fps`, `animation_loops` (content/cover/README.md). A prop does it by its looks' layers: a strip played once as its state is entered, then held or looped (`PropLayer.loop_from`, content/props/README.md; the crypt pillar's crumbles, the crypt gate's opening).
+- **A change plays the frames between the two looks** (grass burning, a door opening, a prop breaking, any drawn state): at least 3 frames, more when it takes longer than a quarter of a second (about one frame each 0.1 to 0.2 s).
+- **Stages hand over.** Each stage's last frame is the next stage's first look (or one step from it), so a chain of stages reads as one movement.
+- **A thing keeps its own shape through a change.** A look drawn in variants has each variant's own strip for each stage, in the same order, so a tuft burns as itself.
+- **Pixels stay hard.** Smooth is in-between frames and motion by whole pixels, never sub-pixel blur, cross-fades or partial transparency. The spell light is read a whole cell at a time (8 px, gameplay/feel/light_grid.gd) and cut into bands; the mist a whole world pixel at a time; neither is blurred up. Accepted jumps: the split screen's cheaper light (`SplitBudget`, cells 8 to 16 px) and a change of the "Effects" row (gameplay/feel/effects_auto.gd), each in one frame.
+- **The default zoom 1 and whole pixels:** at rest every art pixel is whole picture pixels; only while the camera zooms out for a spread party is the world resampled ("The picture and the art's detail"). "Whole pixels" in this guide holds for the art as drawn, the HUD and layout-pixel drawing, and the world at rest.
+- **Code that swaps a look** (a state's frames, a texture, a node shown or hidden) plays a change's frames or eases it; a test or the reviewer names one that pops. Ground cover does it by data (`CoverState.animation_frames`, `animation_fps`, `animation_loops`: content/cover/README.md); a prop by its looks' layers (`PropLayer.loop_from`, content/props/README.md).
 
-The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene (the telegraph frames can be held longer there; 0.25 s is only the shortest), never by the animation.
+The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene, never by the animation.
 
 ## Sound
 
-The game's sound is synthesised from code in a modern style (the owner, 2026-11-18; docs/milestones/sound.md): filtered noise, roaring fire with crackles, bell-like inharmonic glass, FM tones, a little room reverb, all of it kept low (below: deep, never piercing). It is never thin 8-bit beeps, and never imitates a recording of a real thing.
+The game's sound is synthesised from code in a modern style (docs/milestones/sound.md): filtered noise, roaring fire with crackles, bell-like glass, FM tones, a little room reverb, all of it low. Never thin 8-bit beeps, never an imitated recording.
 
 - **Format:** `.ogg` (Vorbis), 44.1 kHz, mono for effects and UI, mono or stereo for music, at most 5 MB.
 - **No clicks:** every sound starts and ends at silence (a 2 ms ramp at least). A loop folds its tail over its start, and a duck ramps.
-- **Pleasant on the hundredth listen.** A sound heard every few seconds (cast, hit) is short, soft at the top and has its variants. It never sounds like one file four times when four players do the same thing.
-- **Deep, never piercing** (the owner, 2026-11-18, after the first listen: "the audio cues are too high which makes them go through and take over too much"). A cue sits low and under the fight: its weight is below about 1 kHz, a ring is a low bell and a hiss is a dull rush. A cast is a soft, muffled pop, like a cork leaving a bottle, each carrier's its own; a hit is like packed snow struck, a soft puff with a faint low bump and a fine dull grain, no ring and no room (the owner, 2026-11-20, after seven rounds of examples; docs/milestones/sound.md, "Hits by carrier"). Sounds heard many times a second sit well under the fight: the `combat` family is at -26 LUFS (it was -20), under the music's loudest moments, and a hit sound that comes again soon plays quieter. Each family has a ceiling for a sound's **top**, its part above the frequency in the table's last column's header, which the bake measures and fails a sound over; the music has none.
-- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is a low bell of glass, storm is a low gust of wind, lightning is a crackle and a zap, void is a low, hollow swell, water is a soft wash (`fire_roar`, `frost_glass`, `storm_gust` and the others, named by element). A reaction mixes its two elements' voices.
+- **Pleasant on the hundredth listen.** A sound heard every few seconds is short, soft at the top and has its variants; four players doing the same thing never sound like one file four times.
+- **Deep, never piercing.** A cue's weight is below about 1 kHz; a ring is a low bell, a hiss a dull rush. A cast is a soft, muffled pop, each carrier's its own; a hit is a soft puff with a faint low bump, no ring and no room (docs/milestones/sound.md, "Hits by carrier"). A hit that comes again soon plays quieter.
+- **Each element has a voice,** shared through patches (`audio/patches/`: `fire_roar`, `frost_glass`, `storm_gust` and the others, named by element). A reaction mixes its two elements' voices.
 
 | Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter | Top (above 2 kHz) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -172,7 +166,7 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 | `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none | -9 LU |
 | `music` (all layers together) | -23 integrated | -1 dBTP | 1 | none | none | none |
 
-Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake places each sound on its family's target (a recipe's `gain`, with a note, places it off it), measuring a loop as it plays round, and fails a variant more than 1 LU from it. The top is the loudness, by the family's measure, of what a sound has above the header's frequency (through a 24 dB an octave high pass), in LU from the whole sound's level: -10 LU is a top 10 LU under the sound, and the bake fails a variant whose top is over its family's (a recipe's `top`, with a note, gives it a ceiling of its own). These numbers are a first tuning; the owner changes them by ear.
+The table is read by `tools/sound.py` and is the one home of these numbers. Momentary is the loudest 400 ms window, integrated the whole file, gated (BS.1770). The bake places each sound on its family's target (a recipe's `gain`, with a note, places it off it) and fails a variant more than 1 LU from it; the top is the loudness above the header's frequency (24 dB an octave high pass) in LU from the sound's level, and the bake fails a variant over its family's (a recipe's `top`, with a note, sets its own). The owner tunes these by ear.
 
 ## File formats
 
@@ -186,13 +180,13 @@ Momentary is the loudest 400 ms window (most sounds here are shorter than short-
 Sessions and anyone else without an image editor may write a pixel sprite as an SVG, listed in the manifest with tier `placeholder`. They follow every rule above and these:
 
 - The root element is `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">`. The size is exactly the grid (or a whole multiple), and `shape-rendering="crispEdges"` is always set. Art at 2x detail is `width="64" height="64" viewBox="0 0 64 64"` (or a whole multiple) in a file named `<name>@2x.svg`.
-- **Only `<rect>` elements**, with whole-number `x`, `y`, `width` and `height`, one rect per run of pixels. No `<path>`, `<circle>`, `<ellipse>`, `<polygon>`, `<text>` or `<image>`, because curves and diagonals are antialiased.
+- **Only `<rect>` elements**, with whole-number `x`, `y`, `width` and `height`, one rect per run of pixels. No `<path>`, `<circle>`, `<ellipse>`, `<polygon>`, `<text>` or `<image>`.
 - **Palette colours only.** Every `fill` is a lower-case `#rrggbb` from the table above. No named colours, no `rgb()`, no `currentColor`.
 - **No antialiasing and no partial transparency:** no `opacity`, `fill-opacity`, `stroke`, `filter`, gradient, pattern, mask, clip path or blend mode, and no `transform` except a whole-number `translate`.
 - A background is simply absent; tiles cover all 32×32 with rects.
 - Rects don't overlap, so every pixel gets exactly one colour.
 
-A minimal valid example, a stone **wall** tile with its lit top-left edge and shaded bottom-right edge (a floor tile is flat instead, see "The 32×32 grid"):
+A minimal valid example, a stone **wall** tile with its lit top-left edge and shaded bottom-right edge (a floor tile is flat instead, see "The 32-unit grid"):
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">
@@ -206,13 +200,13 @@ A minimal valid example, a stone **wall** tile with its lit top-left edge and sh
 
 ## UI
 
-The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
+The HUD and the Style Guide page build on these.
 
-- **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only, and one title type beside it for the names of bosses (and later biomes) only: a bitmap face drawn for the game on the pixel grid, `TitleLabel` in `hud/theme/title_theme.tres`, the game's first font file (docs/milestones/boss-intro.md, rule 7). Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
+- **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only, and one title type beside it for the names of bosses (and later biomes) only: `TitleLabel` in `hud/theme/title_theme.tres`, a bitmap face drawn on the pixel grid (docs/milestones/boss-intro.md, rule 7). Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
-- **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape, so colour is never the only signal. Health is a thin line of a strong red, `#e01a2b`, the one UI colour outside the palette, by the owner's word ("a very red line", 2026-11-19); mana is a thin line of Mana light under each staff's row; both on a dark trough, and neither uses a player colour (`hud/widgets/meter_line.gd`).
+- **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape. Health is a thin line of `#e01a2b`, the one UI colour outside the palette (the owner's word); mana a thin line of Mana light under each staff's row; both on a dark trough, neither in a player colour (`hud/widgets/meter_line.gd`).
 - **Icons:** 16×16 for spells and relics in the overlay, 8×8 for status marks (32×32 and 16×16 at 2x detail, `@2x`), with the 1 px outline and at most 3 shades per material.
-- The HUD is laid out at the **640×360 layout size** and drawn at the picture's scale (2 in the 1280×720 picture; "The picture and the art's detail"). Everything snaps to whole layout pixels, art at 2x to whole picture pixels, and four panels stay readable there. Text is drawn at whole-number sizes.
+- The HUD is laid out at the **640×360 layout size** and drawn at the picture's scale ("The picture and the art's detail"). Everything snaps to whole layout pixels, art at 2x to whole picture pixels, and four panels stay readable there. Text is drawn at whole-number sizes.
 
 ## Golden examples
 

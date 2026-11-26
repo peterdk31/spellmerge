@@ -48,7 +48,6 @@ All in `projectile_manager.gd`: (1) its numbers per slot, a packed array sized i
 - One shader per kind of thing drawn, each with its own batch or node; no mode switches between unrelated looks.
 - Shared code is in includes (`shot_palette`, `shot_look`, `shot_head`, ... `.gdshaderinc`) that card shaders start from.
 - A card's own look is `CarrierCard.look_shader` in its folder (copy `carriers/bolt/bolt.gdshader`); areas get it through `Spells.look_of`, never by reading the card.
--
 - No per-pixel loop over anything that grows; a pixel loops only over a small fixed number. Keep fragment stages small and branch-light; per-instance work in `vertex()`.
 - Both renderers: every shader compiles and draws the same on Mobile and Compatibility: at most 32 varyings (pack small ones in a vector), no `return` from inside a loop in the fragment stage. `tests/smoke/renderer_shaders.gd` checks.
 - Every shader is compiled before the first room: list a shot shader in `projectiles/shader_warmup.gd`, or call `ShaderWarmup.want(shader, how)` where an area first uses it. `tests/core/test_shader_warmup.gd` fails for any left out.

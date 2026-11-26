@@ -71,7 +71,7 @@ Go through things in an order of your own (bodies by actor id, shots by slot, ro
 ## Snapshots (N10)
 
 - `Snapshot.take(areas, world)` / `restore(areas, world)` save what `StateWalk` walks; no save code of your own.
-- An area may give `rebuild_derived()` (DERIVED that follows the state), `remake_body(name) -> Node` (bodies built in code, named by row), `restore_nodes()`.
+- An area may give `rebuild_derived()` (DERIVED that follows the state), `remake_body(name) -> Node` (bodies built in code, matched by name as well as actor id, so the name says its row, e.g. Entities' `Decoy<row>`), `restore_nodes()`.
 - Checked by `tests/core/test_snapshot.gd`, `tests/core/test_snapshot_game.gd`, `tests/core/test_content_determinism.gd`.
 
 ## Input (N2)

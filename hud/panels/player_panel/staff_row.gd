@@ -66,6 +66,11 @@ const LEAD: float = ICON_STEP
 ## How many frames (`set_timing` calls) the white rim stays on a glyph whose staff became ready.
 const RIM_FRAMES: int = 7
 
+## A sigil's glow round its icons while one holds (staff-language L4): grown and shrunk a stage a
+## frame, by whole pixels (docs/STYLE.md, "Smooth").
+const GLOW_STAGES: int = 3
+const SIGIL_GLOW: Color = Color("#e08ad8")
+
 ## How the staff's delay shows (see the top).
 enum Style { BUTTON, NEXT_CAST }
 ## `set_timing`'s `firing` when the row is not told what the mana pays.
@@ -129,6 +134,10 @@ var style: Style = Style.BUTTON:
 
 ## Per card shown, in read order: its icon (null draws a plain square) and whether it is wasted.
 var _icons: Array[Texture2D] = []
+## The staff's sigils' icons (staff-language L4), drawn at the row's right end, and their glow.
+var _sigil_icons: Array[Texture2D] = []
+var _sigils_live: bool = false
+var _glow: int = 0
 var _wasted: PackedByteArray = PackedByteArray()
 ## Per cast: the index in `_icons` of its first card, and how many cards it read.
 var _cast_first: PackedInt32Array = PackedInt32Array()
@@ -210,7 +219,10 @@ func _ready() -> void:
 ## Show the plan of `Spells.staff_view` (`cards`, `casts` with `slots` and `wasted`, the staff's
 ## `wasted`); `icons` holds the icon of each card id of `plan["cards"]` by slot (null for none).
 ## A plan with no cast but cards (every card unknown) shows them as one wasted group.
-func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
+func set_plan(plan: Dictionary, icons: Array[Texture2D], sigil_icons: Array[Texture2D] = []) -> void:
+	_sigil_icons.clear()
+	for icon: Texture2D in sigil_icons:
+		_sigil_icons.append(IconAtlasScript.region_of(icon))
 	_icons.clear()
 	_wasted.clear()
 	_cast_first.clear()
@@ -287,8 +299,33 @@ func set_timing(cursor: int, left: float, winding: bool = false, firing: int = F
 		changed = true
 	if _step_arrows():
 		changed = true
+	var glow: int = clampi(_glow + (1 if _sigils_live and not _sigil_icons.is_empty() else -1), 0, GLOW_STAGES)
+	if glow != _glow:
+		_glow = glow
+		changed = true
 	if changed or is_recharging() != was_recharging:
 		_redraw_changed()
+
+
+## True while one of the staff's sigils holds, so it casts by itself (staff-language L4): its icons glow,
+## grown a stage a `set_timing` frame.
+func set_sigils_live(on: bool) -> void:
+	_sigils_live = on
+
+
+## How far the sigils' glow has grown, 0 to GLOW_STAGES (for tests).
+func glow() -> int:
+	return _glow
+
+
+## How many sigil icons the row shows (for tests).
+func sigil_count() -> int:
+	return _sigil_icons.size()
+
+
+## The room the sigils take at the row's right end.
+func _sigils_room() -> float:
+	return 0.0 if _sigil_icons.is_empty() else _sigil_icons.size() * ICON_STEP + 2.0
 
 
 ## Show the staff's whole mana `mana` of its pool `most` on the line under the cards; a mana not
@@ -440,7 +477,7 @@ func _measure() -> void:
 	if _strip == null:
 		return
 	var left: float = _cards_left()
-	var width: float = maxf(size.x - left, 0.0)
+	var width: float = maxf(size.x - left - _sigils_room(), 0.0)
 	_strip.position = Vector2(left, 0.0)
 	_strip.size = Vector2(width, BOX_HEIGHT)
 	_mana.position = Vector2(left, BOX_HEIGHT + MANA_GAP)
@@ -698,6 +735,29 @@ func _draw_cover_onto(target: CanvasItem, at: Vector2) -> void:
 		target.draw_rect(cap, SHORT, false, 1.0)
 	elif _rim_frames > 0:
 		target.draw_rect(cap, RIM, false, 1.0)
+	_draw_sigils_onto(target, at)
+
+
+## The sigils' icons at the row's right end, each in a frame, and while one holds the glow round them:
+## stage 1 its corners, 2 a whole rim, 3 a rim two pixels wide (whole pixels, a stage a frame).
+func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
+	if _sigil_icons.is_empty():
+		return
+	var x: float = at.x + size.x - _sigils_room() + 2.0
+	var box := Rect2(Vector2(x - 1.0, at.y), Vector2(_sigil_icons.size() * ICON_STEP + 1.0, BOX_HEIGHT))
+	for icon: Texture2D in _sigil_icons:
+		var tile := Rect2(Vector2(x, at.y + 1.0), Vector2(ICON, ICON))
+		target.draw_rect(tile, FILL)
+		if icon != null:
+			target.draw_texture_rect(icon, tile, false)
+		x += ICON_STEP
+	if _glow >= 2:
+		target.draw_rect(box, SIGIL_GLOW, false, 1.0)
+	elif _glow == 1:
+		for corner: Vector2 in [box.position, Vector2(box.end.x - 1.0, box.position.y), Vector2(box.position.x, box.end.y - 1.0), box.end - Vector2.ONE]:
+			target.draw_rect(Rect2(corner, Vector2.ONE), SIGIL_GLOW)
+	if _glow >= 3:
+		target.draw_rect(box.grow(1.0), SIGIL_GLOW, false, 1.0)
 
 
 func _draw_dashed(box: Rect2, color: Color) -> void:

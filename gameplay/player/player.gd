@@ -131,7 +131,7 @@ const REFUSALS: Dictionary = {
 }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max"]
+const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max", &"_sent_sigils"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
 
@@ -156,6 +156,8 @@ var _sent_mana: int = -1
 var _sent_shown: int = -1
 ## What the last `staff_mana_changed` of each staff said (its whole mana; -1: not sent yet).
 var _sent_staff_mana: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+## Which staffs' sigils the last `staff_sigils_live` said hold, a bit a staff (-1: not sent yet).
+var _sent_sigils: int = -1
 var _sent_staff_max: PackedFloat32Array = PackedFloat32Array([-1.0, -1.0, -1.0, -1.0])
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
@@ -362,6 +364,7 @@ func _forget_sent() -> void:
 	_sent_mana = -1
 	_sent_shown = -1
 	_sent_staff_mana.fill(-1)
+	_sent_sigils = -1
 	_sent_staff_max.fill(-1.0)
 
 
@@ -497,6 +500,15 @@ func announce_stats() -> void:
 				_sent_staff_mana[at] = whole
 				_sent_staff_max[at] = most
 				body.events.staff_mana_changed.emit(seat, at, float(whole), most)
+		var live: int = 0
+		for at in mini(caster.staff_count, STAFF_COUNT):
+			if caster.sigil_holds(at):
+				live |= 1 << at
+		if live != _sent_sigils:
+			for at in STAFF_COUNT:
+				if _sent_sigils < 0 or (live ^ _sent_sigils) & (1 << at) != 0:
+					body.events.staff_sigils_live.emit(seat, at, live & (1 << at) != 0)
+			_sent_sigils = live
 	var health: float = body.health.health if body.health != null else 0.0
 	var max_health: float = body.health.max_health if body.health != null else 0.0
 	var shown: int = caster.current if caster != null else 0

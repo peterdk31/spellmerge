@@ -475,6 +475,10 @@ signal revive_progress(player: int, progress: float)
 signal player_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float)
 ## Sender: player. The whole-number mana of staff `staff` (0-3) of `player`'s own wizard changed, or the wizard appeared: that staff's own pool (owner, 2026-11-01). Heard by the builder (the viewed staff's bar and mana shares).
 signal staff_mana_changed(player: int, staff: int, mana: float, max_mana: float)
+## Sender: player. Staff `staff` (0-3) of `player`'s shown body has a sigil that began (`on`) or stopped
+## holding, so it casts by itself (staff-language L4; `Caster.sigil_holds`), or the body appeared. Heard
+## by hud (the corner panel's staff row glows).
+signal staff_sigils_live(player: int, staff: int, on: bool)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.

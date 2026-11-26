@@ -334,7 +334,13 @@ func cache() -> CachedViewScript:
 
 ## Show staff `staff` (0-3) as the plan of `staff_changed` says (`Spells.staff_view`), with
 ## `icons` the icon of each card by slot. A staff with no card hides its row.
-func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D]) -> void:
+## Whether staff `staff`'s sigils hold now (staff-language L4): its row's sigils glow.
+func set_sigils_live(staff: int, on: bool) -> void:
+	if staff >= 0 and staff < STAFF_COUNT:
+		_rows[staff].set_sigils_live(on)
+
+
+func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D], sigil_icons: Array[Texture2D] = []) -> void:
 	if staff < 0 or staff >= STAFF_COUNT:
 		return
 	var has_cards: bool = false
@@ -343,7 +349,7 @@ func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D]) -> vo
 			has_cards = true
 			break
 	_has_cards[staff] = has_cards
-	_rows[staff].set_plan(plan, icons)
+	_rows[staff].set_plan(plan, icons, sigil_icons)
 	_refresh_rows()
 
 

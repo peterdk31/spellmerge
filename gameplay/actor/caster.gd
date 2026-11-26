@@ -248,6 +248,9 @@ func set_sigils(at: int, sigils: Array[SigilBase]) -> void:
 	_sigil_ids[at] = ids
 	_sigil_whens[at] = whens
 	_sigil_amounts[at] = amounts
+	if number >= 0 and holds(at):
+		# The corner panel's row shows its sigils (`plan_of`).
+		staff_built.emit(at)
 
 
 ## The ids of the sigils hand `at`'s staff holds (none for a hand past its staffs).
@@ -501,7 +504,10 @@ func _show(at: int) -> void:
 func plan_of(at: int) -> Dictionary:
 	if actor.spells == null or not holds(at):
 		return {}
-	return actor.spells.staff_view(cards_of(at), staff_of(at))
+	var view: Dictionary = actor.spells.staff_view(cards_of(at), staff_of(at))
+	# Its sigils (staff-language L4), for the corner panel: ids in the order put on.
+	view["sigils"] = sigils_of(at)
+	return view
 
 
 ## The carrier card of the carrier staff `at` cast last (`Spells.last_carrier_card`), or &"".

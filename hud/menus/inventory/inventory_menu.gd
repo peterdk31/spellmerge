@@ -15,6 +15,10 @@ extends Control
 ##   another hand the two change places); the button of the hand it is on takes it off into the bag.
 ##   X drops it on the ground.
 ## - **Cards:** the kinds the bag holds, then (A or RT) a kind's cards with their counts; X drops one.
+## - **Sigils** (staff-language L4): the sigils held, and those on the hands' staffs (count 0 when
+##   none is left in the bag). A hand's button puts the sigil pointed at on the staff on that hand, or
+##   takes it off when that staff has it (`sigil_put_requested`, `sigil_take_requested`); what is
+##   pointed at says which hands' staffs have it.
 ## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
 ##   A uses the one pointed at where it has a use (`ItemKinds.usable`; a potion is drunk:
 ##   `bag_use_requested`, the owner's of 2026-11-19) and X drops one where its kind can be dropped
@@ -68,6 +72,8 @@ const TOGGLE_ACTION: StringName = &"inventory"
 const HINT_ACTIONS: Array[StringName] = [&"accept", &"alternate", &"back", &"inventory", &"dpad"]
 ## The d-pad's arms by quick-use slot (0 up, 1 right, 2 down, 3 left), as the input manager has them.
 const QUICK_ACTIONS: Array[StringName] = InputManagerScript.QUICK_ACTIONS
+## Each hand's button in words, by hand (a sigil's line says which staffs have it).
+const HAND_WORDS: Array[String] = ["RB", "RT", "LB", "LT"]
 ## The buttons read here (the rest come as UIFocus signals).
 const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"inventory", &"quick_up", &"quick_right", &"quick_down", &"quick_left"]
 ## Which layer the ring shows.
@@ -450,6 +456,8 @@ func _poll_hands() -> void:
 		for _press in _presses(HAND_ACTIONS[hand]):
 			if _layer == Layer.STAFFS:
 				put_on_hand(hand)
+			elif _layer == Layer.ITEMS and _in_sigils():
+				sigil_to_hand(hand)
 			elif hand == ENTER_HAND and (_layer == Layer.BAGS or _layer == Layer.KINDS or _menu.uses_mouse()):
 				enter_pointed()
 
@@ -572,6 +580,29 @@ func put_on_hand(hand: int) -> void:
 	var number: int = entry["staff"]
 	_sound(UiSounds.CHOOSE)
 	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand, _mirror.body)
+
+
+## A hand's button on the sigils ring: the pointed sigil onto the staff on hand `hand`, or off it when
+## that staff has it already (staff-language L4; the simulation checks: `sigil_put_requested`,
+## `sigil_take_requested`).
+func sigil_to_hand(hand: int) -> void:
+	var entry: Dictionary = pointed()
+	if not entry.has("item") or _events == null:
+		return
+	var number: int = _mirror.on_hand(hand)
+	if number == NONE:
+		return
+	var id: StringName = entry["item"]
+	_sound(UiSounds.CHOOSE)
+	if _mirror.sigils_of(number).has(id):
+		_events.sigil_take_requested.emit(index, number, id, _mirror.body)
+	else:
+		_events.sigil_put_requested.emit(index, number, id, _mirror.body)
+
+
+## True while the ring shows the sigils bag.
+func _in_sigils() -> bool:
+	return _bag != &"" and ItemKinds.kind_in(_bag) == ItemKinds.SIGIL
 
 
 ## A d-pad arm on a ring of items: the usable item pointed at bound to quick-use slot `slot` (or let
@@ -728,6 +759,12 @@ func _show_layer() -> void:
 				var bound: StringName = _mirror.quick_id(slot)
 				if bound != &"" and _mirror.quick_slot_of(_bag, bound) == slot and not ids.has(bound):
 					ids.append(bound)
+			if _in_sigils():
+				# The sigils on the hands' staffs stay on the ring with none left, to take off there.
+				for hand in HANDS:
+					for id: StringName in _mirror.sigils_of(_mirror.on_hand(hand)):
+						if not ids.has(id):
+							ids.append(id)
 			if not was_items:
 				_shade.clear()
 				_item_order.clear()
@@ -958,7 +995,13 @@ func _draw_info() -> void:
 	elif entry.has("item"):
 		var look: Dictionary = _look(entry["item"])
 		_text(_fit(String(look["name"]), box.size.x - 6.0), at, TEXT)
-		_text("x%d" % int(entry["count"]), at + Vector2(0.0, LINE_STEP), MUTED)
+		var count_line: String = "x%d" % int(entry["count"])
+		if _in_sigils():
+			var on: PackedStringArray = PackedStringArray()
+			for hand in _mirror.hands_with_sigil(entry["item"]):
+				on.append(HAND_WORDS[hand])
+			count_line += ("  on " + ", ".join(on)) if not on.is_empty() else "  on no staff"
+		_text(_fit(count_line, box.size.x - 6.0), at + Vector2(0.0, LINE_STEP), MUTED)
 		var said: PackedStringArray = _wrap(String(look["description"]), box.size.x - 6.0)
 		var rows: int = maxi(floori((box.end.y - 2.0 - (at.y + LINE_STEP * 2.0)) / LINE_STEP), 0)
 		for line in mini(said.size(), rows):

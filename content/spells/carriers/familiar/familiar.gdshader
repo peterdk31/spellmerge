@@ -83,9 +83,9 @@ const float BLINK_RATE = 0.31;
 const float BLINK_SHARE = 0.05;
 
 vec4 shot(vec2 uv) {
-	// The screen pixel, with +x along the flight, the core at 0, pixel centres on whole numbers.
+	// The art pixel's middle (art_centre; ART2), with +x along the flight, the core at 0.
 	vec2 size = vec2(LENGTH, GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - vec2(size.x - FRONT * zoom, size.y * 0.5);
+	vec2 q = art_centre(uv * size) - vec2(size.x - FRONT * zoom, size.y * 0.5);
 	vec4 colour = vec4(0.0);
 	vec2 c = vec2(0.5);
 	// It bobs a pixel across its way, slowly, each on its own beat.
@@ -100,13 +100,14 @@ vec4 shot(vec2 uv) {
 	}
 	vec2 tn = tail_coords(d);
 	if (tn.x > 0.5 && tn.x < tail) {
-		float t = floor(tn.x);
+		// The world pixel each art pixel lies in (ART2), as on the world's grid.
+		float t = floor(tn.x + 0.5);
 		float u = t / tail;
 		float fr = floor(sim_time * 12.0 + seed);
 		float wave = sin(t * 0.38 / zoom - sim_time * 9.0 + seed) * 1.4 * zoom * u;
 		float half_w = max((R - 0.5) * (1.0 - u), 0.5 * zoom);
 		float across = abs(tn.y - wave);
-		bool shown = across <= half_w && (u < 0.6 || hash(t, fr + floor(tn.y), 12.0) > (u - 0.6) * 2.2);
+		bool shown = across <= half_w && (u < 0.6 || hash(t, fr + floor(tn.y + 0.5), 12.0) > (u - 0.6) * 2.2);
 		if (shown) {
 			float edge = half_w - across;
 			vec3 rgb = u < 0.35 ? (edge > 0.75 ? hi : mid) : (u < 0.7 ? (edge > 0.75 ? mid : lo) : lo);
@@ -139,12 +140,15 @@ vec4 shot(vec2 uv) {
 	float d2 = dot(d, d);
 	if (d2 <= R * R + R * 0.6) {
 		bool rim = d2 > (R - 1.0) * (R - 1.0) + (R - 1.0) * 0.6;
-		vec3 rgb = rim ? lo : (d.x > 0.5 * zoom ? hi : mid);
+		// Lit from the front, as its body is (ART2): its rim the base ahead, its shadow round the rest.
+		vec3 rgb = rim ? (d.x > 0.5 * R ? mid : lo) : (d.x > 0.5 * zoom ? hi : mid);
+		// Its glint and eyes on the world pixel each art pixel lies in (ART2), where they were.
+		vec2 dw = floor(d + 0.5);
 		vec2 glint = floor(vec2(-0.3, -0.6) * R + 0.5);
-		rgb = all(equal(floor(d / zoom), floor(glint / zoom))) ? BONE_LIGHT : rgb;
+		rgb = all(equal(floor(dw / zoom), floor(glint / zoom))) ? BONE_LIGHT : rgb;
 		bool blink = fract(sim_time * BLINK_RATE + seed * 0.13) < BLINK_SHARE;
 		vec2 eye = vec2(floor(0.45 * R + 0.5), 0.0);
-		vec2 de = floor(d / zoom) - floor(eye / zoom);
+		vec2 de = floor(dw / zoom) - floor(eye / zoom);
 		bool on_eye = de.x == 0.0 && abs(de.y) == 1.0;
 		rgb = on_eye ? (blink ? lo : OUTLINE) : rgb;
 		colour = vec4(rgb, 1.0);

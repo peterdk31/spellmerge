@@ -116,7 +116,7 @@ vec3 slash_shade(float k) {
 
 void fragment() {
 	vec4 colour = vec4(0.0);
-	vec2 c = floor(world) + 0.5;
+	vec2 c = art_centre(world);
 	float r = length(c - swing_origin);
 	float a = angle_of(c);
 	float age = sim_time - passed_at(a);

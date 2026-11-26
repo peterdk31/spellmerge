@@ -169,7 +169,7 @@ func test_the_ai_walks_through_water_and_ice_but_not_live_water() -> void:
 
 func test_every_change_of_look_plays_four_frames() -> void:
 	for state: CoverState in FLOOR.states:
-		if state.flat_motion == CoverState.FlatMotion.GROW or state.flat_motion == CoverState.FlatMotion.SHRINK:
+		if state.flat_motion == CoverState.FlatMotion.GROW or state.flat_motion == CoverState.FlatMotion.SHRINK or state.flat_motion == CoverState.FlatMotion.GROW_IN:
 			check(state.animation_frames >= 3, "%s plays at least 3 frames (Smooth)" % state.state_id)
 			var seconds: float = float(state.animation_frames) / float(state.animation_fps)
 			var after: float = 0.0

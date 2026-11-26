@@ -44,9 +44,12 @@ extends Resource
 ## light). Empty: not drawn (dry floor).
 @export var flat_material: StringName = &""
 ## How its look plays from when a cell begins to show it, over `animation_frames` at `animation_fps`
-## (docs/STYLE.md, "Smooth"): still; grown in from the shape's edge; shrunk back to its middle; or
-## still with sparks of `flat_spark` that move every frame (a loop).
-enum FlatMotion { STILL, GROW, SHRINK, CRACKLE }
+## (docs/STYLE.md, "Smooth"), the whole puddle as one shape (the owner, 2026-11-26: a puddle shrinks
+## as one puddle from its outer edge, never cell by cell): still; GROW, spreading out from the
+## puddle's middle to its edge; SHRINK, shrinking from its outer edge to its middle, gone at the end;
+## CRACKLE, still with sparks of `flat_spark` that move every frame (a loop); GROW_IN, creeping in
+## from its outer edge to its middle (ice over the water it freezes, the water shrinking before it).
+enum FlatMotion { STILL, GROW, SHRINK, CRACKLE, GROW_IN }
 @export var flat_motion: FlatMotion = FlatMotion.STILL
 ## The material shown under it while it grows or shrinks (ice over water: &"water"); empty: nothing.
 @export var flat_under: StringName = &""

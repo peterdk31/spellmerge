@@ -8,13 +8,15 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Shots: `floor_look_states` (every state side by side, 2x), `floor_look_room` (the room with a live
 ## lake, the whole picture), `floor_look_shimmer_strip`, `floor_look_live_strip`,
-## `floor_look_ice_strip`, `floor_look_steam_strip` (frames of each animation, 2x).
+## `floor_look_ice_strip`, `floor_look_steam_strip`, `floor_look_freeze_strip`, `floor_look_dry_strip` (frames of each animation, 2x).
 
 ## The lake's touches: circles round its middle (px from it), and their radius.
 const LAKE: Array[Vector2] = [Vector2(0, 0), Vector2(22, 4), Vector2(-20, 8), Vector2(6, 18), Vector2(-6, -16), Vector2(30, -12), Vector2(-32, -6)]
 const LAKE_RADIUS: float = 15.0
 const HALF := Vector2i(64, 44)
 const STRIP_HALF := Vector2i(28, 20)
+## A strip of the whole lake (its growing and shrinking as one shape).
+const LAKE_HALF := Vector2i(52, 36)
 const GAP: int = 2
 
 var _events: Node = null
@@ -55,7 +57,7 @@ func take() -> void:
 	await _keep("spent")
 	await settle(100)
 	_touch(&"frost", _middle, 50.0)
-	await settle(10)
+	await _strip("floor_look_freeze_strip", 8, 1, LAKE_HALF)
 	await _keep("freezing")
 	await settle(40)
 	await _keep("ice")
@@ -67,7 +69,7 @@ func take() -> void:
 	_lake()
 	await settle(30)
 	_touch(&"fire", _middle, 50.0)
-	await _strip("floor_look_steam_strip", 8, 1)
+	await _strip("floor_look_steam_strip", 8, 1, LAKE_HALF)
 	await _keep("after steam")
 	await settle(60)
 	await _keep("scorch fades")
@@ -86,6 +88,7 @@ func take() -> void:
 		fail("the puddle did not dry (%s)" % _state_here())
 		return
 	await _keep("drying")
+	await _strip("floor_look_dry_strip", 8, 1, LAKE_HALF)
 	await wait_for(func() -> bool: return _state_here() == &"dry", 120)
 	await settle(20)
 	await _keep("damp")
@@ -136,12 +139,12 @@ func _save_sheet() -> void:
 
 
 ## `count` frames of the lake's middle, `every` frames apart, side by side at 2x, as `shot_name`.
-func _strip(shot_name: String, count: int, every: int) -> void:
+func _strip(shot_name: String, count: int, every: int, half: Vector2i = STRIP_HALF) -> void:
 	var strip: Image = null
 	var cell: Vector2i = Vector2i.ZERO
 	for column in count:
 		var image: Image = await grab()
-		var crop: Image = crop_round(image, on_screen(_middle + Vector2(-20.0, 8.0)), STRIP_HALF)
+		var crop: Image = crop_round(image, on_screen(_middle + (Vector2(-20.0, 8.0) if half == STRIP_HALF else Vector2.ZERO)), half)
 		crop.convert(Image.FORMAT_RGBA8)
 		if strip == null:
 			cell = crop.get_size()

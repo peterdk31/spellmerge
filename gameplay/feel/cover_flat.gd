@@ -9,6 +9,12 @@ extends Sprite2D
 ## cell's change (`show_cell`) and hands its picture over once a frame when one changed (`hand`). Its
 ## states' looks (`CoverState.flat_*`, the palette's shades) are the shader's uniforms, set once.
 ##
+## A puddle grows and shrinks as one shape (the owner, 2026-11-26): a second texture, `depths`, holds
+## each cell's distance from its puddle's edge (in cells, at its middle: red; -0.5 for a cell not drawn)
+## and the most of its puddle (green), worked out here whenever a cell is drawn or no longer drawn
+## (`_work_depths`: a chamfer distance over the grid, then each joined puddle's most), and the shader
+## moves a growing or shrinking state's front through it.
+##
 ## Its states' glow (`CoverState.flat_glow`) is written as the floor's lights each frame
 ## (`write_lights`, `cover_lights.gd`), and the shader reads the spell light (`light_views.gdshaderinc`:
 ## Feel hands its material to the light as a reader, `light_key`), so ice catches it.
@@ -23,6 +29,9 @@ const STATES: int = 16
 ## Art pixels a world pixel of the look (ArtDetail, core/display/art_detail.gd): the shader works its
 ## shapes out at this detail, 64 px a 32-unit cell (the floor's look, ART0's 2x detail).
 const DETAIL: int = ArtDetail.DETAIL
+## The chamfer distance's corner step and the start of a drawn cell's distance.
+const SQRT2: float = 1.41421356
+const FAR: float = 1.0e6
 ## A neighbour's offset by its bit in a cell's mask (the shader's NB_*): left, right, up, down, then
 ## up-left, up-right, down-left, down-right.
 const NEIGHBOURS: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
@@ -42,6 +51,15 @@ var _since: PackedFloat32Array = PackedFloat32Array()
 var _mask: PackedInt32Array = PackedInt32Array()
 var _drawn: PackedByteArray = PackedByteArray()
 var _rows: int = 0
+## The puddles' distances (`depths`), their picture and whether a change of what is drawn wants them
+## worked out again at the next `hand`; the work's lists, made once a lay.
+var _depths: Image = null
+var _depths_upload: TextureUpload = TextureUpload.new()
+var _depths_texture: ImageTexture = null
+var _shape_dirty: bool = false
+var _depth: PackedFloat32Array = PackedFloat32Array()
+var _stack: PackedInt32Array = PackedInt32Array()
+var _seen: PackedByteArray = PackedByteArray()
 ## Each state's glow (0: none) and its colour, from its kind's data.
 var _glow: PackedFloat32Array = PackedFloat32Array()
 var _glow_colour: PackedColorArray = PackedColorArray()
@@ -80,6 +98,10 @@ func lay(laid: CoverLayout, kind_index: int, now: float) -> void:
 	_since.fill(now)
 	_mask.resize(cells)
 	_mask.fill(0)
+	_depth.resize(cells)
+	_stack.resize(cells)
+	_seen.resize(cells)
+	_depths = Image.create_empty(_columns, rows, false, Image.FORMAT_RGF)
 	_glowing.resize(0)
 	_glowing_at.resize(cells)
 	_glowing_at.fill(-1)
@@ -104,6 +126,10 @@ func lay(laid: CoverLayout, kind_index: int, now: float) -> void:
 			_mask[cell] = _mask_of(cell)
 			_write(cell)
 	made.set_shader_parameter(&"cells", texture)
+	_work_depths()
+	_shape_dirty = false
+	_depths_texture = _depths_upload.hand(_depths)
+	made.set_shader_parameter(&"depths", _depths_texture)
 	made.set_shader_parameter(&"art_detail", DETAIL)
 	made.set_shader_parameter(&"room_origin", laid.origin)
 	material = made
@@ -186,6 +212,7 @@ func show_cell(cell: int, columns: int, state: int, now: float) -> void:
 	_since[cell] = now
 	_write(cell)
 	if _is_drawn(state) != _is_drawn(was):
+		_shape_dirty = true
 		# Its neighbours' masks change with it.
 		var x: int = cell % _columns
 		var y: int = cell / _columns
@@ -234,6 +261,92 @@ func _mask_of(cell: int) -> int:
 		if nx >= 0 and ny >= 0 and nx < _columns and ny < _rows and _is_drawn(_state[ny * _columns + nx]):
 			mask |= 1 << bit
 	return mask
+
+
+## Each drawn cell's distance from its puddle's edge (cells, at its middle) and its puddle's most, into
+## `depths`: a two-pass chamfer distance to the nearest cell not drawn (the grid's outside counts as
+## not drawn; 1 a side, SQRT2 a corner), less half a cell; then each puddle (cells joined by a side)
+## flooded for its most and flooded again to write it. A cell not drawn is -0.5. Runs only on a frame
+## when what is drawn changed; allocates nothing (its lists are made at `lay`).
+func _work_depths() -> void:
+	var cells: int = _state.size()
+	for cell in cells:
+		_depth[cell] = FAR if _is_drawn(_state[cell]) else 0.0
+	for y in _rows:
+		for x in _columns:
+			var at: int = y * _columns + x
+			if _depth[at] > 0.0:
+				var d: float = _depth[at]
+				d = minf(d, _chamfer(x - 1, y, 1.0))
+				d = minf(d, _chamfer(x, y - 1, 1.0))
+				d = minf(d, _chamfer(x - 1, y - 1, SQRT2))
+				d = minf(d, _chamfer(x + 1, y - 1, SQRT2))
+				_depth[at] = d
+	for y in range(_rows - 1, -1, -1):
+		for x in range(_columns - 1, -1, -1):
+			var at: int = y * _columns + x
+			if _depth[at] > 0.0:
+				var d: float = _depth[at]
+				d = minf(d, _chamfer(x + 1, y, 1.0))
+				d = minf(d, _chamfer(x, y + 1, 1.0))
+				d = minf(d, _chamfer(x + 1, y + 1, SQRT2))
+				d = minf(d, _chamfer(x - 1, y + 1, SQRT2))
+				_depth[at] = d
+	_seen.fill(0)
+	for start in cells:
+		if _seen[start] != 0:
+			continue
+		if _depth[start] <= 0.0:
+			_seen[start] = 2
+			_depths.set_pixel(start % _columns, start / _columns, Color(-0.5, 0.0, 0.0, 1.0))
+			continue
+		var most: float = _flood(start, 1, 0.0)
+		_flood(start, 2, most)
+
+
+## Floods the puddle of cell `start` (cells joined by a side), marking each `mark` in `_seen`: mark 1
+## returns its most distance; mark 2 writes each cell's distance and `most` into `depths`.
+func _flood(start: int, mark: int, most: float) -> float:
+	var top: int = 1
+	_stack[0] = start
+	_seen[start] = mark
+	var found: float = 0.0
+	while top > 0:
+		top -= 1
+		var at: int = _stack[top]
+		if mark == 1:
+			found = maxf(found, _depth[at] - 0.5)
+		else:
+			_depths.set_pixel(at % _columns, at / _columns, Color(_depth[at] - 0.5, most, 0.0, 1.0))
+		var x: int = at % _columns
+		var y: int = at / _columns
+		for k in 4:
+			var nx: int = x + (1 if k == 0 else (-1 if k == 1 else 0))
+			var ny: int = y + (1 if k == 2 else (-1 if k == 3 else 0))
+			if nx < 0 or ny < 0 or nx >= _columns or ny >= _rows:
+				continue
+			var next: int = ny * _columns + nx
+			if _depth[next] > 0.0 and _seen[next] < mark:
+				_seen[next] = mark
+				_stack[top] = next
+				top += 1
+	return found
+
+
+## The chamfer's distance through cell (`x`, `y`) at `step` more: the grid's outside is not drawn (0).
+func _chamfer(x: int, y: int, step: float) -> float:
+	if x < 0 or y < 0 or x >= _columns or y >= _rows:
+		return step
+	return _depth[y * _columns + x] + step
+
+
+## Cell `cell`'s distance from its puddle's edge (cells, at its middle; -0.5 not drawn) and its
+## puddle's most, as the shader reads them (for tests).
+func depth_of(cell: int) -> Vector2:
+	if _depths == null or cell < 0 or cell >= _state.size():
+		return Vector2(-0.5, 0.0)
+	var texel: Color = _depths.get_pixel(cell % _columns, cell / _columns)
+	return Vector2(texel.r, texel.g)
 
 
 ## Cell `cell`'s texel from its arrays.
@@ -308,6 +421,13 @@ func _drop_glowing(at: int) -> void:
 ## The frame's picture: the clock set, the grid handed over when a cell changed.
 func hand(now: float) -> void:
 	(material as ShaderMaterial).set_shader_parameter(&"view_time", now)
+	if _shape_dirty:
+		_shape_dirty = false
+		_work_depths()
+		var shaped: ImageTexture = _depths_upload.hand(_depths)
+		if shaped != _depths_texture:
+			_depths_texture = shaped
+			(material as ShaderMaterial).set_shader_parameter(&"depths", shaped)
 	if _dirty:
 		_dirty = false
 		var handed: ImageTexture = _upload.hand(_cells)

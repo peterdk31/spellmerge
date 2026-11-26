@@ -19,9 +19,11 @@ shader_type canvas_item;
 // material's shadow (`edges`). Everything is whole pixels: no blur, no fade (docs/STYLE.md, "Smooth").
 //
 // **Motion** (`motions` .x; CoverState.FlatMotion), played from when the cell began to show its state
-// over .y frames at .z a second (.w above 0.5: looping): STILL; GROW, the cell's own rounded shape inset
-// by INSET_MOST * (frames - 1 - frame) / frames px, so it grows in by steps; SHRINK, inset by
-// INSET_MOST * (frame + 1) / frames, so it ends gone; CRACKLE, sparks and arcs of `sparks` a frame each.
+// over .y frames at .z a second (.w above 0.5: looping), the puddle as one shape (the owner, 2026-11-26):
+// a front moves through the puddle's distance from its edge (`depths`, `front`) by steps of its frames:
+// STILL; GROW, spreading from the puddle's middle out; SHRINK, shrinking from its outer edge in, gone
+// at its last frame; CRACKLE, sparks and arcs of `sparks` a frame each; GROW_IN, creeping from its
+// outer edge in.
 // While a state grows or shrinks, `unders` (alpha above 0) is drawn joined where it is not: ice over
 // the water it freezes.
 //
@@ -39,7 +41,6 @@ shader_type canvas_item;
 #include "res://gameplay/feel/light_views.gdshaderinc"
 
 const float CELL = 16.0;
-const int INSET_MOST = 8;
 const int STATES = 16;
 // A cell's drawn neighbours, by bit (CoverFlat.NEIGHBOURS).
 const int NB_L = 1;
@@ -72,6 +73,9 @@ uniform bool shimmer = true;
 uniform vec4 white_hot = vec4(0.957, 0.945, 0.918, 1.0);
 // The room's cover grid (the sprite's own texture, handed again whenever it is).
 uniform sampler2D cells : filter_nearest;
+// Each cell's distance from its puddle's edge (red, cells at its middle; -0.5 not drawn) and its
+// puddle's most (green), worked out by cover_flat.gd as what is drawn changes.
+uniform sampler2D depths : filter_nearest;
 uniform vec4 fills[STATES];
 uniform vec4 edges[STATES];
 uniform vec4 glints[STATES];
@@ -116,21 +120,6 @@ int frame_of(int s, float age) {
 	return motion.w > 0.5 ? frame % frames : min(frame, frames - 1);
 }
 
-// How far state `s`'s shape is inset from its own cell's sides (art px; 0: joined to its neighbours).
-int inset_of(int s, float age, int d) {
-	vec4 motion = motions[s];
-	int kind = int(motion.x + 0.5);
-	int frames = max(int(motion.y + 0.5), 1);
-	int frame = frame_of(s, age);
-	if (kind == 1) {
-		return (INSET_MOST * d * (frames - 1 - frame)) / frames;
-	}
-	if (kind == 2) {
-		return (INSET_MOST * d * (frame + 1)) / frames;
-	}
-	return 0;
-}
-
 // How far in a closed side's edge lies at `along` art px along the world's line `line`: 0 to 2 world
 // px, a height a run of WOBBLE_RUN world px, stepped by whole pixels from one run's height to the next.
 int wobble(int along, int line, int salt, int d) {
@@ -140,6 +129,47 @@ int wobble(int along, int line, int salt, int d) {
 	int a = int(pixel_hash(ivec2(k, line), salt) % uint(2 * d + 1));
 	int b = int(pixel_hash(ivec2(k + 1, line), salt) % uint(2 * d + 1));
 	return (a * (run - t) + b * t) / run;
+}
+
+// Whether state `s` grows or shrinks (GROW, SHRINK, GROW_IN): its front moves through the puddle.
+bool moving(int s) {
+	int kind = int(motions[s].x + 0.5);
+	return kind == 1 || kind == 2 || kind == 4;
+}
+
+// The distance from the puddle's edge (cells) at the room's art pixel `px`: the cells' distances
+// (`depths` red, at each cell's middle; -0.5 for a cell not drawn, and outside the grid) weighed
+// between the four nearest middles.
+float depth_at(ivec2 px, int side, ivec2 size) {
+	vec2 p = (vec2(px) + 0.5) / float(side) - 0.5;
+	ivec2 c = ivec2(floor(p));
+	vec2 t = p - floor(p);
+	float v[4];
+	for (int k = 0; k < 4; k++) {
+		ivec2 at = c + ivec2(k % 2, k / 2);
+		bool inside = at.x >= 0 && at.y >= 0 && at.x < size.x && at.y < size.y;
+		v[k] = inside ? texelFetch(depths, clamp(at, ivec2(0), size - ivec2(1)), 0).r : -0.5;
+	}
+	return mix(mix(v[0], v[1], t.x), mix(v[2], v[3], t.x), t.y);
+}
+
+// How far (art px; below 0: not yet or no longer there) pixel `px` lies inside the front of state
+// `s`'s motion, `age` seconds after its cell began to show it, in a puddle `most` cells deep at its
+// deepest: GROW spreads from the middle out, SHRINK shrinks from the outer edge in (gone at its last
+// frame), GROW_IN creeps from the outer edge in, all by steps of the state's frames and as one shape.
+int front(int s, float age, ivec2 px, int side, ivec2 size, float most, int d) {
+	int kind = int(motions[s].x + 0.5);
+	int frames = max(int(motions[s].y + 0.5), 1);
+	int frame = frame_of(s, age);
+	float deepest = most * float(side) + 1.0;
+	float depth = depth_at(px, side, size) * float(side) + float(wobble(px.x + px.y, 7, 3, d));
+	if (kind == 1) {
+		return int(floor(depth - deepest * float(frames - 1 - frame) / float(frames)));
+	}
+	if (kind == 2) {
+		return int(floor(depth - deepest * float(frame + 1) / float(frames)));
+	}
+	return int(floor(deepest * float(frame + 1) / float(frames) - depth));
 }
 
 // The distance (whole art px, 0 the outer pixel, below 0 outside) from pixel `f` of a cell of side
@@ -385,7 +415,7 @@ void fragment() {
 			int sa = state_of(a);
 			int sb = state_of(b);
 			int sc = state_of(c);
-			if (drawn(sa) && drawn(sb) && drawn(sc) && inset_of(sa, view_time - a.g, d) == 0 && inset_of(sb, view_time - b.g, d) == 0 && inset_of(sc, view_time - c.g, d) == 0) {
+			if (drawn(sa) && drawn(sb) && drawn(sc) && !moving(sa) && !moving(sb) && !moving(sc)) {
 				ivec2 into = ivec2(sx < 0 ? r : side - r, sy < 0 ? r : side - r);
 				float from_far = length(vec2(f) + 0.5 - vec2(into));
 				if (from_far > float(r)) {
@@ -414,12 +444,17 @@ void fragment() {
 		bvec4 joined = bvec4((nb & NB_L) == 0, (nb & NB_R) == 0, (nb & NB_U) == 0, (nb & NB_D) == 0);
 		float age = view_time - here.g;
 		int frame = frame_of(s, age);
-		int inset = inset_of(s, age, d);
 		bool low = false;
-		// While a cell grows or shrinks it is a shape of its own, inset from all four sides (a whole
-		// puddle drying, freezing or steaming at once shrinks or grows cell by cell, never in one jump);
-		// still, it joins its drawn neighbours.
-		int dist = inset > 0 ? edge_dist(f, side, bvec4(true), px, cell, inset, 0, d, low) : edge_dist(f, side, joined, px, cell, 0, nb, d, low);
+		int dist = edge_dist(f, side, joined, px, cell, 0, nb, d, low);
+		// While it grows or shrinks, its front moves through the puddle as one shape (the owner,
+		// 2026-11-26: a puddle shrinks as one puddle from its outer edge, never cell by cell).
+		if (moving(s)) {
+			int ahead = front(s, age, px, side, size, texelFetch(depths, cell, 0).g, d);
+			if (ahead < dist) {
+				dist = ahead;
+				low = false;
+			}
+		}
 		int kind = int(surfaces[s].x + 0.5);
 		if (dist < 0) {
 			bool under_low = false;

@@ -1,32 +1,37 @@
 # content/room_kinds: kinds of room
 
-A kind of room is what a room of a run's map is for the game (run generation, docs/milestones/run-generation.md, "The model"): how it is filled and what ends it. One file per kind, `<id>.tres`, a `RoomKind` (`core/base/room_kind.gd`); the registry finds it by its `id` under `room_kinds` (a folder of its own, so the list of rooms never holds a kind). A room template names the kinds it can host (`RoomBase.kinds`) and a run's kind table where each may stand (`KindRule`, content/runs).
+A kind of room is what a room of a run's map is for the game (docs/milestones/run-generation.md, "The model"): how it is filled, how it is entered and what ends it. One file per kind, `<id>.tres`, a `RoomKind` (`core/base/room_kind.gd`), found by its `id` under `room_kinds`. A room template names the kinds it can host (`RoomBase.kinds`) and a run's kind table where each may stand (`KindRule`, content/runs).
 
 ## Contract
 
-- `fill`: how a room of the kind is filled, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached; from the biome's `MapRules.elite_depth` on, by its `elite_chance`, its first enemy an elite), `elites` (the same, every enemy an elite: a challenge room, connected biomes CB11), `boss` (one of the biome's bosses), `shop` (a shop's shelf, one of each item rolled from the kind's `shelf` table, each bought by the first wizard who steps onto it with its price in their own coins (an inventory item)), `fountain` (a pool of healing shared by every hurt wizard standing in it) or `none` (nothing: a safe room).
-- `ends`: what ends it, one of `RoomKind.ENDS`: `enemies_down`.
-- `door` (connected biomes CB7): how a room of the kind is entered in a biome, one of `RoomKind.DOORS`: none (free), `gather` (a gather door: shut until every standing wizard is on its bridge, then the standing ones come in together; a challenge room, CB11), `gate` (the boss's: a gather door that also waits while any sealed fight holds a wizard, and then brings everyone, downed or far away), `key` (a key door, CB11: its key is dropped in the room its bridge hangs off as that room is cleared; a wizard holding it at the door opens it for all) or `secret` (cracked rock, CB11: it breaks open when the element rolled for the room touches the floor at it).
-- `rewards` (CB11): the reward table (content/rewards) each player rolls a reward from as a room of the kind is cleared, however its foes left it; empty: its clear rewards nobody. `shelf`: a shop's table of items (each line's `price`).
-- `portal_home` (CB7): true when a room of the kind, cleared, opens the portal home on its floor (at its template's zone `portal`, else its middle): every standing wizard in it ends the run, won, back in the hub.
-- **Its look and sound** (connected biomes CB12, decision 30; the inspector's "Look and sound" group, each optional, drawn and heard only): `air`, an `Ambience` (its bed and accents, heard in place of the room's own while the music follows a room of the kind: the room this machine's wizards are in, the most intense of them); `music`, a `MusicTrack` played then in place of the room's (a living boss's music still comes first); `light`, the palette material (docs/STYLE.md, never a player's or Blight) the mouths into a room of the kind shimmer in and its seals' runes glow in (empty: the spark's), and that its room's own light leans toward; `light_tint` (connected biomes CB12b), how far a room of the kind's dark and every light in it lean toward its light's base shade (0 not at all, at most `RoomKind.LIGHT_TINT_MOST`, 0.5; drawn only while dynamic lighting is on, coming in over 3 frames as the room is entered); `air_motes` (CB12b), a `MoteSource` drifting in a room of the kind's air over that room alone, besides its template's `air` (the same rules: `RoomBase.problems_of_air`; best a lit-only kind, `air_dust` or `air_glimmer`, seen where light falls). The crypt's: fight spark 0.08 with stone grit; boss fire 0.3 with rising fire and spark glimmer; start spark 0.2 with a hearth's bone and spark glimmer; reward spark 0.2 and treasure spark 0.25 with gold glimmer; shop spark 0.15 with bone and wood dust; fountain water 0.3 with water and ice glimmer; secret void 0.3 with void glimmer; challenge fire 0.25 with fire dust.
-- A new kind is a new file and a line in a run's kind table; a new way of filling, entering or ending is engine work (one more of `FILLS`, `DOORS` or `ENDS` and the behaviour it names), never a change to the generator.
-- **Its symbol** (connected biomes CB9; also in "Look and sound", optional): `symbol`, what a bridge's mouth into a room of the kind tells of what lies behind it and what the held Y map shows on the room: a 7 × 7 picture as text, a row a line, `#` its light's lit shade, `+` its base shade, `.` none (drawn with a dark edge round it). Empty: nothing is told (a room meant to be found, a secret room). `problems()` names a symbol that is not 7 rows of 7 or has another character. Fight's is crossed blades, boss's a skull, start's a hearth; CB11's: the reward room's a gem, the shop's a purse, the fountain's a drop, the treasure's a chest, the challenge's crossed swords; the secret room's none.
-- A new kind (a reward room, a healing room) is a new file and a line in a run's kind table; a new way of filling or ending is engine work (one more of `FILLS` or `ENDS` and the behaviour it names), never a change to the generator.
+- `fill`, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached; elites from `MapRules.elite_depth` by `elite_chance`), `elites` (every enemy an elite), `boss` (one of the biome's bosses), `shop` (a shelf rolled from `shelf`, each item bought by the first wizard to step on it with its price in their own coins), `fountain` (a pool of healing shared by every hurt wizard in it) or `none` (a safe room).
+- `ends`, one of `RoomKind.ENDS`: `enemies_down`.
+- `door`, one of `RoomKind.DOORS`: none (free), `gather` (shut until every standing wizard is on its bridge), `gate` (the boss's: a gather door that also waits for sealed fights, then brings everyone), `key` (its key dropped in the room its bridge hangs off as that room is cleared) or `secret` (cracked rock broken by the element rolled for the room).
+- `rewards`: the reward table (content/rewards) each player rolls from as a room of the kind is cleared; empty rewards nobody. `shelf`: a shop's table of items (each line's `price`).
+- `portal_home`: a cleared room of the kind opens the portal home (at its template's zone `portal`, else its middle).
+- **Look and sound** (each optional, drawn and heard only): `air` (an `Ambience`), `music` (a `MusicTrack`; a living boss's music still comes first), `light` (a palette material, docs/STYLE.md, never a player's or Blight; empty: the spark's), `light_tint` (0 to `RoomKind.LIGHT_TINT_MOST`), `air_motes` (a `MoteSource`, the rules of `RoomBase.problems_of_air`).
+- **Its symbol:** `symbol`, a 7 × 7 picture as text, a row a line, `#` its light's lit shade, `+` its base shade, `.` none; shown on a bridge's mouth and the Y map. Empty: nothing told (a secret room). `problems()` names a symbol that is not 7 rows of 7 or has another character.
+- **A new kind is a new file and a line in a run's kind table;** a new way of filling, entering or ending is engine work (one more of `FILLS`, `DOORS` or `ENDS` and its behaviour), never a change to the generator.
 - `RoomKind.problems()` must be empty (`tests/content/runs/test_runs.gd`, through `Registry.validate_runs()`).
 
 | Kind | Fill | What it is |
 | --- | --- | --- |
-| `fight` | `enemies` | a fight: its enemies stand as it starts, and it is cleared when they are down; rewards from `clear` |
-| `boss` | `boss` | the boss's room: in a biome its gate (`door = gate`) and, cleared, the portal home; rewards from `boss` |
-| `start` | `none` | a biome's start room (connected biomes CB5, `MapRules.start_kind`): a small safe slab where the party arrives; hosted by `crypt_start` (CB8), cleared as it is entered |
-| `reward` | `none` | a reward room (CB11): each wizard's reward from `reward` as the party steps in; `crypt_reward` |
-| `shop` | `shop` | the shop (CB11, decision 19): its shelf from `shelf`, one of each, first buyer takes it; `crypt_shop` |
-| `fountain` | `fountain` | a fountain (CB11, decision 20): a shared pool of healing; `crypt_fountain` |
-| `treasure` | `none` | a treasure room behind a key door (CB11, decision 21): rewards from `treasure`; `crypt_treasure` |
-| `secret` | `none` | a secret room behind cracked rock that one element breaks (CB11, decision 22): rewards from `secret`; `crypt_secret_a`, `crypt_secret_b` |
-| `challenge` | `elites` | a challenge room behind a gather door (CB11, decision 23): an elite fight, rewards from `challenge`; `crypt_challenge` |
+| `fight` | `enemies` | a fight, cleared when its enemies are down; rewards from `clear` |
+| `boss` | `boss` | the boss's room: its gate (`door = gate`) and, cleared, the portal home; rewards from `boss` |
+| `start` | `none` | a biome's start room (`MapRules.start_kind`), cleared as it is entered |
+| `reward` | `none` | each wizard's reward from `reward` as the party steps in |
+| `shop` | `shop` | the shop: its shelf from `shelf` |
+| `fountain` | `fountain` | a shared pool of healing |
+| `treasure` | `none` | behind a key door: rewards from `treasure` |
+| `secret` | `none` | behind cracked rock: rewards from `secret` |
+| `challenge` | `elites` | behind a gather door: an elite fight, rewards from `challenge` |
 
 ## Allowed files
 
 `.tres`, plus `.uid` and `.license` files. Limit: 1 MB per file.
+
+## Example to copy
+
+`fight.tres` (a plain fight) or `shop.tres` (a fill with a table).
+
+History and reasons: [docs/history/content-room_kinds-README.md](../../docs/history/content-room_kinds-README.md).

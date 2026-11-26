@@ -220,7 +220,7 @@ The pieces the Style Guide page shows as "this is the look", listed with what ea
 | Kind | File | What to learn from it |
 | --- | --- | --- |
 | Player character | `art/kit/golden_staff@2x.svg` (the curl's head sheet at 2x detail, player 1, pointing up and to the right, under the Optimist's eyes and neutral brows at 2x; the first art redrawn at 64×64) | A floating staff: a Wood shaft with a Spark grip wrap, a one-art-pixel outline, the player colour on the head only, the face 8 world units (16 art pixels) above the grip and drawn over the staff; the pupils look where it points |
-| Enemy | `art/kit/golden_stray.svg` (the Cinder Rod, `content/enemies/ember_imp/idle.svg`, with its face) | A stray: a charred rod with a burning crown, no player colour, eyes glowing in its element's light shade with slit pupils, angry brows |
+| Enemy | `art/kit/golden_stray.svg` (the Cinder Rod, `content/enemies/ember_imp/idle@2x.svg`, with its face) | A stray: a charred rod with a burning crown, no player colour, eyes glowing in its element's light shade with slit pupils, angry brows |
 | Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
 | Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |
 | Projectile | `art/vfx/bolt.svg` | Neutral Bone streak with a Spark core (the owner tints the Bone, the element colours the core), outlined in its own shadow shade |

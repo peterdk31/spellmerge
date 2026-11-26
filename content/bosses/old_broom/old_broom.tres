@@ -7,13 +7,13 @@
 [ext_resource type="Script" path="res://core/base/ai_profile.gd" id="5_profile"]
 [ext_resource type="Script" path="res://core/base/enemy_phase.gd" id="6_phase"]
 [ext_resource type="Script" path="res://core/base/phase_look.gd" id="7_look"]
-[ext_resource type="Texture2D" path="res://content/bosses/old_broom/head_burning.svg" id="8_burning"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/head_burning@2x.svg" id="8_burning"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="10_motes"]
 [ext_resource type="Script" path="res://core/base/actor_stats.gd" id="9_stats"]
 [ext_resource type="Script" path="res://core/base/enemy_adds.gd" id="11_adds"]
 [ext_resource type="Script" path="res://core/base/music_track.gd" id="12_music"]
 [ext_resource type="Script" path="res://core/base/boss_intro.gd" id="13_intro"]
-[ext_resource type="Texture2D" path="res://content/bosses/old_broom/portrait.svg" id="14_portrait"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/portrait@2x.svg" id="14_portrait"]
 
 [sub_resource type="Resource" id="Resource_sweep_staff"]
 script = ExtResource("3_staff")

@@ -7,7 +7,7 @@ extends "res://tests/support/screenshot.gd"
 ## second apart, `live_zaps_4x` a crop of the lightning stream.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const STARTER := preload("res://content/wizard/staffs/curl/curl.tres")
 ## Each row: the cards and where its stream starts; its dummies stand beside its line.
 const ROWS: Array = [

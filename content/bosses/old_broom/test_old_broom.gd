@@ -342,7 +342,7 @@ func test_its_own_face_and_drawn_poses() -> void:
 	check_equal(BROOM.phases[0].look.face_row, 1, "phase 2 shows the angrier row")
 	var head := body.get_node("Sprite/Head") as BodyPart
 	var burning: Texture2D = BROOM.phases[0].look.parts[&"Head"]
-	check_equal(head.texture.get_width(), head.hframes * 88, "the head's frames, 88 px each")
+	check_equal(ArtDetail.size_of(head.texture).x, float(head.hframes * 88), "the head's frames, 88 world px each (176 art px at 2x)")
 	check_equal(burning.get_width(), head.texture.get_width(), "the burning head has the same frames")
 	check_equal(burning.get_height(), head.texture.get_height(), "of the same height")
 	var frames: Dictionary = {}
@@ -422,7 +422,8 @@ func test_its_intro() -> void:
 		return
 	var sheet: Image = intro.portrait.get_image()
 	var lit: int = 0
-	var size: int = BossIntro.FRAME
+	# A frame in the sheet's own pixels (twice as many at 2x detail: ArtDetail).
+	var size: int = BossIntro.FRAME * ArtDetail.of(intro.portrait)
 	for y: int in size:
 		for x: int in size:
 			if sheet.get_pixel(BossIntro.EYES * size + x, y).a > 0.0:
@@ -436,7 +437,8 @@ func test_its_intro() -> void:
 
 ## How many rows from the top of `frame` of `sheet` the art starts, from its bottom: its height.
 static func _height(sheet: Image, frame: int) -> int:
-	var size: int = BossIntro.FRAME
+	# A frame in the sheet's own pixels: its frames are square, as tall as the sheet.
+	var size: int = sheet.get_height()
 	for y: int in size:
 		for x: int in size:
 			if sheet.get_pixel(frame * size + x, y).a > 0.0:

@@ -64,6 +64,9 @@ const TAP_TIME: float = 0.14
 var rest_position: Vector2 = Vector2.ZERO
 var rest_rotation: float = 0.0
 var rest_scale: Vector2 = Vector2.ONE
+## Art pixels a world unit of the part it hangs from (its `position` and moves are in them):
+## ArtDetail of the parent's texture, 1 under a plain node.
+var _parent_detail: float = 1.0
 var _rested: bool = false
 
 
@@ -74,7 +77,12 @@ func take_rest() -> void:
 	_rested = true
 	rest_position = position
 	rest_rotation = rotation
-	rest_scale = scale
+	# A part drawn at 2x detail (ArtDetail) is drawn at half its size: its node's scale is its
+	# detail relative to the part it hangs from, whose art pixels its place and offset are in
+	# (a 2x part under a 2x part: scale 1, its numbers in the parent's art pixels).
+	var parent_sprite := get_parent() as Sprite2D
+	_parent_detail = float(ArtDetail.of(parent_sprite.texture)) if parent_sprite != null and parent_sprite.texture != null else 1.0
+	rest_scale = scale * _parent_detail / float(ArtDetail.of(texture))
 
 
 ## Every `BodyPart` under `root` (itself left out), parents before their parts, in the tree's order,
@@ -127,7 +135,8 @@ func show_pose(body: BodyPose) -> void:
 	var shake: float = shudder * (wall + (TRANSITION_SHUDDER if body.pose == BodyPose.Pose.TRANSITION else 0.0))
 	if shake > 0.0:
 		at += Vector2(sin(body.time * SHAKE_RATE.x), cos(body.time * SHAKE_RATE.y)) * shake
-	var place: Vector2 = rest_position + at.round()
+	# Its moves are world units; its place is in its parent's art pixels.
+	var place: Vector2 = rest_position + (at * _parent_detail).round()
 	var turn: float = rest_rotation + deg_to_rad(degrees)
 	var size: Vector2 = rest_scale * stretch
 	if position != place:

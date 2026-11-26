@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## a bolt, pressed with the dummy far (the bolt) and close (the ring). `staff_conditions_play`.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const HURT: Array[StringName] = [&"when_hurt", &"frost", &"nova", &"bolt", &"bolt"]
 const CLOSE: Array[StringName] = [&"when_close", &"fire", &"nova", &"bolt", &"bolt"]
 ## Each: the cards, the wizard's seat, its health share, where it casts from (aiming right), the dummy

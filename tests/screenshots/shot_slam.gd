@@ -6,7 +6,7 @@ extends "res://tests/support/screenshot.gd"
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const STARTER := preload("res://content/wizard/staffs/curl/curl.tres")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 ## Each row: the cards and the ramp of its casters.
 const ROWS: Array = [
 	[[&"slam"], 0],

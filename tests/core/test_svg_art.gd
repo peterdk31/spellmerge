@@ -8,7 +8,7 @@ const ROOTS: Array[String] = ["res://art/tilesets", "res://art/vfx", "res://art/
 ## Files that must be found, so a broken scan cannot pass by finding nothing.
 const KNOWN: Array[String] = [
 	"res://art/tilesets/crypt/floor.svg",
-	"res://content/enemies/ember_imp/idle.svg",
+	"res://content/enemies/ember_imp/idle@2x.svg",
 	"res://art/samples/a_chunky/wizard.svg",
 	"res://art/samples/c_grim/spell_icon.svg",
 	"res://art/samples/hats_std/hat_p1.svg",

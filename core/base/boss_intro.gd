@@ -75,7 +75,8 @@ func problems(owner: String, known_cue: Callable = Callable()) -> PackedStringAr
 	if portrait == null:
 		found.append("%s: its intro has no portrait" % owner)
 	else:
-		var size: Vector2i = Vector2i(portrait.get_width(), portrait.get_height())
+		# Measured in world units: a sheet at 2x detail (ArtDetail) has twice the pixels.
+		var size: Vector2i = Vector2i(ArtDetail.size_of(portrait))
 		if size != Vector2i(FRAME * FRAMES, FRAME):
 			found.append("%s: its intro's portrait is %dx%d; %d frames of %dx%d (%dx%d)" % [owner, size.x, size.y, FRAMES, FRAME, FRAME, FRAME * FRAMES, FRAME])
 	if lines.size() > MAX_LINES:

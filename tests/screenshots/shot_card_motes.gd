@@ -9,7 +9,7 @@ extends "res://tests/support/screenshot.gd"
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 const HEAVY := preload("res://content/spells/modifiers/heavy/heavy.tres")
 ## Frames from each cell's moment to the shot (60 a second).

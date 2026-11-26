@@ -9,7 +9,7 @@
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="7_ai"]
 [ext_resource type="Script" path="res://gameplay/ai/creature_look.gd" id="8_look"]
 [ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
-[ext_resource type="Texture2D" path="res://content/enemies/rime_crook/idle.svg" id="10_idle"]
+[ext_resource type="Texture2D" path="res://content/enemies/rime_crook/idle@2x.svg" id="10_idle"]
 
 [node name="RimeCrook" type="Node2D"]
 script = ExtResource("1_actor")

@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## bent one.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const STARTER := preload("res://content/wizard/staffs/curl/curl.tres")
 ## Each row: the cards, the beam's start and the dummy it may hit (the homing one is off its line).
 const ROWS: Array = [

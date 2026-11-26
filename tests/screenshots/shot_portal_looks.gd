@@ -7,7 +7,7 @@ extends "res://tests/support/screenshot.gd"
 ## `portal_looks` is the whole screen and `portal_looks_ring` a crop of the homing row.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 ## (The homing row's dummy stands within the homing card's reach, 160 px, of the exits.)
 ## Each row: the portal's cards, the beam's cards, where both are cast from, and a dummy (INF for none).
 const ROWS: Array = [

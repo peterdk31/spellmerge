@@ -19,6 +19,7 @@ its palette colours and its silhouette, and is drawn finer in two ways:
     tools/redraw_2x.py IN.svg OUT@2x.png   # an indexed PNG, for a sheet whose rects would pass 1 MB
     tools/redraw_2x.py --blocky IN OUT     # no smoothing: small round shapes (a small face)
     tools/redraw_2x.py --detail IN OUT     # and new detail: one-pixel edge light and shadow
+    tools/redraw_2x.py --texture IN OUT    # and each material's surface (pores, grain, flecks, glints)
 
 Standard library only. Delete the 1x file after by hand (renaming its `.import`, art/README.md step
 2), so the 2x file is the art from then on: redraw it by hand or with a generator, not by running
@@ -208,11 +209,107 @@ def detail(src: Canvas) -> Canvas:
     return out
 
 
-def redraw(src: Canvas, smooth: bool = True, detailed: bool = False) -> Canvas:
-    """`src` at 2x detail: smoothed (or doubled, `smooth` false), its outside outline one art pixel,
-    and with `detailed` new detail at the finer pixels (`detail`)."""
+# Each material's surface at the finer pixels (`texture`): what its inner base-shade pixels show.
+SURFACES = {
+    "Bone": "pores",
+    "Wood": "grain",
+    "Leaf": "veins",
+    "Fire": "flicker",
+    "Ice": "glints",
+    "Water": "glints",
+    "Arc": "glints",
+    "Spark": "glints",
+    "Stone": "speckle",
+    "Void": "speckle",
+    "Blight": "speckle",
+}
+
+
+def _hash(x: int, y: int) -> int:
+    return ((x * 73856093) ^ (y * 19349663) ^ 0x5BD1E995) % 1000003
+
+
+def texture(src: Canvas, frame_width: int = 0) -> Canvas:
+    """A material's surface at the finer pixels (the owner, 2026-11-26: "texture and material"), on
+    the base-shade pixels inside a part (all four neighbours its own material), in the material's
+    own shades: bone pitted with pores (a shadow pit, its bottom-right lit), wood grain in broken
+    streaks along the part's length, leaf veins and fire flicker in light flecks, ice, gold and
+    lightning glints, stone and void speckled. Placed by a hash of the pixel's place in its frame
+    (`frame_width` wide; 0: the picture's height, square frames), so every frame of a strip has
+    the same surface and nothing jumps between frames (docs/STYLE.md, "Smooth")."""
+    shades = materials()
+    p = src.pixels
+    width = frame_width or src.height
+    out = Canvas(src.width, src.height)
+
+    def material(x: int, y: int) -> str | None:
+        colour = _at(p, x, y)
+        return shades[colour][0] if colour in shades else None
+
+    def shade(name: str, which: int) -> str:
+        return next(c for c, (n, s) in shades.items() if n == name and s == which)
+
+    # Each part (a run of one material, four ways): upright when it is at least as tall as wide.
+    part_of: list[list[int]] = [[-1] * src.width for _ in range(src.height)]
+    upright_part: list[bool] = []
+    for sy in range(src.height):
+        for sx in range(src.width):
+            name = material(sx, sy)
+            if name is None or part_of[sy][sx] >= 0:
+                continue
+            index = len(upright_part)
+            stack = [(sx, sy)]
+            part_of[sy][sx] = index
+            box = [sx, sy, sx, sy]
+            while stack:
+                cx, cy = stack.pop()
+                box = [min(box[0], cx), min(box[1], cy), max(box[2], cx), max(box[3], cy)]
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < src.width and 0 <= ny < src.height and part_of[ny][nx] < 0 and material(nx, ny) == name:
+                        part_of[ny][nx] = index
+                        stack.append((nx, ny))
+            upright_part.append(box[3] - box[1] >= box[2] - box[0])
+
+    for y in range(src.height):
+        out.pixels[y] = list(p[y])
+    for y in range(src.height):
+        for x in range(src.width):
+            colour = p[y][x]
+            if colour not in shades or shades[colour][1] != 1:
+                continue
+            name = shades[colour][0]
+            surface = SURFACES.get(name)
+            if surface is None or any(material(x + dx, y + dy) != name for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                continue
+            fx = x % width
+            h = _hash(fx, y)
+            if surface == "pores" and h % 17 == 0:
+                out.pixels[y][x] = shade(name, 0)
+                if _at(p, x + 1, y + 1) == colour:
+                    out.pixels[y + 1][x + 1] = shade(name, 2)
+            elif surface == "grain":
+                upright = upright_part[part_of[y][x]]
+                lane, along = (fx, y) if upright else (y, fx)
+                if lane % 3 == 1 and _hash(lane, along // 3) % 4 != 0:
+                    out.pixels[y][x] = shade(name, 0)
+            elif surface in ("veins", "flicker") and h % 9 == 0:
+                out.pixels[y][x] = shade(name, 2)
+            elif surface == "glints" and h % 23 == 0:
+                out.pixels[y][x] = shade(name, 2)
+            elif surface == "speckle" and h % 13 == 0:
+                out.pixels[y][x] = shade(name, 2)
+    return out
+
+
+def redraw(src: Canvas, smooth: bool = True, detailed: bool = False, textured: bool = False, frame_width: int = 0) -> Canvas:
+    """`src` at 2x detail: smoothed (or doubled, `smooth` false), its outside outline one art pixel;
+    with `detailed` new detail at the finer pixels (`detail`), with `textured` its materials'
+    surfaces too (`texture`, frames `frame_width` wide)."""
     out = thin_outline(scale2x(src)) if smooth else double(src)
-    return detail(out) if detailed else out
+    if textured:
+        out = texture(out, frame_width)
+    return detail(out) if detailed or textured else out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -221,10 +318,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("target", type=Path)
     parser.add_argument("--blocky", action="store_true", help="double without smoothing (small round shapes)")
     parser.add_argument("--detail", action="store_true", help="add detail at the finer pixels: one-pixel edge light and shadow")
+    parser.add_argument("--texture", action="store_true", help="and each material's surface (bone pores, wood grain, flecks, glints)")
+    parser.add_argument("--frame", type=int, default=0, help="a frame's width in the 2x picture (default: its height)")
     args = parser.parse_args(argv)
     if "@2x" not in args.target.stem:
         parser.error("the target's name ends in @2x (ArtDetail)")
-    art = redraw(read_svg(args.source.read_text(encoding="utf-8")), not args.blocky, args.detail)
+    art = redraw(read_svg(args.source.read_text(encoding="utf-8")), not args.blocky, args.detail, args.texture, args.frame)
     if args.target.suffix == ".png":
         args.target.write_bytes(art.png())
     else:

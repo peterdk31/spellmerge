@@ -213,7 +213,8 @@ void vertex() {
 // its quad's vertices worked out. No loops.
 
 void fragment() {
-	vec2 d = floor(px);
+	// The art pixel (ART_DETAIL a world pixel), as a world pixel's corner is (`d + 0.5` its middle).
+	vec2 d = art_centre(px) - 0.5;
 	vec4 colour = vec4(0.0);
 	if (mode < M_LIGHT + 0.5) {
 		// The light: v0.w x the falloff from v0.xy over v0.z, in c0.
@@ -226,7 +227,10 @@ void fragment() {
 		float k = q / max(v0.z, 0.5);
 		float cut = v1.w > 0.5 ? hash_seeded(d.x, d.y, 61.0, v0.x) : bayer4(d);
 		bool kept = q <= v0.z && cut < v1.x * (1.0 - k * k * v1.y);
-		vec4 rgb = q > v0.z - 1.3 && c2.a > 0.0 ? c2 : (k < v1.z ? c0 : c1);
+		// Its rim lit from the top-left (ART2): wide on the lower right, an art pixel on the upper left.
+		vec2 rel = d - floor(v0.xy);
+		float rim_width = mix(0.5, 1.3, clamp(0.5 + dot(rel / max(length(rel), 0.001), vec2(0.7071)), 0.0, 1.0));
+		vec4 rgb = q > v0.z - rim_width && c2.a > 0.0 ? c2 : (k < v1.z ? c0 : c1);
 		colour = kept ? rgb : vec4(0.0);
 	} else if (mode < M_STREAK + 0.5) {
 		// A line from v0.xy to v0.zw, v1.x either side of it, kept at v1.y; its left side c1.

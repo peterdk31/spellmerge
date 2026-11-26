@@ -30,9 +30,9 @@ void vertex() {
 }
 
 vec4 still_look(vec2 uv) {
-	// The screen pixel, the centre at 0, pixel centres on whole numbers.
+	// The screen pixel, the centre at 0, art pixels' middles (art_centre).
 	vec2 size = vec2(GRID) * zoom;
-	vec2 q = floor(uv * size) + 0.5 - size * 0.5;
+	vec2 q = art_centre(uv * size) - size * 0.5;
 	float reach = size.x * 0.5 * 0.3;
 	vec4 colour = vec4(0.0);
 	// What the cards give off: particles born at random points round it.
@@ -57,8 +57,10 @@ vec4 still_look(vec2 uv) {
 		}
 	}
 	// Its mark: a white-hot cross, a ring of its light shade one pixel round it.
-	float d = abs(q.x) + abs(q.y);
-	if (d < 1.0 || (d < 2.0 && (abs(q.x) < 1.0 || abs(q.y) < 1.0))) {
+	// Measured on the world pixel under the art pixel (ART2): the mark keeps its world shape.
+	vec2 qw = floor(q) + 0.5;
+	float d = abs(qw.x) + abs(qw.y);
+	if (d < 1.0 || (d < 2.0 && (abs(qw.x) < 1.0 || abs(qw.y) < 1.0))) {
 		return vec4(hot, 1.0);
 	}
 	if (d < 3.0 && age > 0.5) {

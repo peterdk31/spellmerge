@@ -135,7 +135,7 @@ jobs:
       && needs.release.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Shared with preview.yml's Pages job, so two deploys never overlap.
+    # Shared with preview-pages.yml's deploy, so two deploys never overlap.
     concurrency:
       group: pages
       cancel-in-progress: false

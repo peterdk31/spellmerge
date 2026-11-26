@@ -2,11 +2,13 @@
 #
 # After each merge to main (about hourly, as the develop sessions merge), the web build only
 # (build.sh --web: no unit tests or smoke tests; the daily run checks everything, and a broken
-# build is not released), then it goes to Pages at /preview/. It takes the screenshots for the
-# gallery too (about a minute), but a failed one never keeps the build off Pages. No release,
-# no itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases
-# (smbot.site --preview). A newer merge cancels a build still running, so a burst of merges
-# builds once.
+# build is not released), then it goes to Pages at /preview/ at once, in a few minutes (the
+# owner, 2026-11-26), keeping the last gallery that went out. The screenshots are a job of their
+# own beside it (most of the time: about an hour by 2026-11-26), and when they are done the site
+# goes out once more with them; a failed one never keeps the build off Pages. No release, no
+# itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases (smbot.site
+# --preview). A newer merge cancels a build or a set of screenshots still running, so a burst of
+# merges builds once.
 name: preview
 
 on:
@@ -25,7 +27,7 @@ jobs:
     name: web build
     if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20 # about 3 minutes cold on 2026-11-26 (Godot, the native module, the import, the export)
     concurrency:
       group: preview-build
       cancel-in-progress: true
@@ -48,26 +50,16 @@ jobs:
         with:
           path: ~/.cache/spellmerge-native
           key: native-${{ hashFiles('ci/build/godot.env') }}
-      - name: Virtual display for the screenshots
-        continue-on-error: true # no display: no screenshots, the build still goes out
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
-      - name: Web build, package and screenshots
+      - name: Web build and package
         env:
           VERSION: ${{ steps.plan.outputs.version }}
-        run: ci/build/build.sh --web --screenshots --version "$VERSION" --channel preview --commit "$(git rev-parse HEAD)"
+        run: ci/build/build.sh --web --version "$VERSION" --channel preview --commit "$(git rev-parse HEAD)"
       - name: Keep the build logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-logs
           path: build/logs
-          retention-days: 1
-      - name: Keep the screenshots
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: screenshots
-          path: build/screenshots
-          if-no-files-found: ignore
           retention-days: 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -79,53 +71,74 @@ jobs:
   pages:
     name: deploy the preview to Pages
     needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Shared with daily.yml's Pages job, so two deploys never overlap.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
+    uses: ./.github/workflows/preview-pages.yml
     permissions:
-      contents: read # the releases for /nightly/ and /play/
-      issues: read # Contribute page: the community queue
-      pull-requests: read # Contribute page: recently merged
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    with:
+      version: ${{ needs.build.outputs.version }}
+      gallery: false
+
+  shots:
+    name: screenshots
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: preview-shots
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: Cache Godot (hash-checked again after restore)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          name: web
-          path: dist
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        continue-on-error: true # no gallery without screenshots
+          path: ~/.cache/pinned-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
+      - name: Virtual display for the screenshots
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-vulkan-drivers
+      - name: Screenshots
+        continue-on-error: true # a failed script only warns here, as it did in the web build (the daily run fails on it)
+        run: ci/build/build.sh --quick --screenshots
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshot-logs
+          path: build/logs
+          retention-days: 1
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: screenshots
-          path: screenshots
-      - name: The Spell atlas (smbot.clips; the daily run publishes it on the screenshots branch)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        continue-on-error: true # no atlas yet: the site goes out without it
-        with:
-          ref: screenshots
-          path: published
-          sparse-checkout: atlas
-          persist-credentials: false
-      - name: Assemble the site
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.build.outputs.version }}
-        run: >-
-          python3 -m smbot.site --version "$VERSION" --preview --out site --screenshots screenshots
-          --atlas published/atlas
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: site
+          path: build/screenshots
+          if-no-files-found: ignore
           retention-days: 1
-      - id: deploy
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  gallery:
+    name: deploy the preview again with the screenshots
+    needs: [build, shots]
+    # A failed script still leaves the others' screenshots (the daily run fails on it).
+    if: always() && needs.build.result == 'success' && needs.shots.result != 'cancelled' && needs.shots.result != 'skipped'
+    uses: ./.github/workflows/preview-pages.yml
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+      pages: write
+      id-token: write
+    with:
+      version: ${{ needs.build.outputs.version }}
+      gallery: true

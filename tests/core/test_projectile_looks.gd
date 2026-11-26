@@ -706,3 +706,7 @@ func test_the_carriers_look_shaders_sample_art_pixels() -> void:
 	for id: String in ["beam", "swing", "familiar", "swap"]:
 		var code: String = FileAccess.get_file_as_string("res://content/spells/carriers/%s/%s.gdshader" % [id, id])
 		check(code.contains("art_centre("), "the %s card's look samples art pixels" % id)
+	var beam: String = FileAccess.get_file_as_string("res://content/spells/carriers/beam/beam.gdshader")
+	check(beam.contains("float band = floor(edge - x);"), "the beam's bands keep their world widths on the art grid")
+	var familiar: String = FileAccess.get_file_as_string("res://content/spells/carriers/familiar/familiar.gdshader")
+	check(familiar.contains("vec2 dw = floor(d + 0.5);") and familiar.contains("float t = floor(tn.x + 0.5);"), "the familiar's glint, eyes and tail stay on their world pixels")

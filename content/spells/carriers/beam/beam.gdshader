@@ -250,7 +250,7 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	float at = floor(along);
 	float off = off_at(along, len);
 	// Its lane across in art pixels (ART_DETAIL a world pixel; ART2), `x` in world pixels: its bands
-	// keep their world widths, its edge, core and strands an art pixel fine.
+	// keep their world widths (`band`), its core and strands an art pixel fine.
 	float xs = floor((across - off) * ART_DETAIL / max(cheb, 0.5) + 0.5);
 	float x = abs(xs) / ART_DETAIL;
 	// Its edge here: a ripple that runs down it, and a pixel more where a pulse passes, on its own
@@ -261,7 +261,10 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	float edge = bands + ripple + floor(pulse * 1.6);
 	// Its band, counted in from its edge: 0 its edge (shadow), 1 base, 2 light, 3 white-hot, more the
 	// core. A rift counts the other way round: lips bright, the dark at its middle.
-	float band = edge - x;
+	// Whole bands (ART2): an art lane in a band's half step counts as the band it lies in, so every
+	// band keeps its world width and only the core is an art pixel thin (the beam half an art pixel
+	// narrower on each side of it).
+	float band = floor(edge - x);
 	vec3 shade = band < 0.5 ? lo : (band < 1.5 ? mid : (band < 2.5 ? hi : (band < 3.5 ? hot : BONE_LIGHT)));
 	vec3 rift_shade = band < 0.5 ? hi : (band < 1.5 ? mid : (band < 2.5 ? lo : OUTLINE));
 	vec3 inner = mix(shade, rift_shade, rift);

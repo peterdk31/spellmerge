@@ -1,51 +1,61 @@
 extends "res://tests/support/suite.gd"
-## The screenshot scripts' frame switch (tests/support/drawn_frames.gd): a frame left undrawn still
-## hands out the frame's `frame_pre_draw` (once, after the frame's process), and a drawn frame is
-## left to the engine's own. A headless run draws no frame, so here every frame is one the engine
-## does not draw: with the switch on, nothing stands in.
+## The screenshot scripts' frame switch (tests/support/drawn_frames.gd): while the screen is not
+## drawn, the views redrawn and cleared every frame (a split view) are held off at the renderer, and
+## no view that keeps what it drew (the floor marks' layers) or is drawn once (a bake, a cached
+## panel); the nodes keep the modes the game gave them, and a view is let go as the screen is drawn.
 const DrawnFramesScript := preload("res://tests/support/drawn_frames.gd")
 
-var _heard: int = 0
+
+## A SubViewport in the tree, updated and cleared as given.
+func _view(update: SubViewport.UpdateMode, clear: SubViewport.ClearMode) -> SubViewport:
+	var view := own(SubViewport.new()) as SubViewport
+	view.size = Vector2i(8, 8)
+	view.render_target_update_mode = update
+	view.render_target_clear_mode = clear
+	root.add_child(view)
+	return view
 
 
-func _count() -> void:
-	_heard += 1
-
-
-func _frames_heard(frames: DrawnFramesScript, drawing: bool, count: int) -> int:
+## The switch in the tree, the screen drawn as `drawing` says.
+func _switch(drawing: bool) -> DrawnFramesScript:
+	var frames := own(DrawnFramesScript.new()) as DrawnFramesScript
+	root.add_child(frames)
 	frames.drawing = drawing
-	_heard = 0
-	RenderingServer.frame_pre_draw.connect(_count)
-	for i in count:
-		await process_frame
-	RenderingServer.frame_pre_draw.disconnect(_count)
-	return _heard
+	return frames
 
 
-func test_an_undrawn_frame_hands_out_its_pre_draw_once() -> void:
-	var frames := own(DrawnFramesScript.new()) as DrawnFramesScript
-	root.add_child(frames)
-	# The first frame's stand-in comes from its end; the count is of whole frames after it.
-	var heard: int = await _frames_heard(frames, false, 5)
-	check(heard >= 4 and heard <= 5, "about one frame_pre_draw a frame (%d in 5 frames)" % heard)
+func test_only_a_view_drawn_afresh_every_frame_is_held_off() -> void:
+	var split: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	var layer: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_NEVER)
+	var bake: SubViewport = _view(SubViewport.UPDATE_ONCE, SubViewport.CLEAR_MODE_ALWAYS)
+	var frames: DrawnFramesScript = _switch(false)
+	var held: Array[SubViewport] = frames.held()
+	check(held.has(split), "a view redrawn and cleared every frame is held off")
+	check(not held.has(layer), "a view that keeps what it drew is drawn")
+	check(not held.has(bake), "a view drawn once is drawn")
+	check_equal(split.render_target_update_mode, SubViewport.UPDATE_ALWAYS, "the node keeps the game's mode")
 
 
-func test_a_drawn_frame_is_left_to_the_engine() -> void:
-	var frames := own(DrawnFramesScript.new()) as DrawnFramesScript
-	root.add_child(frames)
-	check_equal(await _frames_heard(frames, true, 4), 0, "no stand-in while frames are drawn (headless draws none)")
+func test_a_view_added_later_is_held_off_from_the_next_frame() -> void:
+	var frames: DrawnFramesScript = _switch(false)
+	var split: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	await process_frame
+	check(frames.held().has(split), "found as it was added, held off at the frame's end")
 
 
-func test_leaving_the_tree_draws_again() -> void:
-	var frames := own(DrawnFramesScript.new()) as DrawnFramesScript
-	root.add_child(frames)
+func test_the_views_are_let_go_as_the_screen_is_drawn() -> void:
+	var split: SubViewport = _view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	var frames: DrawnFramesScript = _switch(false)
+	frames.drawing = true
+	check(frames.held().is_empty(), "nothing held while the screen is drawn")
 	frames.drawing = false
-	check(not RenderingServer.render_loop_enabled, "the render loop is off while frames are not drawn")
+	check(frames.held().has(split), "held off again once the picture is taken")
 	root.remove_child(frames)
-	check(RenderingServer.render_loop_enabled, "the render loop is on again once the switch has left")
+	check(frames.held().is_empty(), "let go as the switch leaves")
 
 
-func test_it_runs_last_and_while_paused() -> void:
-	var frames := own(DrawnFramesScript.new()) as DrawnFramesScript
-	check_equal(frames.process_priority, DrawnFramesScript.LAST, "after every other node's _process")
-	check_equal(frames.process_mode, Node.PROCESS_MODE_ALWAYS, "a paused game's frames are left undrawn too")
+func test_a_drawn_switch_holds_nothing() -> void:
+	_view(SubViewport.UPDATE_ALWAYS, SubViewport.CLEAR_MODE_ALWAYS)
+	var frames: DrawnFramesScript = _switch(true)
+	await process_frame
+	check(frames.held().is_empty(), "every view drawn as the game set it")

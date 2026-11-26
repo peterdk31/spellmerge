@@ -167,13 +167,18 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	wizard.global_position = Vector2(200.0, 180.0)
 	# The run's foes are dealt by its seed, so the first may be one that never winds up a cast (a
 	# Bone Husk strikes in reach): each is tried in turn until one is half-way through its windup.
+	# A foe that strikes in reach may hit the wizard while it is tried: its health is put back after.
 	var winding: Node2D = null
+	var wizard_health: Health = (wizard as Actor).health
+	var health_was: float = wizard_health.health
 	for candidate: Node2D in alive:
 		var was_at: Vector2 = candidate.global_position
 		if _wind_up(candidate):
 			winding = candidate
 			break
 		candidate.global_position = was_at
+		(candidate as Actor).velocity = Vector2.ZERO
+	wizard_health.reset(health_was)
 	if winding == null:
 		fail("the imp is not winding up in enemy_windup")
 		return false

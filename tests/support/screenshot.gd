@@ -24,12 +24,12 @@ extends SceneTree
 ## crypt run's own first room is any of its fight rooms, by the run's seed (run generation RG3b). A
 ## script that shows the generated run sets `pin_room = false` in its `_init()`.
 ##
-## **Only the frames a picture needs are drawn** (`drawn_frames.gd`): after the warm-up the game
-## still steps every frame, but a frame is drawn only for a picture (`grab`) and for the last
-## DRAWN_BEFORE frames of a `settle`, so waiting for a camera or a fight costs the game's step, not a
-## software renderer's 1280 x 720 picture. A script that needs every frame drawn (one that reads a
-## SubViewport it did not `grab`, or times frames) sets `draw_between = true` in its `_init()`; one
-## that needs a single frame drawn awaits `drawn()`.
+## **The screen is drawn only for a picture** (`drawn_frames.gd`): after the warm-up the game steps
+## and the engine draws every frame (the floor marks' layers, bakes and cached panels included), but
+## the screen's own 1280 x 720 picture only on a frame `grab` takes, so waiting for a camera or a
+## fight costs the game's step, not a software renderer's picture. A script that needs the screen
+## drawn every frame (one that times frames, or is watched) sets `draw_between = true` in its
+## `_init()`; one that reads a view of its own (a SubViewport) awaits `frame_drawn()` first.
 ##
 ## **The view is on the game's clock** (`Feel.fixed_view_delta`, a tick's time a frame, as the
 ## benchmark's): the camera's easing, the motes, the mist and the reveals move as far a frame as the
@@ -45,16 +45,12 @@ const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const PinnedRun := preload("res://bench/pinned_run.gd")
 const DrawnFramesScript := preload("res://tests/support/drawn_frames.gd")
 const TickScript := preload("res://core/sim/tick.gd")
-## The last frames of a `settle` that are drawn: two, so a floor baked during it shows by its end
-## (`FloorBake.step` shows a bake once a frame has been drawn after it was laid, in the next frame's
-## step) and a cached panel marked during it is drawn into its picture.
-const DRAWN_BEFORE: int = 2
 ## The room a shot's run plays while `pin_room` is on.
 const PINNED_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 ## The frames `settle()` waits when it is given none.
 var settle_frames: int = 20
-## Whether every frame is drawn (true), or only those a picture needs (false, the default).
+## Whether the screen is drawn every frame (true), or only for a picture (false, the default).
 var draw_between: bool = false
 ## Whether the shaders are compiled (Flow's play tasks run) before `take()`.
 var warm_first: bool = true
@@ -118,13 +114,9 @@ func need(names: Array[String]) -> bool:
 	return true
 
 
-## Waits `frames` frames (`settle_frames` when given none); the last DRAWN_BEFORE are drawn.
 func settle(frames: int = -1) -> void:
-	var count: int = settle_frames if frames < 0 else frames
-	for i in count:
-		_set_drawing(i >= count - DRAWN_BEFORE)
+	for i in (settle_frames if frames < 0 else frames):
 		await process_frame
-	_set_drawing(false)
 
 
 ## Waits until `condition` returns true, at most `frames` frames. Returns whether it did. Faster
@@ -139,18 +131,19 @@ func wait_for(condition: Callable, frames: int = 120) -> bool:
 
 ## The screen as it is drawn this frame.
 func grab() -> Image:
-	await drawn()
+	await frame_drawn()
 	return root.get_texture().get_image()
 
 
-## Waits until this frame is drawn (drawing it, if frames are not drawn now).
-func drawn() -> void:
+## Waits until this frame is drawn, the screen and every view with it.
+func frame_drawn() -> void:
 	_set_drawing(true)
 	await RenderingServer.frame_post_draw
 	_set_drawing(false)
 
 
-## Draw this frame (`on`), or leave it undrawn unless `draw_between` says every frame is drawn.
+## Draw the screen this frame (`on`), or leave it undrawn unless `draw_between` says it is drawn
+## every frame.
 func _set_drawing(on: bool) -> void:
 	if _drawn_frames != null:
 		_drawn_frames.drawing = on or draw_between

@@ -15,6 +15,11 @@ const SPREAD_FRAMES: int = 120
 const MEASURE: int = 240
 
 
+func _init() -> void:
+	# It times the whole frame as drawn: the screen drawn every frame.
+	draw_between = true
+
+
 func take() -> void:
 	if not need(["PlayerInput", "Flow", "Feel", "Events", "Cover"]):
 		return

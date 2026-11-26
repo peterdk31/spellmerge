@@ -1,13 +1,13 @@
 {
 	"assets": [
 		{
-			"path": "content/wizard/staffs/dev/head.svg",
+			"path": "content/wizard/staffs/dev/head@2x.png",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
-			"tool": "Claude (SVG rects written by a small generator, following the pixel rules of the starter heads, 2026-11-01)",
-			"prompt": "A sheet of 48x48 frames of a floating living staff for a top-down 32x32 pixel game, the cog head of the sandbox staff: an upright eight-tooth cog in the player colour with a dark axle hole round a gold hub, on a straight Wood shaft with a gold cap at its butt, the grip at (24, 27) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the same staff with the head in each player colour ramp (blue, rose, green, purple). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tool": "Claude (a PNG drawn by tools/head_art.py from shape and light rules, ART1's redraw at 2x detail with real detail, 2026-11-26)",
+			"prompt": "A sheet of 96x96 frames of a floating living staff at 2x detail (two art pixels a world pixel, drawn at half size in the game) for a top-down 32x32-unit pixel game: an upright eight-tooth cog in the player colour, its rim and teeth bevelled one pixel, four dark round holes and a raised ring round a domed gold hub with a dark axle, on a straight Wood shaft with grain lines and a gold butt cap. Its 48x48 sheet's shape family and about its size kept, so its tip and butt hold. Each pixel shaded by its surface's facing against the light from the top-left in three shades a material, a small Bone light glint at its brightest spot; a one-pixel dark outline round the outside and a dark seam where the head sits on the wood. The grip at (48, 54) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps, each drawn, never rotated; 4 rows, the head in each player colour ramp (blue, rose, green, purple). An indexed PNG of palette colours from docs/STYLE.md, every pixel fully clear or fully opaque."
 		}
 	]
 }

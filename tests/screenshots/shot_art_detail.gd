@@ -1,7 +1,7 @@
 extends "res://tests/support/screenshot.gd"
 ## The 1280 x 720 picture and mixed art (ART0, docs/STYLE.md, "The picture and the art's detail"):
-## the curl, redrawn at 2x detail (its head and the Optimist's face, drawn at half size), beside the
-## star, still 32-unit art drawn twice as big, in play; the room around them (enemies, props, floor:
+## the curl, redrawn at 2x detail (its head and the shared face, drawn at half size), beside the
+## star (32-unit art drawn twice as big until ART1 redrew it at 2x too), in play; the room around them (enemies, props, floor:
 ## today's art) with the curl in it, at the cameras' resting zoom, 1; and zoomed out to 0.8, as the
 ## camera holds a spread party.
 ##
@@ -31,15 +31,15 @@ func take() -> void:
 	if wizards.size() != 2:
 		fail("two wizards were not in the run (%d)" % wizards.size())
 		return
-	# Seat 2 shows its RT staff, the star (32-unit art); seat 1 its RB staff, the curl (2x).
+	# Seat 2 shows its RT staff, the star; seat 1 its RB staff, the curl (both 2x since ART1).
 	tap(1, &"staff_2")
 	for index in 2:
 		input.call("send_virtual_aim", index, Vector2(1, -1).normalized())
 	await settle()
 	var curl := wizards[0].get_node(^"Sprite") as Sprite2D
 	var star := wizards[1].get_node(^"Sprite") as Sprite2D
-	if ArtDetail.of(curl.texture) != 2 or ArtDetail.of(star.texture) != 1:
-		fail("the curl (2x) and the star (1x) are not on show (%d, %d)" % [ArtDetail.of(curl.texture), ArtDetail.of(star.texture)])
+	if ArtDetail.of(curl.texture) != 2 or ArtDetail.of(star.texture) != 2:
+		fail("the curl and the star (both 2x since ART1) are not on show (%d, %d)" % [ArtDetail.of(curl.texture), ArtDetail.of(star.texture)])
 		return
 	# Side by side, a little apart, in the room's middle.
 	var middle: Vector2 = (wizards[0].global_position + wizards[1].global_position) * 0.5

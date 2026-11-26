@@ -8,7 +8,7 @@ extends "res://tests/support/screenshot.gd"
 ## a wall of five stones (a capsule round its row), in a player's ramp. `barriers` is the sheet, `barriers_4x` its first four columns enlarged. Mote
 ## throws are random, so two runs differ in their motes.
 
-const WIZARD: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
+const WIZARD: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
 const COLUMN: float = 56.0
 const TOP: float = 70.0
 ## A wizard's hurt circle (content/wizard/base/wizard.tscn) and its middle above the feet.
@@ -39,7 +39,7 @@ func take() -> void:
 		var feet := Vector2(40.0 + c * COLUMN, TOP)
 		var sprite: Sprite2D = place(WIZARD, 1.0, feet - Vector2(16.0, 28.0))
 		sprite.region_enabled = true
-		sprite.region_rect = Rect2(0.0, 0.0, 32.0, 32.0)
+		sprite.region_rect = Rect2(Vector2.ZERO, ArtDetail.to_art(WIZARD, Vector2(32.0, 32.0)))
 		projectiles.call("set_anchor", c, feet + BODY)
 		events.emit_signal(&"barrier_changed", c, COLUMNS[c][0] as int, 30.0, 0, Vector2.ZERO, HURT)
 	# The size follows the body: a small thing's and a boss's, below.

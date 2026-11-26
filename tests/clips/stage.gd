@@ -35,12 +35,12 @@ const SHOT_CAP: int = 512
 const BOUNDS: Rect2 = Rect2(-640.0, -400.0, 1280.0, 800.0)
 const FLOOR: Texture2D = preload("res://art/tilesets/crypt/floor.svg")
 const IMP_ART: Texture2D = preload("res://content/enemies/ember_imp/idle.svg")
-const WIZARD_ART: Texture2D = preload("res://content/wizard/base/wizard_idle.svg")
+const WIZARD_ART: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
 const HATS: Array[Texture2D] = [
-	preload("res://content/wizard/base/wizard_hat_p1.svg"),
-	preload("res://content/wizard/base/wizard_hat_p2.svg"),
-	preload("res://content/wizard/base/wizard_hat_p3.svg"),
-	preload("res://content/wizard/base/wizard_hat_p4.svg"),
+	preload("res://content/wizard/base/wizard_hat_p1@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p2@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p3@2x.svg"),
+	preload("res://content/wizard/base/wizard_hat_p4@2x.svg"),
 ]
 ## Sprites stand with their feet on the node, the art is drawn this far above it.
 const SPRITE_LIFT: float = 14.0
@@ -255,9 +255,11 @@ func _wizard(player: int, at: Vector2) -> Node2D:
 	body.hframes = 4
 	body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	body.position = Vector2(0.0, -SPRITE_LIFT)
+	# At its art's size in the world (2x detail at half: ArtDetail); the hat, its child and drawn
+	# at the same detail, takes the body's scale.
+	ArtDetail.fit(body)
 	var hat := Sprite2D.new()
 	hat.texture = HATS[player % HATS.size()]
-	hat.hframes = 4
 	hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	body.add_child(hat)
 	wizard.add_child(body)

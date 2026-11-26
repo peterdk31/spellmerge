@@ -12,13 +12,13 @@ its rects would be over the 1 MB limit):
   pointing right, each drawn, never rotated, so the light stays top-left and the curl stays on top)
   by 4 player ramps, 96x96 frames, the grip at (48, 54): the 48x48 sheet's layout at two art
   pixels a world pixel.
-- `content/wizard/staffs/curl/eyes@2x.svg` and `brows@2x.svg`: the Optimist's face (a `FaceArt`,
-  the curl staff's `face`), 32x16 frames: ten eye columns (nine looks, (y + 1) * 3 + x + 1, then the
-  blink) and five brow columns (the moods), the left eye's top-left at (2, 2), the brows' at (2, 10).
+- the Optimist's face, 32x16 frames: ten eye columns (nine looks, (y + 1) * 3 + x + 1, then the
+  blink) and five brow columns (the moods), the left eye's top-left at (2, 2), the brows' at (2, 10):
+  drawn into the shared face sheets by tools/face_art.py (the curl's own face until 2026-11-26).
 - `art/kit/golden_staff@2x.svg`: the golden example at 2x, the three layered as the game does.
 
-    tools/staff_art.py           # writes the three SVGs
-    tools/staff_art.py --check   # fails when an SVG differs from what the rules draw
+    tools/staff_art.py           # writes the head sheet and the golden example
+    tools/staff_art.py --check   # fails when a file differs from what the rules draw
 
 Shapes are worked out at each pixel's middle, in world units times DETAIL; a shape's light and
 shadow come from its edges facing the top left and the bottom right; every outline is one art
@@ -415,8 +415,6 @@ def golden() -> Canvas:
 
 FILES = {
     FOLDER / "head@2x.png": curl_head,
-    FOLDER / "eyes@2x.svg": cheer_eyes,
-    FOLDER / "brows@2x.svg": brows,
     ROOT / "art/kit/golden_staff@2x.svg": golden,
 }
 

@@ -31,6 +31,15 @@ func test_it_draws_what_lies_there_until_it_goes() -> void:
 	check(_look.view_of(0).is_empty(), "nothing of it")
 
 
+## Regression (ART1's review): a staff on the ground draws its head sheet's first frame whole, in
+## the sheet's own pixels (96x96 at 2x detail), not a quarter of it.
+func test_a_head_at_2x_is_drawn_whole() -> void:
+	var star: Texture2D = preload("res://content/wizard/staffs/star/head@2x.png")
+	check_equal(GroundItemsScript.head_region(star), Rect2(0.0, 0.0, 96.0, 96.0), "a 2x frame, 96x96")
+	var made := ImageTexture.create_from_image(Image.create(768, 192, false, Image.FORMAT_RGBA8))
+	check_equal(GroundItemsScript.head_region(made), Rect2(0.0, 0.0, 48.0, 48.0), "a 1x frame, 48x48")
+
+
 func test_feel_has_one() -> void:
 	var feel: Node = root.get_node("Feel")
 	check(feel.call("ground_items") is GroundItemsScript, "Feel draws the items on the ground")

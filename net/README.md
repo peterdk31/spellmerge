@@ -24,7 +24,7 @@ Online play: host-ordered lockstep on `core/sim`'s replay machinery ([docs/miles
 
 ## How a run goes
 
-Joining is in the hub only (`hub_changed`); each return to the hub is a new recording. **Seats are the host's to give, only between ticks** (SEAT_ASK by a number 0-3, answered with LOBBY). Each host tick uses a seat's newest walk/aim/held and all presses/commands; **with none arrived the last frame stands in without presses and commands; the host never waits.** Whoever holds a session calls **`after_tick()` after every tick**.
+Joining is in the hub only (`hub_changed`): a machine coming while the party is out is turned away before anything of it is read; a link past the third guest is closed. Each return to the hub is a new recording. **Seats are the host's to give, only between ticks** (SEAT_ASK by a number 0-3, answered with LOBBY). Each host tick uses a seat's newest walk/aim/held and all presses/commands; **with none arrived the last frame stands in without presses and commands; the host never waits.** Whoever holds a session calls **`after_tick()` after every tick**.
 
 ## Contract
 

@@ -14,6 +14,10 @@ wobble_rate = 9.0
 glow = 0.3
 shade_from = 1
 shape = "#"
+shape_2x = "
+##
+.#
+"
 shape_play = "life"
 count = 1
 speed = Vector2(6.0, 30.0)

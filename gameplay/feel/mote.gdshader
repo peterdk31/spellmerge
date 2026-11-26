@@ -18,9 +18,11 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   in any frame and any way it turns: `Motes.reach_of`), its shape (frames, how they play: 0
 //   life, 1 loop, 2 pick; frames a second; 1 when it turns with its flight) and its light (x: 1
 //   for a kind drawn only where light falls, `MoteKind.lit_only`; y: how much the world's stirs
-//   move it, `MoteKind.stirred`), and their shapes as
-//   `shape_atlas`: SHAPE_SIZE squares, a kind's frames along its row, each pixel 0 none, 0.5 its
-//   shade, 1 the shade hotter;
+//   move it, `MoteKind.stirred`; z: the art pixels a world unit its shape is drawn at,
+//   `MoteKind.detail`: 2 for a kind drawn at the art's detail, `shape_2x`, ART2), and their shapes as
+//   `shape_atlas`: SHAPE_CELL squares, a kind's frames along its row (a shape at 1x in the middle of
+//   its square), each pixel 0 none, 0.5 its shade, 1 the shade hotter. A kind at 2x stands on art
+//   pixels (half world units) and its shape, reach and glow are counted in them;
 // - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
 //   and its caster's ramp; any other ramp (a room's walls) is a row of `ramp_table` (white-hot,
 //   light, base, shadow across).
@@ -78,13 +80,14 @@ uniform vec4 lit_steps = vec4(0.12, 0.16, 0.305, 0.45);
 uniform float lit_hue = 0.6;
 
 // Motes.LIFE_MAX, SOURCE_CODE, KIND_CODE, HEIGHT_MAX, MAX_KINDS, EXACT_SOURCE, TABLE_SOURCE;
-// MoteKind.SHAPE_SIZE.
+// MoteKind.SHAPE_SIZE and SHAPE_CELL.
 const float LIFE_MAX = 4.0;
 const float SOURCE_CODE = 128.0;
 const float KIND_CODE = 255.0;
 const float HEIGHT_MAX = 63.75;
 const int MAX_KINDS = 256;
 const int SHAPE_SIZE = 5;
+const int SHAPE_CELL = 11;
 const float EXACT_SOURCE = 8.0;
 const float TABLE_SOURCE = 16.0;
 // How far a hot mote's glow reaches past its shape.
@@ -100,7 +103,7 @@ const float RISE_SPEED = 2.0;
 // and the world pixel drawn. A lit-only mote: 1 (else 0), the shade its life allows now (0 white-hot
 // ... 3 shadow), and its base and shadow shades (m_hot and m_rgb are then its white-hot and light
 // ones). The small ones go together in a vector (`m_cell_turn`: the shape's square, then the turn;
-// `m_shade`: the glow, the lit-only flag, the life's shade), since the Vulkan renderer gives every
+// `m_shade`: the glow, the lit-only flag, the life's shade, the art pixels a world unit), since the Vulkan renderer gives every
 // varying a slot of its own and a GPU has 32 (2026-11-22, D1: 33 failed to compile there).
 varying flat vec2 m_at;
 // Where a lit-only mote is in the world (as drawn): the light it reads.
@@ -108,7 +111,7 @@ varying flat vec2 m_world;
 varying flat vec3 m_rgb;
 varying flat vec3 m_hot;
 varying flat vec4 m_cell_turn;
-varying flat vec3 m_shade;
+varying flat vec4 m_shade;
 varying vec2 m_px;
 varying flat vec3 m_mid;
 varying flat vec3 m_lo;
@@ -175,7 +178,7 @@ void vertex() {
 	m_rgb = vec3(0.0);
 	m_hot = vec3(0.0);
 	m_cell_turn = vec4(0.0, 0.0, 1.0, 0.0);
-	m_shade = vec3(0.0, 0.0, 3.0);
+	m_shade = vec4(0.0, 0.0, 3.0, 1.0);
 	m_mid = vec3(0.0);
 	m_lo = vec3(0.0);
 	vec4 light_of = alive ? texelFetch(kind_table, ivec2(3, k), 0) : vec4(0.0);
@@ -196,7 +199,9 @@ void vertex() {
 		}
 		vec2 seen = at.xy - vec2(0.0, at.z);
 		m_world = seen;
-		vec2 pixel = floor(seen);
+		// Its art pixel (a world pixel at 1x, half of one at 2x): every place below is in them.
+		float detail = max(light_of.z, 1.0);
+		vec2 pixel = floor(seen * detail);
 		// Cooling: evenly from its first shade down to shadow over its life.
 		float shade_from = sway.z;
 		int shade = int(min(shade_from + floor(t / life * (4.0 - shade_from)), 3.0));
@@ -206,7 +211,7 @@ void vertex() {
 		frame = mod(clamp(frame, 0.0, 1.0e6), frames);
 		// Turned with its way (8 ways), read over the last moment; at rest, the way it was thrown.
 		vec2 turn = vec2(1.0, 0.0);
-		float reach = float(SHAPE_SIZE / 2);
+		float reach = detail > 1.5 ? float(SHAPE_CELL / 2) : float(SHAPE_SIZE / 2);
 		if (shape.w > 0.5) {
 			vec3 before = mote_flight(from, vel, h0, vz, t - TURN_LOOK, motion, sway, s);
 			vec2 way = seen - (before.xy - vec2(0.0, before.z));
@@ -221,14 +226,15 @@ void vertex() {
 		// A glowing mote's quad holds its glow (as far from its pixel for every shape); one
 		// with none only its shape's pixels (P1c: most motes are a pixel or two, and their
 		// fragments were most of their cost).
-		reach = lit > 0.0 ? reach + GLOW_REACH : sway.w;
+		reach = lit > 0.0 ? reach + GLOW_REACH * detail : sway.w;
 		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
 		vec2 p = mix(pixel - reach, pixel + 1.0 + reach, corner);
-		VERTEX = p;
+		VERTEX = p / detail;
 		m_px = p;
 		m_at = pixel;
 		m_shade.x = lit;
-		m_cell_turn = vec4(vec2(frame, float(k)) * float(SHAPE_SIZE), turn);
+		m_shade.w = detail;
+		m_cell_turn = vec4(vec2(frame, float(k)) * float(SHAPE_CELL), turn);
 		if (!lit_only) {
 			m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, shade);
 			m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, max(shade - 1, 0));
@@ -249,7 +255,7 @@ void fragment() {
 	vec2 d = floor(m_px) - m_at;
 	// The shape's pixel this one is: turned back by its way, to the nearest pixel.
 	vec2 q = round(vec2(m_cell_turn.z * d.x + m_cell_turn.w * d.y, -m_cell_turn.w * d.x + m_cell_turn.z * d.y));
-	float half_size = float(SHAPE_SIZE / 2);
+	float half_size = float(SHAPE_CELL / 2);
 	float mark = 0.0;
 	if (abs(q.x) <= half_size && abs(q.y) <= half_size) {
 		mark = texelFetch(shape_atlas, ivec2(m_cell_turn.xy + q + half_size), 0).r;
@@ -275,6 +281,6 @@ void fragment() {
 		COLOR = vec4(m_rgb, 1.0);
 	} else {
 		// The glow round a hot mote: light added, no alpha.
-		COLOR = vec4(m_rgb * m_shade.x * 0.5 * falloff(length(d), half_size + GLOW_REACH), 0.0);
+		COLOR = vec4(m_rgb * m_shade.x * 0.5 * falloff(length(d), (float(SHAPE_SIZE / 2) + GLOW_REACH) * m_shade.w), 0.0);
 	}
 }

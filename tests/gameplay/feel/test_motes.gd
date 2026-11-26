@@ -264,6 +264,7 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 		var mine: float = float(constants[name])
 		check(code.contains("const float %s = %s;" % [name, ("%.2f" % mine).trim_suffix("0") if not is_equal_approx(mine, roundf(mine)) else "%.1f" % mine]), "the shader's %s is mote.gd's (%s)" % [name, mine])
 	check(code.contains("const int SHAPE_SIZE = %d;" % MoteKind.SHAPE_SIZE), "the shader's SHAPE_SIZE is MoteKind's")
+	check(code.contains("const int SHAPE_CELL = %d;" % MoteKind.SHAPE_CELL), "the shader's SHAPE_CELL is MoteKind's")
 	check(code.contains("vec4 shape = texelFetch(kind_table, ivec2(2, k), 0);"), "and reads every kind's shape from its row")
 
 
@@ -328,7 +329,7 @@ func test_a_shapes_reach_is_as_far_as_its_pixels() -> void:
 	var reaches: Array[float] = [motes.kind_numbers(0)[1].w, motes.kind_numbers(1)[1].w, motes.kind_numbers(2)[1].w]
 	check_equal(reaches, [0.0, 1.0, 3.0] as Array[float], "the shader is handed each kind's reach")
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
-	check(code.contains("reach = lit > 0.0 ? reach + GLOW_REACH : sway.w;"), "and draws a mote with no glow that far")
+	check(code.contains("reach = lit > 0.0 ? reach + GLOW_REACH * detail : sway.w;") and code.contains("VERTEX = p / detail;"), "and draws a mote with no glow that far, in its art pixels")
 
 
 func test_a_shapes_frames_play_as_its_kind_says() -> void:
@@ -1213,3 +1214,48 @@ func _body_of(texture: Texture2D, at: Vector2, scale: float) -> Sprite2D:
 	body.add_child(sprite)
 	root.add_child(body)
 	return sprite
+
+
+## ART2: a kind may be drawn at the art's detail (`shape_2x`, two art pixels a world unit): its frames
+## in the atlas at SHAPE_CELL, its reach in art pixels and its detail in its row; a kind at 1x sits
+## in the middle of its square as it did, so it draws the same.
+func test_a_shape_at_2x_is_drawn_in_art_pixels() -> void:
+	var fine := _kind(&"fine")
+	fine.shape = "##o\n\n#"
+	fine.shape_2x = "...#oo\n####oo\n\no#\n##"
+	check_equal(fine.detail(), 2, "a kind with a 2x shape is drawn at 2")
+	check_equal(fine.drawn_frames().size(), 2, "its 2x frames are the ones drawn")
+	var c: int = MoteKind.SHAPE_CELL / 2
+	var head: PackedByteArray = fine.cell_pixels(0)
+	check_equal(head[(c + 1) * MoteKind.SHAPE_CELL + c], MoteKind.PIXEL_BODY, "centred on the mote: the left and upper of the two middles")
+	check_equal(head[c * MoteKind.SHAPE_CELL + c + 2], MoteKind.PIXEL_HOT, "the hot head ahead, on the mote's row")
+	check_equal(fine.problems(), PackedStringArray(), "a fine 2x shape")
+	check_equal(MotesScript.reach_of(fine), 3, "its reach in art pixels")
+	var plain := _kind(&"plain")
+	plain.shape = "##o"
+	check_equal(plain.detail(), 1, "a kind with no 2x shape is drawn at 1")
+	var middle: PackedByteArray = plain.cell_pixels(0)
+	check(middle[c * MoteKind.SHAPE_CELL + c] == MoteKind.PIXEL_BODY and middle[c * MoteKind.SHAPE_CELL + c + 1] == MoteKind.PIXEL_HOT, "a 1x shape in the middle of its square")
+	check_equal(MotesScript.reach_of(plain), 1, "its reach in world pixels, as before")
+	var motes: MotesScript = _pool(1024, [plain, fine])
+	check_equal(motes.kind_numbers(0)[3].z, 1.0, "the shader is told a 1x kind's detail")
+	check_equal(motes.kind_numbers(1)[3].z, 2.0, "and a 2x kind's")
+	check_equal(motes.shape_value(0, 0, MoteKind.SHAPE_SIZE / 2 + 1, MoteKind.SHAPE_SIZE / 2), MoteKind.PIXEL_HOT, "the atlas holds a 1x frame in its square's middle")
+	check_equal(motes.shape_value(1, 1, c, c), MoteKind.PIXEL_HOT, "and a 2x frame across its square")
+	var wrong := _kind(&"wrong")
+	wrong.shape = "#\n\n#"
+	wrong.shape_2x = "##"
+	check(not wrong.problems().is_empty(), "a 2x shape has as many frames as its 1x one")
+	wrong.shape_2x = "############\n\n#"
+	check(not wrong.problems().is_empty(), "and at most SHAPE_CELL art pixels a row")
+	wrong.shape_2x = "#x\n\n#"
+	check(not wrong.problems().is_empty(), "and only the shape's marks")
+
+
+## ART2: every kind that a spell, a hit or a cue throws is drawn at the art's detail.
+func test_the_spells_kinds_are_drawn_at_2x() -> void:
+	for id: String in ["spark", "ember", "fleck", "glimmer", "murk", "droplet", "wisp", "tail", "tail_long", "tail_streak", "streak", "glob", "drain", "bit", "ash", "dust", "smoke", "ward", "rising", "seam"]:
+		var kind: MoteKind = load("res://content/motes/%s.tres" % id) as MoteKind
+		check(kind != null and kind.detail() == 2, "%s has its 2x shape" % id)
+		if kind != null:
+			check_equal(kind.problems(), PackedStringArray(), "%s's shapes are fine" % id)

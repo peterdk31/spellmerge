@@ -8,6 +8,11 @@ extends "res://tests/support/suite.gd"
 ##   the soaked set off Current, and its kills are the atom's caster's (`kill_landed` with its tag).
 ## - **Ice bridge** (build 4): a fountain's puddle; a frost bolt over it freezes its way; who stands
 ##   on the ice is chilled, never frozen; a fire bolt over it thaws it to water, for the lake.
+## - **Oil and a match** (build 2, docs/milestones/oil-spill.md): an oil spray lays oil down a
+##   corridor as its caster walks it; one fire atom across it and the corridor burns end to end;
+##   whoever stands in it is struck as the atom's caster's, and a kill there is that caster's.
+## - **The fire road** (build 3): a dash with Oil lays a lane of oil behind its caster; a second
+##   staff's fire bolt lights it: a line of fire along the dash's way.
 const Kit := preload("res://tests/gameplay/cover/cover_kit.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const FLOOR: CoverKind = preload("res://content/cover/floor/floor.tres")
@@ -187,3 +192,74 @@ func test_a_kill_by_the_lakes_current_is_the_lighters() -> void:
 		check(_kills[0][1] == weak, "its")
 		check_equal(_kills[0][0], 3, "the lighter's kill")
 		check_equal(_kills[0][2], tag, "with its spell's tag (on kill hears it)")
+
+
+## The cells of the lane y = `y` from x = `from` to `to` (world px) in the state `state_id`.
+func _lane_in(y: float, from: float, to: float, states: Array[StringName]) -> int:
+	var found: int = 0
+	var x: float = from
+	while x <= to:
+		if states.has(_state_at(Vector2(x, y))):
+			found += 1
+		x += 16.0
+	return found
+
+
+func test_build_2_oil_and_a_match() -> void:
+	var lane: float = 72.0
+	var sprayer: Actor = _caster(Vector2(16.0, lane), [&"oil", &"spray"], Vector2.RIGHT)
+	for n in 4:
+		check(sprayer.caster.cast(0), "the oil spray pours (%d)" % n)
+		_tick(30)
+		sprayer.position += Vector2(48.0, 0.0)
+	_kit.world.actors.erase(sprayer)
+	sprayer.free()
+	_tick(20)
+	var oiled: int = _lane_in(lane, 24.0, 232.0, [&"oiled"] as Array[StringName])
+	check(oiled >= 12, "the corridor is oiled (%d of 14 cells)" % oiled)
+	var crowd: Array[Actor] = []
+	for x in [120.0, 160.0, 200.0]:
+		crowd.append(_dummy(Vector2(x, lane), 1000.0))
+	var weak: Actor = _dummy(Vector2(216.0, lane), 3.0)
+	var match_caster: Actor = _caster(Vector2(40.0, lane - 40.0), [&"fire", &"atom"], Vector2.DOWN)
+	check(match_caster.caster.cast(0), "one fire atom across the oil")
+	# Three seconds (the fixture's tick is 1/16 s): the fire has run its length, and burns 6.
+	_tick(48)
+	var burning: int = _lane_in(lane, 24.0, 232.0, [&"burning", &"catching"] as Array[StringName])
+	check(burning >= oiled - 1, "the corridor burns end to end (%d of %d)" % [burning, oiled])
+	var struck: Array[Node] = _struck_bodies()
+	for body in crowd:
+		check(struck.has(body), "who stands in it is struck")
+	for heard: Array in _struck:
+		check_equal(heard[0], match_caster.caster_number(), "as the atom's caster's")
+	var killed: bool = false
+	for heard: Array in _kills:
+		if heard[1] == weak:
+			killed = true
+			check_equal(heard[0], match_caster.caster_number(), "the kill is the atom's caster's")
+	check(killed, "the weak one standing in it died, a kill that counts")
+	var sight := CoverSight.new()
+	_kit.cover.look(Vector2(160.0, lane), 48.0, sight)
+	check(sight.harms(Vector2(160.0, lane)), "the enemies will not walk into it")
+
+
+func test_build_3_the_fire_road() -> void:
+	var dasher: Actor = _kit.world.actor(Vector2(24.0, 88.0), [&"caster", &"mover"], Fixture.Scripted.new(), [[&"oil", &"dash"] as Array[StringName]])
+	dasher.aim = Vector2.RIGHT
+	var start: float = dasher.position.x
+	check(dasher.caster.cast(0), "the oil dash")
+	_tick(16)
+	var end: float = dasher.position.x
+	check(end - start >= 64.0, "it moved (%s px)" % (end - start))
+	# Its lane is where its body's middle went.
+	var lane: float = (dasher.global_position + dasher.body_offset).y
+	_kit.world.actors.erase(dasher)
+	dasher.free()
+	var laid: int = _lane_in(lane, start + 16.0, end - 8.0, [&"oiled"] as Array[StringName])
+	check(laid >= 3, "a lane of oil behind it (%d cells)" % laid)
+	var lighter: Actor = _caster(Vector2(start + 24.0, lane - 48.0), [&"fire", &"bolt"], Vector2.DOWN)
+	check(lighter.caster.cast(0), "a second staff's fire bolt across it")
+	_tick(32)
+	var fire: int = _lane_in(lane, start + 16.0, end - 8.0, [&"burning", &"catching"] as Array[StringName])
+	check(fire >= laid, "a wall of fire drawn by moving (%d of %d)" % [fire, laid])
+	check_equal(_kit.cover.room().actor_at(_kit.cover.layout.cell_of(Vector2(end - 16.0, lane))), lighter.caster_number(), "the lighter's")

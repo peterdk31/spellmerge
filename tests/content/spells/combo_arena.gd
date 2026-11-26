@@ -19,6 +19,11 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const CoverScript := preload("res://gameplay/cover/cover.gd")
+const FLOOR_KIND: CoverKind = preload("res://content/cover/floor/floor.tres")
+## The floor's room (`use_floor`; a room with nothing in it is a screen, 640 x 360): round the
+## caster, who stands at (0, 0) and aims along +x.
+const FLOOR_ROOM: Rect2 = Rect2(-160.0, -180.0, 640.0, 360.0)
 
 const STEP: float = 1.0 / 60.0
 ## Health of an imp, high enough that no combo kills it by accident.
@@ -66,6 +71,9 @@ var spawns: Array = []
 var pushable: bool = false
 ## Seconds of arena time that have passed.
 var time: float = 0.0
+## The floor's cover (`use_floor`; null without): the real cover area with the `floor` kind, stepped
+## after Combat, so what lands on the floor and what burns there plays as in the game.
+var cover: CoverScript = null
 
 var _walls: Array[Rect2] = []
 ## Enemy shots sent so far (`shoot_at`): each goes from a staff of its own, so none waits for another's cooldown.
@@ -112,8 +120,29 @@ func add_imp(at: Vector2, health: float = IMP_HEALTH, offset: Vector2 = Vector2.
 	_root.add_child(imp)
 	imp.global_position = at
 	combat.register_actor(imp, health, IMP_RADIUS, 0, offset)
+	if cover != null:
+		# An actor of the table, so the floor's statuses and strikes reach it.
+		var id: int = projectiles.actors.open(ActorSeats.ActorsScript.TEAM_ENEMIES, ActorSeats.ActorsScript.RAMP_ENEMY)
+		projectiles.actors.set_node(id, imp)
 	imps.append(imp)
 	return imp
+
+
+## Lays the floor's cover under the arena (FLOOR_ROOM; a combo's `floor`): call it before adding imps,
+## which then stand in it as actors of the table.
+func use_floor() -> void:
+	var layout := _own(Node2D.new()) as Node2D
+	layout.position = FLOOR_ROOM.position
+	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i.ZERO)
+	cover = _own(CoverScript.new()) as CoverScript
+	cover.events = bus
+	cover.actors = projectiles.actors
+	cover.registry = registry
+	cover.sim = Sim.seeded(7)
+	cover.use_kinds([FLOOR_KIND] as Array[CoverKind])
+	_root.add_child(cover)
+	bus.room_built.emit(&"combo_floor", 0, layout)
+	bus.room_entered.emit(&"combo_floor", 0)
 
 
 ## Puts a body for the actor `player` at `at` that Combat knows (so a barrier on it works) and
@@ -256,6 +285,8 @@ func run(seconds: float) -> void:
 		combat.step(STEP)
 		if entities != null:
 			entities.step(STEP)
+		if cover != null:
+			cover.step(STEP)
 		if pushable:
 			for imp in imps:
 				if is_instance_valid(imp):

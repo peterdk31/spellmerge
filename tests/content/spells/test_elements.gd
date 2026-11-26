@@ -27,7 +27,8 @@ func test_every_status_an_element_names_is_one_combat_knows() -> void:
 	combat.register_actor(enemy, 10, 5.0)
 	for element: ElementBase in _elements:
 		if element.status_id == &"":
-			check(element.heals, "%s names no status, so it heals" % element.id)
+			# Its point is elsewhere: it heals (Mend), or the floor answers it (Oil).
+			check(element.heals or _floor_answers(element.id), "%s names no status, so it heals or the floor answers it" % element.id)
 			continue
 		check(combat.apply_status(0, enemy, element.status_id, element.status_duration, element.status_strength), "%s: combat accepts %s" % [element.id, element.status_id])
 
@@ -41,3 +42,15 @@ func test_the_elements_have_different_statuses_and_tints() -> void:
 			statuses[element.status_id] = element.id
 		check(not tints.has(element.tint), "%s's tint is its own (also %s)" % [element.id, tints.get(element.tint, "")])
 		tints[element.tint] = element.id
+
+
+## True when a kind of ground cover has a row for `element` (content/cover/: a `CoverTrigger` it moves by).
+func _floor_answers(element: StringName) -> bool:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	for kind: Resource in registry.get_all(&"cover"):
+		for state: CoverState in (kind as CoverKind).states:
+			for trigger: CoverTrigger in state.triggers:
+				if trigger.when == CoverTrigger.When.ELEMENT and trigger.element == element:
+					return true
+	return false

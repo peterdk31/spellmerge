@@ -130,6 +130,15 @@ func test_a_dash_touches_its_way() -> void:
 	check(cells.size() >= 3, "the cells along its way (%d)" % cells.size())
 
 
+## A spray pours (docs/milestones/oil-spill.md): it strikes its cone at once, with no shot, and
+## touched nothing before; now it passes along its middle and touches its cone's end.
+func test_a_spray_pours_along_its_middle_and_over_its_end() -> void:
+	_cast([&"oil", &"spray"])
+	_world.run(2)
+	check(_cells_of(&"oil").size() >= 3, "the cells along its middle (%d)" % _cells_of(&"oil").size())
+	check_equal(_touched, 1, "and one touch where it pours, over its cone's end")
+
+
 func test_a_swing_touches_along_its_tip() -> void:
 	_cast([&"fire", &"swing"])
 	_world.run(40)

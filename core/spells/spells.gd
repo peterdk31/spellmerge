@@ -2096,12 +2096,22 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 
 ## Each element of `spell` touched the floor within `radius` of `at` (`floor_touched`, ground cover
 ## GC5, rule 5: one event an element, in its infusions' order), for whatever lies on the floor (the
-## cover area). Nothing for a spell of no element.
+## cover area); a spell with Spill touches its strength wider (docs/milestones/oil-spill.md). Nothing
+## for a spell of no element.
 func _touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float, tag: int) -> void:
 	if events == null or spell == null or not at.is_finite():
 		return
+	var wide: float = maxf(radius, 0.0) + spell.behaviour(ModifierBase.Behaviour.SPILL)
 	for element: StringName in spell.element_ids:
-		events.floor_touched.emit(actor, element, at, maxf(radius, 0.0), tag)
+		events.floor_touched.emit(actor, element, at, wide, tag)
+
+
+## A carrier of `spell` that only passes over the floor (a dash, a swing, a beam) landed at `at`:
+## with Spill its elements touch the floor Spill's strength round it (`_touch_floor`); nothing
+## without (its passing touches are its own, `_pass_floor`).
+func _spill(spell: CompiledSpell, actor: int, at: Vector2, tag: int) -> void:
+	if spell != null and spell.behaviour(ModifierBase.Behaviour.SPILL) > 0.0:
+		_touch_floor(spell, actor, at, 0.0, tag)
 
 
 ## The shots the projectile manager's last step handed back as entering a new floor cell

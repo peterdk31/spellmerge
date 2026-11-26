@@ -153,7 +153,9 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int, walled: bool = fa
 	kit.cast_as(caster, kit.projectiles.get_seq_of(caster) if caster >= 0 else 0)
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.cast_done()
-	kit.blast(spell, tag, actor, at)
+	# A pull whose hit spent its shot touches as that shot's end would (`_touch_end`, held back for
+	# the arrival); a dash or a teleport touched its way, and lands only with a blast or Spill.
+	kit.land(spell, tag, actor, at, 0.0 if kit.carrier_of(spell).has(Carrier.MOVES_CASTER) else spell.radius)
 	for event: int in WALL_THEN_EXPIRE if walled else EXPIRE_ONLY:
 		for trigger in spell.triggers:
 			if trigger.event == event:

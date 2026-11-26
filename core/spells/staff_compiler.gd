@@ -148,7 +148,9 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 		elif card is CarrierCard:
 			var carrier_card := card as CarrierCard
 			var on: Carrier = Carriers.of(carrier_card.carrier)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up)
+			# An infusion that counts there (a blast's carries one too): what a spill needs.
+			var infused: bool = not _elements_on(on, elements, modifiers).is_empty()
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up, infused)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
 			spell.slot = slot
@@ -264,8 +266,9 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
 ## every carrier. `payload`: the carrier is a payload's, which adds no
 ## wind-down to a staff. `wind_up`: its carrier card's wind-up; with a
-## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
-static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
+## charge kept on it the carrier winds up too, so a shorter wind-up counts there. `infused`: an
+## infusion counts on it (what a spill needs, `Carrier.works`).
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0, infused: bool = false) -> Array[ModifierBase]:
 	var deflects: bool = false
 	var blasts: bool = false
 	for modifier in modifiers:
@@ -283,7 +286,7 @@ static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: 
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up, held)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts, infused) and _numbers_count(modifier, on, blasts, payload, winds_up, held)
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -331,7 +334,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false)
+		return on.works(modifier.behaviour, false, false) and _numbers_count(modifier, on, false, false, false)
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:

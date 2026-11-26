@@ -27,6 +27,7 @@ const MATERIALS: Dictionary[StringName, Array] = {
 	&"arc": [Color("3f6b10"), Color("b4e82a"), Color("eeffa6")],
 	&"mana": [Color("161c55"), Color("2c3aa8"), Color("6f86f0")],
 	&"leaf": [Color("2f4022"), Color("5b7233"), Color("a0ad55")],
+	&"oil": [Color("211a1e"), Color("4a3729"), Color("b88a3e")],
 	&"blight": [Color("4d3f12"), Color("a68a2a"), Color("e3cf6b")],
 	&"player_1": [Color("1d3a6b"), Color("3b73c9"), Color("7fc0f0")],
 	&"player_2": [Color("7a2347"), Color("d9477a"), Color("f59ab8")],

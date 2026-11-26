@@ -197,3 +197,159 @@ func test_only_wet_floor_carries_lightning() -> void:
 		var carries: bool = state.on_element(&"lightning") != &""
 		check_equal(carries, state.state_id == &"wet", "%s carries lightning only if it is wet" % state.state_id)
 
+
+
+# --- Oil (docs/milestones/oil-spill.md) -------------------------------------------------------
+
+func _oil_block(x: int, y: int, w: int, h: int) -> void:
+	_touch_block(&"oil", x, y, w, h)
+	_kit.wait(0.4)
+
+
+func test_oil_coats_it_lies_long_and_soaks_in() -> void:
+	var cell: int = _kit.cell(4, 4)
+	_kit.touch(&"oil", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"oiling", "the oil spreads in")
+	_kit.wait(0.3)
+	check_equal(_kit.state_of(cell), &"oiled", "oiled")
+	check(not FLOOR.states[FLOOR.state_at(&"oiled")].gives(), "oil gives nothing to who stands in it")
+	_kit.wait(20.0)
+	_kit.touch(&"oil", _kit.middle(cell))
+	_kit.wait(20.0)
+	check_equal(_kit.state_of(cell), &"oiled", "more oil keeps it oiled (its time from 0)")
+	_kit.wait(10.2)
+	check_equal(_kit.state_of(cell), &"soaking", "it soaks in after 30 s")
+	_kit.wait(0.6)
+	check_equal(_kit.state_of(cell), &"dry", "and the floor is dry")
+
+
+func test_fire_lights_oil_and_runs_through_joined_oil_and_no_further() -> void:
+	_oil_block(2, 2, 8, 1)
+	_oil_block(12, 2, 2, 1)
+	var tag: int = SpellTag.make(2, 1, 0, 0)
+	_kit.world.bus.floor_touched.emit(2, &"fire", _kit.middle(_kit.cell(2, 2)), 0.0, tag)
+	_kit.steps(1)
+	check_equal(_kit.state_of(_kit.cell(2, 2)), &"catching", "the oil catches")
+	_kit.wait(2.5)
+	for x in range(2, 10):
+		var state: StringName = _kit.state_of(_kit.cell(x, 2))
+		check(state == &"burning" or state == &"catching", "the fire ran to cell %d (%s)" % [x, state])
+	check_equal(_kit.cover.room().actor_at(_kit.cell(9, 2)), 2, "a cell the fire ran to is its lighter's")
+	check_equal(_kit.cover.room().tag_at(_kit.cell(9, 2)), tag, "and its spell's")
+	for x in [12, 13]:
+		check_equal(_kit.state_of(_kit.cell(x, 2)), &"oiled", "oil not joined to it does not burn (%d)" % x)
+	check_equal(_kit.state_of(_kit.cell(5, 4)), &"dry", "dry floor does not burn")
+
+
+func test_burning_oil_harms_who_stands_in_it_as_its_lighters() -> void:
+	_oil_block(2, 2, 3, 3)
+	var body: Actor = _kit.world.actor(_kit.middle(_kit.cell(3, 3)), [&"health", &"hurtbox"])
+	var struck: Array = []
+	_kit.world.bus.floor_strike_requested.connect(func(caster: int, target: Node, element: StringName, damage: float, tag: int) -> void: struck.append([caster, target, element, damage, tag]))
+	_kit.steps(2)
+	check(_kit.asked.is_empty(), "oil asks nothing of who stands in it")
+	var before: float = _kit.world.combat.health_of(body)
+	var tag: int = SpellTag.make(1, 2, 0, 0)
+	_kit.world.bus.floor_touched.emit(1, &"fire", _kit.middle(_kit.cell(3, 3)), 0.0, tag)
+	_kit.wait(0.8)
+	check(_kit.has_status(body, &"burn"), "it burns")
+	check(not struck.is_empty(), "struck")
+	check_equal(struck[0][0], 1, "as the hit of who lit it")
+	check_equal(struck[0][2], &"fire", "by fire")
+	check_equal(struck[0][4], tag, "with its spell's tag")
+	check(_kit.world.combat.health_of(body) < before, "it hurt")
+	var sight := CoverSight.new()
+	_kit.cover.look(_kit.middle(_kit.cell(3, 3)), 48.0, sight)
+	check(sight.harms(_kit.middle(_kit.cell(3, 3))), "burning oil is danger to the AI")
+
+
+func test_oil_is_no_danger_to_the_ai() -> void:
+	_oil_block(2, 2, 3, 3)
+	var sight := CoverSight.new()
+	_kit.cover.look(_kit.middle(_kit.cell(3, 3)), 48.0, sight)
+	check(not sight.harms(_kit.middle(_kit.cell(3, 3))), "the enemies walk over oil")
+
+
+func test_it_burns_long_burns_down_to_scorched_then_dry() -> void:
+	_oil_block(2, 2, 1, 1)
+	var cell: int = _kit.cell(2, 2)
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.wait(0.4)
+	check_equal(_kit.state_of(cell), &"burning", "burning")
+	_kit.wait(5.0)
+	check_equal(_kit.state_of(cell), &"burning", "it burns long")
+	_kit.wait(1.0)
+	check_equal(_kit.state_of(cell), &"burning_down", "it burns down")
+	_kit.wait(0.6)
+	check_equal(_kit.state_of(cell), &"scorched", "scorched")
+	check(not FLOOR.states[FLOOR.state_at(&"scorched")].gives(), "scorched floor gives nothing")
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"scorched", "fire does nothing to it")
+	_kit.wait(10.2)
+	check_equal(_kit.state_of(cell), &"scorch_fading", "its soot shrinks away (Smooth)")
+	_kit.wait(0.6)
+	check_equal(_kit.state_of(cell), &"dry", "then dry")
+
+
+func test_new_oil_on_scorched_floor_lies_again() -> void:
+	_oil_block(2, 2, 1, 1)
+	var cell: int = _kit.cell(2, 2)
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.wait(7.2)
+	check_equal(_kit.state_of(cell), &"scorched", "scorched")
+	_kit.touch(&"oil", _kit.middle(cell))
+	_kit.wait(0.3)
+	check_equal(_kit.state_of(cell), &"oiled", "new oil lies on it")
+
+
+func test_water_and_frost_put_an_oil_fire_out_and_leave_the_oil() -> void:
+	for element: StringName in [&"water", &"frost"]:
+		_oil_block(2, 2, 1, 1)
+		var cell: int = _kit.cell(2, 2)
+		_kit.touch(&"fire", _kit.middle(cell))
+		_kit.wait(0.4)
+		check_equal(_kit.state_of(cell), &"burning", "burning")
+		_kit.touch(element, _kit.middle(cell))
+		_kit.steps(1)
+		check_equal(_kit.state_of(cell), &"doused", "%s puts it out" % element)
+		_kit.wait(0.4)
+		check_equal(_kit.state_of(cell), &"oiled", "and leaves the oil (%s)" % element)
+		_kit.touch(&"fire", _kit.middle(cell))
+		_kit.steps(1)
+		check_equal(_kit.state_of(cell), &"catching", "to be lit again (%s)" % element)
+		_kit.wait(8.0)
+
+
+func test_lightning_does_not_light_oil_and_oil_does_nothing_on_water() -> void:
+	_oil_block(2, 2, 1, 1)
+	_kit.touch(&"lightning", _kit.middle(_kit.cell(2, 2)))
+	_kit.steps(1)
+	check_equal(_kit.state_of(_kit.cell(2, 2)), &"oiled", "lightning does not light oil")
+	_wet_block(6, 2, 1, 1)
+	_kit.touch(&"oil", _kit.middle(_kit.cell(6, 2)))
+	_kit.steps(1)
+	check_equal(_kit.state_of(_kit.cell(6, 2)), &"wet", "oil on water: nothing")
+
+
+func test_the_fire_touches_its_neighbours_a_puddle_beside_it_boils() -> void:
+	_oil_block(2, 2, 1, 1)
+	_wet_block(3, 2, 1, 1)
+	_kit.touch(&"fire", _kit.middle(_kit.cell(2, 2)))
+	_kit.wait(1.5)
+	var boiled: StringName = _kit.state_of(_kit.cell(3, 2))
+	check(boiled == &"steam" or boiled == &"dry", "the water beside the fire boiled away (%s)" % boiled)
+
+
+## Regression (the oil screenshots): a cell still catching took no water, kept burning and lit the
+## doused oil round it again; water and frost put a catching fire out too.
+func test_water_puts_out_a_fire_still_catching() -> void:
+	_oil_block(2, 2, 1, 1)
+	var cell: int = _kit.cell(2, 2)
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"catching", "catching")
+	_kit.touch(&"water", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"doused", "put out")

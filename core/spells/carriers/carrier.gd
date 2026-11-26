@@ -136,13 +136,16 @@ func moves_along() -> bool:
 	return has(MOVES_ALONG)
 
 
-## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or
-## the blast, meet what the behaviour needs (`ModifierBase.needs`). The carrier that runs nothing
-## (id &"") runs no card.
-func works(behaviour: int, blasts: bool = false) -> bool:
+## True when `behaviour` does something on it (with a blast on it, when `blasts`; with an infusion
+## that counts on it, when `infused`): its traits, or the blast, meet what the behaviour needs
+## (`ModifierBase.needs`), and an infusion is there where it needs one ("infused"). The carrier that
+## runs nothing (id &"") runs no card.
+func works(behaviour: int, blasts: bool = false, infused: bool = true) -> bool:
 	if id() == &"":
 		return false
 	var need: Dictionary = ModifierBase.needs(behaviour)
+	if bool(need.get("infused", false)) and not infused:
+		return false
 	return _meets(need) or (blasts and (need.get("or_cards", []) as Array).has(ModifierBase.Behaviour.BLAST))
 
 

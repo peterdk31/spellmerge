@@ -3271,7 +3271,8 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 	var turn: float = 1.0 if side >= 0 else -1.0
 	var found: int = 0
 	for slot in _high:
-		if _alive[slot] == 0 or _team[slot] == mine:
+		# A shot that hits nothing (a field) is not met.
+		if _alive[slot] == 0 or _team[slot] == mine or _layers[slot] == 0:
 			continue
 		var radius: float = _radius[slot]
 		# Along its last step (and its next `ahead`), so a small fast shot (an atom) does not slip
@@ -3302,7 +3303,7 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 	var mine: int = _team_now(caster)
 	var found: int = first
 	for slot in _high:
-		if _alive[slot] == 0 or _team[slot] == mine or _guard_has(found, slot):
+		if _alive[slot] == 0 or _team[slot] == mine or _layers[slot] == 0 or _guard_has(found, slot):
 			continue
 		var reach: float = width + _radius[slot]
 		var samples: int = _guard_samples(slot)
@@ -3406,7 +3407,8 @@ func threat(point: Vector2, radius: float, team: int, own: int = -1, horizon: fl
 ## `point`, if sooner than `best` (or as soon, from a lower slot); then it becomes `threat_slot`
 ## and `threat_away` its way off. Returns the new best.
 func _threat_try(slot: int, point: Vector2, radius: float, team: int, own: int, horizon: float, best: float) -> float:
-	if _alive[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
+	# A shot that hits nothing (a field) is no threat.
+	if _alive[slot] == 0 or _layers[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
 		return best
 	var reach: float = radius + _radius[slot]
 	var rel: Vector2 = point - _pos[slot]
@@ -4533,7 +4535,8 @@ func _shield_block(slot: int) -> void:
 			while other >= 0:
 				if _shield[slot] <= 0 and _deflect[slot] == 0:
 					return
-				if _alive[other] != 0 and other != slot and _team[other] != mine:
+				# A shot that hits nothing (a field) is not met.
+				if _alive[other] != 0 and other != slot and _team[other] != mine and _layers[other] != 0:
 					_shield_meets(slot, other)
 				other = _shot_next[other]
 
@@ -4962,7 +4965,9 @@ func set_field(slot: int) -> bool:
 ## circle before the step and is inside it now, or went through it (a fast shot). Every shot that moved is seen, flying, circling or
 ## homing, but a field, a stopped shot (a local stop, a linger's hold, a stuck one) and a falling one
 ## in the air. Returns how many; `field_shot(n)` and `field_of(n)` say which, in slot order and, for
-## one shot, in the fields' order (at most the cap of them). The native kernel's `field_pass` is
+## one shot, in the fields' order (at most the cap of them: a pair past it is dropped, the shot then
+## inside without having taken the field; more shots coming into fields in one step than the cap
+## holds shots is not a game that is played). The native kernel's `field_pass` is
 ## this, to the bit; nothing is asked of it with no field.
 func shots_into_fields(fields: PackedInt32Array, count: int) -> int:
 	count = mini(count, fields.size())
@@ -5004,7 +5009,7 @@ func _pass_fields(fields: PackedInt32Array, count: int) -> int:
 			continue
 		var to: Vector2 = _pos[slot]
 		var from: Vector2 = _prev[slot]
-		if from == to:
+		if from == to or not from.is_finite() or not to.is_finite():
 			continue
 		if not box.intersects(Rect2(from, Vector2.ZERO).expand(to), true):
 			continue

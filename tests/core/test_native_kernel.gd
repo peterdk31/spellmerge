@@ -388,8 +388,9 @@ func test_the_field_pass_hands_back_like_the_gdscript() -> void:
 			if n == 2:
 				m.set_orbit(slot, 60.0, 0.0, 1.5, at)
 		fields.append(slot)
-	# A stale row: a slot that is no field.
+	# Stale rows: a slot past the shots, and the first plain shot's (a live shot that is no field).
 	fields.append(250)
+	fields.append(fields[fields.size() - 2] + 1)
 	var handed: int = 0
 	for step in 150:
 		if step % 2 == 0:

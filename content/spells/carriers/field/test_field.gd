@@ -98,13 +98,14 @@ func test_a_shot_takes_it_once_and_again_when_it_comes_back() -> void:
 
 func test_what_it_gives_is_at_least_its_own() -> void:
 	_arena = ArenaScript.new(root)
-	_cast_field(["bounce", "field"])
+	_cast_field(["bounce", "ghost", "field"])
 	var pm: ManagerScript = _arena.projectiles
 	var centre: Vector2 = pm.get_position_of(_fields().field_slot(0))
 	var shot: int = pm.spawn(0, centre - Vector2(60.0, 0.0), Vector2(200.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY)
-	pm.set_bounce(shot, 3)
+	pm.set_bounce(shot, 30)
 	_arena.run(0.4)
-	check_equal(pm.get_bounce_of(shot), 3, "a shot with more bounces than the field keeps its own")
+	check(pm.has_flags(shot, ManagerScript.F_GHOST), "it came into the field (it took its ghost)")
+	check_equal(pm.get_bounce_of(shot), 30, "a shot with more bounces than the field keeps its own")
 
 
 func test_an_enemy_shot_takes_a_players_field() -> void:
@@ -189,3 +190,43 @@ func test_a_shot_that_goes_through_it_in_one_step_takes_it() -> void:
 	var shot: int = pm.spawn(0, centre - Vector2(FIELD.radius + 10.0, 0.0), Vector2((FIELD.radius * 2.0 + 20.0) * 60.0, 0.0), 3.0, 1.0, ManagerScript.LAYER_ENEMY)
 	_arena.run(STEP)
 	check(pm.get_bounce_of(shot) > 0, "it took the field it went through")
+
+
+## A field hits nothing and meets nothing: an enemy's shot that takes its shield or deflect does not
+## stop or turn the field itself (it would end it, or make it the enemy's).
+func test_an_enemy_shot_given_its_guard_leaves_the_field_be() -> void:
+	for guard: StringName in [&"shield", &"deflect"]:
+		_arena = ArenaScript.new(root)
+		_cast_field([guard, "field"])
+		var pm: ManagerScript = _arena.projectiles
+		var slot: int = _fields().field_slot(0)
+		var seq: int = pm.get_seq_of(slot)
+		var actor: int = pm.get_actor_of(slot)
+		for n in 3:
+			_arena.shoot_at(Vector2(220.0, -10.0 + 10.0 * n), Vector2.ZERO)
+		_arena.run(1.5)
+		check(pm.is_alive(slot) and pm.get_seq_of(slot) == seq, "%s: the field is still there" % guard)
+		check_equal(pm.get_actor_of(slot), actor, "%s: and still its caster's" % guard)
+		check_equal(_fields().field_count(), 1, "%s: one field open" % guard)
+		_arena.free_all()
+		_arena = null
+
+
+func test_a_dam_that_ends_leaves_a_shot_to_another_that_holds_it() -> void:
+	_arena = ArenaScript.new(root)
+	var imp: Node2D = _arena.add_imp(Vector2(200.0, 0.0))
+	_cast_field(["linger", "field"])
+	_arena.run(3.0)
+	_arena.install_cards(0, 1, ["linger", "field"])
+	check(_arena.cast(0, 1), "a second dam on the first")
+	_arena.run(STEP)
+	_arena.install_cards(0, 2, ["bolt"])
+	check(_arena.cast(0, 2), "a bolt into both")
+	_arena.run(0.5)
+	check_equal(_fields().held_count(), 2, "both dams hold it")
+	_arena.run(2.0)
+	check_equal(_fields().field_count(), 1, "the first dam ended")
+	check_equal(_fields().held_count(), 1, "the second still holds it")
+	check_equal(_arena.lost(imp), 0, "and it has not gone on")
+	_arena.run(3.0)
+	check(_arena.lost(imp) > 0, "it goes on when the second ends")

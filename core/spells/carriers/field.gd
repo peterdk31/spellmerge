@@ -157,11 +157,31 @@ func _let_go(field_seq: int) -> void:
 			i += 1
 			continue
 		var shot: int = _hd_slot[i]
-		if kit.projectiles.is_alive(shot) and kit.projectiles.get_seq_of(shot) == _hd_seq[i]:
-			kit.projectiles.release_shot(shot)
+		var seq: int = _hd_seq[i]
 		_hd_slot.remove_at(i)
 		_hd_seq.remove_at(i)
 		_hd_field.remove_at(i)
+		if kit.projectiles.is_alive(shot) and kit.projectiles.get_seq_of(shot) == seq:
+			kit.projectiles.release_shot(shot)
+			# Another dam that holds it still does, for its own life left.
+			var left: float = _held_by_another(shot, seq)
+			if left > 0.0:
+				kit.projectiles.freeze_shot(shot, left)
+
+
+## The longest life left of a live field that holds the shot `shot` (born `seq`), 0 for none.
+func _held_by_another(shot: int, seq: int) -> float:
+	var left: float = 0.0
+	for h in _hd_slot.size():
+		if _hd_slot[h] != shot or _hd_seq[h] != seq:
+			continue
+		var row: int = _fd_seq.find(_hd_field[h])
+		if row < 0:
+			continue
+		var field: int = _fd_slot[row]
+		if kit.projectiles.is_alive(field) and kit.projectiles.get_seq_of(field) == _hd_field[h]:
+			left = maxf(left, kit.projectiles.get_life_of(field))
+	return left
 
 
 ## The shot in `shot` came into the field in `field_slot` (born `field_seq`): it takes the field's

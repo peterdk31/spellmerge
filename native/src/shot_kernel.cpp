@@ -2425,7 +2425,7 @@ namespace {
 
 struct Threat {
 	Arr<PackedByteArray> alive, motion, state;
-	Arr<PackedInt32Array> team, actor;
+	Arr<PackedInt32Array> team, actor, layers;
 	Arr<PackedVector2Array> pos, vel;
 	Arr<PackedFloat32Array> radius, life;
 	int64_t slot = -1;
@@ -2438,6 +2438,7 @@ struct Threat {
 		state.load(m, k.state);
 		team.load(m, k.team);
 		actor.load(m, k.actor);
+		layers.load(m, k.layers);
 		pos.load(m, k.pos);
 		vel.load(m, k.vel);
 		radius.load(m, k.radius);
@@ -2447,7 +2448,7 @@ struct Threat {
 	// The shared part of `threat`'s loop and `_threat_try`: when the shot in `s` comes within
 	// `rad` of `point` (-1 for never or not a threat), and whether it is still.
 	double when(int64_t s, const Vector2 &point, double rad, int64_t tm, int64_t own, double horizon, bool &still, Vector2 &rel) {
-		if (alive[s] == 0 || (team[s] == tm && tm != TEAM_NONE) || (actor[s] == own && own >= 0)) {
+		if (alive[s] == 0 || layers[s] == 0 || (team[s] == tm && tm != TEAM_NONE) || (actor[s] == own && own >= 0)) {
 			return -2.0;
 		}
 		const double reach = rad + (double)radius[s];
@@ -2811,7 +2812,7 @@ int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_
 		}
 		const Vector2 to = pos[s];
 		const Vector2 from = prev[s];
-		if (from == to) {
+		if (from == to || !from.is_finite() || !to.is_finite()) {
 			continue;
 		}
 		if ((f & F_FALLING) != 0 && (double)to.y < (double)floor_y[s] - FALL_BAND) {

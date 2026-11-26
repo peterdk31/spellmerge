@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
 			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
-			"prompt": "The mend icon at 1x for the HUD's small cells, 16x16 art pixels: A green cross, bevelled, with a leaf at its heart. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The mend icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A green cross, bevelled, with a leaf at its heart. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/elements/mend/icon@2x.svg",

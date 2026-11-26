@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by hand)",
-			"prompt": "A 16x16 icon for the On Wall trigger: a stone wall of Stone-grey bricks on the right with a Bone shot hitting its face from the left, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"tier": "good",
+			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py, at 1x), written by Claude",
+			"prompt": "The on wall icon at 1x for the HUD's small cells, 16x16 art pixels, from the same parts as its 2x icon: A shot about to meet a wall of bricks. Lit from the top-left in at most three palette shades a material, a one-pixel outline; palette colours from docs/STYLE.md only."
 		},
 		{
 			"path": "content/spells/triggers/on_wall/icon@2x.svg",
@@ -16,7 +16,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "good",
 			"tool": "tools/icon_art.py (shape and light rules, tools/sprite_rules.py), written by Claude",
-			"prompt": "The on wall icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A shot about to meet a wall. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
+			"prompt": "The on wall icon, 16x16 world units drawn at 2x detail (32x32 art pixels): A shot about to meet a wall of bricks. Its own shapes, lit from the top-left in at most three palette shades a material, seams between parts, a one-art-pixel outline; palette colours from docs/STYLE.md only."
 		}
 	]
 }

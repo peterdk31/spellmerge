@@ -776,8 +776,13 @@ func _sigil_content(id: StringName) -> SigilBase:
 static func _known_sigils(ids: Array[StringName], in_registry: Node) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for id: StringName in ids:
-		if out.size() < SigilBase.MOST_A_STAFF and not out.has(id) and ItemKinds.content(ItemKinds.SIGIL, id, in_registry as RegistryScript) != null:
-			out.append(id)
+		if out.size() >= SigilBase.MOST_A_STAFF or out.has(id) or in_registry == null or not in_registry.has_method(&"get_resource"):
+			continue
+		# As `staff_content` finds a staff: any node that serves content by folder and id.
+		for folder: StringName in ItemKinds.content_of(ItemKinds.SIGIL):
+			if ItemKinds.is_content(ItemKinds.SIGIL, in_registry.call(&"get_resource", folder, id) as Resource):
+				out.append(id)
+				break
 	return out
 
 

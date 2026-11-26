@@ -136,12 +136,13 @@ A new item kind, **sigil** (`content/sigils/<id>/`, a `SigilBase` on `ItemConten
 - **A press too:** the owner may still press it; a press is a press as today. An auto cast is no new press, so it does not set off `on recast` (only a press does).
 - **Never a switch-off:** a staff with sustained (`hold`) cards on is never cast by its sigil (that cast would switch them off), and one that winds up winds up as any cast.
 - **Read from the simulation only:** health from the body's `Health`, close from the projectile manager's target grid (`has_foe_near`), aim from the actor. No device, no camera, no clock. The sigils are part of the staff's `ItemStack`, which is state (hashed and snapshotted), so a restored game casts the same.
-- **Not while** its holder is down, in a menu that pauses its casting, or the staff is on no hand (in the bag).
+- **Not while** its holder is down, or the staff is on no hand (in the bag): a staff in the bag keeps its sigils but casts nothing.
+- **No line of sight:** an auto cast goes along the aim as a held button does; it does not wait for a clear line (an enemy's AI does for its own presses). An enemy whose condition holds behind a pillar spends its cast on the pillar, with its telegraph.
 - **Enemies too** (the owner, 2026-11-25): an enemy's staff entry (`StaffCards.sigils`) may name sigils, and its staff casts by itself by the same rule in the same `Caster.step`, along the foe's aim. **Its warning:** an enemy's cast always winds up with its staff's telegraph (`cast_winding`, the staff's `wind_up`), and a staff entry with a sigil and no wind-up is a data problem (`StaffCards.problems`), so a foe never casts by itself without its warning and players can still react. Which foes:
 
 | Enemy | Staff | Sigil | Why |
 | --- | --- | --- | --- |
-| Ember Imp | its fire bolt (wind-up 0.7 s) | Cast when Close | come close and it spits fire at you, telegraphed |
+| Rime Crook | its frost pull (wind-up 0.7 s) | Cast when Close | come close and it hooks you in with frost, telegraphed |
 | Storm Fork | its triple lightning (wind-up 0.75 s) | Cast when Hurt | wounded, it lashes out on its own |
 
   Every other foe, and the Old Broom, has none for now.
@@ -149,8 +150,8 @@ A new item kind, **sigil** (`content/sigils/<id>/`, a `SigilBase` on `ItemConten
 ### Reading it
 
 - **The corner panel's staff row:** a small icon for each sigil beside the staff's glyph, and while one holds, a slow glow round the glyph (by whole pixels, in at least 3 frames; Smooth) so the player sees why the staff is firing.
-- **The builder:** under the staff's name, its sigils' icons and words ("Casts by itself: when hurt, when close").
-- **The inventory menu:** a sigil's icon and its line; on a staff, its sigils beside its slots.
+- **The builder:** under the staff's name on its hub, its sigils' words ("By itself when hurt, when close"); their icons are the corner panel's, beside it.
+- **The inventory menu:** the Sigils bag lists the sigils held and those on the hands' staffs; a hand's button puts the one pointed at on that hand's staff, or takes it off (a staff in the staff bag is put on a hand first); its line says which hands' staffs have it.
 
 ### L4's tests
 

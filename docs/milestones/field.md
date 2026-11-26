@@ -4,7 +4,7 @@
 
 ## What the players see
 
-**Field** (`content/spells/carriers/field/`, carrier `field`, `core/spells/carriers/field.gd`): "A circle ahead. It catches every shot, then lets them all go at once."
+**Field** (`content/spells/carriers/field/`, carrier `field`, `core/spells/carriers/field.gd`): "Catches every shot, then lets them all go at once."
 
 - It is **a round field on the floor a step ahead** (`ray_length`, short of a wall), there for its life, its edge trembling. It hits nothing.
 - **Every shot that comes into it is caught**: drawn in to its middle and held there, its life waiting. Anyone's shots: a teammate's, an enemy's, the caster's own (the owner's answer 4).

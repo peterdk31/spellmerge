@@ -57,6 +57,11 @@ var _reaction_left: float = 0.0
 
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
+	# Its body at its art's size in the world (a body drawn at 2x detail at half: ArtDetail), as
+	# CreatureLook fits a creature's.
+	var body := actor.get_node_or_null(^"Sprite") as Sprite2D
+	if body != null:
+		ArtDetail.fit(body)
 	_buckets.resize(DPS_BUCKETS)
 	_buckets.fill(0.0)
 	_bucket_left = DPS_WINDOW / float(DPS_BUCKETS)

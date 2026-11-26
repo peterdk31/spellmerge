@@ -261,7 +261,8 @@ func _hop(delta: float, dir: Vector2) -> void:
 			# A layered body lifts as a whole: its parts ride its sprite.
 			sprite.position = _sprite_position + _lift
 		elif sprite != null:
-			sprite.offset = _sprite_offset + _lift
+			# The offset is in the sprite's art pixels (twice the world's at 2x detail: ArtDetail).
+			sprite.offset = _sprite_offset + ArtDetail.to_art(sprite.texture, _lift)
 		if _face != null and _face_part == null:
 			_face.body_offset = _lift
 	if _face != null and _face_part != null:

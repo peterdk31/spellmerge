@@ -41,8 +41,9 @@ func _still_data() -> EnemyBase:
 
 ## An enemy on the imp's scene; `layered`: its Sprite shows no art and holds a head (leaning,
 ## trailing, swishing, squashing, shaking, its face on it, two frames: the second for a wind-up and
-## a wall) with a handle on it.
-func _body(layered: bool, data: EnemyBase = null, at: Vector2 = Vector2.ZERO, face_art: FaceArt = null) -> Actor:
+## a wall) with a handle on it; `detail`: the parts' art drawn at that detail (ArtDetail: twice the
+## pixels at 2, the handle's place and offset in the head's art pixels).
+func _body(layered: bool, data: EnemyBase = null, at: Vector2 = Vector2.ZERO, face_art: FaceArt = null, detail: int = 1) -> Actor:
 	var body: Actor = ImpData.scene.instantiate() as Actor
 	if face_art != null:
 		(body.get_node("Face") as Face).art = face_art
@@ -54,7 +55,7 @@ func _body(layered: bool, data: EnemyBase = null, at: Vector2 = Vector2.ZERO, fa
 		sprite.hframes = 1
 		var head := BodyPart.new()
 		head.name = "Head"
-		head.texture = _art(Vector2i(16, 8), 2)
+		head.texture = ArtDetail.mark(_art(Vector2i(16, 8) * detail, 2), detail)
 		head.hframes = 2
 		head.position = Vector2(0.0, -4.0)
 		head.lean = 10.0
@@ -69,9 +70,9 @@ func _body(layered: bool, data: EnemyBase = null, at: Vector2 = Vector2.ZERO, fa
 		sprite.add_child(head)
 		var handle := BodyPart.new()
 		handle.name = "Handle"
-		handle.texture = _art(Vector2i(4, 16))
-		handle.position = Vector2(0.0, -6.0)
-		handle.offset = Vector2(0.0, -8.0)
+		handle.texture = ArtDetail.mark(_art(Vector2i(4, 16) * detail), detail)
+		handle.position = Vector2(0.0, -6.0) * detail
+		handle.offset = Vector2(0.0, -8.0) * detail
 		handle.lean = 20.0
 		head.add_child(handle)
 	fx.wire(body)
@@ -251,6 +252,34 @@ func test_the_face_rides_its_part() -> void:
 	_dash(body, Vector2(120.0, 0.0), 0.6)
 	_run(body, 20)
 	check(face.body_offset.x < resting.x, "the face goes with the trailing head (%s, %s)" % [resting, face.body_offset])
+
+
+## Parts drawn at 2x detail (ART1) nest: the head at half its art, the handle under it at its
+## parent's scale, both where and as big as the 1x parts, and the face riding the head rests where
+## it would at 1x (regression: the rest was measured before the head took its scale).
+func test_parts_at_2x_stand_where_1x_ones_do_and_the_face_rests_on_them() -> void:
+	var plain := _body(true, null, Vector2(-60.0, 0.0))
+	var fine := _body(true, null, Vector2(60.0, 0.0), null, 2)
+	_run_all([plain, fine], 2)
+	var heads: Array[BodyPart] = [plain.get_node("Sprite/Head") as BodyPart, fine.get_node("Sprite/Head") as BodyPart]
+	check_equal(heads[1].scale, Vector2(0.5, 0.5), "the 2x head at half its art")
+	check_equal(heads[1].get_node("Handle").scale, Vector2.ONE, "the 2x handle under it at its scale")
+	for i in 2:
+		var head: BodyPart = heads[i]
+		var handle := head.get_node("Handle") as BodyPart
+		var body: Actor = plain if i == 0 else fine
+		var rect: Rect2 = handle.global_transform * handle.get_rect()
+		heads[i].set_meta(&"handle_rect", Rect2(rect.position - body.global_position, rect.size))
+	var rects: Array[Rect2] = [heads[0].get_meta(&"handle_rect"), heads[1].get_meta(&"handle_rect")]
+	check(rects[0].position.is_equal_approx(rects[1].position) and rects[0].size.is_equal_approx(rects[1].size), "the handle where and as big as at 1x (%s, %s)" % rects)
+	var faces: Array[Vector2] = []
+	for body: Actor in [plain, fine]:
+		for child in body.get_children():
+			if child is Face:
+				faces.append((child as Face).body_offset)
+	check_equal(faces.size(), 2, "both wear a face")
+	if faces.size() == 2:
+		check(faces[1].distance_to(faces[0]) <= 0.5, "the face rests on the 2x head as on the 1x one (%s, %s)" % faces)
 
 
 func test_a_phase_brings_its_parts_art_and_motes_that_follow() -> void:

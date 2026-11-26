@@ -522,7 +522,9 @@ func _draw_frame(node: Control, frame: int) -> void:
 	if _intro == null or _intro.portrait == null:
 		return
 	var side: float = BossIntro.FRAME
-	node.draw_texture_rect_region(_intro.portrait, Rect2(Vector2.ZERO, Vector2(side, side) * SCALE), Rect2(frame * side, 0.0, side, side))
+	# The frame in the portrait's own pixels (twice as many at 2x detail: ArtDetail), drawn as big.
+	var detail: float = float(ArtDetail.of(_intro.portrait))
+	node.draw_texture_rect_region(_intro.portrait, Rect2(Vector2.ZERO, Vector2(side, side) * SCALE), Rect2(Vector2(frame * side, 0.0) * detail, Vector2(side, side) * detail))
 
 
 func _draw_name() -> void:

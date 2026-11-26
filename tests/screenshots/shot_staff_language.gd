@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## `staff_language_play` is the whole screen.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 ## Each: the cards, where they are cast from (aiming right), the dummies, and every how many frames
 ## the staff is pressed (0: once, `ONCE_AT` frames in, so its burst is still on screen).
 const CASTS: Array = [

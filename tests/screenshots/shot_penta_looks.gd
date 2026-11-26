@@ -4,7 +4,7 @@ extends "res://tests/support/screenshot.gd"
 ## bolts leaving the ring aimed in before they bend for a dummy. `penta_looks` is the whole screen.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 ## Each: the cards, where they are cast from (aiming right) and the dummy (INF for none). The
 ## caster has no body here, so the wall row shows the ring round the point it is cast from.
 const CASTS: Array = [

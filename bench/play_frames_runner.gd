@@ -155,9 +155,10 @@ func _process(delta: float) -> void:
 	var events: Node = get_tree().root.get_node_or_null("Events")
 	if events == null:
 		return
-	for wizard: Node2D in _wizards:
-		if not is_instance_valid(wizard):
+	for each in _wizards:
+		if not is_instance_valid(each):
 			continue
+		var wizard := each as Node2D
 		var middle: Vector2 = wizard.global_position + LAKE_OFFSET
 		if _lake_water <= 0.0:
 			events.emit_signal(&"floor_touched", -1, &"water", middle, LAKE_RADIUS, 0)

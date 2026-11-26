@@ -93,6 +93,11 @@ func lay(laid: CoverLayout, kind_index: int, now: float) -> void:
 	var made := ShaderMaterial.new()
 	made.shader = SHADER
 	_set_looks(made)
+	if _glow_of(0) > 0.0:
+		# A kind whose rest glows: every cell lights from the start.
+		for cell in cells:
+			_glowing_at[cell] = _glowing.size()
+			_glowing.append(cell)
 	if _is_drawn(0):
 		# Every cell at rest is drawn: each one's neighbours inside the grid are.
 		for cell in cells:

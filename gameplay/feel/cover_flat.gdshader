@@ -145,39 +145,56 @@ int wobble(int along, int line, int salt, int d) {
 // The distance (whole art px, 0 the outer pixel, below 0 outside) from pixel `f` of a cell of side
 // `side` to its shape's edge, its closed sides given by `cl` (left, right, up, down; an open side is
 // joined), `px` the room's pixel (for the wobble), `cell` the cell; `inset` more in from every side.
+// `nb` the cell's drawn neighbours (NB_*; 0 while it is a shape of its own): a closed side's end that
+// meets an inner bend (the side's neighbour beyond its end and the cell past it drawn) follows the
+// bend's arc, the same arc the undrawn cell draws its fillet to, so the shape has no seam there.
 // `low` is set to whether the nearest edge faces down or right (the shape's far, lower right side).
-int edge_dist(ivec2 f, int side, bvec4 cl, ivec2 px, ivec2 cell, int inset, int d, out bool low) {
+int edge_dist(ivec2 f, int side, bvec4 cl, ivec2 px, ivec2 cell, int inset, int nb, int d, out bool low) {
 	int last = side - 1;
 	int best = 9999;
 	low = false;
 	int r = CORNER * d;
+	vec2 c = vec2(f) + 0.5;
+	float fr = float(r);
+	float fs = float(side);
+	// Each closed side: its straight edge, or the bend's arc at an end that meets one.
 	if (cl.x) {
-		int v = f.x - inset - wobble(px.y, cell.x * 2, 1, d);
+		vec2 centre = f.y < r && (nb & (NB_U | NB_UL)) == (NB_U | NB_UL) ? vec2(-fr, fr) : (f.y > last - r && (nb & (NB_D | NB_DL)) == (NB_D | NB_DL) ? vec2(-fr, fs - fr) : vec2(-1.0e6));
+		int v = centre.x > -1.0e5 ? int(floor(length(c - centre) - float(r))) : f.x - inset - wobble(px.y, cell.x * 2, 1, d);
 		if (v < best) { best = v; low = false; }
 	}
 	if (cl.y) {
-		int v = last - f.x - inset - wobble(px.y, cell.x * 2 + 2, 1, d);
+		vec2 centre = f.y < r && (nb & (NB_U | NB_UR)) == (NB_U | NB_UR) ? vec2(fs + fr, fr) : (f.y > last - r && (nb & (NB_D | NB_DR)) == (NB_D | NB_DR) ? vec2(fs + fr, fs - fr) : vec2(-1.0e6));
+		int v = centre.x > -1.0e5 ? int(floor(length(c - centre) - float(r))) : last - f.x - inset - wobble(px.y, cell.x * 2 + 2, 1, d);
 		if (v < best) { best = v; low = true; }
 	}
 	if (cl.z) {
-		int v = f.y - inset - wobble(px.x, cell.y * 2, 2, d);
+		vec2 centre = f.x < r && (nb & (NB_L | NB_UL)) == (NB_L | NB_UL) ? vec2(fr, -fr) : (f.x > last - r && (nb & (NB_R | NB_UR)) == (NB_R | NB_UR) ? vec2(fs - fr, -fr) : vec2(-1.0e6));
+		int v = centre.x > -1.0e5 ? int(floor(length(c - centre) - float(r))) : f.y - inset - wobble(px.x, cell.y * 2, 2, d);
 		if (v < best) { best = v; low = false; }
 	}
 	if (cl.w) {
-		int v = last - f.y - inset - wobble(px.x, cell.y * 2 + 2, 2, d);
+		vec2 centre = f.x < r && (nb & (NB_L | NB_DL)) == (NB_L | NB_DL) ? vec2(fr, fs + fr) : (f.x > last - r && (nb & (NB_R | NB_DR)) == (NB_R | NB_DR) ? vec2(fs - fr, fs + fr) : vec2(-1.0e6));
+		int v = centre.x > -1.0e5 ? int(floor(length(c - centre) - float(r))) : last - f.y - inset - wobble(px.x, cell.y * 2 + 2, 2, d);
 		if (v < best) { best = v; low = true; }
 	}
-	// A rounded corner where two closed sides meet: the distance in from a quarter circle.
+	// A rounded corner where two closed sides meet: the distance in from a quarter circle, its radius
+	// no more than half the (inset) shape, so one corner's square never reaches another's.
 	int lo = inset;
 	int hi = last - inset;
+	int rr = min(r, (hi - lo + 1) / 2);
+	bool left = f.x < lo + rr;
+	bool right = f.x >= hi + 1 - rr;
+	bool top = f.y < lo + rr;
+	bool bottom = f.y >= hi + 1 - rr;
 	ivec2 corner = ivec2(-1);
-	if (cl.x && cl.z && f.x < lo + r && f.y < lo + r) { corner = ivec2(lo + r, lo + r); }
-	if (cl.y && cl.z && f.x > hi - r && f.y < lo + r) { corner = ivec2(hi + 1 - r, lo + r); }
-	if (cl.x && cl.w && f.x < lo + r && f.y > hi - r) { corner = ivec2(lo + r, hi + 1 - r); }
-	if (cl.y && cl.w && f.x > hi - r && f.y > hi - r) { corner = ivec2(hi + 1 - r, hi + 1 - r); }
-	if (corner.x >= 0) {
-		vec2 from = vec2(f) + 0.5 - vec2(corner);
-		int v = int(floor(float(r) - length(from)));
+	if (cl.x && cl.z && left && top) { corner = ivec2(lo + rr, lo + rr); }
+	else if (cl.y && cl.z && right && top) { corner = ivec2(hi + 1 - rr, lo + rr); }
+	else if (cl.x && cl.w && left && bottom) { corner = ivec2(lo + rr, hi + 1 - rr); }
+	else if (cl.y && cl.w && right && bottom) { corner = ivec2(hi + 1 - rr, hi + 1 - rr); }
+	if (corner.x >= 0 && rr > 0) {
+		vec2 from = c - vec2(corner);
+		int v = int(floor(float(rr) - length(from)));
 		if (v < best) {
 			best = v;
 			low = from.x + from.y > 0.0;
@@ -360,7 +377,8 @@ void fragment() {
 			vec4 c = cell_at(cell + ivec2(sx, sy), size);
 			int sa = state_of(a);
 			int sb = state_of(b);
-			if (drawn(sa) && drawn(sb) && drawn(state_of(c)) && inset_of(sa, view_time - a.g, d) == 0 && inset_of(sb, view_time - b.g, d) == 0) {
+			int sc = state_of(c);
+			if (drawn(sa) && drawn(sb) && drawn(sc) && inset_of(sa, view_time - a.g, d) == 0 && inset_of(sb, view_time - b.g, d) == 0 && inset_of(sc, view_time - c.g, d) == 0) {
 				ivec2 into = ivec2(sx < 0 ? r : side - r, sy < 0 ? r : side - r);
 				float from_far = length(vec2(f) + 0.5 - vec2(into));
 				if (from_far > float(r)) {
@@ -394,17 +412,17 @@ void fragment() {
 		// While a cell grows or shrinks it is a shape of its own, inset from all four sides (a whole
 		// puddle drying, freezing or steaming at once shrinks or grows cell by cell, never in one jump);
 		// still, it joins its drawn neighbours.
-		int dist = inset > 0 ? edge_dist(f, side, bvec4(true), px, cell, inset, d, low) : edge_dist(f, side, joined, px, cell, 0, d, low);
+		int dist = inset > 0 ? edge_dist(f, side, bvec4(true), px, cell, inset, 0, d, low) : edge_dist(f, side, joined, px, cell, 0, nb, d, low);
 		int kind = int(surfaces[s].x + 0.5);
 		if (dist < 0) {
 			bool under_low = false;
-			int under = unders[s].a > 0.0 ? edge_dist(f, side, joined, px, cell, 0, d, under_low) : -1;
+			int under = unders[s].a > 0.0 ? edge_dist(f, side, joined, px, cell, 0, nb, d, under_low) : -1;
 			if (under >= 0) {
 				// The water under ice keeps its look while the ice grows over it or shrinks off it.
 				COLOR = under == 0 ? under_edges[s] : water(unders[s], under_edges[s], under_lights[s], px, under, under_low, t, d);
 			} else if (kind == 3) {
 				// Steam rises off where the water was.
-				int full = edge_dist(f, side, joined, px, cell, 0, d, under_low);
+				int full = edge_dist(f, side, joined, px, cell, 0, nb, d, under_low);
 				int share = 3 - abs(frame - 1);
 				if (full < 0 || share <= 0 || !wisp(px, shimmer ? int(floor(view_time * WISP_FPS)) : 0, share, d)) {
 					discard;

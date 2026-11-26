@@ -132,10 +132,24 @@ class Redraw2xTest(unittest.TestCase):
         wood = ("#3d2a2e", "#7a4a35", "#b27a4a")
         rows = ["#" * 6] + ["#" + "s" * 4 + "#" for _ in range(14)] + ["#" * 6]
         rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{OUTLINE if c == "#" else wood[1]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
-        out = redraw_2x.texture(redraw_2x.double(redraw_2x.read_svg(f'<svg width="6" height="16">{rects}</svg>')))
+        picture = redraw_2x.double(redraw_2x.read_svg(f'<svg width="6" height="16">{rects}</svg>'))
+        out = redraw_2x.texture(picture, picture.width)
         grain = [(x, y) for y in range(out.height) for x in range(out.width) if out.pixels[y][x] == wood[0]]
         columns = {x for x, _ in grain}
         self.assertLess(len(columns), len(grain) / 3, "streaks down the tall part, a few columns many pixels long")
+
+    def test_a_strip_not_whole_frames_is_refused_and_stone_never_shaded_down(self) -> None:
+        stone = ("#2b2840", "#4a4663", "#7a7694")
+        rows = ["#" * 10] + ["#" + "s" * 8 + "#" for _ in range(6)] + ["#" * 10]
+        colours = {"#": OUTLINE, "s": stone[0]}
+        rects = "".join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="{colours[c]}"/>' for y, row in enumerate(rows) for x, c in enumerate(row))
+        picture = redraw_2x.double(redraw_2x.read_svg(f'<svg width="10" height="8">{rects}</svg>'))
+        with self.assertRaises(ValueError):
+            redraw_2x.texture(picture)
+        out = redraw_2x.texture(picture, picture.width)
+        colours_out = {c for row in out.pixels for c in row}
+        self.assertNotIn(stone[0], colours_out, "a body's Stone shadow becomes its base")
+        self.assertEqual([row[0] for row in out.pixels], [row[0] for row in picture.pixels], "the outline left alone")
 
     def test_a_target_not_named_at_2x_is_refused(self) -> None:
         with self.assertRaises(SystemExit):

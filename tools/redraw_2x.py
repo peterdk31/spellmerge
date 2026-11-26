@@ -231,15 +231,22 @@ def _hash(x: int, y: int) -> int:
 
 def texture(src: Canvas, frame_width: int = 0) -> Canvas:
     """A material's surface at the finer pixels (the owner, 2026-11-26: "texture and material"), on
-    the base-shade pixels inside a part (all four neighbours its own material), in the material's
+    the pixels inside a part (all four neighbours its own material), in the material's
     own shades: bone pitted with pores (a shadow pit, its bottom-right lit), wood grain in broken
     streaks along the part's length, leaf veins and fire flicker in light flecks, ice, gold and
     lightning glints, stone and void speckled. Placed by a hash of the pixel's place in its frame
-    (`frame_width` wide; 0: the picture's height, square frames), so every frame of a strip has
-    the same surface and nothing jumps between frames (docs/STYLE.md, "Smooth")."""
+    (`frame_width` wide; 0: the picture's height, square frames; a width that is not whole frames is
+    refused), so every frame of a strip has the same surface and nothing jumps between frames
+    (docs/STYLE.md, "Smooth"). Marks go a shade down (or up in the shadow band) on every shade of the
+    part's inside; Stone never takes its shadow (the floor's), and a body's Stone shadow becomes
+    its base."""
     shades = materials()
     p = src.pixels
     width = frame_width or src.height
+    if src.width % width != 0:
+        raise ValueError(f"a {src.width}-wide picture is not whole frames {width} wide: give the frame's width")
+    # Frames are one row of `width` each, as tall as the picture.
+    height = src.height
     out = Canvas(src.width, src.height)
 
     def material(x: int, y: int) -> str | None:
@@ -276,29 +283,38 @@ def texture(src: Canvas, frame_width: int = 0) -> Canvas:
     for y in range(src.height):
         for x in range(src.width):
             colour = p[y][x]
-            if colour not in shades or shades[colour][1] != 1:
+            if colour not in shades:
                 continue
-            name = shades[colour][0]
+            name, level = shades[colour]
+            # Stone shadow is the floor's (docs/STYLE.md, "Readability"): a body's is its base.
+            if name in NO_SHADOW and level == 0:
+                out.pixels[y][x] = shade(name, 1)
+                continue
             surface = SURFACES.get(name)
             if surface is None or any(material(x + dx, y + dy) != name for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
                 continue
-            fx = x % width
-            h = _hash(fx, y)
+            # Marks a shade down (in the shadow band a shade up, so they show there too) or up.
+            darker = level - 1 if level > 0 else 1
+            lighter = level + 1 if level < 2 else 1
+            if name in NO_SHADOW:
+                darker = level
+            fx, fy = x % width, y % height
+            h = _hash(fx, fy)
             if surface == "pores" and h % 17 == 0:
-                out.pixels[y][x] = shade(name, 0)
-                if _at(p, x + 1, y + 1) == colour:
-                    out.pixels[y + 1][x + 1] = shade(name, 2)
+                out.pixels[y][x] = shade(name, darker)
+                if _at(p, x + 1, y + 1) == colour and material(x + 2, y + 1) == name and material(x + 1, y + 2) == name:
+                    out.pixels[y + 1][x + 1] = shade(name, lighter)
             elif surface == "grain":
                 upright = upright_part[part_of[y][x]]
-                lane, along = (fx, y) if upright else (y, fx)
+                lane, along = (fx, fy) if upright else (fy, fx)
                 if lane % 3 == 1 and _hash(lane, along // 3) % 4 != 0:
-                    out.pixels[y][x] = shade(name, 0)
+                    out.pixels[y][x] = shade(name, darker)
             elif surface in ("veins", "flicker") and h % 9 == 0:
-                out.pixels[y][x] = shade(name, 2)
+                out.pixels[y][x] = shade(name, lighter)
             elif surface == "glints" and h % 23 == 0:
-                out.pixels[y][x] = shade(name, 2)
+                out.pixels[y][x] = shade(name, lighter)
             elif surface == "speckle" and h % 13 == 0:
-                out.pixels[y][x] = shade(name, 2)
+                out.pixels[y][x] = shade(name, lighter)
     return out
 
 

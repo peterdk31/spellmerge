@@ -83,6 +83,8 @@ func take_rest() -> void:
 	var parent_sprite := get_parent() as Sprite2D
 	_parent_detail = float(ArtDetail.of(parent_sprite.texture)) if parent_sprite != null and parent_sprite.texture != null else 1.0
 	rest_scale = scale * _parent_detail / float(ArtDetail.of(texture))
+	# Drawn at it from now on, so what is measured from the rest (a face riding it) is the drawn one.
+	scale = rest_scale
 
 
 ## Every `BodyPart` under `root` (itself left out), parents before their parts, in the tree's order,

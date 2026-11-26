@@ -19,7 +19,7 @@ const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const BROOM: EnemyBase = preload("res://content/bosses/old_broom/old_broom.tres")
 ## The colours of the portrait's eyes in its rest pose (Bone light and shadow, the outline): where its
 ## eyes frame may light.
-const EYE_COLOURS: Array[String] = ["f4f1ea", "a39fb8", "14121f"]
+const EYE_COLOURS: Array[String] = ["f4f1ea", "d4d0e0", "a39fb8", "14121f"]
 
 
 func _spells() -> SpellsScript:
@@ -344,6 +344,8 @@ func test_its_own_face_and_drawn_poses() -> void:
 	var burning: Texture2D = BROOM.phases[0].look.parts[&"Head"]
 	check_equal(ArtDetail.size_of(head.texture).x, float(head.hframes * 88), "the head's frames, 88 world px each (176 art px at 2x)")
 	check_equal(burning.get_width(), head.texture.get_width(), "the burning head has the same frames")
+	# A part keeps its scale from its rest (BodyPart): a phase's art is drawn at the same detail.
+	check_equal(ArtDetail.of(burning), ArtDetail.of(head.texture), "the burning head at the same detail")
 	check_equal(burning.get_height(), head.texture.get_height(), "of the same height")
 	var frames: Dictionary = {}
 	for pose in BodyPose.Pose.values():
@@ -456,3 +458,19 @@ static func _part_of(cue: Variant, type: StringName) -> Dictionary:
 
 static func _held_of(cue: Variant) -> StringName:
 	return StringName(_part_of(cue, &"held").get("sound", ""))
+
+
+## Regression (ART1's review): its parts drawn at 2x detail, the face riding the binding rests on it
+## (its body_offset about nothing at rest), and the burning sparks rise from the lower bristles.
+func test_its_2x_parts_carry_the_face_where_it_rests() -> void:
+	var fx := Fixture.new(root)
+	fx.players[0].position = Vector2(300.0, 0.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	fx.run(body, 5)
+	var face := body.get_node(^"Face") as Face
+	# Its idle sway and taps move it a few pixels; measured from a rest taken before the head was
+	# scaled it was (9, 17).
+	check(face.body_offset.length() <= 4.0, "the face rests on the binding (%s)" % face.body_offset)
+	var head := body.get_node(^"Sprite/Head") as Sprite2D
+	check_equal(head.scale, ArtDetail.draw_scale(head.texture), "the head at half its art")
+	fx.free_all()

@@ -1194,7 +1194,7 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	var squashed := _body_of(husk, Vector2(100.0, 100.0), 1.0)
 	bus.damage_dealt.emit(0, squashed.get_parent(), 1, Vector2.ZERO)
 	feel.step(0.015625)
-	check(squashed.scale != Vector2.ONE, "squashed when it is killed")
+	check(squashed.scale != ArtDetail.draw_scale(husk), "squashed when it is killed")
 	before = motes.next_row()
 	bus.enemy_died.emit(0, squashed.get_parent(), Vector2(100.0, 100.0), -1)
 	check(feel.spectacle().broken_from() == husk, "the death broke the body's art")

@@ -124,6 +124,7 @@ func _body(texture: Texture2D, at: Vector2) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
+	ArtDetail.fit(sprite)
 	body.add_child(sprite)
 	root.add_child(body)
 	return sprite

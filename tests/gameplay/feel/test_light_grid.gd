@@ -58,21 +58,21 @@ static func _rows(kind: int, seed_of: int) -> PackedFloat32Array:
 		var red: int = rng.randi_range(0, 3) + 4 * rng.randi_range(0, 5)
 		rows[at + 8] = float(red) / 255.0
 		var bits: int = 0
-		for layer in [2, 5, 9, 14, 3, 18]:
+		for layer in [2, 5, 9, 14, 3, 18, 23]:
 			if rng.randf() < 0.3:
 				bits |= 1 << (layer - 1)
 		if rng.randf() < 0.15:
 			bits |= 1 << (LightGridScript.ENEMY_RAMP - 1)
 		if rng.randf() < 0.1:
 			bits |= 1 << (LightGridScript.EXACT - 1)
-		rows[at + 9] = float(bits & 255) / 255.0
-		rows[at + 10] = float((bits >> 8) & 255) / 255.0
-		rows[at + 11] = float((bits >> 16) & 255) / 255.0
+		rows[at + 9] = float(bits & 1023) / LightGridScript.LOOK_CHANNEL
+		rows[at + 10] = float((bits >> 10) & 1023) / LightGridScript.LOOK_CHANNEL
+		rows[at + 11] = float((bits >> 20) & 1023) / LightGridScript.LOOK_CHANNEL
 		# The core: plain (white), a palette shade, or anything.
 		var core := Color(1.0, 1.0, 1.0)
 		var pick: float = rng.randf()
 		if pick < 0.4:
-			var m: int = rng.randi_range(0, 20)
+			var m: int = rng.randi_range(0, LightGridScript.MATERIALS * 3 - 1)
 			core = Color(LightGridScript.SHADES[m * 3], LightGridScript.SHADES[m * 3 + 1], LightGridScript.SHADES[m * 3 + 2])
 		elif pick < 0.8:
 			core = Color(rng.randf(), rng.randf(), rng.randf())
@@ -235,7 +235,7 @@ func test_a_rows_glow_is_its_looks() -> void:
 	var plain: Vector3 = grid.look_glow(1.0, 1.0, 1.0, 1, 0, 0, 0, false)
 	check(plain.is_equal_approx(Vector3(0.851 + (0.961 - 0.851) * 0.35, 0.278 + (0.604 - 0.278) * 0.35, 0.478 + (0.722 - 0.478) * 0.35)), "a plain look glows in its player's colours")
 	# An enemy's: the fifth ramp.
-	var enemy: Vector3 = grid.look_glow(1.0, 1.0, 1.0, 1, 0, 0, 1 << (LightGridScript.ENEMY_RAMP - 17), false)
+	var enemy: Vector3 = grid.look_glow(1.0, 1.0, 1.0, 1, 0, 0, 1 << (LightGridScript.ENEMY_RAMP - 21), false)
 	check(enemy.is_equal_approx(Vector3(0.651 + (0.890 - 0.651) * 0.35, 0.541 + (0.812 - 0.541) * 0.35, 0.165 + (0.420 - 0.165) * 0.35)), "an enemy's in Blight")
 	# A fire core with an ice infusion: it glows in the ice's material.
 	var fire_ice: Vector3 = grid.look_glow(0.878, 0.349, 0.184, 0, 1 << 1, 0, 0, false)

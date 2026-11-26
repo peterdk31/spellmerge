@@ -151,8 +151,11 @@ constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
 constexpr double SPECK_RADIUS = 2.0;
-constexpr int64_t LOOK_ENEMY_RAMP = 1 << 22;
-constexpr int64_t EMITTING_MASK = ((1 << 22) - 1) & ~(1 << 10);
+constexpr int64_t LOOK_ENEMY_RAMP = 1 << 28;
+constexpr int64_t EMITTING_MASK = ((1 << 23) - 1) & ~(1 << 10);
+// A look channel's bits (ProjectileManager.LOOK_CHANNEL_BITS).
+constexpr int64_t LOOK_CHANNEL_BITS = 10;
+constexpr int64_t LOOK_CHANNEL_MAX = (1 << LOOK_CHANNEL_BITS) - 1;
 constexpr int PARTICLES_PER_SHOT_MAX = 12;
 // core/actors: the first ramp that is not a hat's, "no team", and the world's (nobody's foe).
 constexpr int RAMP_ENEMY = 4;
@@ -1446,6 +1449,7 @@ const Constant CONSTANTS[] = {
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
 	{ "SPECK_RADIUS", (double)SPECK_RADIUS },
 	{ "LOOK_ENEMY_RAMP", (double)LOOK_ENEMY_RAMP },
+	{ "LOOK_CHANNEL_BITS", (double)LOOK_CHANNEL_BITS },
 	{ "EMITTING_MASK", (double)EMITTING_MASK },
 	{ "PARTICLES_PER_SHOT_MAX", (double)PARTICLES_PER_SHOT_MAX },
 	{ "RAMP_ENEMY", (double)RAMP_ENEMY },
@@ -1683,8 +1687,9 @@ inline Color look_color(int64_t ramp, int64_t zoom, int64_t look) {
 	const bool hat = is_hat_ramp(ramp);
 	const int64_t bits = hat ? (look & ~LOOK_ENEMY_RAMP) : (look | LOOK_ENEMY_RAMP);
 	const int64_t red = (hat ? ramp : 0) + clampi(zoom, 0, 63) * 4;
-	return Color((float)((double)red / 255.0), (float)((double)(bits & 255) / 255.0),
-			(float)((double)((bits >> 8) & 255) / 255.0), (float)((double)((bits >> 16) & 255) / 255.0));
+	const double m = (double)LOOK_CHANNEL_MAX;
+	return Color((float)((double)red / 255.0), (float)((double)(bits & LOOK_CHANNEL_MAX) / m),
+			(float)((double)((bits >> LOOK_CHANNEL_BITS) & LOOK_CHANNEL_MAX) / m), (float)((double)((bits >> (2 * LOOK_CHANNEL_BITS)) & LOOK_CHANNEL_MAX) / m));
 }
 // `still_code`.
 inline double still_code(double age, double left) {

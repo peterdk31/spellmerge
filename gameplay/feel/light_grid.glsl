@@ -34,24 +34,27 @@ const float RUNE_REACH = 1.5;
 const float FLASH_FROM = 0.02;
 const float FLASH_SPAN = 0.42;
 const float HF_LIVE = 1.0;
-const int MATERIALS = 7;
+const int MATERIALS = 8;
 const int ENEMY_PLAYER = 4;
-const int KIND_COUNT = 22;
-const int ENEMY_RAMP = 23;
-const int EXACT = 24;
+const int KIND_COUNT = 23;
+const int ENEMY_RAMP = 29;
+const int EXACT = 30;
+const int LOOK_BITS = 10;
+const float LOOK_CHANNEL = 1023.0;
 const int PALETTE_MOST = 4;
 const float INFUSION_MARK = 128.0 / 255.0;
 
 const float P_BASE[15] = float[](0.231, 0.451, 0.788, 0.851, 0.278, 0.478, 0.247, 0.561, 0.310, 0.541, 0.310, 0.769, 0.651, 0.541, 0.165);
 const float P_LIGHT[15] = float[](0.498, 0.753, 0.941, 0.961, 0.604, 0.722, 0.561, 0.831, 0.416, 0.788, 0.604, 0.941, 0.890, 0.812, 0.420);
-const float SHADES[63] = float[](
+const float SHADES[72] = float[](
 	0.561, 0.176, 0.165, 0.878, 0.349, 0.184, 1.0, 0.635, 0.235,
 	0.722, 0.502, 0.122, 0.949, 0.761, 0.188, 1.0, 0.953, 0.651,
 	0.122, 0.439, 0.502, 0.310, 0.839, 0.863, 0.769, 0.965, 0.949,
 	0.290, 0.078, 0.314, 0.627, 0.188, 0.604, 0.878, 0.541, 0.847,
 	0.247, 0.420, 0.063, 0.706, 0.910, 0.165, 0.933, 1.0, 0.651,
 	0.639, 0.624, 0.722, 0.831, 0.816, 0.878, 0.957, 0.945, 0.918,
-	0.059, 0.290, 0.267, 0.118, 0.612, 0.549, 0.435, 0.863, 0.753);
+	0.059, 0.290, 0.267, 0.118, 0.612, 0.549, 0.435, 0.863, 0.753,
+	0.129, 0.102, 0.118, 0.290, 0.216, 0.161, 0.722, 0.541, 0.243);
 
 // The frame (LightGridGpu.FRAME_*): head (cell, boxes, lamps, unused), a view's (origin x, y,
 // columns, rows) and (atlas x, y, 0, 0), the infusion table, the boxes that block light and their
@@ -92,8 +95,8 @@ shared uint keep[64];
 
 bool bit_set(int b0, int b1, int b2, int look) {
 	int bit = look - 1;
-	int byte_of = bit < 8 ? b0 : (bit < 16 ? b1 : b2);
-	return ((byte_of >> (bit % 8)) & 1) == 1;
+	int channel = bit < LOOK_BITS ? b0 : (bit < 2 * LOOK_BITS ? b1 : b2);
+	return ((channel >> (bit % LOOK_BITS)) & 1) == 1;
 }
 
 int material_of(float r, float g, float b) {
@@ -171,9 +174,9 @@ vec3 look_glow(float cr, float cg, float cb, int who, int b0, int b1, int b2) {
 vec3 glow_of(int at) {
 	float red = floor(rows[at + 8] * 255.0 + 0.5);
 	int who = int(mod(red, 4.0));
-	int b0 = int(floor(rows[at + 9] * 255.0 + 0.5));
-	int b1 = int(floor(rows[at + 10] * 255.0 + 0.5));
-	int b2 = int(floor(rows[at + 11] * 255.0 + 0.5));
+	int b0 = int(floor(rows[at + 9] * LOOK_CHANNEL + 0.5));
+	int b1 = int(floor(rows[at + 10] * LOOK_CHANNEL + 0.5));
+	int b2 = int(floor(rows[at + 11] * LOOK_CHANNEL + 0.5));
 	return look_glow(rows[at + 12], rows[at + 13], rows[at + 14], who, b0, b1, b2);
 }
 

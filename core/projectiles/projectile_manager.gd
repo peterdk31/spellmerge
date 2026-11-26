@@ -478,17 +478,26 @@ const LOOK_DOUBLE: int = 19
 const LOOK_CONVERGE: int = 20
 const LOOK_DRIFT: int = 21
 ## Water: drops shaken off the path that fall and splash (kind 22, Feel's poof flag until the poof
-## became a flash kind of its own: flash kinds F2). 23 is the enemy ramp and 24 the exact colour:
+## became a flash kind of its own: flash kinds F2). 29 is the enemy ramp and 30 the exact colour:
 ## not kinds.
 const LOOK_DROPS: int = 22
-const LOOK_COUNT: int = 23
-## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
-const LOOK_MAX_KINDS: int = 24
-## A flag in the look, not a kind (kind 23 of the shader): drawn in the enemy ramp (Blight
+## Oil: a dark drip that hangs under the shot, stretches and falls, its sheen catching the light
+## (docs/milestones/oil-spill.md; the look slots widened for it, the owner, 2026-11-26).
+const LOOK_SLICK: int = 23
+const LOOK_COUNT: int = 24
+## The most kinds the instance data has room for: three channels of LOOK_CHANNEL_BITS bits
+## (`look_color`), the two flags at the top (the enemy ramp, and Feel's EXACT past it).
+const LOOK_MAX_KINDS: int = 30
+## Bits a channel of the instance colour carries (green, blue, alpha), as n / (2^bits - 1): ten, so
+## the look holds 30 (the owner, 2026-11-26: room for Oil's own look). A colour channel keeps ten
+## bits whole on both renderers (stored as floats; `test_projectile_looks` holds every value).
+const LOOK_CHANNEL_BITS: int = 10
+const LOOK_CHANNEL_MAX: int = (1 << LOOK_CHANNEL_BITS) - 1
+## A flag in the look, not a kind (kind 29 of the shader): drawn in the enemy ramp (Blight
 ## ochre, docs/STYLE.md) wherever a hat colour would show (staffs F2). Set by `ramp_look` for
 ## any ramp that is not a hat ramp (0-3): the shader's ramp field is two bits and this flag;
-## kind 24 is Feel's EXACT.
-const LOOK_ENEMY_RAMP: int = 1 << 22
+## kind 30 is Feel's EXACT.
+const LOOK_ENEMY_RAMP: int = 1 << 28
 ## A shot is drawn in a quad of LOOK_GRID x zoom screen pixels across: a rune's is
 ## square round its centre, a bolt's or orbit shot's LOOK_LENGTH x zoom long with the shot
 ## LOOK_GRID / 2 x zoom from its front, for its tail (48 px at zoom 1), the particles it gives off
@@ -556,7 +565,7 @@ const SPARK_TAG_BITS: int = 12
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
 ## twinkle, 11 the weave none).
-const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4, 0.45]
+const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4, 0.45, 0.4]
 ## A dash's speed streak: a birth of this look kind is one of the motes' dash path kinds
 ## (`MoteKind.dash_path`). The manager lays none: a dash's streaks are a `stream` part of its cue,
 ## which Feel gives off in this format (gameplay/feel/streams.gd; spell-spectacle-2.md, S5).
@@ -5700,6 +5709,38 @@ func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, cor
 	return spark_birth_count < SPARK_BIRTHS_MAX
 
 
+## A birth's look float holds its layers only: a float keeps whole numbers to 2^24, and the look's
+## flags (the enemy ramp, Feel's EXACT) sit at bits 28 and 29 since the look widened to 30. Its
+## flags ride in its ramp float instead, `ramp + SPARK_FLAG_STEP x flags` (`birth_ramp`), read back
+## by `birth_ramp_of` and `birth_look_of` (the motes, in GDScript and natively).
+const SPARK_FLAG_STEP: int = 16
+## The look's first flag's bit (LOOK_ENEMY_RAMP's).
+const SPARK_FLAG_SHIFT: int = 28
+const SPARK_LAYER_MASK: int = (1 << SPARK_FLAG_SHIFT) - 1
+
+
+## A birth's ramp float: `ramp` (-1 to 7) and the flags of `look`.
+static func birth_ramp(ramp: int, look: int) -> float:
+	return float(ramp + SPARK_FLAG_STEP * (look >> SPARK_FLAG_SHIFT))
+
+
+## A birth's look float: the layers of `look`.
+static func birth_look(look: int) -> float:
+	return float(look & SPARK_LAYER_MASK)
+
+
+## The ramp a birth's ramp float `ramp_value` carries.
+static func birth_ramp_of(ramp_value: float) -> int:
+	var whole: int = int(ramp_value)
+	return whole - SPARK_FLAG_STEP * floori(float(whole + SPARK_FLAG_STEP / 2) / float(SPARK_FLAG_STEP))
+
+
+## The whole look a birth carries: the layers of its look float and the flags of its ramp float.
+static func birth_look_of(ramp_value: float, look_value: float) -> int:
+	var whole: int = int(ramp_value)
+	return int(look_value) | (floori(float(whole + SPARK_FLAG_STEP / 2) / float(SPARK_FLAG_STEP)) << SPARK_FLAG_SHIFT)
+
+
 ## Write a birth (see `_add_birth`) as birth `n` of `births`.
 static func _put_birth(births: PackedFloat32Array, n: int, at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> void:
 	var i: int = n * SPARK_BIRTH_STRIDE
@@ -5708,8 +5749,8 @@ static func _put_birth(births: PackedFloat32Array, n: int, at: Vector2, back: Ve
 	births[i + SPARK_BACK_X] = back.x
 	births[i + SPARK_BACK_Y] = back.y
 	births[i + SPARK_KIND] = float(kind)
-	births[i + SPARK_RAMP] = float(ramp)
-	births[i + SPARK_LOOK] = float(look)
+	births[i + SPARK_RAMP] = birth_ramp(ramp, look)
+	births[i + SPARK_LOOK] = birth_look(look)
 	births[i + SPARK_CORE] = core.r
 	births[i + SPARK_CORE + 1] = core.g
 	births[i + SPARK_CORE + 2] = core.b
@@ -6195,7 +6236,14 @@ func _look_color(slot: int) -> Color:
 ## it too, so the encoding lives in one place.
 static func look_color(ramp: int, zoom: int, look: int) -> Color:
 	var bits: int = ramp_look(ramp, look)
-	return Color(float(look_red(ramp, zoom)) / 255.0, float(bits & 255) / 255.0, float((bits >> 8) & 255) / 255.0, float((bits >> 16) & 255) / 255.0)
+	var m: float = float(LOOK_CHANNEL_MAX)
+	return Color(float(look_red(ramp, zoom)) / 255.0, float(bits & LOOK_CHANNEL_MAX) / m, float((bits >> LOOK_CHANNEL_BITS) & LOOK_CHANNEL_MAX) / m, float((bits >> (2 * LOOK_CHANNEL_BITS)) & LOOK_CHANNEL_MAX) / m)
+
+
+## The look bits an instance colour's green, blue and alpha carry (`look_color`'s inverse).
+static func look_of_channels(g: float, b: float, a: float) -> int:
+	var m: float = float(LOOK_CHANNEL_MAX)
+	return roundi(g * m) | (roundi(b * m) << LOOK_CHANNEL_BITS) | (roundi(a * m) << (2 * LOOK_CHANNEL_BITS))
 
 
 ## `look_color` for the actor `caster`'s ramp (a shot or an effect of its).
@@ -6275,7 +6323,7 @@ static func row_ramp(rows: PackedFloat32Array, n: int) -> int:
 
 static func row_look(rows: PackedFloat32Array, n: int) -> int:
 	var i: int = n * DRAW_STRIDE
-	return roundi(rows[i + 9] * 255.0) | (roundi(rows[i + 10] * 255.0) << 8) | (roundi(rows[i + 11] * 255.0) << 16)
+	return look_of_channels(rows[i + 9], rows[i + 10], rows[i + 11])
 
 
 static func row_core(rows: PackedFloat32Array, n: int) -> Color:

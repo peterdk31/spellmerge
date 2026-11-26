@@ -11,9 +11,11 @@
 //                    line stays one pixel, so a bigger shot is bigger, never chunkier (63 at
 //                    most: Feel's flash shaders read their zoom from the row's transform
 //                    instead, so no cue is capped in size)
-//   colour g, b, a   the look: one bit per layer kind (kind 1 is bit 0 of green, kind 9 bit 0
-//                    of blue, kind 17 bit 0 of alpha), every kind the shot's cards bring, and
-//                    the flags (ENEMY_RAMP, EXACT)
+//   colour g, b, a   the look, as n / LOOK_CHANNEL (ten bits a channel): one bit per layer kind
+//                    (kind 1 is bit 0 of green, kind 11 bit 0 of blue, kind 21 bit 0 of alpha),
+//                    every kind the shot's cards bring, and the flags (ENEMY_RAMP, EXACT, at the
+//                    top). A colour channel keeps ten bits whole on both renderers (floats); one
+//                    kept in bytes would not.
 // A shader's vertex() works the look out once (`look_of`, `look_from_color`) and hands it to the
 // fragments with SET_LOOK, so a pixel never does.
 //
@@ -209,7 +211,7 @@ Look look_of(vec3 c, float who, float z, vec3 b, float s, bool particles) {
 // The look an instance colour carries (see above), with the core colour `c`.
 Look look_from_color(vec4 color, vec3 c, float s, bool particles) {
 	float red = floor(color.r * 255.0 + 0.5);
-	return look_of(c, mod(red, 4.0), max(floor(red / 4.0), 1.0), floor(color.gba * 255.0 + 0.5), s, particles);
+	return look_of(c, mod(red, 4.0), max(floor(red / 4.0), 1.0), floor(color.gba * LOOK_CHANNEL + 0.5), s, particles);
 }
 
 // A number in [0, 1) from three numbers and the shot's seed: the same on every machine.

@@ -108,7 +108,7 @@ func new_frame() -> void:
 func motes_of(tag: int, look: int) -> PackedInt32Array:
 	if not _card_motes or tag == 0:
 		return _motes.kinds_of_look(look)
-	# A tag is below 2^25 and a look's layers below 2^21: one int for both.
+	# A tag is below 2^25 and a look's layers below 2^23: one int for both.
 	var key: int = tag | ((look & LAYER_BITS) << 25)
 	var seen: Variant = _seen.get(key)
 	if seen != null:

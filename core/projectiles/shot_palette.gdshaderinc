@@ -16,6 +16,9 @@ const vec3 ICE_LIGHT = vec3(0.769, 0.965, 0.949);
 const vec3 SPARK_LIGHT = vec3(1.0, 0.953, 0.651);
 const vec3 WATER_BASE = vec3(0.118, 0.612, 0.549);
 const vec3 WATER_LIGHT = vec3(0.435, 0.863, 0.753);
+const vec3 OIL_SHADOW = vec3(0.129, 0.102, 0.118);
+const vec3 OIL_BASE = vec3(0.290, 0.216, 0.161);
+const vec3 OIL_LIGHT = vec3(0.722, 0.541, 0.243);
 const vec3 VOID_BASE = vec3(0.627, 0.188, 0.604);
 const vec3 VOID_LIGHT = vec3(0.878, 0.541, 0.847);
 const vec3 ARC_BASE = vec3(0.706, 0.910, 0.165);
@@ -27,16 +30,17 @@ const vec3 STONE_SHADOW = vec3(0.169, 0.157, 0.251);
 const vec3 STONE_BASE = vec3(0.290, 0.275, 0.388);
 const vec3 STONE_LIGHT = vec3(0.478, 0.463, 0.580);
 // The materials a core's tint can name, three shades each (shadow, base, light): Fire, Spark,
-// Ice, Void, Arc, Bone, Water.
-const int MATERIALS = 7;
-const vec3 SHADES[21] = vec3[](
+// Ice, Void, Arc, Bone, Water, Oil.
+const int MATERIALS = 8;
+const vec3 SHADES[24] = vec3[](
 	vec3(0.561, 0.176, 0.165), vec3(0.878, 0.349, 0.184), vec3(1.0, 0.635, 0.235),
 	vec3(0.722, 0.502, 0.122), vec3(0.949, 0.761, 0.188), vec3(1.0, 0.953, 0.651),
 	vec3(0.122, 0.439, 0.502), vec3(0.310, 0.839, 0.863), vec3(0.769, 0.965, 0.949),
 	vec3(0.290, 0.078, 0.314), vec3(0.627, 0.188, 0.604), vec3(0.878, 0.541, 0.847),
 	vec3(0.247, 0.420, 0.063), vec3(0.706, 0.910, 0.165), vec3(0.933, 1.0, 0.651),
 	vec3(0.639, 0.624, 0.722), vec3(0.831, 0.816, 0.878), vec3(0.957, 0.945, 0.918),
-	vec3(0.059, 0.290, 0.267), vec3(0.118, 0.612, 0.549), vec3(0.435, 0.863, 0.753));
+	vec3(0.059, 0.290, 0.267), vec3(0.118, 0.612, 0.549), vec3(0.435, 0.863, 0.753),
+	vec3(0.129, 0.102, 0.118), vec3(0.290, 0.216, 0.161), vec3(0.722, 0.541, 0.243));
 
 // The layer kinds (LOOK_* in projectile_manager.gd): one bit each in the look.
 const float L_EMBERS = 1.0;
@@ -61,12 +65,17 @@ const float L_DOUBLE = 19.0;
 const float L_CONVERGE = 20.0;
 const float L_DRIFT = 21.0;
 const float L_DROPS = 22.0;
-const float KIND_COUNT = 22.0;
+const float L_SLICK = 23.0;
+const float KIND_COUNT = 23.0;
 // Flags in the look, not particles: the enemy ramp (Blight ochre takes the player's place; staffs
 // F2), and an exact colour (a reaction's own, its ramp made from it instead of the palette material
-// it is nearest). Kind 22 is water's drops (Feel's poof flag until flash kinds F2).
-const float ENEMY_RAMP = 23.0;
-const float EXACT = 24.0;
+// it is nearest), at the top of the look's 30 (LOOK_ENEMY_RAMP in projectile_manager.gd).
+const float ENEMY_RAMP = 29.0;
+const float EXACT = 30.0;
+// A look channel's bits (green, blue, alpha of the instance colour, n / LOOK_CHANNEL; LOOK_CHANNEL_BITS
+// in projectile_manager.gd).
+const float LOOK_CHANNEL = 1023.0;
+const float LOOK_BITS = 10.0;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:
 // 4 + 2n, so one card is a trickle, many cards a richer mix, never a cloud
 // (`particles_of` in projectile_manager.gd; keep the two equal).
@@ -99,8 +108,15 @@ const float STILL_HIT = 0.15;
 
 bool bit_set(vec3 b, float look) {
 	float bit = look - 1.0;
-	float byte = bit < 8.0 ? b.x : (bit < 16.0 ? b.y : b.z);
-	return mod(floor(byte / exp2(mod(bit, 8.0))), 2.0) > 0.5;
+	float channel = bit < LOOK_BITS ? b.x : (bit < 2.0 * LOOK_BITS ? b.y : b.z);
+	return mod(floor(channel / exp2(mod(bit, LOOK_BITS))), 2.0) > 0.5;
+}
+
+// A look int's three channels (`ProjectileManager.look_color`'s green, blue and alpha, as whole
+// numbers), for `bit_set`: a beam's or a swing's look comes as an int, never through a colour.
+vec3 look_channels(int look) {
+	int m = (1 << int(LOOK_BITS)) - 1;
+	return vec3(float(look & m), float((look >> int(LOOK_BITS)) & m), float((look >> (2 * int(LOOK_BITS))) & m));
 }
 
 bool flag_set(float flags, float f) {

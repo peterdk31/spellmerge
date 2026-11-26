@@ -60,6 +60,7 @@ private:
 	int64_t _row_source = 0, _row_kind = 0, _row_life = 0, _row_height = 0, _row_core = 0, _row_seed = 0;
 	int64_t _spark_x = 0, _spark_y = 0, _spark_back_x = 0, _spark_back_y = 0, _spark_kind = 0;
 	int64_t _spark_ramp = 0, _spark_look = 0, _spark_core = 0, _spark_tag = 0, _spark_tag_bits = 0;
+	int64_t _spark_flag_step = 0, _spark_flag_shift = 0;
 	int64_t _spark_streak = 0, _pair_layers = 0;
 	int64_t _enemy_source = 0, _exact_source = 0, _look_enemy_ramp = 0, _look_exact = 0;
 	double _life_max = 0.0, _height_max = 0.0, _source_code = 0.0, _kind_code = 0.0, _trail_speed = 0.0;

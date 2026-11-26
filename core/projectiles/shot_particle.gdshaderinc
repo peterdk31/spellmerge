@@ -162,6 +162,17 @@ Particle place_particle(float look, vec2 from, float a, float i, float cyc, floa
 		p.shown = a < 0.85;
 		p.run = a > 0.65 ? 1.0 : 0.0;
 		p.rgb = a < 0.35 ? WATER_LIGHT : WATER_BASE;
+	} else if (look == L_SLICK) {
+		// Oil: a heavy drip that hangs under the path, stretches to a string as it lets go, then
+		// falls straight down; its top catches the light (the sheen), the rest is the dark oil.
+		float hang = 0.45;
+		float x = -2.0 - 3.0 * h;
+		float y = a < hang ? 1.0 + 2.0 * a / hang : 3.0 + 5.0 * (a - hang) * (a - hang) / ((1.0 - hang) * (1.0 - hang));
+		p.at = floor(from + vec2(x, y) * z);
+		p.shown = a < 0.9;
+		// The string back up to the path while it stretches (a pixel above it).
+		p.extra = a < hang && a > 0.2 ? vec2(0.0, -1.0) : vec2(0.0);
+		p.rgb = a < 0.15 ? OIL_LIGHT : (a < hang ? OIL_BASE : OIL_SHADOW);
 	}
 	return p;
 }

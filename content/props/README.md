@@ -12,11 +12,11 @@ Things in the world that stand, block, take hits, react by casting spell cards a
 
 - **One folder each:** `content/props/<id>/` with `<id>.tres` (a `PropBase`, core/base/prop_base.gd), `<id>_states.tres` (a `PropStates`; may name another prop's instead), its art, `assets.json` and `test_<id>.gd`. Deleting a prop is deleting its folder. Registry folder `props`, by `id`.
 - **One shared body:** `base/prop.tscn` (team `Actors.TEAM_WORLD`; `Health`, `Hurtbox`, `Footprint`, `Caster`, `PropStateTriggers`, `Sprite`, `PropLook`; no controller, no Mover), filled by `PropBody.make(data)`. **No `.gd` and no scene per prop:** a new prop is data and art.
-- **`PropBase`:** `id`, `display_name`, `scene`, `max_health`, `invincible`, `role`, `area_size`, `area_offset`, hurt shape (`radius` or `size`, `offset`), ground (`footprint_radius` or `footprint_size`, `footprint_offset`), `blocks_light` (`shaft_size`, `shaft_offset`; view only), `staffs` (1–4 `StaffCards`; `wind_up` is a fuse, `wind_cue` its look), `stats` (`ActorStats`; null: defaults), `states`, `looks`.
+- **`PropBase`:** `id`, `display_name`, `scene`, `max_health`, `invincible`, `role`, `area_size`/`area_offset`, hurt shape (`radius` or `size`, `offset`), ground (`footprint_*`), `blocks_light` (view only), `staffs` (1–4 `StaffCards`; `wind_up` is a fuse), `stats`, `states`, `looks`.
 - **Looks:** `PropBase.looks`, one `PropStateLook` per state (`state_id`; empty: every state without its own; every state needs one). A look has:
   - `layers` (`PropLayer`, in order): `texture`, `frames`, `fps`, `loop_from` (0 loops all; a later frame plays the change once then loops; the last frame plays once and holds), `offset` (whole pixels), `drawn` (`AMONG_BODIES`, `OVER_BODIES`, `ON_FLOOR`, `HIDDEN`), `motes` (`MoteSource`; content/motes/README.md). A look only shown (set up, snapshot restore) starts at rest, with no change played.
   - **The first layer is the body** (the scene's `Sprite`, flashed by hits): never `HIDDEN` nor `OVER_BODIES`. A mote mask is a still layer of its own, never the body's nor a multi-frame one.
-  - a light: `light_reach`, `light_at`, `light_tint` / `light_layer`, `light_after`, `light_until`.
+  - a light (`light_reach` above 0, `light_*`).
   - `cue`: played as the state is entered (not the start state).
 - **Changes of state play their frames** (docs/STYLE.md, "Smooth").
 - **Art from a grid:** `<name>.grid.json` -> `tools/pixel_grid.py` -> `<name>.svg` (and `<name>_motes.svg` when the grid marks `*`). Commit the grid and both SVGs; `tools/test_pixel_grid.py` fails when they differ.

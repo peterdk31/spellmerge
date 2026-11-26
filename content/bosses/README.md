@@ -9,14 +9,14 @@ Boss fights with several phases, fair and readable for 1 to 4 players. The examp
 A boss is an enemy (content/enemies/README.md) with `boss = true`: **data, with no script of its own**. A behaviour the AI lacks goes into `gameplay/ai/` for every enemy, never into one boss.
 
 - **Data:** an `EnemyBase` (`core/base/enemy_base.gd`) `.tres`: `id` (the folder's name), `display_name`, `lore`, `max_health`, `health_per_player` (share added per player after the first, live), `move_speed`, `contact_damage`, `boss = true`, `size`, `hit_color`, `stats`, `biomes`, `min_depth`.
-- **Stats:** `stats`, an `ActorStats` sub-resource (core/base/actor_stats.gd): `power`, `mass`, `spell_scale` (size, never reach), `resist_burn`, `resist_chill`, `resist_gust`, `resist_hex`, `resist_static`, `resist_possess`. A phase may set its own (`EnemyPhase.stats`; null keeps the last).
+- **Stats:** `stats`, an `ActorStats` (core/base/actor_stats.gd): `power`, `mass`, `spell_scale` (size, never reach), `resist_*`. A phase may set its own (null keeps the last).
 - **Lore:** one line, at most 60 characters; `Registry.validate_story` checks it. Add its name and story to docs/STORY.md in the same PR.
 - **Staffs:** `StaffCards` sub-resources of its `.tres`, never files in `content/wizard/staffs/`. Each `StaffBase` has `slots`, `wind_up` (the telegraph), `cooldown` (up to 30 s), `first_wait`, its mana, and player card ids in slot order. Moment cues: `wind_cue`, `move_cue`, `cast_cue`, `wall_cue`.
 - **Moves** are its cards': a dash's pass is its hurt shape × `radius_mult`, never × `spell_scale`; keep it inside the body's art.
 - **Profile:** `profile`, an `AIProfile` sub-resource (never in `content/enemies/profiles/`): `aim_lock`, `turns`. Running up for a long move and walking round props are the AI's.
 - **Phases:** `phases`, `EnemyPhase`: a condition (`health_below` or `after_seconds`), once, in order; protected for `transition`; then its `staffs` (list all, including ones that stay), `stats`, `profile`, `look` (`PhaseLook`: texture, face style, `face_row`, size, `parts`, `motes`, `motes_on`, `sound`, `cue`), `intensity`.
-- **Adds:** `EnemyPhase.adds` (`EnemyAdds`, core/base/enemy_adds.gd): `enemy` (a `content/enemies/` id, never a boss), `count`, `per_player`, `every`, `wave_count`, `wave_per_player`, `cap`, `cap_per_player`, `at`. They crumble when the boss dies.
-- **Scene:** an actor like an enemy's: `Health`, `Hurtbox`, `Contact`, `Mover`, `Footprint`, `Caster`, `AIController`, `CreatureLook` (`full_speed`, `hops`), `Sprite`, `Face`. `Stats` is added by the body from its data.
+- **Adds:** `EnemyPhase.adds` (`EnemyAdds`, core/base/enemy_adds.gd: `enemy` (never a boss), counts per player, waves, caps, `at`); they crumble when the boss dies.
+- **Scene:** an actor like an enemy's (see the broom's); `Stats` is added by the body from its data.
 - **Sounds:** its cues are `content/cues/` files with a prefix of its own (cues must sit in `content/cues`); each names a sound id whose recipe is `audio/sfx/<id>/`. A cue's `held` part lasts as long as its moment. `death_sound` replaces `boss_death`'s.
 - **Intro:** `boss_intro`, a `BossIntro` sub-resource (core/base/boss_intro.gd; docs/milestones/boss-intro.md): `portrait` (three 96×96 frames, or 192×192 at `@2x`: rest, mean, eyes), `lines` (at most three, at most 60 characters, the boss alone speaking), `accent` (a docs/STYLE.md ramp), `dark_cue`, `reveal_cue`. Checked by `BossIntro.problems`.
 - **Music:** `music`, a `MusicTrack` (core/base/music_track.gd); each phase raises the intensity.
@@ -49,7 +49,7 @@ A boss needing one of these needs the general piece built in the shared engine f
 1. Copy `old_broom/` to `content/bosses/<id>/`, rename its files; set `id` (the boss's and each staff's) to the folder's name; point `scene` and sprites at the new folder.
 2. Give it a name and a line of lore; add both to docs/STORY.md.
 3. Write its staffs, profile and phases in the `.tres`; set `biomes`.
-4. Replace the parts' art (grids `<part>.grid.json` via `tools/pixel_grid.py`, or `tools/enemy_art.py`), pivots, offsets, frames, numbers, face sheets, `anchor`, `glow`; list each sprite in `assets.json`; commit the `.uid` and `.import` files.
+4. Replace the parts' art (`tools/enemy_art.py` or `tools/pixel_grid.py`), their numbers and the face sheets; list each sprite in `assets.json`; commit the `.uid` and `.import` files.
 5. Rewrite its test for its own data; play it in a one-room run (`bench/pinned_run.gd`, `fill` boss).
 6. Run the checks; open a PR with a GIF or video of the whole fight.
 

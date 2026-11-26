@@ -65,10 +65,11 @@ jobs:
             python3 -m unittest discover -s tools
           fi
 
-
   godot-tests:
     # The game's whole unit test suite on every PR (the owner, 2026-11-26), so a session needs no
-    # full run of its own and a PR is merged on this check, run again for each new push.
+    # full run of its own; the orchestrator merges on it (.claude/skills/orchestrate). Not yet one
+    # of the ruleset's required checks nor smbot.merge's REQUIRED_CHECKS (it takes longer than
+    # their 15-minute wait): that is the owner's call.
     name: godot-tests
     runs-on: ubuntu-latest
     timeout-minutes: 45

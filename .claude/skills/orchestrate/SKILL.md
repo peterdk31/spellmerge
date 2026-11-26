@@ -28,7 +28,7 @@ Its message arrives as a notification: call ReadNotifications.
 
 ## Merging (only you merge)
 A PR merges when all of these hold:
-- its checks are green on the head sha: `rules`, `ci-tests` and `godot-tests` (the whole unit suite);
+- its checks are green on the head sha: `rules`, `ci-tests` and `godot-tests` (the whole unit suite). Check `godot-tests` yourself: it is not a required check of the ruleset or of `ci/smbot/merge.py`;
 - the branch contains the current `origin/main`;
 - one fresh-context review was done;
 - the owner's open questions are answered, or are only refinements.

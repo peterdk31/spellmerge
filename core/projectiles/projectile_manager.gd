@@ -256,6 +256,9 @@ const F_ALONE: int = 1024
 ## Spent by a hit in the hit pass (`_finding`): it takes no more hits, and is ended with the
 ## pass's other spent shots at the pass's end (`_end_spent`), its slot held until its hits are sent.
 const F_SPENT: int = 2048
+## It is a field (`set_field`; the `field` carrier, docs/milestones/field.md): the field pass never
+## hands it back as a shot that came into a field.
+const F_FIELD: int = 4096
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
@@ -680,7 +683,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_trail_out", &"_trail_count"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_trail_out", &"_trail_count", &"_field_out", &"_field_out_field"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -872,6 +875,11 @@ var _trail_y: PackedInt32Array = PackedInt32Array()
 ## and how many (`trail_count`). Written in place; the pass sizes it to the cap once.
 var _trail_out: PackedInt32Array = PackedInt32Array()
 var _trail_count: int = 0
+## Scratch: what the last field pass found (`shots_into_fields`): each shot that came into a field,
+## in slot order, and the index of that field in the list it was handed, in its order. Sized to the
+## cap once; written in place.
+var _field_out: PackedInt32Array = PackedInt32Array()
+var _field_out_field: PackedInt32Array = PackedInt32Array()
 var _curve_to: PackedFloat32Array = PackedFloat32Array()
 var _curve_ease: PackedFloat32Array = PackedFloat32Array()
 var _curve_speed: PackedFloat32Array = PackedFloat32Array()
@@ -1837,6 +1845,8 @@ func set_cap(value: int) -> void:
 	_trail_x.resize(_cap)
 	_trail_y.resize(_cap)
 	_trail_out.resize(_cap)
+	_field_out.resize(_cap)
+	_field_out_field.resize(_cap)
 	_curve_to.resize(_cap)
 	_curve_ease.resize(_cap)
 	_curve_speed.resize(_cap)
@@ -3095,6 +3105,27 @@ func set_shield(slot: int, charges: int) -> bool:
 	else:
 		_leave(slot, B_SHIELD)
 	return true
+
+
+## How many more times the shot in `slot` bounces off a wall (`set_bounce`; 0 for a dead slot).
+func get_bounce_of(slot: int) -> int:
+	return _bounce[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0
+
+
+## The seconds the shot in `slot` sticks to what it hits (`set_sticky`; 0 for none or a dead slot).
+func get_sticky_of(slot: int) -> float:
+	return _stick[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0.0
+
+
+## True when the shot in `slot` is alive and has every one of `flags` (F_*: `set_return`'s F_RETURN,
+## `set_spiral`'s F_WAVE, ...).
+func has_flags(slot: int, flags: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and (_flags[slot] & flags) == flags
+
+
+## True when the shot in `slot` homes (`set_homing`, `set_homing_curve`).
+func is_homing(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and ((_kinds[slot] >> B_HOMING) & 1) != 0
 
 
 ## How many shield charges the shot in `slot` has left.
@@ -4915,6 +4946,106 @@ func shots_into_gates() -> int:
 	return found
 
 
+## The fields (the `field` carrier, docs/milestones/field.md): the still shot in `slot` is a field.
+## It hits nothing (no hit layers: the hit pass tests no target for it), and the field pass never
+## hands it back itself (it does not take another field's cards).
+func set_field(slot: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_flags[slot] |= F_FIELD
+	_layers[slot] = 0
+	return true
+
+
+## The field pass: the shots that came into one of the first `count` fields of `fields` (their slots;
+## a dead or stale one is passed by) in the last step: those whose middle was outside the field's
+## circle before the step and is inside it now, or went through it (a fast shot). Every shot that moved is seen, flying, circling or
+## homing, but a field, a stopped shot (a local stop, a linger's hold, a stuck one) and a falling one
+## in the air. Returns how many; `field_shot(n)` and `field_of(n)` say which, in slot order and, for
+## one shot, in the fields' order (at most the cap of them). The native kernel's `field_pass` is
+## this, to the bit; nothing is asked of it with no field.
+func shots_into_fields(fields: PackedInt32Array, count: int) -> int:
+	count = mini(count, fields.size())
+	if count <= 0:
+		return 0
+	if _kernel != null:
+		var found: int = _kernel.call(&"field_pass", self, fields, count)
+		if found >= 0:
+			return found
+	return _pass_fields(fields, count)
+
+
+## `shots_into_fields`' GDScript (the reference the kernel is held to, and its fallback).
+func _pass_fields(fields: PackedInt32Array, count: int) -> int:
+	var found: int = 0
+	var most: int = _field_out.size()
+	# The box round every live field: a shot outside it is in none (a shortcut the kernel need not
+	# take: it changes no answer).
+	var box := Rect2()
+	var boxed: bool = false
+	for n in count:
+		var field: int = fields[n]
+		if field < 0 or field >= _high or _alive[field] == 0 or (_flags[field] & F_FIELD) == 0:
+			continue
+		var round_it := Rect2(_pos[field] - Vector2(_radius[field], _radius[field]), Vector2(_radius[field], _radius[field]) * 2.0)
+		box = round_it if not boxed else box.merge(round_it)
+		boxed = true
+	if not boxed:
+		return 0
+	box = box.grow(1.0)
+	for slot in _high:
+		if _alive[slot] == 0:
+			continue
+		var flags: int = _flags[slot]
+		if (flags & F_FIELD) != 0:
+			continue
+		var state: int = _state[slot]
+		if state == S_FROZEN or state == S_STUCK or state == S_HELD:
+			continue
+		var to: Vector2 = _pos[slot]
+		var from: Vector2 = _prev[slot]
+		if from == to:
+			continue
+		if not box.intersects(Rect2(from, Vector2.ZERO).expand(to), true):
+			continue
+		if (flags & F_FALLING) != 0 and to.y < _floor[slot] - FALL_BAND:
+			continue
+		for n in count:
+			var field: int = fields[n]
+			if field < 0 or field >= _high or _alive[field] == 0 or (_flags[field] & F_FIELD) == 0:
+				continue
+			var centre: Vector2 = _pos[field]
+			var radius: float = _radius[field]
+			# A step that stays off the circle's box on one side never comes into it (most, at once).
+			if minf(from.x, to.x) > centre.x + radius or maxf(from.x, to.x) < centre.x - radius or minf(from.y, to.y) > centre.y + radius or maxf(from.y, to.y) < centre.y - radius:
+				continue
+			var within: float = radius * radius
+			if from.distance_squared_to(centre) <= within:
+				continue
+			if to.distance_squared_to(centre) > within:
+				# Not inside now: in only if it went through it in this step (a fast shot).
+				var way: Vector2 = to - from
+				var t: float = clampf((centre - from).dot(way) / way.dot(way), 0.0, 1.0)
+				if (from + way * t).distance_squared_to(centre) > within:
+					continue
+			if found >= most:
+				return found
+			_field_out[found] = slot
+			_field_out_field[found] = n
+			found += 1
+	return found
+
+
+## The `n`th shot the last field pass handed back (its slot), and the index of the field it came
+## into in the list the pass was handed.
+func field_shot(n: int) -> int:
+	return _field_out[n]
+
+
+func field_of(n: int) -> int:
+	return _field_out_field[n]
+
+
 ## Mark in `out` (one byte a place of `grid`, sized to them) each place a live shot is in now
 ## (connected biomes CB3: a shot keeps a room awake, and wakes one it comes into). Allocates nothing
 ## once `out` is sized.
@@ -6447,6 +6578,15 @@ func freeze_shot(slot: int, seconds: float) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or seconds <= 0.0:
 		return false
 	_freeze[slot] = maxf(_freeze[slot], seconds)
+	return true
+
+
+## The shot in `slot` is let go of its local stop now (a field's hold that ended early; the field
+## carrier). False for a shot that is not alive.
+func release_shot(slot: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_freeze[slot] = 0.0
 	return true
 
 

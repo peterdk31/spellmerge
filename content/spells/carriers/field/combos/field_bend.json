@@ -1,0 +1,11 @@
+{
+	"id": "field_bend",
+	"name": "The bend",
+	"does": "A pillar hides the imp; a homing field just past it: a straight bolt fired past the pillar comes into the field and turns back toward the imp behind it.",
+	"casts": [{"staff": 0, "cards": ["homing", "field"]}, {"staff": 1, "cards": ["bolt"], "at": 0.3}],
+	"imps": [[150, 60]],
+	"walls": [[60, 22, 16, 70]],
+	"seconds": 2.0,
+	"needs": "homing",
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

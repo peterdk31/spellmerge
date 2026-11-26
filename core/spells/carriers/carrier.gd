@@ -42,6 +42,7 @@ const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
 const AOE: int = CarrierTraits.AOE
 const MELEE: int = CarrierTraits.MELEE
+const GIVES: int = CarrierTraits.GIVES
 
 ## What draws its look (`look_drawer`), and so which area a card's `look_shader` (and light) is
 ## for (docs/milestones/card-looks.md): the projectile manager's head batches (LOOK_SHOT: a shot
@@ -193,6 +194,12 @@ static func _has_one(has: Dictionary, behaviours: Array) -> bool:
 	return false
 
 
+## True when it gives its cards to the shots that come into it (`GIVES`, a field): its own shot
+## wears none of them but Growth (`Spells._land_shots`), which widens it.
+func gives_cards() -> bool:
+	return has(GIVES)
+
+
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.
 func takes_infusion(blasts: bool) -> bool:
 	return hits() or blasts
@@ -207,7 +214,7 @@ func takes_element(_element: ElementBase, blasts: bool) -> bool:
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`
 ## (`CompiledSpell.homing_range`); 0 where homing cannot steer it.
 func homing_range(ray_length: float, reach: float) -> float:
-	if not steers():
+	if not steers() and not gives_cards():
 		return 0.0
 	return maxf(reach, ray_length) if has(INSTANT_HOMING) else reach
 

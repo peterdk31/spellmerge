@@ -2,7 +2,7 @@
 
 **Status (2026-11-25): the owner decided to build it, Part 1 first** (its first slice: [floor.md](floor.md)), Part 4 beside it in another session; the owner's answers to the open points are below. **Before that: design, for the owner to read (2026-11-25).** The owner parked the nine new cards ([new-cards.md](new-cards.md)): "I'm not sure that these new cards will actually enable builds I really want in the game. I think the fundamental building blocks needs more work", and asked for a design of three foundations: (1) a floor of materials, (2) field carriers, (3) staff-logic cards and wider numbers. This doc starts from the builds they should make possible, then gives each part's mechanism, what it does to the cards there are, and the decisions that are the owner's. Tuning numbers are left for each part's own milestone doc. A review against the code (2026-11-25) corrected the first draft; each part now says what is there today and what is new engine work. The owner continues it later.
 
-**The owner's answers (2026-11-25):** the order can turn: Part 4, the language (builds 9 to 12), is built now, beside Part 1, the floor; its own doc is [staff-language.md](staff-language.md). **Open point 6, a card that stands for another card, stays not proposed.**
+**Part 2, fields, is built (2026-11-26):** its doc is [field.md](field.md). **The owner's answers (2026-11-25):** the order can turn: Part 4, the language (builds 9 to 12), is built now, beside Part 1, the floor; its own doc is [staff-language.md](staff-language.md). **Open point 6, a card that stands for another card, stays not proposed.**
 
 ## Why these three
 

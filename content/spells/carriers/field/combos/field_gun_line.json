@@ -1,0 +1,10 @@
+{
+	"id": "field_gun_line",
+	"name": "The gun line",
+	"does": "A fire field ahead; frost bolts fired through it come out burning as well, and set off Thaw on the imp beyond.",
+	"casts": [{"staff": 0, "cards": ["fire", "field"]}, {"staff": 1, "cards": ["frost", "bolt"], "at": 0.3}],
+	"imps": [[200, 0]],
+	"seconds": 1.6,
+	"needs": "field",
+	"checks": [{"kind": "reaction", "reaction": "thaw"}]
+}

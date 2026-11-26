@@ -1,0 +1,11 @@
+{
+	"id": "field_ricochet_gate",
+	"name": "The ricochet gate",
+	"does": "A bounce field at a corridor's mouth: a plain bolt fired through it comes off the wall beyond into the imp it could not reach.",
+	"casts": [{"staff": 0, "cards": ["bounce", "field"]}, {"staff": 1, "cards": ["bolt"], "at": 0.3, "dir": [1, 0.25]}],
+	"imps": [[115, 62]],
+	"walls": [[170, -60, 12, 160]],
+	"seconds": 2.0,
+	"needs": "bounce",
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

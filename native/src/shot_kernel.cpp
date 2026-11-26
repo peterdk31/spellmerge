@@ -82,6 +82,8 @@ constexpr int F_DEFERRED = 256;
 constexpr int F_QUAD = 512;
 constexpr int F_ALONE = 1024;
 constexpr int F_SPENT = 2048;
+// The manager's F_FIELD: a field's own still shot (`set_field`), never handed back by the field pass.
+constexpr int F_FIELD = 4096;
 constexpr int F_STUCK = 16;
 // A hit's share of the hit-work budget (`HIT_WORK`).
 constexpr int64_t HIT_WORK = 400;
@@ -218,6 +220,8 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(trail_x, "_trail_x", PACKED_INT32_ARRAY) \
 	X(trail_y, "_trail_y", PACKED_INT32_ARRAY) \
 	X(trail_out, "_trail_out", PACKED_INT32_ARRAY) \
+	X(field_out, "_field_out", PACKED_INT32_ARRAY) \
+	X(field_out_field, "_field_out_field", PACKED_INT32_ARRAY) \
 	X(floor_y, "_floor", PACKED_FLOAT32_ARRAY) \
 	X(draw_regions, "_draw_regions", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
@@ -1359,6 +1363,7 @@ const Constant CONSTANTS[] = {
 	{ "F_GHOST", (double)F_GHOST },
 	{ "F_ALONE", (double)F_ALONE },
 	{ "F_SPENT", (double)F_SPENT },
+	{ "F_FIELD", (double)F_FIELD },
 	{ "F_STUCK", (double)F_STUCK },
 	{ "HIT_WORK", (double)HIT_WORK },
 	// In halves, each exact as a double (the manager's map has them, `native_constants`).
@@ -2766,6 +2771,91 @@ int64_t ShotKernel::trail_pass(Object *m, int64_t top) {
 	return count;
 }
 
+// The field pass (`_pass_fields`, docs/milestones/field.md): every live shot that is no field, not
+// stopped (a local stop, a linger's hold, stuck), moved this step and is not falling in the air, whose
+// middle was outside one of the first `count` fields of `fields` (live still shots marked F_FIELD)
+// before the step and is inside it now, or went through it (a fast shot), is written to `_field_out` with the field's index in
+// `_field_out_field`, in slot order, then the fields' order, at most as many as `_field_out` holds.
+// Returns how many, or -1 on bad sizes (GDScript then runs the pass itself).
+int64_t ShotKernel::field_pass(Object *m, const PackedInt32Array &fields, int64_t count) {
+	const Names &k = *names;
+	Arr<PackedByteArray> alive, state;
+	Arr<PackedVector2Array> pos, prev;
+	Arr<PackedInt32Array> flags, out, out_field;
+	Arr<PackedFloat32Array> floor_y, radius;
+	alive.load(m, k.alive);
+	state.load(m, k.state);
+	pos.load(m, k.pos);
+	prev.load(m, k.prev);
+	flags.load(m, k.flags);
+	out.load(m, k.field_out);
+	out_field.load(m, k.field_out_field);
+	floor_y.load(m, k.floor_y);
+	radius.load(m, k.radius);
+	const int64_t high = m->get(k.high);
+	ERR_FAIL_COND_V(count < 0 || count > fields.size() || high < 0 || high > alive.n || high > state.n || high > pos.n || high > prev.n || high > flags.n || high > floor_y.n || high > radius.n || out_field.n < out.n, -1);
+	const int32_t *field_slots = fields.ptr();
+	const int64_t most = out.n;
+	int64_t found = 0;
+	for (int64_t s = 0; s < high; s++) {
+		if (alive[s] == 0) {
+			continue;
+		}
+		const int32_t f = flags[s];
+		if ((f & F_FIELD) != 0) {
+			continue;
+		}
+		const int st = state[s];
+		if (st == S_FROZEN || st == S_STUCK || st == S_HELD) {
+			continue;
+		}
+		const Vector2 to = pos[s];
+		const Vector2 from = prev[s];
+		if (from == to) {
+			continue;
+		}
+		if ((f & F_FALLING) != 0 && (double)to.y < (double)floor_y[s] - FALL_BAND) {
+			continue;
+		}
+		for (int64_t n = 0; n < count; n++) {
+			const int64_t field = field_slots[n];
+			if (field < 0 || field >= high || alive[field] == 0 || (flags[field] & F_FIELD) == 0) {
+				continue;
+			}
+			const Vector2 centre = pos[field];
+			const double r = (double)radius[field];
+			// A step that stays off the circle's box on one side never comes into it (most, at once).
+			const double lo_x = (double)(from.x < to.x ? from.x : to.x);
+			const double hi_x = (double)(from.x > to.x ? from.x : to.x);
+			const double lo_y = (double)(from.y < to.y ? from.y : to.y);
+			const double hi_y = (double)(from.y > to.y ? from.y : to.y);
+			if (lo_x > (double)centre.x + r || hi_x < (double)centre.x - r || lo_y > (double)centre.y + r || hi_y < (double)centre.y - r) {
+				continue;
+			}
+			const double within = r * r;
+			if ((double)from.distance_squared_to(centre) <= within) {
+				continue;
+			}
+			if ((double)to.distance_squared_to(centre) > within) {
+				// Not inside now: in only if it went through it in this step (a fast shot).
+				const Vector2 way = to - from;
+				double t = (double)(centre - from).dot(way) / (double)way.dot(way);
+				t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+				if ((double)(from + way * (real_t)t).distance_squared_to(centre) > within) {
+					continue;
+				}
+			}
+			if (found >= most) {
+				return found;
+			}
+			out[found] = (int32_t)s;
+			out_field[found] = (int32_t)n;
+			found++;
+		}
+	}
+	return found;
+}
+
 // --- The draw regions --------------------------------------------------------------------------
 
 namespace {
@@ -2879,6 +2969,7 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("threat_query", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_query);
 	ClassDB::bind_method(D_METHOD("shot_places", "manager", "from"), &ShotKernel::shot_places);
 	ClassDB::bind_method(D_METHOD("trail_pass", "manager", "top"), &ShotKernel::trail_pass);
+	ClassDB::bind_method(D_METHOD("field_pass", "manager", "fields", "count"), &ShotKernel::field_pass);
 	ClassDB::bind_method(D_METHOD("region_counts", "regions", "rows", "count"), &ShotKernel::region_counts);
 	ClassDB::bind_method(D_METHOD("region_rows", "regions", "rows", "count"), &ShotKernel::region_rows);
 }

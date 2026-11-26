@@ -39,7 +39,7 @@ func test_every_need_names_known_behaviours_traits_and_fields() -> void:
 	# A typo in a needs row would quietly make a card work or waste everywhere.
 	var fields: Array[String] = ["any", "not", "or_cards", "cards", "or_infused", "not_cards"]
 	# Every flag up to the highest trait (a new one is added above the last).
-	var all_traits: int = (CarrierTraits.MOVES_ALONG << 1) - 1
+	var all_traits: int = (CarrierTraits.GIVES << 1) - 1
 	var modifier_needs: Dictionary = {}
 	for behaviour: int in ModifierBase.RULES:
 		modifier_needs[behaviour] = ModifierBase.needs(behaviour)

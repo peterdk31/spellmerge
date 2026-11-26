@@ -75,6 +75,8 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`CarrierCard`; on 
 | `stone_lit` | flow, at the hub's teleporter stone as it lights (every wizard on it; online-lobby L1) | a wide ring going out and a ring of glimmers rising off the stone's edge |
 | `portal_through` | the portal carrier (`cue_shown`), where a shot, a body or nothing else goes into a gate and where it comes out | a small ring going out without its cards and a few sparks (`often`) |
 | `portal_close` | the portal card's `end_cue`, at each of its gates as it closes (`carrier_ended`) | a ring closing, a puff and its cards' motes |
+| `field_open` | the field card's `shown_cue`, where it lies as it opens (docs/milestones/field.md) | a ring gathering in and glimmers round it |
+| `field_through` | the field carrier (`cue_shown`), where a shot comes into a field and takes its cards | a small ring going out without its cards and a few sparks (`often`) |
 | `appear` | the teleport card's `end_cue`, at `carrier_ended` where it lands | a column struck down (`fall`), a spray, a small shake and punch |
 | `trade` | the swap card's `shown_cue`, at each end of its trade | a column struck down and a small one pulled up, their rings crossing |
 | `dash_start` | the dash card's `shown_cue`, at `carrier_shown` `dash` where it leaves (spell-spectacle-2.md, S5) | a few `dust` motes at its feet (`below` 8) in the room's colours, for lightning (`if_layer` 5) an `arc` along its way as far as it goes, and two `stream` parts until it lands: its speed streaks (`dash_path`, 120 a second, 13 px across and 4 along) and its cards' particles (`spell`, 60 tries a second, 10 px across; embers and frost flecks, layers 1 and 2, from its feet) |

@@ -17,6 +17,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -69,6 +70,8 @@ public:
 	int64_t shot_places(Object *manager, int64_t from);
 	// `_pass_trail`: the shots that trail and entered a new floor cell, handed back in `_trail_out`.
 	int64_t trail_pass(Object *manager, int64_t top);
+	// `_pass_fields`: the shots that came into a field this step, handed back in `_field_out`.
+	int64_t field_pass(Object *manager, const PackedInt32Array &fields, int64_t count);
 	// The draw regions' hand-out (`DrawRegions`: `_count`, `_write`): each region's rows counted, and
 	// each row copied into its region's buffer, by the place its square lies in.
 	void region_counts(Object *regions, const PackedFloat32Array &rows, int64_t count);

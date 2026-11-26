@@ -20,6 +20,19 @@ o#
 
 o
 "
+shape_2x = "
+.o#.
+o###
+####
+.##.
+
+.o#
+o##
+.#.
+
+o#
+##
+"
 shape_play = "pick"
 shape_rate = 8.0
 shape_turns = true

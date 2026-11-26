@@ -671,3 +671,21 @@ func test_a_births_flags_and_layers_come_back_whole() -> void:
 			var births := PackedFloat32Array([ManagerScript.birth_ramp(ramp, look), ManagerScript.birth_look(look)])
 			check_equal(ManagerScript.birth_ramp_of(births[0]), ramp, "the ramp %d with flags %d" % [ramp, flags])
 			check_equal(ManagerScript.birth_look_of(births[0], births[1]), look, "and the whole look")
+
+
+## ART2: a shot's core is drawn at the art's detail (docs/STYLE.md, "The picture and the art's
+## detail"): in art pixels, HEAD_DETAIL a world unit (ArtDetail's), moving by them, its box holding
+## its rays; pierce's line is drawn for a speck too and over the shadow edge; the bolt reshapes it
+## with its own measure and rays.
+func test_a_shot_core_is_drawn_at_the_arts_detail() -> void:
+	var include: String = FileAccess.get_file_as_string("res://core/projectiles/shot_head.gdshaderinc")
+	check(include.contains("const float HEAD_DETAIL = %d.0;" % ArtDetail.DETAIL), "HEAD_DETAIL is ArtDetail.DETAIL")
+	check(include.contains("vec2 px = floor(at * HEAD_DETAIL);") and include.contains("vec2 A = floor(P * HEAD_DETAIL);"), "its middle and its pixels are art pixels")
+	check(include.contains("float half_size = (reach + 2.0) / HEAD_DETAIL;"), "its box holds its rays and its edge, in world units")
+	var fragments: String = include.get_slice("// ---- Fragments ----", 1)
+	var line: int = fragments.find("on_line(A + 0.5")
+	var edge: int = fragments.find("shadow edge, on the lower right")
+	check(line > 0 and edge > line, "pierce's line is drawn before (over) the shadow edge")
+	check(fragments.find("} else if (v1.x < 1.0e6") > 0 and not fragments.contains("!speck && v1.x"), "and for a speck too")
+	var bolt: String = FileAccess.get_file_as_string("res://content/spells/carriers/bolt/bolt.gdshader")
+	check(bolt.contains("#define HEAD_BODY") and bolt.contains("#define HEAD_RAY") and bolt.find("#define HEAD_RAY") < bolt.find("#include"), "the bolt reshapes the core before it includes the head")

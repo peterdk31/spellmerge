@@ -95,6 +95,14 @@ var look_layers: PackedInt32Array:
 ##
 ##     #
 @export_multiline var shape: String = "#"
+## The shape drawn at the art's detail (two art pixels a world unit each way: docs/STYLE.md, "The
+## picture and the art's detail"; ART2), as `shape` is written, up to SHAPE_CELL x SHAPE_CELL art
+## pixels a frame, with as many frames as `shape` in the same order (a stage of it is the same
+## stage here, docs/STYLE.md "Smooth"). When it is given it is what is drawn, and the mote moves
+## by art pixels (half world units); `shape` stays its look at one pixel a world unit (its reach in
+## the world, and the shape of a kind not yet redrawn). Drawn by hand for each kind: its own light
+## from the top-left ("o" on its upper left, "#" the rest), its own shape, never `shape` doubled.
+@export_multiline var shape_2x: String = ""
 ## How its frames play: `life` through them evenly over its life, `loop` round them
 ## `shape_rate` a second (each mote from its own frame), `pick` one at random for each mote,
 ## kept.
@@ -120,9 +128,12 @@ var look_layers: PackedInt32Array:
 @export_range(0.0, 32.0, 1.0) var height: float = 4.0
 
 
-## The most pixels a shape is across and down, and the most frames it has (the shader's
-## SHAPE_SIZE and the room in `Motes`' shape atlas).
+## The most pixels a 1x shape is across and down (`shape`; the shader's SHAPE_SIZE).
 const SHAPE_SIZE: int = 5
+## The most art pixels a 2x shape is across and down (`shape_2x`): the side of a kind's square in
+## `Motes`' shape atlas and the shader's SHAPE_CELL. A shape at 1x sits in the middle of it.
+const SHAPE_CELL: int = 11
+## The most frames a shape has (the room in `Motes`' shape atlas).
 const SHAPE_FRAMES: int = 8
 ## How `shape_play` is told to the shader.
 const SHAPE_PLAYS: Array[String] = ["life", "loop", "pick"]
@@ -138,9 +149,39 @@ func kind() -> StringName:
 
 ## The shape's frames, each its rows (lines with no spaces round them).
 func shape_frames() -> Array[PackedStringArray]:
+	return _frames_of(shape)
+
+
+## Art pixels a world unit its shape is drawn at: 2 when it has a `shape_2x`, else 1.
+func detail() -> int:
+	return ArtDetail.DETAIL if not _frames_of(shape_2x).is_empty() else 1
+
+
+## The frames of the shape it is drawn with (`shape_2x` at detail 2, else `shape`).
+func drawn_frames() -> Array[PackedStringArray]:
+	return _frames_of(shape_2x) if detail() > 1 else shape_frames()
+
+
+## Frame `frame` of the shape it is drawn with, as SHAPE_CELL x SHAPE_CELL art pixels (PIXEL_*), row
+## by row, the mote's own art pixel in the middle (row and column SHAPE_CELL / 2): `shape_2x` at
+## detail 2, else `shape` in the middle of the square.
+func cell_pixels(frame: int) -> PackedByteArray:
+	if detail() > 1:
+		return _pixels_of(_frames_of(shape_2x), frame, SHAPE_CELL)
+	var small: PackedByteArray = shape_pixels(frame)
+	var pixels := PackedByteArray()
+	pixels.resize(SHAPE_CELL * SHAPE_CELL)
+	var inset: int = (SHAPE_CELL - SHAPE_SIZE) / 2
+	for y in SHAPE_SIZE:
+		for x in SHAPE_SIZE:
+			pixels[(y + inset) * SHAPE_CELL + x + inset] = small[y * SHAPE_SIZE + x]
+	return pixels
+
+
+func _frames_of(text: String) -> Array[PackedStringArray]:
 	var frames: Array[PackedStringArray] = []
 	var rows := PackedStringArray()
-	for line in shape.replace("\r", "").split("\n"):
+	for line in text.replace("\r", "").split("\n"):
 		var row: String = line.strip_edges()
 		if row.is_empty():
 			if not rows.is_empty():
@@ -156,16 +197,20 @@ func shape_frames() -> Array[PackedStringArray]:
 ## Frame `frame` of the shape as SHAPE_SIZE x SHAPE_SIZE pixels (PIXEL_*), row by row, the
 ## mote's own pixel in the middle (row and column SHAPE_SIZE / 2).
 func shape_pixels(frame: int) -> PackedByteArray:
+	return _pixels_of(shape_frames(), frame, SHAPE_SIZE)
+
+
+## Frame `frame` of `frames` as `size` x `size` pixels, centred as `shape_pixels` says.
+static func _pixels_of(frames: Array[PackedStringArray], frame: int, size: int) -> PackedByteArray:
 	var pixels := PackedByteArray()
-	pixels.resize(SHAPE_SIZE * SHAPE_SIZE)
-	var frames: Array[PackedStringArray] = shape_frames()
+	pixels.resize(size * size)
 	if frame < 0 or frame >= frames.size():
 		return pixels
 	var rows: PackedStringArray = frames[frame]
 	var wide: int = 0
 	for row in rows:
 		wide = maxi(wide, row.length())
-	var middle: int = SHAPE_SIZE / 2
+	var middle: int = size / 2
 	var top: int = middle - (rows.size() - 1) / 2
 	var left: int = middle - (wide - 1) / 2
 	for r in rows.size():
@@ -173,10 +218,10 @@ func shape_pixels(frame: int) -> PackedByteArray:
 		for c in row.length():
 			var x: int = left + c
 			var y: int = top + r
-			if x < 0 or y < 0 or x >= SHAPE_SIZE or y >= SHAPE_SIZE:
+			if x < 0 or y < 0 or x >= size or y >= size:
 				continue
 			var mark: String = row[c]
-			pixels[y * SHAPE_SIZE + x] = PIXEL_BODY if mark == "#" else (PIXEL_HOT if mark == "o" else PIXEL_NONE)
+			pixels[y * size + x] = PIXEL_BODY if mark == "#" else (PIXEL_HOT if mark == "o" else PIXEL_NONE)
 	return pixels
 
 
@@ -218,18 +263,29 @@ func _shape_problems() -> PackedStringArray:
 		found.append("%s: a shape has 1 to %d frames, apart by a blank line" % [id, SHAPE_FRAMES])
 	if not SHAPE_PLAYS.has(shape_play):
 		found.append("%s: shape_play '%s' is not one of %s" % [id, shape_play, SHAPE_PLAYS])
+	found.append_array(_frames_problems(frames, SHAPE_SIZE, "shape"))
+	if detail() > 1:
+		var fine: Array[PackedStringArray] = _frames_of(shape_2x)
+		if fine.size() != frames.size():
+			found.append("%s: shape_2x has %d frames, shape %d: one for each, in the same order" % [id, fine.size(), frames.size()])
+		found.append_array(_frames_problems(fine, SHAPE_CELL, "shape_2x"))
+	return found
+
+
+func _frames_problems(frames: Array[PackedStringArray], size: int, field: String) -> PackedStringArray:
+	var found := PackedStringArray()
 	var drawn: bool = false
 	for f in frames.size():
 		var rows: PackedStringArray = frames[f]
-		if rows.size() > SHAPE_SIZE:
-			found.append("%s: shape frame %d is more than %d rows" % [id, f + 1, SHAPE_SIZE])
+		if rows.size() > size:
+			found.append("%s: %s frame %d is more than %d rows" % [id, field, f + 1, size])
 		for row in rows:
-			if row.length() > SHAPE_SIZE:
-				found.append("%s: shape row '%s' is more than %d pixels" % [id, row, SHAPE_SIZE])
+			if row.length() > size:
+				found.append("%s: %s row '%s' is more than %d pixels" % [id, field, row, size])
 			for mark in row:
 				if not "#o.".contains(mark):
-					found.append("%s: shape mark '%s' is not one of # o ." % [id, mark])
+					found.append("%s: %s mark '%s' is not one of # o ." % [id, field, mark])
 				drawn = drawn or mark == "#" or mark == "o"
 	if not frames.is_empty() and not drawn:
-		found.append("%s: its shape draws nothing" % id)
+		found.append("%s: its %s draws nothing" % [id, field])
 	return found

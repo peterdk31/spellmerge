@@ -249,8 +249,10 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	float len = max(beam_length, 1.0);
 	float at = floor(along);
 	float off = off_at(along, len);
-	float xs = floor((across - off) / max(cheb, 0.5) + 0.5);
-	float x = abs(xs);
+	// Its lane across in art pixels (ART_DETAIL a world pixel; ART2), `x` in world pixels: its bands
+	// keep their world widths (`band`), its core and strands an art pixel fine.
+	float xs = floor((across - off) * ART_DETAIL / max(cheb, 0.5) + 0.5);
+	float x = abs(xs) / ART_DETAIL;
 	// Its edge here: a ripple that runs down it, and a pixel more where a pulse passes, on its own
 	// side each (`x` the pixel's, so the two edges ripple apart).
 	float side = xs < 0.0 ? 1.0 : 0.0;
@@ -259,7 +261,10 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	float edge = bands + ripple + floor(pulse * 1.6);
 	// Its band, counted in from its edge: 0 its edge (shadow), 1 base, 2 light, 3 white-hot, more the
 	// core. A rift counts the other way round: lips bright, the dark at its middle.
-	float band = edge - x;
+	// Whole bands (ART2): an art lane in a band's half step counts as the band it lies in, so every
+	// band keeps its world width and only the core is an art pixel thin (the beam half an art pixel
+	// narrower on each side of it).
+	float band = floor(edge - x);
 	vec3 shade = band < 0.5 ? lo : (band < 1.5 ? mid : (band < 2.5 ? hi : (band < 3.5 ? hot : BONE_LIGHT)));
 	vec3 rift_shade = band < 0.5 ? hi : (band < 1.5 ? mid : (band < 2.5 ? lo : OUTLINE));
 	vec3 inner = mix(shade, rift_shade, rift);
@@ -279,7 +284,7 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 		}
 		float kind = infusion_kind(i);
 		vec3 s = strand_at(kind, float(i - 1), strands, along, reach);
-		bool hit = abs(xs - s.x) <= 0.5 + 0.5 * abs(s.z);
+		bool hit = abs(xs / ART_DETAIL - s.x) <= 0.25 + 0.5 * abs(s.z);
 		bool front = s.y > 0.0;
 		vec3 strand_shade = infusion_shade(i, front ? (band < 2.5 ? 2 : 1) : 0);
 		strand_shade = kind == L_PULL ? (front ? OUTLINE : infusion_shade(i, 1)) : strand_shade;
@@ -291,7 +296,7 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	if (kept && along >= 0.0 && along <= len) {
 		if (x <= edge) {
 			colour = vec4(inner, 1.0);
-		} else if (x == edge + 1.0 && mod(at * 7.0 + side * 5.0 + floor(sim_time * 30.0) * 13.0, 11.0) < 1.5) {
+		} else if (x == edge + 1.0 / ART_DETAIL && mod(at * 7.0 + side * 5.0 + floor(sim_time * 30.0) * 13.0, 11.0) < 1.5) {
 			// Sparkles a pixel past its edge, re-rolled every other frame, in the pulse's colours.
 			colour = vec4(pulse_e >= 0.0 ? infusion_shade(pe, 2) : mix(hi, VOID_LIGHT, rift), 1.0);
 		}
@@ -341,7 +346,7 @@ void fragment() {
 	// A piece: only the pixels on its side of each bend (the cuts), along it from its start.
 	vec4 colour = vec4(0.0);
 	vec2 P = world;
-	vec2 c = floor(P) + 0.5;
+	vec2 c = art_centre(P);
 	bool inside = dot(c - cut_lo.xy, cut_lo.zw) >= 0.0 && dot(c - cut_hi.xy, cut_hi.zw) < 0.0;
 	vec2 d = P - piece.xy;
 	float along = piece.z + dot(d, piece_way.xy);

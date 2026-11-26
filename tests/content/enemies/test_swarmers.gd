@@ -40,7 +40,7 @@ func test_each_is_a_cheap_body_with_a_stray_face() -> void:
 		var sprite := body.get_node_or_null(^"Sprite") as Sprite2D
 		check(sprite != null and sprite.texture != null, "%s: a body sprite" % data.id)
 		if sprite != null and sprite.texture != null:
-			check_equal(sprite.texture.get_size(), Vector2(FRAME, FRAME), "%s: one 32 px body" % data.id)
+			check_equal(ArtDetail.size_of(sprite.texture), Vector2(FRAME, FRAME), "%s: one 32 px body (in world units; 64 art pixels at 2x)" % data.id)
 		check(body.get_node_or_null(^"Telegraph") == null, "%s: no telegraph (it never casts)" % data.id)
 		check(body.get_node_or_null(^"Caster") == null, "%s: no caster node" % data.id)
 		var look := body.get_node_or_null(^"CreatureLook")

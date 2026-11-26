@@ -50,7 +50,7 @@ func test_each_stray_is_one_body_with_its_telegraph_parts() -> void:
 		var sprite := body.get_node_or_null(^"Sprite") as Sprite2D
 		check(sprite != null and sprite.texture != null, "%s: a body sprite" % data.id)
 		if sprite != null and sprite.texture != null:
-			check_equal(sprite.texture.get_size(), Vector2(FRAME, FRAME), "%s: one 32 px body" % data.id)
+			check_equal(ArtDetail.size_of(sprite.texture), Vector2(FRAME, FRAME), "%s: one 32 px body (in world units; 64 art pixels at 2x)" % data.id)
 		check(body.get_node_or_null(^"Telegraph") == null, "%s: no telegraph node: its lane is Feel's (docs/milestones/cast-timing.md, T6b)" % data.id)
 		var look := body.get_node_or_null(^"CreatureLook")
 		var face := body.get_node_or_null(^"Face")
@@ -145,7 +145,7 @@ func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:
 		body.velocity = Vector2(40.0, 0.0)
 		highest = maxf(highest, look.lift())
 		check_equal(face.body_offset, Vector2(0.0, -look.lift()), "the face is told the lift")
-		check_equal(sprite.offset.y, -look.lift(), "the sprite hops by it")
+		check_equal(sprite.offset.y / float(ArtDetail.of(sprite.texture)), -look.lift(), "the sprite hops by it (its offset in its art pixels)")
 	check(highest >= CreatureLook.HOP_HEIGHT - 0.5, "walking, it hops %d px (got %.1f)" % [int(CreatureLook.HOP_HEIGHT), highest])
 	highest = 0.0
 	for i in 32:
@@ -177,9 +177,11 @@ func test_a_stray_plays_its_carriers_staff_animation() -> void:
 	for step in 480:
 		world.run_all(1)
 		glowed = glowed or look.is_glowing(sprite)
-		stretched = stretched or sprite.scale != Vector2.ONE
+		# At rest the scale is its art's (a 2x body at half: ArtDetail).
+		var rest: Vector2 = ArtDetail.draw_scale(sprite.texture)
+		stretched = stretched or sprite.scale != rest
 		highest = maxf(highest, look.lift())
-		if look.pose_dir().is_zero_approx() and (look.is_glowing(sprite) or sprite.scale != Vector2.ONE):
+		if look.pose_dir().is_zero_approx() and (look.is_glowing(sprite) or sprite.scale != rest):
 			lingered += 1
 	check(glowed, "its staff glowed while it cast")
 	check(stretched, "and stretched the body")
@@ -198,15 +200,16 @@ func test_a_stray_gives_its_sprite_back_when_its_animation_ends_stretched_and_gl
 	var fake := FakeSpells.new()
 	body.spells = fake
 	look.step(AiFixture.STEP)
-	check(not look.is_glowing(sprite) and sprite.scale == Vector2.ONE, "at rest: no glow, no stretch")
+	check(not look.is_glowing(sprite) and sprite.scale == ArtDetail.draw_scale(sprite.texture), "at rest: no glow, no stretch")
 	# [aim, pose (turn, lift, push), glow, stretch], as the fake's poses read them.
 	fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(0.0, 3.0, 0.0), 0.8, 0.5]
 	look.step(AiFixture.STEP)
 	check(look.is_glowing(sprite), "glowing while it plays")
-	check(sprite.scale.x > 1.0, "stretched along its aim (%s)" % sprite.scale)
+	var rest: Vector2 = ArtDetail.draw_scale(sprite.texture)
+	check(sprite.scale.x > rest.x, "stretched along its aim (%s)" % sprite.scale)
 	fake.staff_poses.erase(body.id)
 	look.step(AiFixture.STEP)
 	check(not look.is_glowing(sprite) and sprite.material == null, "the glow given back the step it ends")
-	check_equal(sprite.scale, Vector2.ONE, "and the stretch")
+	check_equal(sprite.scale, rest, "and the stretch (back to its art's scale)")
 	body.spells = null
 	fake.free()

@@ -16,11 +16,11 @@ const HATS: Array[Texture2D] = [
 	preload("res://content/wizard/base/wizard_hat_p3@2x.svg"),
 	preload("res://content/wizard/base/wizard_hat_p4@2x.svg"),
 ]
-const IMP := preload("res://content/enemies/ember_imp/idle.svg")
-const SPLINTER := preload("res://content/enemies/splinter/idle.svg")
-const FORK := preload("res://content/enemies/storm_fork/idle.svg")
-const CROOK := preload("res://content/enemies/rime_crook/idle.svg")
-const SCEPTER := preload("res://content/enemies/bone_scepter/idle.svg")
+const IMP := preload("res://content/enemies/ember_imp/idle@2x.svg")
+const SPLINTER := preload("res://content/enemies/splinter/idle@2x.svg")
+const FORK := preload("res://content/enemies/storm_fork/idle@2x.svg")
+const CROOK := preload("res://content/enemies/rime_crook/idle@2x.svg")
+const SCEPTER := preload("res://content/enemies/bone_scepter/idle@2x.svg")
 const WALL_TOP := preload("res://art/tilesets/crypt/wall_top.svg")
 const PILLAR := preload("res://art/tilesets/crypt/pillar.svg")
 const PILLAR_TOP := preload("res://art/tilesets/crypt/pillar_top.svg")

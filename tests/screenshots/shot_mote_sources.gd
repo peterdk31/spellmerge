@@ -10,8 +10,8 @@ extends "res://tests/support/screenshot.gd"
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
-const HUSK := preload("res://content/enemies/bone_husk/idle.svg")
-const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const HUSK := preload("res://content/enemies/bone_husk/idle@2x.svg")
+const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 const FROST := preload("res://content/spells/elements/frost/frost.tres")
 const LIGHTNING := preload("res://content/spells/elements/lightning/lightning.tres")
@@ -110,6 +110,7 @@ func _body(texture: Texture2D, at: Vector2) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
+	ArtDetail.fit(sprite)
 	body.add_child(sprite)
 	root.add_child(body)
 	return sprite

@@ -26,7 +26,7 @@ const JOBS: Dictionary[StringName, Script] = {
 
 func test_every_job_is_the_managers_and_named_in_its_derived() -> void:
 	var manager: Node = ManagerScript.new()
-	var derived: Array = ManagerScript.get_script_constant_map()["DERIVED"]
+	var derived: Array = ManagerScript.DERIVED
 	for name: StringName in JOBS:
 		var job: Object = manager.get(name)
 		check(job != null and job.get_script() == JOBS[name], "the manager's %s is a %s" % [name, JOBS[name].resource_path])
@@ -37,7 +37,7 @@ func test_every_job_is_the_managers_and_named_in_its_derived() -> void:
 func test_every_member_of_a_job_is_linked() -> void:
 	for name: StringName in JOBS:
 		var script: Script = JOBS[name]
-		var listed: Array = script.get_script_constant_map()["DERIVED"]
+		var listed: Array = (script as Script).get_script_constant_map()["DERIVED"]
 		for info: Dictionary in script.get_script_property_list():
 			if int(info["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
 				continue
@@ -94,6 +94,6 @@ func _check_linked(manager: Node, when: String) -> void:
 				continue
 			# A packed array: one more element through the alias, seen by the manager, then taken back.
 			var size: int = own.size()
-			alias.call(&"resize", size + 1)
+			alias.resize(size + 1)
 			check(manager.get(member).size() == size + 1, "%s: %s.%s is the manager's own array, not a copy" % [when, name, member])
-			alias.call(&"resize", size)
+			alias.resize(size)

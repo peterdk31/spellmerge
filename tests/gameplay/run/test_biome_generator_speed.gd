@@ -7,8 +7,9 @@ extends "res://tests/support/suite.gd"
 ## socket (`Growth._loop_ends`), asking `_loop_keeps` once a room pair while the map stands as it is.
 ##
 ## - The count is the same: every placement weighed while seed 4242's and other crypt maps grow is
-##   counted the way it was (`Growth._closable_from`, each crossing looked up) and matches, and the
-##   map grown so is the one `BiomeGenerator.generate` makes.
+##   also counted the way it was before (`Checked._closable_before`: each crossing looked up, and
+##   `_loop_keeps` asked afresh) and matches; the growth checked is `BiomeGenerator.generate`'s (its
+##   tries and dice), so its map is the generator's.
 ## - Quick: seed 4242's map within `USUAL` times `SLACK` interpreted-GDScript references
 ##   (tests/support/wall_clock.gd); grown with the count worked out as before, it measures `BEFORE`.
 # unit-test-alone
@@ -43,10 +44,7 @@ class Checked:
 	var as_before: bool = false
 
 	func _closable(shape: PieceShape, place: Vector2, joined: int, parent: int, kind: StringName) -> int:
-		var before: int = 0
-		for socket in shape.sockets():
-			if socket != joined:
-				before += _closable_from(place + shape.socket_at[socket], shape.socket_facing[socket], parent, kind)
+		var before: int = _closable_before(shape, place, joined, parent, kind)
 		if as_before:
 			return before
 		var now: int = super._closable(shape, place, joined, parent, kind)
@@ -54,6 +52,27 @@ class Checked:
 		if now != before:
 			differed += 1
 		return now
+
+
+	## The count as it was before #972, line for line: each crossing of each socket looked up in
+	## `free_at`, and `_loop_keeps` asked afresh each time (no cache of this growth's read).
+	func _closable_before(shape: PieceShape, place: Vector2, joined: int, parent: int, kind: StringName) -> int:
+		var count: int = 0
+		for socket in shape.sockets():
+			if socket == joined:
+				continue
+			var at: Vector2 = place + shape.socket_at[socket]
+			for crossing: BiomeGenerator.Crossing in crossings[shape.socket_facing[socket]]:
+				var far: Vector2 = at + crossing.span
+				var key := Vector3i(roundi(far.x), roundi(far.y), RoomSocket.opposite(crossing.far_facing))
+				if not free_at.has(key):
+					continue
+				var other: int = (free_at[key] as Vector2i).x
+				if other == parent or not _bridge_clear(Rect2(at - crossing.from_at, crossing.size), other, -1):
+					continue
+				if _loop_keeps(parent, kind, other):
+					count += 1
+		return count
 
 
 ## The map of seed `seed_value` grown as `generate` grows it (its tries, its dice), by `Checked`
@@ -79,9 +98,12 @@ func _generated(seed_value: int) -> BiomeMap:
 
 
 func test_every_placement_counts_its_loops_as_before() -> void:
+	var slow_weighed: int = 0
 	for seed_value: int in [SLOW_SEED] + SEEDS:
 		var growths: Array[Checked] = []
 		var grown: BiomeMap = _grown(seed_value, growths)
+		if seed_value == SLOW_SEED and not growths.is_empty():
+			slow_weighed = growths[-1].counted
 		check(grown != null, "seed %d: a map grown" % seed_value)
 		var counted: int = 0
 		var differed: int = 0
@@ -90,16 +112,15 @@ func test_every_placement_counts_its_loops_as_before() -> void:
 			differed += growth.differed
 		check_equal(differed, 0, "seed %d: of %d placements weighed, none counts its loops otherwise" % [seed_value, counted])
 		if grown != null:
-			# The rooms' fights and rewards are rolled after the growth: its rooms and bridges are compared.
+			# The checked growth takes `generate`'s tries and dice (the rooms' fights and rewards are
+			# rolled after the growth: its rooms and bridges are compared).
 			var made: BiomeMap = _generated(seed_value)
 			check_equal(grown.room_templates, made.room_templates, "seed %d: the generator's rooms" % seed_value)
 			check_equal(grown.room_places, made.room_places, "seed %d: where they stand" % seed_value)
 			check_equal(grown.room_mirrors, made.room_mirrors, "seed %d: their mirrorings" % seed_value)
 			check_equal(grown.bridge_ends, made.bridge_ends, "seed %d: its bridges' ends" % seed_value)
 	# Seed 4242 weighs the most (a loop-pull style): the check covers the case that was slow.
-	var slow: Array[Checked] = []
-	_grown(SLOW_SEED, slow)
-	check(slow[-1].counted > 10000, "seed %d weighs tens of thousands of placements (%d)" % [SLOW_SEED, slow[-1].counted])
+	check(slow_weighed > 10000, "seed %d weighs tens of thousands of placements (%d)" % [SLOW_SEED, slow_weighed])
 
 
 func test_the_slow_seeds_map_is_made_quickly() -> void:

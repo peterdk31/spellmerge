@@ -17,7 +17,7 @@ const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.Projec
 ## What `beam_elements` gives for a beam with no spell.
 const NO_ELEMENTS: Array[StringName] = []
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near", &"_gate_outs"]
+const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near", &"_gate_outs", &"walk_together", &"_walking", &"_walk_count", &"_walk_rows", &"_walk_actors", &"_walk_offsets", &"_walk_counts", &"_walk_lengths", &"_walk_pierces", &"_walk_widths", &"_walk_ghosts", &"_walk_sources", &"_walk_got", &"_walk_ends", &"_walk_headings"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_bm_source", &"_bm_due_body"]
 
@@ -119,6 +119,31 @@ var _zap_steps: int = 0
 var _zap_near: Array[Node2D] = []
 var _zap_centres: PackedVector2Array = PackedVector2Array()
 var _zap_radii: PackedFloat32Array = PackedFloat32Array()
+## The beams between their hits walk their rays together, in one call (`_flush_walks`,
+## `Projectiles.ray_walks`; #972: a beam split four times is 81 beams, each walking its ray every
+## step). Within `step` (`_walking`) a beam that only finds how far it gets this step (`_walks_along`)
+## is queued (`_walk_rows`, `_walk_count` of them) once its caster has placed it; the queue is walked,
+## in row order, before anything that could read or change what a walk reads or what it leaves: a
+## beam that hits or walks alone, a beam that ends, a portal's leg, and the step's end. What such a
+## beam does meanwhile (its life, its place and path) touches only its own row, so every row comes
+## out as the beams one by one leave it. `walk_together` false walks each alone (tests compare the
+## two). Scratch, empty between steps: the rays' inputs and what they hand back, kept, so a step
+## allocates nothing once it has had as many beams.
+var walk_together: bool = true
+var _walking: bool = false
+var _walk_count: int = 0
+var _walk_rows: PackedInt32Array = PackedInt32Array()
+var _walk_actors: PackedInt32Array = PackedInt32Array()
+var _walk_offsets: PackedInt32Array = PackedInt32Array()
+var _walk_counts: PackedInt32Array = PackedInt32Array()
+var _walk_lengths: PackedFloat64Array = PackedFloat64Array()
+var _walk_pierces: PackedInt32Array = PackedInt32Array()
+var _walk_widths: PackedFloat64Array = PackedFloat64Array()
+var _walk_ghosts: PackedByteArray = PackedByteArray()
+var _walk_sources: Array[Node] = []
+var _walk_got: PackedFloat64Array = PackedFloat64Array()
+var _walk_ends: PackedVector2Array = PackedVector2Array()
+var _walk_headings: PackedVector2Array = PackedVector2Array()
 
 
 func id() -> StringName:
@@ -177,6 +202,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 
 ## Every beam gone at once, quietly (`Spells.clear`).
 func clear() -> void:
+	_walk_count = 0
 	_bm_on.fill(0)
 	_bm_spell.fill(null)
 	_bm_source.fill(null)
@@ -475,6 +501,9 @@ func _beam_step(at: int, delta: float) -> void:
 	if _bm_life[at] <= 0.0:
 		_end_beam(at, true)
 		return
+	if _bm_parent[at] >= 0:
+		# A portal's leg follows its parent's gate, which the parent's walk sets.
+		_flush_walks()
 	_beam_follow(at, delta)
 	if _bm_on[at] == 0:
 		return
@@ -483,6 +512,10 @@ func _beam_step(at: int, delta: float) -> void:
 	var hit: bool = _bm_tick[at] <= 0.0
 	if hit:
 		_bm_tick[at] = maxf(_bm_tick[at] + SpellLimits.BEAM_TICK, 0.001)
+	elif _walking and _walks_along(at):
+		_queue_walk(at)
+		return
+	_flush_walks()
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	_beam_cast(at, hit)
@@ -494,6 +527,69 @@ func _beam_step(at: int, delta: float) -> void:
 	# Its end pours onto the floor every step (the floor's first slice).
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		kit.pass_floor(spell, tag, _bm_actor[at], _bm_end[at], _bm_end[at])
+
+
+## True when live beam `at`, between its hits, may walk its ray with the others (`_flush_walks`): its
+## walk sends nothing and its guard and gates do nothing (no bounce, no shield or deflect, cast by a
+## body, not falling, no gate open and no ray caster set), so all its step leaves after its walk is
+## its row, read from the walk, and its pass over the floor (queued for the floor, in turn).
+func _walks_along(at: int) -> bool:
+	var spell: CompiledSpell = _bm_spell[at]
+	return _bm_caster[at] < 0 and _bm_shield[at] <= 0 and kit.bounces(spell) == 0 and spell.behaviour(ModifierBase.Behaviour.DEFLECT) <= 0.0 and _air(at) == 0.0 and kit.projectiles.walks_batch()
+
+
+## Queues live beam `at`'s walk for `_flush_walks`.
+func _queue_walk(at: int) -> void:
+	if _walk_rows.size() <= _walk_count:
+		var size: int = maxi(SpellLimits.BEAM_ROWS_START, _walk_count * 2)
+		_walk_rows.resize(size)
+		_walk_actors.resize(size)
+		_walk_offsets.resize(size)
+		_walk_counts.resize(size)
+		_walk_lengths.resize(size)
+		_walk_pierces.resize(size)
+		_walk_widths.resize(size)
+		_walk_ghosts.resize(size)
+		_walk_sources.resize(size)
+		_walk_got.resize(size)
+		_walk_ends.resize(size)
+		_walk_headings.resize(size)
+	_walk_rows[_walk_count] = at
+	_walk_count += 1
+
+
+## The queued beams walk their rays (`Projectiles.ray_walks`), each as `_beam_cast` walks a beam
+## between its hits, then, in row order, take what their walk found and pass over the floor, as the
+## rest of their step (`_beam_step`) does; their gates (none open) and guards (none) do nothing.
+func _flush_walks() -> void:
+	var count: int = _walk_count
+	if count == 0:
+		return
+	_walk_count = 0
+	for k in count:
+		var at: int = _walk_rows[k]
+		var spell: CompiledSpell = _bm_spell[at]
+		_walk_actors[k] = _bm_actor[at]
+		_walk_offsets[k] = at * _bm_stride
+		_walk_counts[k] = _bm_count[at]
+		_walk_lengths[k] = _bm_length[at]
+		_walk_pierces[k] = spell.pierce
+		_walk_widths[k] = _beam_width(at)
+		_walk_ghosts[k] = 1 if kit.ghost(spell) else 0
+		_walk_sources[k] = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
+	kit.projectiles.ray_walks(count, _walk_actors, _bm_points, _walk_offsets, _walk_counts, _walk_lengths, _walk_pierces, _walk_widths, _walk_ghosts, _walk_sources, SpellRuntime.HITS, _walk_got, _walk_ends, _walk_headings)
+	for k in count:
+		var at: int = _walk_rows[k]
+		_walk_sources[k] = null
+		_steer_row = at
+		_bm_reach[at] = _walk_got[k]
+		_bm_tip[at] = _walk_ends[k]
+		_bm_tip_dir[at] = _walk_headings[k]
+		# What a walk with no gate open leaves of one (`_keep_gate`).
+		_bm_gate[at] = -1
+		_bm_gate_heading[at] = Vector2.ZERO
+		_bm_gate_left[at] = 0.0
+		kit.pass_floor(_bm_spell[at], _bm_tag[at], _bm_actor[at], _bm_end[at], _bm_end[at])
 
 
 ## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its
@@ -954,6 +1050,8 @@ func _wave(points: PackedVector2Array, first: int, count: int, amp: float, start
 func _end_beam(at: int, finished: bool) -> void:
 	if _bm_on[at] == 0:
 		return
+	# What an end sets off comes after the walks of the beams before it.
+	_flush_walks()
 	_bm_on[at] = 0
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
@@ -1059,11 +1157,14 @@ func end_of(tag: int) -> void:
 ## Runs every live beam on by `delta` (a beam started meanwhile, by a payload, waits for the next).
 func step(delta: float) -> void:
 	var first_new: int = _bm_next_born
+	_walking = walk_together
 	for at in _bm_on.size():
 		if _bm_on[at] != 0 and _bm_born[at] < first_new:
 			kit.cast_as(_bm_caster[at], _bm_caster_seq[at])
 			_beam_step(at, delta)
 			kit.cast_done()
+	_flush_walks()
+	_walking = false
 	_pull_magnets()
 	_step_zaps(delta)
 

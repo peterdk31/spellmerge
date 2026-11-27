@@ -16,8 +16,11 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -66,6 +69,12 @@ public:
 	// shape overlaps the circle, by distance to its centre, skipping rows `skip` and `skip_also`, the
 	// world's and, with a `team`, that team's; -1 for none. The grid must be ready (`_query_ready`).
 	int64_t nearest_target(Object *manager, const Vector2 &point, double radius, int64_t layers, int64_t skip, int64_t skip_also, int64_t team);
+	// `ProjectileRays.ray_walks`: many beams' rays between their hits, each as `ray_points` walks it
+	// (no event), from ray `from` on; returns the first it hands back to GDScript, or `rays`.
+	int64_t ray_walks(Object *manager, int64_t from, int64_t rays, const PackedInt32Array &actors, const PackedVector2Array &points, const PackedInt32Array &offsets,
+			const PackedInt32Array &counts, const PackedFloat64Array &lengths, const PackedInt32Array &pierces, const PackedFloat64Array &widths,
+			const PackedByteArray &ghosts, const PackedInt32Array &skips, int64_t layers, int64_t targets, bool stale, const PackedFloat64Array &got,
+			const PackedVector2Array &ends, const PackedVector2Array &headings);
 	// `shot_places`: which places hold a shot, from the room grid's whole squares (asks handed back).
 	int64_t shot_places(Object *manager, int64_t from);
 	// `_pass_trail`: the shots that trail and entered a new floor cell, handed back in `_trail_out`.

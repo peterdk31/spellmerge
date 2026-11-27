@@ -698,7 +698,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_trail_out", &"_trail_count", &"_field_out", &"_field_out_field", &"_job_rows", &"_job_targets", &"_job_moves", &"_job_hits", &"_job_walls", &"_job_guards", &"_job_places", &"_job_rays", &"_job_batches", &"_job_draw"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_kernel_rays", &"_walk_skips", &"_trail_out", &"_trail_count", &"_field_out", &"_field_out_field", &"_job_rows", &"_job_targets", &"_job_moves", &"_job_hits", &"_job_walls", &"_job_guards", &"_job_places", &"_job_rays", &"_job_batches", &"_job_draw"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -1326,6 +1326,10 @@ var native: bool = true:
 var _kernel: Object = null
 ## Whether `_kernel` has `nearest_target` (a library built before it has not).
 var _kernel_nearest: bool = false
+## Whether `_kernel` has `ray_walks` (a library built before it has not), and that call's scratch: the
+## rows of the bodies its rays are cast from (`ProjectileRays.ray_walks`).
+var _kernel_rays: bool = false
+var _walk_skips: PackedInt32Array = PackedInt32Array()
 ## `shot_places`' scratch for the native kernel: 1 for each place it found a shot in.
 var _places_found: PackedByteArray = PackedByteArray()
 ## The threads the native kernel's loops run on: 0 for its own choice (the machine's cores less
@@ -1436,6 +1440,7 @@ func set_native(on: bool) -> void:
 	_kernel = kernel
 	# A library built before the nearest-target search runs its GDScript (sim-native SN3).
 	_kernel_nearest = kernel.has_method(&"nearest_target")
+	_kernel_rays = kernel.has_method(&"ray_walks")
 	set_native_threads(native_threads)
 
 
@@ -3114,6 +3119,16 @@ func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce
 ## See `ProjectileRays.ray_points`.
 func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	return _job_rays.ray_points(caster, points, offset, count, length, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
+
+
+## See `ProjectileRays.ray_walks`.
+func ray_walks(rays: int, actors: PackedInt32Array, points: PackedVector2Array, offsets: PackedInt32Array, counts: PackedInt32Array, lengths: PackedFloat64Array, pierces: PackedInt32Array, widths: PackedFloat64Array, ghosts: PackedByteArray, sources: Array[Node], layers: int, got: PackedFloat64Array, ends: PackedVector2Array, headings: PackedVector2Array) -> void:
+	_job_rays.ray_walks(rays, actors, points, offsets, counts, lengths, pierces, widths, ghosts, sources, layers, got, ends, headings)
+
+
+## See `ProjectileRays.walks_batch`.
+func walks_batch() -> bool:
+	return _job_rays.walks_batch()
 
 
 ## See `ProjectileRays.ray_curve`.

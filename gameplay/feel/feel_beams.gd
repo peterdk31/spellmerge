@@ -42,6 +42,13 @@ var _shown_beam_look: PackedInt32Array
 var _shown_beam_tint: PackedColorArray
 var _shown_beam_tag: PackedInt64Array
 var _next_shown_beam: PackedInt32Array
+## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
+## change, in LIVE_SET's order: `_draw_live_beams` sets one only when its value changes (a fan of
+## split beams is dozens of nodes, #972), and every one again when the node's shader changes. Feel's
+## own; an entry is made with its node.
+var _live_set: Array[Array] = []
+## The order of `_live_set`'s entries.
+enum LiveSet { SHADER, CORE, BODY, LEAD, WIDTH, PLAYER, LOOK, INFUSIONS, INFUSION_COUNT, FADE, SWELL, GLOW, SIZE }
 
 
 ## Takes Feel and its containers and jobs, by the names in LINKED (`Feel._link_jobs`).
@@ -250,7 +257,7 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 		_thin_points.resize(all)
 	_thin_sorted.resize(all - 2)
 	for n in all:
-		_thin_points[n] = beams.call("beam_point", i, n)
+		_thin_points[n] = beams.call(&"beam_point", i, n)
 	var prev: Vector2 = _thin_points[0]
 	var here: Vector2 = _thin_points[1]
 	for n in range(1, all - 1):
@@ -291,26 +298,36 @@ func _draw_live_beams(real_delta: float) -> void:
 		feel._beam_sounds.new_frame()
 	var count: int = 0
 	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
-	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
+	var beams: Object = spells.call(&"carrier", &"beam") if spells != null and spells.has_method(&"carrier") else null
 	if beams != null:
-		count = int(beams.call("beam_slots"))
+		count = int(beams.call(&"beam_slots"))
 	while _live_beams.size() < count:
 		_live_beams.append(_make_beam())
 		_live_paths.append(_make_beam_path())
+	while _live_set.size() < _live_beams.size():
+		var last: Array = []
+		last.resize(LiveSet.SIZE)
+		_live_set.append(last)
+	# What the beams' rows can tell, asked once a frame (a stand-in may lack some).
+	var has_look: bool = beams != null and beams.has_method(&"beam_look")
+	var has_card: bool = beams != null and beams.has_method(&"beam_carrier_card")
+	var has_growth: bool = beams != null and beams.has_method(&"beam_growth")
+	var has_infusions: bool = beams != null and beams.has_method(&"beam_infusions")
+	var has_tag: bool = beams != null and beams.has_method(&"beam_tag")
 	for i in _live_beams.size():
 		var node: MeshInstance2D = _live_beams[i]
-		if i >= count or not bool(beams.call("beam_on", i)):
+		if i >= count or not bool(beams.call(&"beam_on", i)):
 			if node.visible:
 				node.visible = false
 			continue
-		var all: int = int(beams.call("beam_point_count", i))
+		var all: int = int(beams.call(&"beam_point_count", i))
 		var points: int = mini(all, FeelScript.LIVE_BEAM_POINTS)
 		# A longer path keeps the points that shape it most (`_thin_beam`).
 		var thin: bool = all > FeelScript.LIVE_BEAM_POINTS
 		if thin:
 			_thin_beam(beams, i, all)
-		var reach: float = beams.call("beam_reach", i)
-		var origin: Vector2 = beams.call("beam_point", i, 0) if points > 0 else Vector2.INF
+		var reach: float = beams.call(&"beam_reach", i)
+		var origin: Vector2 = beams.call(&"beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():
 			node.visible = false
 			continue
@@ -328,7 +345,7 @@ func _draw_live_beams(real_delta: float) -> void:
 				break
 			if thin and _thin_keep[n] == 0:
 				continue
-			var point: Vector2 = _thin_points[n] if thin else beams.call("beam_point", i, n)
+			var point: Vector2 = _thin_points[n] if thin else beams.call(&"beam_point", i, n)
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
 				end_at = prev.move_toward(point, reach - walked)
@@ -343,50 +360,85 @@ func _draw_live_beams(real_delta: float) -> void:
 			prev = point
 		var before: Vector3 = path[used - 2]
 		var end_dir: Vector2 = Vector2(before.x, before.y).direction_to(end_at)
-		var since: float = beams.call("beam_since_hit", i)
+		var since: float = beams.call(&"beam_since_hit", i)
 		# It dissolves at its end as its carrier says (`Carrier.fade_left`), when it acts no more.
-		var fade: float = beams.call("beam_fade", i)
+		var fade: float = beams.call(&"beam_fade", i)
 		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
 		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
 		# Drawn across a fixed width; flare, flicker and fade swell and dissolve its pixels instead
 		# of stretching them.
-		var caster: int = beams.call("beam_caster", i)
+		var caster: int = beams.call(&"beam_caster", i)
 		var body: Color = Color.WHITE
 		if feel.projectiles != null:
 			body = feel.projectiles.tint_of(caster)
-		var tint: Color = beams.call("beam_tint", i)
+		var tint: Color = beams.call(&"beam_tint", i)
+		var ramp: int = _beam_ramp(feel._ramp_of(caster))
+		var look_id: int = int(beams.call(&"beam_look", i)) if has_look else 0
 		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
-		var look: CardLook = _carrier_card_look_of(beams.call("beam_carrier_card", i) as StringName if beams.has_method("beam_carrier_card") else &"", Carrier.LOOK_BEAM)
-		_use_shader(node, look.shader if look.shader != null else BEAM_SHADER)
+		var look: CardLook = _carrier_card_look_of(beams.call(&"beam_carrier_card", i) as StringName if has_card else &"", Carrier.LOOK_BEAM)
+		var shader: Shader = look.shader if look.shader != null else BEAM_SHADER
+		var last: Array = _live_set[i]
+		if last[LiveSet.SHADER] != shader:
+			# Another shader: every uniform is given again.
+			_use_shader(node, shader)
+			last.fill(null)
+			last[LiveSet.SHADER] = shader
 		var material: ShaderMaterial = node.material as ShaderMaterial
-		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
-		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
+		var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
+		if last[LiveSet.CORE] != core:
+			material.set_shader_parameter(&"core_override", core)
+			last[LiveSet.CORE] = core
+		var body_tint: Color = Color(body.r, body.g, body.b, fade * preset.beam_alpha)
+		if last[LiveSet.BODY] != body_tint:
+			material.set_shader_parameter(&"body_tint", body_tint)
+			last[LiveSet.BODY] = body_tint
 		material.set_shader_parameter(&"beam_path", path)
 		material.set_shader_parameter(&"beam_points", used)
 		material.set_shader_parameter(&"beam_length", walked)
-		material.set_shader_parameter(&"beam_lead", FeelScript.BEAM_LEAD)
+		if last[LiveSet.LEAD] != FeelScript.BEAM_LEAD:
+			material.set_shader_parameter(&"beam_lead", FeelScript.BEAM_LEAD)
+			last[LiveSet.LEAD] = FeelScript.BEAM_LEAD
 		material.set_shader_parameter(&"beam_start", origin)
 		material.set_shader_parameter(&"beam_end", end_at)
 		material.set_shader_parameter(&"sim_time", feel._clock)
 		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
-		var grown: float = float(beams.call("beam_growth", i)) if beams.has_method("beam_growth") else 1.0
-		material.set_shader_parameter(&"beam_width", FeelScript.BEAM_WIDTH * grown)
-		material.set_shader_parameter(&"beam_player", _beam_ramp(feel._ramp_of(caster)))
-		material.set_shader_parameter(&"beam_look", int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0)
+		var grown: float = float(beams.call(&"beam_growth", i)) if has_growth else 1.0
+		var width: float = FeelScript.BEAM_WIDTH * grown
+		if last[LiveSet.WIDTH] != width:
+			material.set_shader_parameter(&"beam_width", width)
+			last[LiveSet.WIDTH] = width
+		if last[LiveSet.PLAYER] != ramp:
+			material.set_shader_parameter(&"beam_player", ramp)
+			last[LiveSet.PLAYER] = ramp
+		if last[LiveSet.LOOK] != look_id:
+			material.set_shader_parameter(&"beam_look", look_id)
+			last[LiveSet.LOOK] = look_id
 		# Every infusion on it, in slot order, for a look that shows each (the beam card's strands).
-		var infusions: PackedColorArray = beams.call("beam_infusions", i) if beams.has_method("beam_infusions") else PackedColorArray()
-		material.set_shader_parameter(&"beam_infusions", infusions)
-		material.set_shader_parameter(&"beam_infusion_count", mini(infusions.size(), FeelScript.BEAM_INFUSIONS_MOST))
-		material.set_shader_parameter(&"beam_fade", fade)
-		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
-		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
+		var infusions: PackedColorArray = beams.call(&"beam_infusions", i) if has_infusions else PackedColorArray()
+		if last[LiveSet.INFUSIONS] != infusions:
+			material.set_shader_parameter(&"beam_infusions", infusions)
+			last[LiveSet.INFUSIONS] = infusions
+		var infusion_count: int = mini(infusions.size(), FeelScript.BEAM_INFUSIONS_MOST)
+		if last[LiveSet.INFUSION_COUNT] != infusion_count:
+			material.set_shader_parameter(&"beam_infusion_count", infusion_count)
+			last[LiveSet.INFUSION_COUNT] = infusion_count
+		if last[LiveSet.FADE] != fade:
+			material.set_shader_parameter(&"beam_fade", fade)
+			last[LiveSet.FADE] = fade
+		var swell: float = maxf(fade, 0.35) * flare * flicker * grown
+		if last[LiveSet.SWELL] != swell:
+			material.set_shader_parameter(&"beam_swell", swell)
+			last[LiveSet.SWELL] = swell
+		if last[LiveSet.GLOW] != preset.beam_alpha:
+			material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
+			last[LiveSet.GLOW] = preset.beam_alpha
 		node.visible = true
 		_sound_beam(beams, i, caster, origin, fade)
-		_beam_motes(path, used, walked, end_at, end_dir, fade, _beam_ramp(feel._ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, int(beams.call("beam_tag", i)) if beams.has_method("beam_tag") else 0, real_delta)
+		_beam_motes(path, used, walked, end_at, end_dir, fade, ramp, look_id, tint, int(beams.call(&"beam_tag", i)) if has_tag else 0, real_delta)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if spectacle != null:
-			spectacle.light_beam(i, path, used, _beam_ramp(feel._ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade, look.light_intensity, look.light_reach)
+			spectacle.light_beam(i, path, used, ramp, look_id, tint, fade, look.light_intensity, look.light_reach)
 
 
 ## The sound of live beam `i` of `beams` (its card's hum and its infusions' loops, `beam_sounds.gd`)
@@ -395,6 +447,9 @@ func _draw_live_beams(real_delta: float) -> void:
 ## down to BEAM_FADE_FLOOR.
 func _sound_beam(beams: Object, i: int, caster: int, origin: Vector2, fade: float) -> void:
 	if feel._beam_sounds == null or not beams.has_method(&"beam_elements"):
+		return
+	# This frame's beams hold all the sounds they may: the hold would refuse this one.
+	if feel._beam_sounds.full():
 		return
 	var table: ActorsScript = feel._actor_table()
 	var team: int = table.team_of(caster) if table != null else ActorsScript.TEAM_WIZARDS

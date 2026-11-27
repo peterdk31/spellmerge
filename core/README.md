@@ -68,7 +68,7 @@ Its code is split by job; its state is not. `projectile_manager.gd` holds every 
 | walls | `projectile_walls.gd` | wall bodies, solid shots, what a shot does at a wall |
 | guards | `projectile_guards.gd` | deflect, block, shots in a wedge, `threat`, shields |
 | places | `projectile_places.gd` | portal gates, fields, `shot_places`, `pass_shot` |
-| rays | `projectile_rays.gd` | `ray`, `sweep`, `strike` and a beam's path |
+| rays | `projectile_rays.gd` | `ray`, `sweep`, `strike`, a beam's path, and many beams' rays between their hits walked in one call (`ray_walks`, natively `ShotKernel.ray_walks`) |
 | batches | `projectile_batches.gd` | the MultiMesh batches, card bodies, the heads' mesh |
 | draw | `projectile_draw.gd` | `update_draw`, motes and tails, the row codes |
 

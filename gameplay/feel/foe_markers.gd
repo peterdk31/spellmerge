@@ -14,7 +14,8 @@ extends Node2D
 ## **The look:** a plain triangle in the palette's Fire base with the Outline round it (Fire is the
 ## enemies' telegraphs' colour; Blight is kept for their spells and the hat colours for the players,
 ## docs/STYLE.md), smaller than a teammate's marker and with no notch, so the two are told apart by
-## shape and size as well as colour. A boss's is larger and in Fire light.
+## shape and size as well as colour. A boss's is larger and in Fire light. Pixel art at the art's
+## detail (ART4: `PixelShape.arrows`, shaded from the top-left), turning by WAYS whole steps.
 ##
 ## **Smooth** (docs/STYLE.md): a marker grows in and shrinks out over STAGES looks of whole pixels,
 ## a look a drawn frame at the fastest and STAGE_SECONDS apart; one going keeps its place and way
@@ -72,11 +73,15 @@ const LENGTH_STEP: float = 4.0
 const HALF_WIDTH_STEP: float = 1.0
 const BOSS_LENGTH_STEP: float = 5.0
 const BOSS_HALF_WIDTH_STEP: float = 2.0
-## The dark edge round it (the palette's Outline) and its colours (Fire base; a boss's Fire light).
-const OUTLINE: float = 2.0
-const OUTLINE_COLOR: Color = Color("#14121f")
+## Its tones at the art's detail (`PixelShape`: Outline, light, base, shadow): the Fire ramp; a boss's
+## a step brighter, Fire light its base, lit in Spark light over a Fire base shade.
+const TONES: PackedColorArray = [Color("#14121f"), Color("#ffa23c"), Color("#e0592f"), Color("#8f2d2a")]
+const BOSS_TONES: PackedColorArray = [Color("#14121f"), Color("#fff3a6"), Color("#ffa23c"), Color("#e0592f")]
+## The base colours, as the look's doc names them.
 const COLOR: Color = Color("#e0592f")
 const BOSS_COLOR: Color = Color("#ffa23c")
+## The ways a head is drawn pointing: the nearest of WAYS (pixel art turns by whole steps).
+const WAYS: int = 16
 
 ## Twice the most wanted at once: room for those shrinking out beside those growing in.
 const SLOTS: int = ScreenViewsScript.VIEWS_MOST * (MOST_A_VIEW + BOSSES_A_VIEW) * 2
@@ -105,9 +110,9 @@ var _place_counts: PackedInt32Array = PackedInt32Array()
 var _ids: PackedInt32Array = PackedInt32Array()
 ## Real seconds since the markers last changed their looks.
 var _since: float = 0.0
-## The triangle and its edge (closed), filled for each marker drawn.
-var _points: PackedVector2Array = PackedVector2Array()
-var _outline: PackedVector2Array = PackedVector2Array()
+## The heads baked at the art's detail (`PixelShape.arrows`): by look (1 ... STAGES, a foe's then a
+## boss's: `_head_of`), then by way.
+var _heads: Array[Array] = []
 
 
 func _init() -> void:
@@ -124,8 +129,11 @@ func _init() -> void:
 	_places.resize(ScreenViewsScript.VIEWS_MOST * PLACES_A_VIEW)
 	_place_counts.resize(ScreenViewsScript.VIEWS_MOST)
 	_ids.resize(ActorsScript.ACTORS)
-	_points.resize(3)
-	_outline.resize(4)
+	var art: float = 1.0 / PixelShape.ART_PIXEL
+	for boss in [false, true]:
+		for stage in range(1, STAGES + 1):
+			var size: Vector2 = size_at(stage, boss) * art
+			_heads.append(PixelShape.arrows(size.x, size.y, 0.0, WAYS))
 
 
 ## A drawn frame, `delta` real seconds on: find the foes of the sealed places the wizards of
@@ -365,21 +373,14 @@ static func size_at(stage: int, boss: bool) -> Vector2:
 	return Vector2(BOSS_LENGTH_STEP if boss else LENGTH_STEP, BOSS_HALF_WIDTH_STEP if boss else HALF_WIDTH_STEP) * float(stage)
 
 
+## Each marker's head at the art's detail, in its tones with the Outline round it, the nearest of
+## WAYS to the way to its foe.
 func _draw() -> void:
 	for at in count:
 		var slot: int = _shown[at]
 		var boss: bool = _boss[slot] != 0
-		var size: Vector2 = size_at(_stage[slot], boss)
-		var middle: Vector2 = _at[slot].round()
-		var way: Vector2 = _way[slot]
-		var side: Vector2 = Vector2(-way.y, way.x) * size.y
-		var back: Vector2 = middle - way * (size.x * 0.5)
-		_points[0] = middle + way * (size.x * 0.5)
-		_points[1] = back + side
-		_points[2] = back - side
-		_outline[0] = _points[0]
-		_outline[1] = _points[1]
-		_outline[2] = _points[2]
-		_outline[3] = _points[0]
-		draw_polyline(_outline, OUTLINE_COLOR, OUTLINE)
-		draw_colored_polygon(_points, BOSS_COLOR if boss else COLOR)
+		var stage: int = _stage[slot]
+		if stage <= 0:
+			continue
+		var head: PixelShape = (_heads[(STAGES if boss else 0) + stage - 1] as Array)[PixelShape.way_index(_way[slot], WAYS)]
+		head.draw(self, _at[slot].round(), BOSS_TONES if boss else TONES)

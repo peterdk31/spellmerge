@@ -5,7 +5,9 @@ extends Node2D
 ## played on another machine can be in none of them; a small arrow in that wizard's hat colour then
 ## sits at the screen's edge, on the line from the middle of the view nearest it (where that view's
 ## wizards are drawn: its anchor) to where that view would draw it, pointing the way. A downed
-## teammate's pulses, with a ring round it: a revive needs someone to walk there.
+## teammate's pulses, with a ring round it: a revive needs someone to walk there. Pixel art at the
+## art's detail (ART4: `PixelShape.arrows`, in the wizard's ramp, lit from the top-left), turning by
+## WAYS whole steps and pulsing by whole looks.
 ## (The foes of a fight out of a view have smaller markers of their own, `foe_markers.gd`.)
 ##
 ## Only the wizards of seats that are not this machine's get one (`Frames.seats_here`); with no
@@ -32,13 +34,16 @@ const SHOWN_MARGIN: float = 4.0
 const LENGTH: float = 15.0
 const HALF_WIDTH: float = 4.5
 const NOTCH: float = 3.0
-## The dark edge round the arrowhead, and its colour (the damage numbers' outline).
-const OUTLINE: float = 3.0
-const OUTLINE_COLOR: Color = Color(0.078, 0.071, 0.122, 1.0)
-## A downed teammate's marker: pulses a second, how much bigger it grows, and its ring's radius.
+## The ways it is drawn pointing (ART4: pixel art at the art's detail turns by whole steps, never
+## between two pixels): the nearest of WAYS to the way to its wizard.
+const WAYS: int = 16
+## A downed teammate's marker: pulses a second, how much bigger it grows at the top of a beat, its
+## ring's radius (layout pixels) and band (art pixels), and the looks a beat steps through.
 const PULSE_RATE: float = 2.0
 const PULSE_GROW: float = 0.35
 const RING_RADIUS: float = 12.0
+const RING_BAND: int = 2
+const PULSE_LOOKS: int = 3
 
 ## How many markers show now, and each one's seat, place (screen pixels), way (to its wizard),
 ## colour and whether its wizard is down. Sized once (a marker a seat).
@@ -50,9 +55,11 @@ var _colour: PackedColorArray = PackedColorArray()
 var _down: PackedByteArray = PackedByteArray()
 ## Feel's clock, for the pulse.
 var _clock: float = 0.0
-## One half of the arrowhead (a triangle) and its whole edge (closed), filled for each marker drawn.
-var _points: PackedVector2Array = PackedVector2Array()
-var _outline: PackedVector2Array = PackedVector2Array()
+## The heads baked at the art's detail (`PixelShape.arrows`), by pulse look then way, and the downed
+## rings by pulse look; and the four tones a marker is drawn in, filled for each one drawn.
+var _heads: Array[Array] = []
+var _rings: Array[PixelShape] = []
+var _tones: PackedColorArray = PackedColorArray([Palette.OUTLINE, Color.WHITE, Color.WHITE, Color.WHITE])
 
 
 func _init() -> void:
@@ -61,8 +68,11 @@ func _init() -> void:
 	_way.resize(ActorsScript.SEATS)
 	_colour.resize(ActorsScript.SEATS)
 	_down.resize(ActorsScript.SEATS)
-	_points.resize(3)
-	_outline.resize(5)
+	var art: float = 1.0 / PixelShape.ART_PIXEL
+	for look in PULSE_LOOKS:
+		var grow: float = 1.0 + PULSE_GROW * look / float(PULSE_LOOKS - 1)
+		_heads.append(PixelShape.arrows(roundf(LENGTH * grow * art), roundf(HALF_WIDTH * grow * art), roundf(NOTCH * grow * art), WAYS))
+		_rings.append(PixelShape.ring(2 * roundi(RING_RADIUS * grow * art), RING_BAND))
 
 
 ## Find the teammates in none of `views` (this machine's views: one picture, or the split
@@ -128,30 +138,30 @@ func is_down(at: int) -> bool:
 	return _down[at] != 0
 
 
+## Its arrowhead at the art's detail, shaded in its wizard's ramp with the Outline round it (the
+## nearest of WAYS); a downed wizard's pulses by whole looks (PULSE_LOOKS: bigger, its ring lit up
+## to Bone's white heat at the top of a beat), never a scale between pixels or a fade.
 func _draw() -> void:
 	for at in count:
-		var size: float = 1.0
 		var colour: Color = _colour[at]
+		_tones[PixelShape.LIGHT] = Palette.shade_beside(colour, Palette.LIGHT)
+		_tones[PixelShape.BASE] = colour
+		_tones[PixelShape.SHADOW] = Palette.shade_beside(colour, Palette.SHADOW)
+		var look: int = pulse_look(at)
 		if _down[at] != 0:
-			var beat: float = 0.5 + 0.5 * sin(_clock * TAU * PULSE_RATE)
-			size *= 1.0 + PULSE_GROW * beat
-			draw_arc(_at[at], RING_RADIUS * size, 0.0, TAU, 24, OUTLINE_COLOR, 3.0)
-			draw_arc(_at[at], RING_RADIUS * size, 0.0, TAU, 24, colour.lerp(Color.WHITE, beat), 1.0)
-		var way: Vector2 = _way[at]
-		var side: Vector2 = Vector2(-way.y, way.x) * (HALF_WIDTH * size)
-		var tip: Vector2 = _at[at] + way * (LENGTH * 0.5 * size)
-		var back: Vector2 = _at[at] - way * (LENGTH * 0.5 * size)
-		var notch: Vector2 = back + way * (NOTCH * size)
-		_outline[0] = tip
-		_outline[1] = back + side
-		_outline[2] = notch
-		_outline[3] = back - side
-		_outline[4] = tip
-		draw_polyline(_outline, OUTLINE_COLOR, OUTLINE)
-		_points[0] = tip
-		_points[1] = back + side
-		_points[2] = notch
-		draw_colored_polygon(_points, colour)
-		_points[1] = notch
-		_points[2] = back - side
-		draw_colored_polygon(_points, colour)
+			var ring: PixelShape = _rings[look]
+			if look > 0:
+				_tones[PixelShape.BASE] = Palette.WHITE_HOT if look == PULSE_LOOKS - 1 else _tones[PixelShape.LIGHT]
+			ring.draw(self, _at[at], _tones)
+			_tones[PixelShape.BASE] = colour
+		var head: PixelShape = (_heads[look] as Array)[PixelShape.way_index(_way[at], WAYS)]
+		head.draw(self, _at[at], _tones)
+
+
+## The pulse look marker `at` is drawn in: 0 standing, up to PULSE_LOOKS - 1 at the top of a downed
+## wizard's beat.
+func pulse_look(at: int) -> int:
+	if _down[at] == 0:
+		return 0
+	var beat: float = 0.5 + 0.5 * sin(_clock * TAU * PULSE_RATE)
+	return clampi(int(beat * PULSE_LOOKS), 0, PULSE_LOOKS - 1)

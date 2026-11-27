@@ -77,3 +77,33 @@ func test_a_glyph_is_wide_enough_for_its_key() -> void:
 	var space: ActionGlyphScript = _glyph(0, &"staff_1")
 	var letter: ActionGlyphScript = _glyph(0, &"staff_2")
 	check(space.custom_minimum_size.x > letter.custom_minimum_size.x, "the Space key is wider than J")
+
+
+## ART4 part 3: every glyph is pixel art at the art's detail, its body as big as the glyph (in art
+## pixels, half a layout pixel), its Outline round it with the corners cut, on whole art pixels.
+func test_every_glyph_is_drawn_at_the_arts_detail_in_its_outline() -> void:
+	_input.join(0)
+	_input.join(1)
+	var actions: Array[StringName] = [&"accept", &"back", &"alternate", &"staff_1", &"staff_2", &"staff_3", &"staff_4", &"pause", &"inventory", &"quick_up", &"quick_left"]
+	var shapes: Dictionary = {}
+	for player in 2:
+		for action in actions:
+			var glyph: ActionGlyphScript = _glyph(player, action)
+			var body: PixelShape = glyph.body()
+			var name: String = "%s for player %d" % [action, player + 1]
+			check(body != null, "%s has a body" % name)
+			if body == null:
+				continue
+			shapes[int(glyph.current_glyph()["shape"])] = true
+			check_equal([body.width, body.height], [roundi(glyph.custom_minimum_size.x * 2.0), roundi(ActionGlyphScript.GLYPH_HEIGHT * 2.0)], "%s fills its glyph in art pixels" % name)
+			check_equal(body.tone_at(0, 0), -1, "%s has its corner cut" % name)
+			check_equal(body.tone_at(body.width / 2, 0), PixelShape.OUTLINE, "%s has its Outline along its top" % name)
+	check(shapes.size() >= 4, "round buttons, symbols, shoulders and triggers among them (%d shapes)" % shapes.size())
+
+
+func test_a_cap_is_cut_by_steps_at_its_corners() -> void:
+	var rows: PackedStringArray = ActionGlyphScript.cap_rows(10, 8, 3, 1)
+	check_equal(rows[0], "...####...", "the top row cut three in")
+	check_equal(rows[2], ".########.", "a step a row")
+	check_equal(rows[3], "##########", "then whole")
+	check_equal(rows[7], ".########.", "the bottom cut one in")

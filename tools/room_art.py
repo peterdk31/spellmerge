@@ -830,7 +830,8 @@ def files() -> dict[Path, Callable[[], Canvas | Light]]:
 
 
 def stem(path: Path) -> str:
-    return path.name.split("@")[0].removesuffix(".svg")
+    """A file's piece name: its name before `@2x`, else before its extension (a 1x mask)."""
+    return Path(path.name.split("@")[0]).stem
 
 
 def main(argv: list[str] | None = None) -> int:

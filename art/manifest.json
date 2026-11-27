@@ -604,6 +604,15 @@
       "prompt": "The glow of the hub's island edge, drawn by tools/ground_shape.py at half size: every seam pixel's band colour by how wide the edge is there, blurred near and far, added over the room (content/edges/magic). Soft and partly transparent on purpose (the owner, 2026-11-16: the style guide is a starting point for the hub)."
     },
     {
+      "path": "art/ui/fonts/text.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/font_art.py, 2026-11-27: an original pixel face drawn from glyph parts (stems, bars, round boxes, diagonals, dots) on each face's guides and stroke, at 17 sizes, each with its one-art-pixel outline and outline-with-shadow; metrics in text.json)",
+      "prompt": "The game's text font (ART4 part 4): an original pixel face at art-pixel detail (two art pixels a layout pixel) for every HUD, menu, card and damage-number text, printable ASCII and the few others the game writes, readable at 8 px with a one-art-pixel dark outline over a bright floor; white on clear, tinted by the game. Read by core/display/pixel_font.gd."
+    },
+    {
       "path": "art/ui/fonts/title.svg",
       "origin": "ai",
       "author": "Claude",

@@ -34,10 +34,11 @@ theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="Center/Lines"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
 theme_override_colors/font_color = Color(0.94902, 0.756863, 0.305882, 1)
-theme_override_font_sizes/font_size = 40
 text = "Spellmerge"
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Tagline" type="Label" parent="Center/Lines"]
 layout_mode = 2

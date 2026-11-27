@@ -10,10 +10,15 @@ extends RefCounted
 ## Feel warm the default font as they start (`warm_game`), and `drawn_since_warm` names any glyph a
 ## run drew that was not warmed (the 4-bot smoke test and the playtest's `--fail-on-errors` fail on
 ## it, headless too), so a new size or character cannot be forgotten.
+##
+## The game's own font (`PixelFont`, ART4 part 4) is a bitmap font with every glyph of every size it
+## has on its pages from the start: nothing is ever rasterized, so warming it only notes its caches,
+## and `drawn_since_warm` names a size or outline drawn that it does not have (a cache it did not
+## have before) instead.
 
-## The characters warmed: printable ASCII, and the few others the game writes (characters the
-## font lacks, arrows or a tick, are drawn by a system font of the engine's, which no warm-up
-## reaches: the game writes none).
+## The characters warmed: printable ASCII, and the few others the game writes. The game's pixel
+## font draws these and no others (a character it lacks draws nothing: it has no system fallback),
+## so a new character is drawn in `tools/font_art.py` and listed here (`test_pixel_font.gd`).
 const FIRST: int = 32
 const LAST: int = 126
 const EXTRA: String = "×·•–—…∞°"
@@ -21,10 +26,10 @@ const EXTRA: String = "×·•–—…∞°"
 const LIGATURES: String = "fi fl ff ffi ffl ft fj"
 ## The default font's sizes the game draws (font size, outline size): the labels (8 to 16 px and
 ## the theme's outline 2; the panels' 3 and 4), the damage numbers (8 px, outline 3), the frame
-## rate's readout (10 px, outline 3), the altar's code (16 px, outline 4) and the main menu's title
-## (40 px). Measured on a whole biome's play (seed 11, two players) and the menus; a size drawn
+## rate's readout (10 px, outline 3), the altar's code (16 px, outline 4) and 40 px (the main menu's title
+## until 2026-11-27, now in the title type; kept for any large text). Measured on a whole biome's play (seed 11, two players) and the menus; a size drawn
 ## and not listed is named by `drawn_since_warm` (`tests/core/test_glyph_warmup.gd` shows the
-## menu and the HUD's widgets). About 10 ms a pair.
+## menu and the HUD's widgets). About 10 ms a pair for a font that rasterizes (none for the pixel font, which has them all).
 const GAME_SIZES: Array[Vector2i] = [
 	Vector2i(8, 0), Vector2i(10, 0), Vector2i(12, 0), Vector2i(14, 0), Vector2i(16, 0),
 	Vector2i(8, 2), Vector2i(10, 2), Vector2i(12, 2), Vector2i(14, 2), Vector2i(16, 2),
@@ -62,6 +67,10 @@ static func warm(font: Font, sizes: Array[Vector2i]) -> void:
 	var file := font as FontFile
 	if file == null:
 		return
+	if file.data.is_empty():
+		# A bitmap font: every glyph is drawn on its pages already.
+		_warmed[file] = glyphs(file)
+		return
 	var server: TextServer = TextServerManager.get_primary_interface()
 	for size: Vector2i in sizes:
 		file.render_range(0, size, FIRST, LAST)
@@ -90,10 +99,15 @@ static func drawn_since_warm() -> PackedStringArray:
 	var out := PackedStringArray()
 	for font: FontFile in _warmed:
 		var before: Dictionary = _warmed[font]
+		var bitmap: bool = font.data.is_empty()
+		var font_name: String = font.resource_path if not font.resource_path.is_empty() else "the default font"
 		var now: Dictionary = glyphs(font)
 		for key: String in now:
 			var had: PackedInt32Array = before.get(key, PackedInt32Array())
 			var has: PackedInt32Array = now[key]
+			if bitmap and not before.has(key):
+				out.append("%s %s: a size or outline the font does not have" % [font_name, key])
+				continue
 			if has.size() == had.size():
 				continue
 			var size: int = int(key.get_slice("/", 0))
@@ -101,7 +115,7 @@ static func drawn_since_warm() -> PackedStringArray:
 			for glyph: int in has:
 				if not had.has(glyph):
 					new_chars += characters_of(font, size, glyph)
-			out.append("%s %s: %d -> %d glyphs (%s)" % [font.resource_path if not font.resource_path.is_empty() else "the default font", key, had.size(), has.size(), new_chars.c_escape()])
+			out.append("%s %s: %d -> %d glyphs (%s)" % [font_name, key, had.size(), has.size(), new_chars.c_escape()])
 	return out
 
 

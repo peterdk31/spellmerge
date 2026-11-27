@@ -84,7 +84,7 @@ func test_a_sheet_places_each_glyph_where_the_font_draws_it() -> void:
 		check(Rect2(Vector2.ZERO, Vector2(sheet.size)).encloses(outline), "%s: inside the sheet" % glyph)
 		right = region.end.x
 		var place: Rect2 = sheet.place_of(code, Vector2(100.0, 50.0))
-		check_equal([place.size, place.position + Vector2(float(sheet.pad), float(sheet.baseline))], [region.size, Vector2(100.0, 50.0)], "%s: drawn a pixel a texel, its baseline at the asked place" % glyph)
+		check_equal([place.size * float(NumberGlyphsScript.DETAIL), place.position + Vector2(float(sheet.pad), float(sheet.baseline))], [region.size, Vector2(100.0, 50.0)], "%s: drawn DETAIL texels a pixel (the font's art pixels), its baseline at the asked place" % glyph)
 		check(sheet.pad > DrawerScript.OUTLINE and is_equal_approx(sheet.advance_of(code), ThemeDB.fallback_font.get_char_size(code, 8).x), "%s: room for its outline, the font's advance" % glyph)
 	check(sheet.white_region().position.x >= right and not sheet.has("x".unicode_at(0)), "the white square after the glyphs; no other character")
 

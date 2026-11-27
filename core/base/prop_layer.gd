@@ -6,14 +6,17 @@ extends Resource
 ## `PropStateLook.layers`. View only: nothing in the game reads it. It has no `id`, so the registry
 ## never takes it for content.
 ##
-## Its picture's bottom middle stands on the prop's feet, moved by `offset`; whole pixels. Its
+## Its picture's bottom middle stands on the prop's feet, moved by `offset`; whole pixels. A
+## picture named `<name>@2x` is drawn at 2x detail, at half its pixels (`ArtDetail`), so it stands as
+## big as its 1x art did. Its
 ## frames, when it has several, are side by side, played `fps` a second on the view's clock from
 ## when its state's look is shown, and round again from `loop_from`: from the first (0, the
 ## default) a loop; from a later one, the frames before it play once as the state is entered (the
 ## frames between the last look and this one, docs/STYLE.md "Smooth") and the rest loop; from the
 ## last, the strip plays once and holds its last frame (a crumble ending in rubble).
 
-## The picture (`.svg` or `.png`, palette colours; `tools/pixel_grid.py` writes one from a grid).
+## The picture (`.svg` or `.png`, palette colours; `tools/prop_art.py` draws the props' at 2x, and
+## `tools/pixel_grid.py` writes one from a grid, such as a mote mask).
 @export var texture: Texture2D = null
 ## Where its bottom middle stands from the prop's feet, in pixels.
 @export var offset: Vector2 = Vector2.ZERO
@@ -44,8 +47,14 @@ func has_mask() -> bool:
 	return false
 
 
-## The size of one frame (zero with no picture).
+## The size of one frame in the world (zero with no picture): its art pixels over its art's detail
+## (`ArtDetail`: a `<name>@2x` picture has two a world unit, so a 48 x 64 frame at 2x stands 24 x 32).
 func frame_size() -> Vector2i:
+	return frame_px() / ArtDetail.of(texture)
+
+
+## The size of one frame in its picture's own pixels (zero with no picture).
+func frame_px() -> Vector2i:
 	if texture == null:
 		return Vector2i.ZERO
 	return Vector2i(texture.get_width() / maxi(frames, 1), texture.get_height())
@@ -103,10 +112,13 @@ func dress(sprite: Sprite2D) -> void:
 	sprite.frame = rest_frame()
 	sprite.centered = true
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset.
+	# At its size in the world: a 2x picture at half its pixels (ArtDetail).
+	ArtDetail.fit(sprite)
+	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset,
+	# which is in the picture's own pixels.
 	var at: Vector2 = drawn_at()
 	sprite.position = at.floor()
-	sprite.offset = at - at.floor()
+	sprite.offset = ArtDetail.to_art(texture, at - at.floor())
 	sprite.z_index = z_index()
 	sprite.visible = drawn != Drawn.HIDDEN
 
@@ -129,6 +141,8 @@ func problems(owner: String) -> PackedStringArray:
 		found.append("%s has no texture." % owner)
 	elif texture.get_width() % maxi(frames, 1) != 0:
 		found.append("%s: its %d px are not %d frames of a width." % [owner, texture.get_width(), frames])
+	elif ArtDetail.of(texture) > 1 and (frame_px().x % ArtDetail.of(texture) != 0 or frame_px().y % ArtDetail.of(texture) != 0):
+		found.append("%s: its %s px frames at %dx detail are not whole world units." % [owner, frame_px(), ArtDetail.of(texture)])
 	if frames < 1:
 		found.append("%s: frames is %d; at least 1." % [owner, frames])
 	if fps < 0.0:

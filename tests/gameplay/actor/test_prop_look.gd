@@ -3,14 +3,14 @@ extends "res://tests/support/suite.gd"
 ## prop body shows the look of the state it is in (`PropBase.looks`, `PropStateLook`, `PropLayer`):
 ## the body's own `Sprite` as its first layer, its other layers, a node giving off each of their
 ## `MoteSource`s (a mask reading its layer), a light spot, and its cue as a state is entered. The
-## exploding barrel (content/props/exploding_barrel, its art by tools/pixel_grid.py) idle, lit and broken; a snapshot giving a state back; an animated layer;
+## exploding barrel (content/props/exploding_barrel, its art by tools/prop_art.py) idle, lit and broken; a snapshot giving a state back; an animated layer;
 ## Feel's source motes reading a prop's sources; the looks' problems.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const EXPLODING_BARREL: PropBase = preload("res://content/props/exploding_barrel/exploding_barrel.tres")
-const ART: String = "res://content/props/exploding_barrel/%s.svg"
+const ART: String = "res://content/props/exploding_barrel/%s@2x.svg"
 
 var _world: Fixture
 ## [caster, cue] of every `cue_shown`.
@@ -58,6 +58,27 @@ func test_the_exploding_barrels_looks_are_sound() -> void:
 	check_equal(EXPLODING_BARREL.look_problems(), PackedStringArray(), "every state has a sound look")
 	for state in EXPLODING_BARREL.states.list:
 		check(EXPLODING_BARREL.look_of(state.state_id) != null, "a look for %s" % state.state_id)
+
+
+## A picture at 2x detail (`<name>@2x`, ArtDetail) stands as big as its 1x art did: its frames
+## measured in world units, drawn at half its pixels, its 1x mask laid over it at its own size, and
+## nothing moved by half a pixel (ART3).
+func test_a_picture_at_2x_stands_its_1x_size() -> void:
+	var layer: PropLayer = EXPLODING_BARREL.look_of(&"idle").layers[0]
+	check_equal([layer.frame_px(), layer.frame_size()], [Vector2i(48, 64), Vector2i(24, 32)], "48x64 art pixels, 24x32 world units")
+	var body: Actor = _barrel()
+	var sprite := body.get_node("Sprite") as Sprite2D
+	check_equal(sprite.scale, Vector2(0.5, 0.5), "drawn at half its pixels")
+	var mask := _look(body).get_node("Layer1") as Sprite2D
+	check_equal(mask.scale, Vector2.ONE, "its 1x mask at its own size")
+	check_equal(mask.position, sprite.position, "on the same feet")
+	var flat := PropLayer.new()
+	flat.texture = load("res://content/props/dust_heap/scattered@2x.svg") as Texture2D
+	var shown := Sprite2D.new()
+	flat.dress(shown)
+	check_equal(flat.frame_size(), Vector2i(32, 16), "the scattered heap: 32x16 world units")
+	check_equal([shown.position, shown.offset], [Vector2(0, -8), Vector2.ZERO], "its bottom middle on the feet, no half pixel")
+	shown.free()
 
 
 func test_it_shows_the_state_it_starts_in_with_its_body_sprite_first() -> void:

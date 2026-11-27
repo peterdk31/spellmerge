@@ -18,7 +18,7 @@ unit: each art pixel's middle is tested against the parts, the topmost that hold
   parts read apart; the outside gets a one-art-pixel outline, closed eight ways; the silhouette's
   bottom-right edge a shade down, its top-left a shade up.
 
-Standard library only; used by tools/enemy_art.py.
+Standard library only; used by tools/enemy_art.py and tools/prop_art.py.
 """
 
 from __future__ import annotations
@@ -88,7 +88,9 @@ class Hit:
 class Part:
     """A shape with a material (a palette material's name, or `colour` for a flat colour) and a
     surface; `seam`: a dark line where it lies over the part below; `glint`: its brightest pixel
-    Bone light; `cracks`: polylines (world units) drawn a shade down across it."""
+    Bone light; `cracks`: polylines (world units) drawn a shade down across it; `raised`: Stone
+    that stands up from the floor (a pillar, a slab: tools/prop_art.py) and may take its shadow shade
+    on its bottom-right turns, which a body's stone never does."""
 
     test: Callable[[float, float], Hit | None]
     material: str = "Wood"
@@ -98,6 +100,7 @@ class Part:
     glint: bool = False
     cracks: list[list[Point]] = field(default_factory=list)
     seed: int = 0
+    raised: bool = False
 
 
 # --- shapes -------------------------------------------------------------------------------------
@@ -269,7 +272,7 @@ def moved(part: Part, ox: float, oy: float, scale: float = 1.0, turn: float = 0.
         return Hit((n[0] * cs - n[1] * sn, n[0] * sn + n[1] * cs, n[2]), hit.u, hit.v)
 
     cracks = [[(ox + (px * cs - py * sn) * scale, oy + (px * sn + py * cs) * scale) for px, py in line] for line in part.cracks]
-    return Part(test, part.material, part.surface, part.colour, part.seam, part.glint, cracks, part.seed)
+    return Part(test, part.material, part.surface, part.colour, part.seam, part.glint, cracks, part.seed, part.raised)
 
 
 # --- surfaces -----------------------------------------------------------------------------------
@@ -377,7 +380,7 @@ def draw(parts: list[Part], width: int, height: int, outline: bool = True) -> Ca
             shade = _surface(part, hit, shade, px, py)
             if _on_crack(part, (px + 0.5) / DETAIL, (py + 0.5) / DETAIL):
                 shade = shade - 1 if shade > 0 else 1
-            if part.material == "Stone":
+            if part.material == "Stone" and not part.raised:
                 shade = max(shade, 1)
             canvas.pixels[py][px] = ramp[max(0, min(2, shade))]
             if part.glint:

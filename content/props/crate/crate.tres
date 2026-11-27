@@ -2,12 +2,12 @@
 
 [ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
 [ext_resource type="Resource" path="res://content/props/crate/crate_states.tres" id="2"]
-[ext_resource type="Texture2D" path="res://content/props/crate/idle.svg" id="3"]
+[ext_resource type="Texture2D" path="res://content/props/crate/idle@2x.svg" id="3"]
 [ext_resource type="Script" path="res://core/base/prop_layer.gd" id="4"]
 [ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="5"]
-[ext_resource type="Texture2D" path="res://content/props/crate/cracked.svg" id="6"]
+[ext_resource type="Texture2D" path="res://content/props/crate/cracked@2x.svg" id="6"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="7"]
-[ext_resource type="Texture2D" path="res://content/props/crate/broken.svg" id="8"]
+[ext_resource type="Texture2D" path="res://content/props/crate/broken@2x.svg" id="8"]
 [ext_resource type="Script" path="res://core/base/prop_base.gd" id="9"]
 
 [sub_resource type="Resource" id="idle_layer_0"]

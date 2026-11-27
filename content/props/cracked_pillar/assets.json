@@ -1,28 +1,31 @@
 {
 	"assets": [
 		{
-			"path": "content/props/cracked_pillar/intact.svg",
+			"path": "content/props/cracked_pillar/cracked@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from intact.grid.json, 2026-11-15)",
-			"prompt": "A stone pillar prop, 24x48, seen from a little above: a wide Stone cap with a Bone-lit top edge, a square shaft of stacked blocks with dark mortar lines, a wide base. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The square pillar cracked: a crack zig-zagging down its shaft, one at its capital's corner and one at its plinth. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
-			"path": "content/props/cracked_pillar/cracked.svg",
+			"path": "content/props/cracked_pillar/intact@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from cracked.grid.json, 2026-11-15)",
-			"prompt": "The stone pillar cracked: intact.svg with a zig-zag crack down its shaft, a chip off the cap's right corner and a split in its base. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "A square stone pillar, 24x48 units: a lit capital slab, a shaft of four stacked raised-Stone blocks with dark joints, pitted, lit down its left and shaded down its right, a plinth at its foot. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
-			"path": "content/props/cracked_pillar/rubble.svg",
+			"path": "content/props/cracked_pillar/rubble@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from rubble.grid.json, 2026-11-15)",
-			"prompt": "The stone pillar fallen: a low pile of four Stone blocks, 24x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The square pillar fallen: three broken stone blocks in a heap and a chip on top, 24x16 units. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		}
 	]
 }

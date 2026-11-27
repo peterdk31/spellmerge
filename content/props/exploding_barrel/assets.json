@@ -1,36 +1,39 @@
 {
 	"assets": [
 		{
-			"path": "content/props/exploding_barrel/idle.svg",
+			"path": "content/props/exploding_barrel/broken@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
-			"prompt": "A powder keg prop, 24x32: bulging Wood staves, two Stone iron hoops at each end, a lid and a short dark fuse, a painted Fire flame mark on its front. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The exploding barrel burst: a scorched barrel bottom with a ring of splintered staves standing round it, embers on it and a hoop's piece beside it. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
+		},
+		{
+			"path": "content/props/exploding_barrel/fusing@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The exploding barrel fusing: the same barrel, a Spark spark burning at the fuse's tip and the rune's heart hot Spark. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
+		},
+		{
+			"path": "content/props/exploding_barrel/idle@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "An exploding barrel, 24x32 units: a bulging Wood barrel of staves running down it, round across and lit on its left, a grained lid lit from above, two raised-Stone hoops with rivets, a dark fuse from its lid and a diamond rune of fire with a Fire heart on its front. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
 			"path": "content/props/exploding_barrel/idle_motes.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"tool": "Claude (written by tools/prop_art.py from the prop's list of glowing points, 2026-11-27)",
 			"prompt": "The mote points of idle.svg: its painted flame mark's pixels in Bone light, nothing else."
-		},
-		{
-			"path": "content/props/exploding_barrel/fusing.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from fusing.grid.json, 2026-11-12)",
-			"prompt": "The powder keg lit: idle.svg with a Spark light tip on its fuse. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
-		},
-		{
-			"path": "content/props/exploding_barrel/broken.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from broken.grid.json, 2026-11-12)",
-			"prompt": "The powder keg blown apart: a scorched ring of broken Wood stave stubs, coals and a loose Stone hoop on the floor beside it. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
 		}
 	]
 }

@@ -1,44 +1,47 @@
 {
 	"assets": [
 		{
-			"path": "content/props/arc_lodestone/idle.svg",
+			"path": "content/props/arc_lodestone/charged@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
-			"prompt": "An arc lodestone prop, 24x32: a dark Stone standing stone with Arc lime veins down its face and two small Arc crystal tips growing from its sides. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
-		},
-		{
-			"path": "content/props/arc_lodestone/idle_motes.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
-			"prompt": "The mote points of idle.svg: its crystal tips' lit faces and four points of its veins in Bone light, nothing else."
-		},
-		{
-			"path": "content/props/arc_lodestone/charged.svg",
-			"origin": "ai",
-			"author": "Claude",
-			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from charged.grid.json, 2026-11-12)",
-			"prompt": "The arc lodestone charged: idle.svg with every Arc shade a step brighter, its veins Arc light and its crystal tips white-hot Bone light. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The arc lodestone charged: the same stone, its vein, nodes and side arcs all Arc light. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
 			"path": "content/props/arc_lodestone/charged_motes.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from charged.grid.json, 2026-11-12)",
+			"tool": "Claude (written by tools/prop_art.py from the prop's list of glowing points, 2026-11-27)",
 			"prompt": "The mote points of charged.svg, the same as idle_motes.svg: in Bone light, nothing else."
 		},
 		{
-			"path": "content/props/arc_lodestone/spent.svg",
+			"path": "content/props/arc_lodestone/idle@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from spent.grid.json, 2026-11-12)",
-			"prompt": "The arc lodestone spent: idle.svg with its veins and crystal tips burnt out to dark Stone shades. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "An arc lodestone, 24x32 units: a rounded standing stone of dark raised Stone with a widened foot, pitted, a lit top-left and a shaded bottom-right, a zig-zag vein of Arc shadow down its face with three Arc base nodes and two Arc base arcs curling up its sides. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
+		},
+		{
+			"path": "content/props/arc_lodestone/idle_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (written by tools/prop_art.py from the prop's list of glowing points, 2026-11-27)",
+			"prompt": "The mote points of idle.svg: its crystal tips' lit faces and four points of its veins in Bone light, nothing else."
+		},
+		{
+			"path": "content/props/arc_lodestone/spent@2x.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The arc lodestone spent: the same stone with no arc, its vein left as a dark crack down its face. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		}
 	]
 }

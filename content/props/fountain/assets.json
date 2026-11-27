@@ -1,35 +1,37 @@
 {
 	"assets": [
 		{
-			"path": "content/props/fountain/still.svg",
+			"path": "content/props/fountain/still@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from still.grid.json, 2026-11-16)",
-			"prompt": "A fountain prop, 32x32 seen from above at an angle: a round Stone basin with a front wall, holding Water with a few light ripples, and a Stone pillar in its middle carrying a small bowl that pours a thin stream off its right lip. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "A fountain, 32x32 units: a round raised-Stone basin, its front face shaded, holding Water with streaks, ripples and a glint, a round stone column with a joint, a slab and a small water bowl on top, a trickle down its right side. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
 			"path": "content/props/fountain/still_motes.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from still.grid.json, 2026-11-16)",
+			"tool": "Claude (written by tools/prop_art.py from the prop's list of glowing points, 2026-11-27)",
 			"prompt": "The mote points of still.svg: two pixels of the water in its top bowl, in Bone light, nothing else."
 		},
 		{
-			"path": "content/props/fountain/welling.svg",
+			"path": "content/props/fountain/welling@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from welling.grid.json, 2026-11-16)",
-			"prompt": "The fountain welling up before a burst: still.svg with a column of Water bulging up out of the top bowl, foam in Bone light at its top, water pouring off both lips of the bowl and foam on the basin's water. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The fountain welling: the same fountain with a spout of Water rising out of its bowl, white Bone light at its top, trickles down both sides and splashes on the basin. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
 			"path": "content/props/fountain/welling_motes.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from welling.grid.json, 2026-11-16)",
+			"tool": "Claude (written by tools/prop_art.py from the prop's list of glowing points, 2026-11-27)",
 			"prompt": "The mote points of welling.svg: four pixels up the bulging column of water, in Bone light, nothing else."
 		}
 	]

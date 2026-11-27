@@ -11,7 +11,7 @@ extends Node
 ## would put on screen (tests/gameplay/feel/test_ground_drawing.gd holds every room's drawing to its
 ## baked art, pixel for pixel, and its imported textures to the drawn ones as shown, rims and drips
 ## alike), so drawing it again was a whole room's work at the run's start for nothing (#972: about
-## a third of a biome's pieces, half its ground's time on the web).
+## a third of a biome's pieces: 1.95 s of its ground became 1.20 s on the web, one seed).
 ##
 ## No load stall: the native module draws a crypt room in a few tens of milliseconds on the module's
 ## threads (`GroundKernel.draw`); `last_usec` holds how long the last room took, drawing and

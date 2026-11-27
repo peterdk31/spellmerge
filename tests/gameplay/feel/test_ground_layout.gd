@@ -165,7 +165,7 @@ func test_a_mirrored_layout_is_drawn_mirrored() -> void:
 
 func test_an_unmirrored_room_keeps_its_baked_art() -> void:
 	# The baked art is what the drawing would show (test_ground_drawing.gd), so no room laid unmirrored
-	# is drawn, with the native module or without (#972: it was half a biome's ground at a run's start).
+	# is drawn, with the native module or without (#972: two fifths of a biome's ground at a run's start on the web).
 	var events: EventsScript = own(EventsScript.new()) as EventsScript
 	for native: bool in [true, false]:
 		var part: LayoutScript = _part()

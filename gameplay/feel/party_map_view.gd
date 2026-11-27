@@ -79,6 +79,8 @@ const SHOWN: int = 1
 const ENTERED: int = 2
 ## A wizard's dot, its side in map pixels (inside its dark edge of a screen pixel).
 const DOT: int = 2
+## One art pixel, in layout pixels (ART4: the dots and the pick are drawn at the art's detail).
+const ART: float = PixelShape.ART_PIXEL
 ## The pick's outline round a room (`map_pick_changed`, the HUD's; the owner, 2026-11-19): its stages
 ## at FPS, 0 none, then its four corners' dots, then brackets of BRACKET map pixels, then the whole
 ## outline, in the seat's own colour, a screen pixel wide outside the room's box.
@@ -735,12 +737,26 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 			continue
 		var side: int = DOT * scale
 		var dot: Vector2 = origin + ((_wizard_at[wizard] - _area.position) / MAP_CELL).floor() * scale - Vector2(side / 2, side / 2)
-		canvas.draw_rect(Rect2(dot - Vector2(1, 1), Vector2(side + 2, side + 2)), Palette.OUTLINE)
-		canvas.draw_rect(Rect2(dot, Vector2(side, side)), _wizard_colour[wizard])
+		_draw_pip(canvas, Rect2(dot, Vector2(side, side)), _wizard_colour[wizard])
 
 
-## Seat `seat`'s picked room's outline on `canvas` at its stage (the class doc's PICK_STAGES): a screen
-## pixel outside the room's box on the map, in the seat's own colour over the dark outline's edge.
+## A wizard's dot over `rect` at the art's detail (ART4): its hat colour lit along its top and left
+## art pixels and shaded along its bottom and right, the Outline an art pixel round it with its
+## corners cut.
+static func _draw_pip(canvas: Control, rect: Rect2, colour: Color) -> void:
+	# As `PixelShape` shades: an art pixel with nothing above or left of it lit (so the top-right and
+	# bottom-left corners are lit too), the rest of the bottom and right edges in shadow.
+	_outline_round(canvas, rect)
+	canvas.draw_rect(rect, PixelShape.shadow_of(colour))
+	canvas.draw_rect(Rect2(rect.position, rect.size - Vector2(ART, ART)), colour)
+	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, ART)), PixelShape.light_of(colour))
+	canvas.draw_rect(Rect2(rect.position, Vector2(ART, rect.size.y)), PixelShape.light_of(colour))
+
+
+## Seat `seat`'s picked room's outline on `canvas` at its stage (the class doc's PICK_STAGES): a band a
+## screen pixel wide outside the room's box on the map, in the seat's own colour (lit along its top
+## and left, its base along its bottom and right), the Outline an art pixel either side of it, its
+## corners cut (ART4: the HUD's cursor at the art's detail).
 func _draw_pick(canvas: SeatMap, seat: int, origin: Vector2, scale: int) -> void:
 	var stage: int = _pick_stage[seat]
 	var room: int = _pick[seat]
@@ -749,27 +765,38 @@ func _draw_pick(canvas: SeatMap, seat: int, origin: Vector2, scale: int) -> void
 	var corner: Vector2 = origin + ((_rects[room].position - _area.position) / MAP_CELL).floor() * scale - Vector2(2, 2)
 	var size: Vector2 = (_rects[room].size / MAP_CELL).ceil() * scale + Vector2(4, 4)
 	var colour: Color = _wizard_colour[seat]
-	if stage >= PICK_STAGES:
-		_frame_rect(canvas, Rect2(corner - Vector2.ONE, size + Vector2(2, 2)), Palette.OUTLINE)
-		_frame_rect(canvas, Rect2(corner, size), colour)
-		_frame_rect(canvas, Rect2(corner + Vector2.ONE, size - Vector2(2, 2)), Palette.OUTLINE)
-		return
-	var arm: float = 1.0 if stage == 1 else float(mini(BRACKET * scale, int(minf(size.x, size.y) * 0.5)))
-	for x in 2:
-		for y in 2:
-			var at: Vector2 = corner + Vector2(size.x - 1.0 if x == 1 else 0.0, size.y - 1.0 if y == 1 else 0.0)
-			var across := Vector2(-arm + 1.0 if x == 1 else 0.0, 0.0)
-			var down := Vector2(0.0, -arm + 1.0 if y == 1 else 0.0)
-			canvas.draw_rect(Rect2(at + across, Vector2(arm, 1.0)), colour)
-			canvas.draw_rect(Rect2(at + down, Vector2(1.0, arm)), colour)
+	var light: Color = PixelShape.light_of(colour)
+	var arm: float = size.x if stage >= PICK_STAGES else (1.0 if stage == 1 else float(mini(BRACKET * scale, int(minf(size.x, size.y) * 0.5))))
+	var tall: float = size.y if stage >= PICK_STAGES else arm
+	# Its Outline first, all round, then its band's base, then its light over it: one corner's Outline
+	# never covers another's band, and where a lit side meets a base one the light wins, as
+	# `PixelShape` shades.
+	for band in 3:
+		for x in 2:
+			for y in 2:
+				var at: Vector2 = corner + Vector2(size.x - arm if x == 1 else 0.0, size.y - 1.0 if y == 1 else 0.0)
+				var down: Vector2 = corner + Vector2(size.x - 1.0 if x == 1 else 0.0, size.y - tall if y == 1 else 0.0)
+				var across := Rect2(at, Vector2(arm, 1.0))
+				var upright := Rect2(down, Vector2(1.0, tall))
+				if band == 0:
+					_outline_round(canvas, across)
+					_outline_round(canvas, upright)
+				elif band == 1:
+					if y == 1:
+						canvas.draw_rect(across, colour)
+					if x == 1:
+						canvas.draw_rect(upright, colour)
+				else:
+					if y == 0:
+						canvas.draw_rect(across, light)
+					if x == 0:
+						canvas.draw_rect(upright, light)
 
 
-## A one-pixel frame round `rect`, by four filled rectangles (whole pixels, never a stroked line).
-static func _frame_rect(canvas: Control, rect: Rect2, colour: Color) -> void:
-	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 1.0)), colour)
-	canvas.draw_rect(Rect2(rect.position + Vector2(0.0, rect.size.y - 1.0), Vector2(rect.size.x, 1.0)), colour)
-	canvas.draw_rect(Rect2(rect.position, Vector2(1.0, rect.size.y)), colour)
-	canvas.draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1.0, 0.0), Vector2(1.0, rect.size.y)), colour)
+## The Outline an art pixel round `rect`, its corners cut (the two rects of its four-way edge).
+static func _outline_round(canvas: Control, rect: Rect2) -> void:
+	canvas.draw_rect(Rect2(rect.position.x - ART, rect.position.y, rect.size.x + 2.0 * ART, rect.size.y), Palette.OUTLINE)
+	canvas.draw_rect(Rect2(rect.position.x, rect.position.y - ART, rect.size.x, rect.size.y + 2.0 * ART), Palette.OUTLINE)
 
 
 ## A new biome's pieces as the map draws them: each place's floor read from `grid` at MAP_CELL (once a

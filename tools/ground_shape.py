@@ -67,7 +67,7 @@ import ground_walls
 
 ROOT = Path(__file__).resolve().parent.parent
 # Bump when what the generator draws changes, so every room's `--check` asks for a new run.
-VERSION = 5
+VERSION = 6
 # How far round a trimmed ledge cell's middle its floor is cleared (`Drawing._trim_to_reach`).
 TRIM_ROUND = 5
 PALETTE = ROOT / "core/base/palette.gd"
@@ -86,6 +86,8 @@ HOLE_LAYER = 2
 SIDE_REACH = 130
 # How far past a pin's end a frame's edge eases back to its noise, in pixels.
 PIN_EASE = 12.0
+# Art pixels a world pixel of the ground's fine art (ArtDetail.DETAIL: 64x64 a 32-unit cell).
+DETAIL = 2
 # The most bytes a file may be (AGENTS.md, hard rule 3: 1 MB an image).
 MOST_BYTES = 1024 * 1024
 
@@ -595,6 +597,9 @@ class Drawing:
     def __init__(self, shape: dict, placed: list[tuple[float, float, float]] | None = None,
                  clear: list[tuple[float, float, float]] | None = None) -> None:
         self.mats = materials()
+        # Art pixels a world pixel of what this drawing draws (1; its `fine` twin's DETAIL).
+        self.detail = 1
+        self.coarse: "Drawing | None" = None
         self.ground = Ground(shape, placed, clear)
         # The edge styles by side: the outlines' (0) and the pits' and their cracks' (1).
         self.style = load_style(shape["edge"])
@@ -651,6 +656,46 @@ class Drawing:
         self.glow_w, self.glow_h, self.glow = self._draw_glow()
         self.walls, self.holes = self._grid_rects()
         self.wall_art = self._draw_wall_art()
+
+    @functools.cached_property
+    def fine(self) -> "Drawing":
+        """This ground at 2x (DETAIL art pixels a world pixel, `_fine`), drawn when first asked for."""
+        return self._fine(DETAIL)
+
+    def _fine(self, d: int) -> "Drawing":
+        """The same ground drawn again at `d` art pixels a world pixel (ArtDetail): its outline (where a
+        body stands, the cracks, pits and areas, each pixel's side, t and seam band) is this drawing's,
+        every pixel `d` by `d` art pixels, so the art and the walls never disagree; what is drawn on it
+        (the floor's materials, the seam and lip, the pebbles and rubble, the wall's foot, the rock face
+        and the walls' art) is drawn again at that detail by the same rules, with what finer pixels
+        show (ground_materials.py, ground_walls.py). Its floor, rock face and wall art only: the glow,
+        the walls' cells, the rims and the drips are this drawing's."""
+        fine = Drawing.__new__(Drawing)
+        fine.mats, fine.styles, fine.style, fine.grounds = self.mats, self.styles, self.style, self.grounds
+        fine.deeps, fine.deep = self.deeps, self.deep
+        fine.detail = d
+        fine.coarse = self
+        fine.w, fine.h = self.w * d, self.h * d
+        g = self.ground
+        fine.ground = Ground.__new__(Ground)
+        fine.ground.shape = g.shape
+        fine.ground.land = _upsampled(g.land, self.w, self.h, d)
+        fine.ground.pit = _upsampled(g.pit, self.w, self.h, d)
+        fine.ground.pit_side = _upsampled(g.pit_side, self.w, self.h, d)
+        fine.ground.material = _upsampled(g.material, self.w, self.h, d)
+        fine.ground.crack = _upsampled(g.crack, self.w, self.h, d)
+        fine.solid = _upsampled(self.solid, self.w, self.h, d)
+        fine.side = _upsampled(self.side, self.w, self.h, d)
+        fine.t = _upsampled(self.t, self.w, self.h, d)
+        fine.band = _upsampled(self.band, self.w, self.h, d)
+        n = fine.w * fine.h
+        fine.floor = bytearray(n * 4)
+        fine.under = bytearray(n * 4)
+        fine._draw_floor()
+        fine._draw_edges()
+        fine._draw_under()
+        fine.wall_art = fine._draw_wall_art()
+        return fine
 
     def _sides(self) -> bytearray:
         """Which edge style each pixel's nearest edge is drawn in: open ground is its own side (a
@@ -758,8 +803,9 @@ class Drawing:
         g = self.ground
         seed = int(g.shape.get("seed", 0))
         noise = ground_materials.Noise(unit, noise1, fbm2)
-        centres = [(self.w / 2.0, self.h / 2.0)] + [tuple(a["centre"]) for a in g.shape.get("areas", [])]
-        mats = [ground_materials.Material(spec, k, seed, (self.w, self.h), centres[k], lambda c: colour(c, self.mats), noise)
+        d = self.detail
+        centres = [(self.w / 2.0, self.h / 2.0)] + [(a["centre"][0] * d, a["centre"][1] * d) for a in g.shape.get("areas", [])]
+        mats = [ground_materials.Material(spec, k, seed, (self.w, self.h), centres[k], lambda c: colour(c, self.mats), noise, d)
                 for k, spec in enumerate(self.grounds)]
         edge_distance = self._edge_distance(max((int(m.edge_reach) for m in mats if m.needs_edge_distance()), default=0))
         for p in range(self.w * self.h):
@@ -923,14 +969,16 @@ class Drawing:
         as t allows), over the floor, each in its side's edge style; then the lip's pebbles and
         rubble, and the dark foot of a wall's face."""
         g = self.ground
+        k = self.detail
         lips = [([colour(c, self.mats) for c in st["lip"]["shades"]], int(st["lip"]["width"])) for st in self.styles]
         lip_most = max(width for _, width in lips)
-        # The distance in from the edge, up to the widest lip, by a walk in from the edges.
+        # The distance in from the edge, up to the widest lip, by a walk in from the edges (in this
+        # drawing's pixels: the seam is `k` of them, a world pixel).
         dist = bytearray(self.w * self.h)
         frontier = [p for p in range(self.w * self.h) if self._is_edge(p)]
         for p in frontier:
             dist[p] = 1
-        for d in range(2, lip_most + 2):
+        for d in range(2, (lip_most + 1) * k + 1):
             nxt = []
             for q in frontier:
                 x, y = q % self.w, q // self.w
@@ -954,10 +1002,14 @@ class Drawing:
             roll = unit(x, y, 5051)
             if d == 1:
                 edge_pixels.append(p)
-            if d == 1 and "seam" in self.styles[side]:
+            seamed = "seam" in self.styles[side]
+            if d <= k and seamed:
                 ramp = self._seam_colour(p)
                 if ramp is None:
                     continue
+                if k > 1:
+                    # Finer: the seam's inner row toward its light, its outer toward its shadow.
+                    roll = roll * 0.5 if d > 1 else 0.5 + roll * 0.5
                 # Light and base where the edge is whole, base then shadow as a crack narrows.
                 if roll < t * 0.5:
                     rgb = ramp[2]
@@ -967,41 +1019,71 @@ class Drawing:
                     rgb = ramp[0]
                 self._put(self.floor, p, rgb)
                 self.seam.append(p)
-            elif d - 1 <= lip_width * t + 0.2 and t > 0.2:
-                self._put(self.floor, p, lip_cols[1] if roll < 0.3 else lip_cols[0])
+            elif (d - k) / k <= lip_width * t + 0.2 and t > 0.2:
+                # Finer: the lip's outer row (under the seam, or the edge's own) in its shadow.
+                if k > 1 and d == (k + 1 if seamed else 1):
+                    self._put(self.floor, p, lip_cols[0])
+                else:
+                    self._put(self.floor, p, lip_cols[1] if roll < 0.3 else lip_cols[0])
+        # The pebbles and the rubble lie where the 1x drawing put them (its seam and edge pixels).
+        if k == 1:
+            self.pebbles_at: list[list[tuple[int, int]]] = [[], []]
+            self.stones_at: list[list[tuple[int, int, int]]] = [[], []]
         for side, style in enumerate(self.styles):
             pebbles = style["lip"].get("pebbles")
             if pebbles:
-                self._draw_pebbles(pebbles, [p for p in self.seam if self.side[p] == side])
+                if k == 1:
+                    self.pebbles_at[side] = self._pebble_places(pebbles, [p for p in self.seam if self.side[p] == side])
+                self._draw_pebbles(pebbles, (self.coarse or self).pebbles_at[side])
             rubble = style["lip"].get("rubble")
             if rubble:
-                self._draw_rubble(rubble, [p for p in edge_pixels if self.side[p] == side])
+                if k == 1:
+                    self.stones_at[side] = self._rubble_places(rubble, [p for p in edge_pixels if self.side[p] == side])
+                self._draw_rubble(rubble, (self.coarse or self).stones_at[side])
             face = style.get("face")
             if face and "foot" in face and side == 0:
                 self._draw_foot(face["foot"])
 
-    def _draw_pebbles(self, pebbles: dict, seam: list[int]) -> None:
+    def _pebble_places(self, pebbles: dict, seam: list[int]) -> list[tuple[int, int]]:
+        """The seam pixels a pebble lies above: one every `every` (by hash) where the edge is whole."""
+        return [(p % self.w, p // self.w) for p in seam if self.t[p] >= 0.9 and not hash32(p, 6061) % int(pebbles["every"])]
+
+    def _draw_pebbles(self, pebbles: dict, places: list[tuple[int, int]]) -> None:
+        """A pebble above each of `places` (world pixels), 4 by 3 world pixels: its rim dark, its body
+        and a lit fleck (`shades`: dark, base, light). Finer, its corners rounded off, its fleck lit
+        along the upper left, a dark speck at its body's lower right."""
         g = self.ground
         shades = [colour(c, self.mats) for c in pebbles["shades"]]
-        for p in seam:
-            if self.t[p] < 0.9 or hash32(p, 6061) % int(pebbles["every"]):
-                continue
-            x, y = p % self.w, p // self.w
-            for dy in range(-6, -3):
-                for dx in range(-2, 2):
-                    q = (y + dy) * self.w + x + dx
-                    if 0 <= y + dy < self.h and 0 <= x + dx < self.w and g.land[q]:
-                        inner = -5 <= dy <= -4 and -1 <= dx <= 0
-                        self._put(self.floor, q, shades[2] if (inner and dx == -1 and dy == -5) else shades[1] if inner else shades[0])
+        k = self.detail
+        for x0, y0 in places:
+            for j in range(3 * k):
+                for i in range(4 * k):
+                    xx, yy = (x0 - 2) * k + i, (y0 - 6) * k + j
+                    q = yy * self.w + xx
+                    if not (0 <= yy < self.h and 0 <= xx < self.w) or not g.land[q]:
+                        continue
+                    inner = k <= i < 3 * k and k <= j < 3 * k
+                    if k == 1:
+                        rgb = shades[2] if (inner and i == 1 and j == 1) else shades[1] if inner else shades[0]
+                    elif (i == 0 or i == 4 * k - 1) and (j == 0 or j == 3 * k - 1):
+                        continue
+                    elif not inner:
+                        rgb = shades[0]
+                    elif i < 2 * k and j < 2 * k and i + j < 3 * k:
+                        rgb = shades[2]
+                    elif i == 3 * k - 1 and j == 3 * k - 1:
+                        rgb = shades[0]
+                    else:
+                        rgb = shades[1]
+                    self._put(self.floor, q, rgb)
 
-    def _draw_rubble(self, rubble: dict, edge: list[int]) -> None:
-        """Stones and grit fallen along an edge: one every `every` edge pixels (by hash), `sizes`
-        pixels across, lying on the land just inside it; each its base colour with a lit top row and
-        a dark row under it (`shades`: dark, base, light)."""
+    def _rubble_places(self, rubble: dict, edge: list[int]) -> list[tuple[int, int, int]]:
+        """Where each stone of rubble lies and how big (world pixels): one every `every` edge pixels (by
+        hash), `sizes` pixels across, on the land just inside the edge."""
         g = self.ground
-        dark, base, light = (colour(c, self.mats) for c in rubble["shades"])
         lo, hi = (int(v) for v in rubble["sizes"])
         every = int(rubble["every"])
+        found: list[tuple[int, int, int]] = []
         for p in edge:
             if self.t[p] < 0.6 or hash32(p, 7071) % every:
                 continue
@@ -1012,22 +1094,43 @@ class Drawing:
                 if 0 <= nx < self.w and 0 <= ny < self.h and g.land[ny * self.w + nx] and not self._is_edge(ny * self.w + nx):
                     x, y = nx, ny
                     break
-            for dy in range(size + 1):
-                for dx in range(size + 1):
-                    xx, yy = x + dx, y + dy
+            found.append((x, y, size))
+        return found
+
+    def _draw_rubble(self, rubble: dict, stones: list[tuple[int, int, int]]) -> None:
+        """Stones and grit fallen along an edge (`stones`, world pixels): each its base colour with a lit
+        top row and a dark row under it (`shades`: dark, base, light). Finer, a stone wider than a pixel
+        has its upper corners rounded off and its left side lit too, and its shadow fades a step."""
+        g = self.ground
+        dark, base, light = (colour(c, self.mats) for c in rubble["shades"])
+        k = self.detail
+        for x0, y0, size in stones:
+            for dy in range((size + 1) * k):
+                for dx in range((size + 1) * k):
+                    xx, yy = x0 * k + dx, y0 * k + dy
                     if not (0 <= xx < self.w and 0 <= yy < self.h) or not g.land[yy * self.w + xx]:
                         continue
-                    rgb = dark if dy == size else light if dy == 0 and size > 1 else base
-                    if dx == size and dy < size:
+                    if dx // k == size and dy // k < size:
                         continue
-                    self._put(self.floor, yy * self.w + xx, rgb)
+                    q = yy * self.w + xx
+                    if k == 1:
+                        rgb = dark if dy == size else light if dy == 0 and size > 1 else base
+                    elif dy >= size * k:
+                        rgb = dark if dy == size * k else _mix(tuple(self.floor[q * 4:q * 4 + 3]), dark, 0.5)
+                    elif size > 1 and dy == 0 and (dx == 0 or dx == size * k - 1):
+                        continue
+                    elif size > 1 and (dy == 0 or dx == 0):
+                        rgb = light
+                    else:
+                        rgb = base
+                    self._put(self.floor, q, rgb)
 
     def _draw_foot(self, foot: list) -> None:
-        """The dark foot of a wall's face: the floor right under it, `foot[1]` rows mixed toward
+        """The dark foot of a wall's face: the floor right under it, `foot[1]` world pixels mixed toward
         `foot[0]`, less each row down."""
         g = self.ground
         shade = colour(foot[0], self.mats)
-        rows = int(foot[1])
+        rows = int(foot[1]) * self.detail
         for p in range(self.w, self.w * self.h):
             if not g.land[p] or g.land[p - self.w] or g.pit[p - self.w] or g.crack[p - self.w] > 0.0:
                 continue
@@ -1048,6 +1151,7 @@ class Drawing:
             rocks.append(None if rock is None else ([colour(c, self.mats) for c in rock["shades"]], colour(rock["strata"], self.mats),
                                                     colour(rock["roots"], self.mats), rock["depth"]))
         seed = int(self.ground.shape.get("seed", 0)) + 21
+        k = self.detail
         bottoms: dict[int, int] = {}
         # The edge pixel each bottom hangs under (its seam band is the drips' colour).
         edges: dict[int, int] = {}
@@ -1062,7 +1166,7 @@ class Drawing:
                 shades, strata, root, (lo, hi) = rocks[side]
                 deep = self.deeps[side]
                 t = self.t[p]
-                depth = int((lo + (hi - lo) * noise1(x / 14.0, seed) ** 1.8) * t)
+                depth = int((lo + (hi - lo) * noise1(x / (14.0 * k), seed) ** 1.8) * t * k)
                 bottom = y
                 for d in range(1, depth + 1):
                     yy = y + d
@@ -1071,24 +1175,37 @@ class Drawing:
                     q = yy * self.w + x
                     if self.solid[q]:
                         break
-                    k = noise2(x, yy, 7.0, seed + 1)
-                    rgb = shades[1] if k > 0.55 else shades[0]
-                    if math.sin((yy + noise1(x / 9.0, seed + 2) * 18.0) / 5.0) > 0.85:
+                    n = noise2(x, yy, 7.0 * k, seed + 1)
+                    rgb = shades[1] if n > 0.55 else shades[0]
+                    turn = (yy / k + noise1(x / (9.0 * k), seed + 2) * 18.0) / 5.0
+                    layer = math.sin(turn)
+                    if layer > 0.85:
                         rgb = strata
+                    elif k > 1 and layer > 0.6 and math.cos(turn) < 0.0:
+                        # Finer: the shadow a stratum casts on the rock under it.
+                        rgb = _mix(rgb, strata, 0.5)
+                    elif k > 1 and d == 1:
+                        # Finer: the face's top row catching the light under the edge.
+                        rgb = shades[1]
                     rgb = _mix(deep, rgb, t)
                     self._put(self.under, q, rgb)
                     bottom = yy
                 if bottom > y and t > 0.6:
                     q = bottom * self.w + x
                     self._put(self.under, q, strata)
-                    bottoms[x * self.h + bottom] = q
-                    edges[x * self.h + bottom] = p
-                    if hash32(x, y, seed) % 7 == 0:
-                        length = 6 + hash32(x, y, seed, 2) % 30
+                    if k == 1:
+                        bottoms[x * self.h + bottom] = q
+                        edges[x * self.h + bottom] = p
+                    # A root hangs from a world pixel's edge (finer, from one column of its pixels).
+                    xr, yr = x // k, y // k
+                    if hash32(xr, yr, seed) % 7 == 0 and (k == 1 or x % k == hash32(xr, yr, seed, 3) % k):
+                        length = (6 + hash32(xr, yr, seed, 2) % 30) * k
                         for d in range(1, length):
                             yy = bottom + d
                             if yy < self.h and not self.solid[yy * self.w + x]:
                                 self._put(self.under, yy * self.w + x, root)
+        if k > 1:
+            return
         # The drips leave from the rock's bottom: runs of neighbouring columns under one band of the
         # seam, each in that band's colour alone; a line runs right to left, so the left of its way
         # (where a line throws its motes) is down.
@@ -1183,7 +1300,7 @@ class Drawing:
             if not self.solid[p] and g.crack[p] == 0.0 and not g.pit[p]:
                 wall[p] = 1
         return ground_walls.draw(self.w, self.h, self.solid, wall, self.style, lambda c: colour(c, self.mats), noise2,
-                                 int(g.shape.get("seed", 0)) + 61)
+                                 int(g.shape.get("seed", 0)) + 61, self.detail)
 
     @staticmethod
     def _merge(wall: list[list[bool]]) -> list[tuple[int, int, int, int]]:
@@ -1216,6 +1333,19 @@ class Drawing:
                     open_runs[span] = [r, 1]
         rects.sort(key=lambda rect: (rect[1], rect[0]))
         return rects
+
+
+def _upsampled(mask, w: int, h: int, d: int):
+    """`mask` (w by h, a bytearray or an array) with every value `d` by `d` times, as the same type."""
+    out = mask[:0]
+    for y in range(h):
+        row = mask[y * w:(y + 1) * w]
+        wide = row[:0]
+        for v in row:
+            wide.extend([v] * d) if not isinstance(wide, (bytes, bytearray)) else wide.extend(bytes([v]) * d)
+        for _ in range(d):
+            out.extend(wide)
+    return out
 
 
 def _bilinear(grid: list[float], cols: int, fx: float, fy: float) -> float:
@@ -1292,10 +1422,15 @@ def outputs_of(shape_path: Path) -> dict[str, Path]:
     return {
         "scene": shape_path.parent / f"{stem}_ground.tscn",
         "floor": art / f"{stem}_ground_floor.png",
-        "under": art / f"{stem}_ground_under.png",
+        "fine_floor": art / f"{stem}_ground_floor@2x.png",
+        "under": art / f"{stem}_ground_under@2x.png",
         "glow": art / f"{stem}_ground_glow.png",
-        "wall": art / f"{stem}_ground_wall.png",
+        "wall": art / f"{stem}_ground_wall@2x.png",
     }
+
+
+# The files a ground had before its rock face and walls were drawn at 2x (`generate` deletes them).
+OLD_OUTPUTS = ("_ground_under.png", "_ground_wall.png")
 
 
 def res_path(path: Path) -> str:
@@ -1314,9 +1449,10 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
     sizes = sorted({(w, h) for _, _, w, h in drawing.walls + drawing.holes})
     shape_ids = {size: f"Box_{size[0]}x{size[1]}" for size in sizes}
     wall_art = drawing.wall_art is not None
-    steps = 5 + len(drawing.rims) + len(drawing.drips) + len(sizes) + (1 if wall_art else 0)
+    steps = 6 + len(drawing.rims) + len(drawing.drips) + len(sizes) + (1 if wall_art else 0)
     lines = [f"[gd_scene load_steps={steps} format=3]", ""]
     lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["floor"])}" id="1_floor"]')
+    lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["fine_floor"])}" id="6_fine"]')
     lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["under"])}" id="2_under"]')
     lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["glow"])}" id="3_glow"]')
     lines.append('[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]')
@@ -1348,6 +1484,11 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
         lines += [f'[sub_resource type="RectangleShape2D" id="{shape_ids[size]}"]', f"size = Vector2({size[0]}, {size[1]})", ""]
     lines += ['[node name="Floor" type="Sprite2D"]', f"z_index = {FLOOR_Z}", "texture_filter = 1", 'texture = ExtResource("1_floor")',
               "centered = false", f'metadata/ground_inputs = "{digest}"', ""]
+    # The floor at 2x (ArtDetail), over the 1x one exactly (its first child: under the glow and all the
+    # rest); the 1x stays the floor's texture, which is what the room's readers measure and sample.
+    half = f"scale = Vector2({_num(1.0 / DETAIL)}, {_num(1.0 / DETAIL)})"
+    lines += ['[node name="Detail" type="Sprite2D" parent="."]', "texture_filter = 1", half, 'texture = ExtResource("6_fine")',
+              "centered = false", ""]
     lines += ['[node name="Glow" type="Sprite2D" parent="."]', 'material = SubResource("GlowAdd")', "z_as_relative = false",
               f"z_index = {GLOW_Z}", "texture_filter = 2", "scale = Vector2(2, 2)", 'texture = ExtResource("3_glow")', "centered = false", ""]
     if drawing.walls:
@@ -1355,13 +1496,13 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
     if wall_art:
         # The walls' own art, on their body, so a hit on a wall sheds its colours.
         lines += ['[node name="WallArt" type="Sprite2D" parent="Walls"]', "z_as_relative = false", f"z_index = {FLOOR_Z}",
-                  "texture_filter = 1", 'texture = ExtResource("5_wall")', "centered = false", ""]
+                  "texture_filter = 1", half, 'texture = ExtResource("5_wall")', "centered = false", ""]
     # The rock face hangs into the void: on the walls' body where the void is wall and no pit's
     # shaft is among it (a hit on a wall sheds it), else on the root.
     on_walls = drawing.ground.shape.get("void", "wall") != "hole" and drawing.walls and not any(drawing.ground.pit_side)
     under_parent = "Walls" if on_walls else "."
     lines += [f'[node name="Underside" type="Sprite2D" parent="{under_parent}"]', "z_as_relative = false", f"z_index = {FLOOR_Z}",
-              "texture_filter = 1", 'texture = ExtResource("2_under")', "centered = false", ""]
+              "texture_filter = 1", half, 'texture = ExtResource("2_under")', "centered = false", ""]
     for i, (x, y, w, h) in enumerate(drawing.walls):
         lines += [f'[node name="W{i + 1}" type="CollisionShape2D" parent="Walls"]', f"position = Vector2({_num(x + w / 2)}, {_num(y + h / 2)})",
                   f'shape = SubResource("{shape_ids[(w, h)]}")', ""]
@@ -1388,14 +1529,16 @@ def draw(shape_path: Path) -> "Drawing":
 def files_of(drawing: "Drawing", shape_path: Path) -> dict[str, bytes]:
     """The bytes of every file the ground of `shape_path` is, by what it is (as `generate` writes them)."""
     outs = outputs_of(shape_path)
+    fine = drawing.fine
     found = {
         "floor": png(drawing.w, drawing.h, drawing.floor),
-        "under": png(drawing.w, drawing.h, drawing.under),
+        "fine_floor": png(fine.w, fine.h, fine.floor),
+        "under": png(fine.w, fine.h, fine.under),
         "glow": png(drawing.glow_w, drawing.glow_h, drawing.glow),
         "scene": scene_text(drawing, outs, inputs_hash(shape_path)).encode("utf-8"),
     }
-    if drawing.wall_art is not None:
-        found["wall"] = png(drawing.w, drawing.h, drawing.wall_art)
+    if fine.wall_art is not None:
+        found["wall"] = png(fine.w, fine.h, fine.wall_art)
     for kind, data in found.items():
         if len(data) > MOST_BYTES:
             raise ValueError(f"{outs[kind].name} would be {len(data)} bytes, over the {MOST_BYTES} a file may be (AGENTS.md, hard rule 3)")
@@ -1412,6 +1555,12 @@ def generate(shape_path: Path) -> dict[str, Path]:
         outs[kind].write_bytes(data)
     if "wall" not in written and outs["wall"].exists():
         outs["wall"].unlink()
+    stem = shape_path.name.removesuffix(".shape.json")
+    for end in OLD_OUTPUTS:
+        old = outs["floor"].parent / f"{stem}{end}"
+        for path in (old, old.with_name(old.name + ".import")):
+            if path.exists():
+                path.unlink()
     return {kind: outs[kind] for kind in written}
 
 
@@ -1427,7 +1576,7 @@ def stale(shape_path: Path) -> str | None:
     match = re.search(r'metadata/ground_inputs = "([0-9a-f]+)"', scene.read_text(encoding="utf-8"))
     if match is None or match.group(1) != inputs_hash(shape_path):
         return f"{scene.relative_to(ROOT)} is older than its shape, edge style, ground materials or the generator"
-    kinds = ["floor", "under", "glow"] + (["wall"] if "_ground_wall.png" in scene.read_text(encoding="utf-8") else [])
+    kinds = ["floor", "fine_floor", "under", "glow"] + (["wall"] if "_ground_wall@2x.png" in scene.read_text(encoding="utf-8") else [])
     for kind in kinds:
         if not outputs_of(shape_path)[kind].exists():
             return f"{outputs_of(shape_path)[kind].relative_to(ROOT)} is missing"
@@ -1452,6 +1601,9 @@ def fixture_hashes() -> dict[str, dict[str, str]]:
             "under": hashlib.sha256(bytes(drawing.under)).hexdigest(),
             "glow": hashlib.sha256(bytes(drawing.glow)).hexdigest(),
             "wall": hashlib.sha256(bytes(drawing.wall_art or b"")).hexdigest(),
+            "fine_floor": hashlib.sha256(bytes(drawing.fine.floor)).hexdigest(),
+            "fine_under": hashlib.sha256(bytes(drawing.fine.under)).hexdigest(),
+            "fine_wall": hashlib.sha256(bytes(drawing.fine.wall_art or b"")).hexdigest(),
             "lines": hashlib.sha256(lines.encode()).hexdigest(),
         }
     return found

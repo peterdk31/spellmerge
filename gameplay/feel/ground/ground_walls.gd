@@ -4,14 +4,16 @@ extends RefCounted
 ## and `face`): the twin of `tools/ground_walls.py`, line by line. Its face, on the wall the camera
 ## looks at (the floor below it), in courses of masonry; its top, rough stone falling into the dark
 ## away from the floor. Drawn on whatever floor it is handed, so a mirrored room's faces still stand
-## above the floor's top edges. Static only.
+## above the floor's top edges. At a finer `detail` (art pixels a world pixel, ArtDetail) every length
+## is the same in the world, drawn with more pixels and what they show (`_fine_face`). Static only.
 
 const N := preload("res://gameplay/feel/ground/ground_noise.gd")
 
 
 ## The wall art as RGBA (clear where nothing is drawn): `floor` marks the pixels a body stands on,
-## `wall` the pixels of wall to draw (1), `style` the edge style (its `top` and `face`).
-static func draw(w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, style: Dictionary, palette: Dictionary, seed: int) -> PackedByteArray:
+## `wall` the pixels of wall to draw (1), `style` the edge style (its `top` and `face`), all `detail`
+## art pixels a world pixel.
+static func draw(w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, style: Dictionary, palette: Dictionary, seed: int, detail: int = 1) -> PackedByteArray:
 	var image := PackedByteArray()
 	image.resize(w * h * 4)
 	var top: Dictionary = style.get("top", {})
@@ -20,16 +22,16 @@ static func draw(w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteAr
 		return image
 	var rows := PackedByteArray()
 	if not face.is_empty():
-		rows = _face_rows(w, h, floor_mask, wall, int(face["height"]))
-		_draw_face(image, w, h, rows, face, palette, seed)
+		rows = _face_rows(w, h, floor_mask, wall, int(face["height"]) * detail, detail)
+		_draw_face(image, w, h, rows, face, palette, seed, detail)
 	else:
 		rows.resize(w * h)
 	if not top.is_empty():
-		_draw_top(image, w, h, floor_mask, wall, rows, top, palette, seed)
+		_draw_top(image, w, h, floor_mask, wall, rows, top, palette, seed, detail)
 	return image
 
 
-static func _face_rows(w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, face_height: int) -> PackedByteArray:
+static func _face_rows(w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, face_height: int, detail: int = 1) -> PackedByteArray:
 	var rows := PackedByteArray()
 	rows.resize(w * h)
 	for p in range(w, w * h):
@@ -37,7 +39,7 @@ static func _face_rows(w: int, h: int, floor_mask: PackedByteArray, wall: Packed
 			continue
 		var x: int = p % w
 		var y: int = p / w
-		for k in range(1, face_height + 2):
+		for k in range(1, face_height + detail + 1):
 			var yy: int = y - k
 			if yy < 0 or wall[yy * w + x] == 0:
 				break
@@ -45,10 +47,10 @@ static func _face_rows(w: int, h: int, floor_mask: PackedByteArray, wall: Packed
 	return rows
 
 
-static func _draw_face(image: PackedByteArray, w: int, h: int, rows: PackedByteArray, face: Dictionary, palette: Dictionary, seed: int) -> void:
-	var face_height: int = int(face["height"])
-	var course: int = int(face["course"])
-	var block: int = int(face["block"])
+static func _draw_face(image: PackedByteArray, w: int, h: int, rows: PackedByteArray, face: Dictionary, palette: Dictionary, seed: int, detail: int = 1) -> void:
+	var face_height: int = int(face["height"]) * detail
+	var course: int = int(face["course"]) * detail
+	var block: int = int(face["block"]) * detail
 	var shades: Array = face["shades"]
 	var low: int = N.colour(shades[0], palette)
 	var high: int = N.colour(shades[1], palette)
@@ -61,7 +63,9 @@ static func _draw_face(image: PackedByteArray, w: int, h: int, rows: PackedByteA
 			continue
 		var x: int = p % w
 		var rgb: int
-		if k == face_height + 1:
+		if detail > 1:
+			rgb = _fine_face(x, k, face_height, course, block, low, high, joint, light, cap, seed, detail)
+		elif k == face_height + 1:
 			rgb = cap
 		elif k == face_height:
 			rgb = light
@@ -76,7 +80,29 @@ static func _draw_face(image: PackedByteArray, w: int, h: int, rows: PackedByteA
 		put(image, p, rgb)
 
 
-static func _draw_top(image: PackedByteArray, w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, rows: PackedByteArray, top: Dictionary, palette: Dictionary, seed: int) -> void:
+## A face's pixel at a finer detail (`face_height`, `course` and `block` in its pixels): the cap darker
+## at its top, the lit line a step into the stone, and each block lit along its top and left and
+## shaded along its bottom and right, the mortar a thin line.
+static func _fine_face(x: int, k: int, face_height: int, course: int, block: int, low: int, high: int, joint: int, light: int, cap: int, seed: int, detail: int) -> int:
+	if k > face_height:
+		return cap if k > face_height + detail / 2 else N.mix(cap, joint, 0.5)
+	if k > face_height - detail:
+		return light if k == face_height else N.mix(light, high, 0.5)
+	var row: int = (k - 1) / course
+	var up: int = (k - 1) % course
+	var across: int = (x + row * (block / 2)) % block
+	if up == course - 1 or across == 0:
+		return joint
+	var n: float = N.noise2(float(x / block * block + row * 7 * detail), float(row * detail), 3.0 * float(detail), seed + 41)
+	var rgb: int = N.mix(low, high, minf(1.0, float(k - 1) / float(face_height) * 0.8 + n * 0.3))
+	if up == course - 2 or across == 1:
+		return N.mix(rgb, light, 0.35)
+	if up == 0 or across == block - 1:
+		return N.mix(rgb, joint, 0.4)
+	return rgb
+
+
+static func _draw_top(image: PackedByteArray, w: int, h: int, floor_mask: PackedByteArray, wall: PackedByteArray, rows: PackedByteArray, top: Dictionary, palette: Dictionary, seed: int, detail: int = 1) -> void:
 	var shades: Array = top["shades"]
 	var dark: int = N.colour(shades[0], palette)
 	var stone: int = N.colour(shades[1], palette)
@@ -84,8 +110,11 @@ static func _draw_top(image: PackedByteArray, w: int, h: int, floor_mask: Packed
 	var rim: int = N.colour(top["rim"], palette)
 	var deep: int = N.colour(top["deep"], palette)
 	var fade_range: Array = top["fade"]
-	var near: float = float(fade_range[0])
-	var far: float = float(fade_range[1])
+	var near: float = float(fade_range[0]) * float(detail)
+	var far: float = float(fade_range[1]) * float(detail)
+	# At a finer detail the grain is finer than a world pixel's.
+	var fine_scale: float = 3.0 if detail == 1 else 2.0 * float(detail)
+	var rough_scale: float = 9.0 * float(detail)
 	# How far each wall pixel is from the floor, by a walk out from the floor's edge.
 	var dist := PackedInt32Array()
 	dist.resize(w * h)
@@ -120,9 +149,12 @@ static func _draw_top(image: PackedByteArray, w: int, h: int, floor_mask: Packed
 		if dd == 1:
 			rgb = rim
 		else:
-			var fine: float = N.noise2(float(x), float(y), 3.0, seed + 51)
-			var rough: float = N.noise2(float(x), float(y), 9.0, seed + 52)
-			rgb = joint if fine < 0.28 else N.mix(dark, stone, rough)
+			var fine: float = N.noise2(float(x), float(y), fine_scale, seed + 51)
+			var rough: float = N.noise2(float(x), float(y), rough_scale, seed + 52)
+			if detail > 1 and dd == 2:
+				rgb = N.mix(rim, N.mix(dark, stone, rough), 0.5)
+			else:
+				rgb = joint if fine < 0.28 else N.mix(dark, stone, rough)
 		var fade: float = minf(1.0, maxf(0.0, (float(dd) - near) / maxf(1.0, far - near)))
 		put(image, p, N.mix(rgb, deep, fade))
 

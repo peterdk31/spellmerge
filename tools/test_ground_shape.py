@@ -128,7 +128,7 @@ class GroundShapeTest(unittest.TestCase):
         self._cells(d.holes, cells, "hole", self)
         open_cells = sum(1 for cy in range(0, d.h, gs.CELL) for cx in range(0, d.w, gs.CELL) if d.floor[((cy + gs.CELL // 2) * d.w + cx + gs.CELL // 2) * 4 + 3] == 0)
         self.assertEqual(len(cells), open_cells, "every open cell a hole")
-        text = gs.scene_text(d, {"floor": gs.ROOT / "art/a.png", "under": gs.ROOT / "art/b.png", "glow": gs.ROOT / "art/c.png"}, "abc")
+        text = gs.scene_text(d, {"floor": gs.ROOT / "art/a.png", "fine_floor": gs.ROOT / "art/d.png", "under": gs.ROOT / "art/b.png", "glow": gs.ROOT / "art/c.png"}, "abc")
         self.assertNotIn('name="Walls"', text)
         self.assertIn(f'[node name="Holes" type="StaticBody2D" parent="."]\ncollision_layer = {gs.HOLE_LAYER}', text)
         self.assertIn('[node name="Underside" type="Sprite2D" parent="."]', text, "the rock face on the root: no wall to shed it")
@@ -202,7 +202,7 @@ class GroundShapeTest(unittest.TestCase):
 
     def test_the_scene(self) -> None:
         d = self.drawing
-        outs = {"floor": gs.ROOT / "art/a.png", "under": gs.ROOT / "art/b.png", "glow": gs.ROOT / "art/c.png"}
+        outs = {"floor": gs.ROOT / "art/a.png", "fine_floor": gs.ROOT / "art/d.png", "under": gs.ROOT / "art/b.png", "glow": gs.ROOT / "art/c.png"}
         text = gs.scene_text(d, outs, "abc")
         self.assertIn('[node name="Floor" type="Sprite2D"]', text, "its root is the room's Floor")
         self.assertIn(f"z_index = {gs.FLOOR_Z}", text)
@@ -402,7 +402,7 @@ class HallTest(unittest.TestCase):
             x, y = int(a[0] + dy / length * 3), int(a[1] - dx / length * 3)
             into += not d.solid[y * d.w + x]
         self.assertGreater(into, len(rim) * 0.9, "the left of the rim's way, where a line throws its motes, is the pit")
-        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
         self.assertIn('kind = &"pit_dust"', text)
         self.assertIn('colours = Array[StringName]([&"stone", &"bone"])', text, "the rim's own colours")
         self.assertNotIn("band_length", text, "no bands: the rim names its colours")
@@ -428,7 +428,7 @@ class HallTest(unittest.TestCase):
         y = 32
         self.assertEqual(tuple(d.wall_art[((y - face["height"]) * d.w + x) * 4:((y - face["height"]) * d.w + x) * 4 + 3]), light,
                          "the face's lit top row, its height above the floor's top edge")
-        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
         self.assertIn('[node name="WallArt" type="Sprite2D" parent="Walls"]', text, "on the walls, which shed it")
         self.assertIn('[node name="Underside" type="Sprite2D" parent="."]', text, "the pit's shaft on the root, never shed by a wall")
 
@@ -526,7 +526,7 @@ class FloatingHallTest(unittest.TestCase):
                 p = (y + gs.CELL // 2) * d.w + x + gs.CELL // 2
                 if not d.solid[p] and not g.pit[p] and g.crack[p] == 0.0:
                     self.assertEqual(cells.get((x, y)), "wall", f"cell {x},{y}: off the slab, a wall stops a body")
-        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
         self.assertNotIn("WallArt", text)
         self.assertIn('[node name="Walls" type="StaticBody2D"', text)
 
@@ -549,7 +549,7 @@ class FloatingHallTest(unittest.TestCase):
     def test_dust_falls_off_its_edge(self) -> None:
         d = self.drawing
         self.assertEqual(sorted(d.rim_sides), [0, 1], "a rim round the slab and one round its pit")
-        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
         self.assertEqual(text.count('kind = &"pit_dust"'), 2, "dust off the slab's edge and into its pit")
 
     def test_its_lip_is_broken_stone(self) -> None:
@@ -571,9 +571,66 @@ class FloatingHallTest(unittest.TestCase):
 
     def test_a_floating_room_with_no_pit_hangs_its_underside_on_the_walls(self) -> None:
         d = gs.Drawing({k: v for k, v in self.shape.items() if k not in ("pits", "cracks", "pit_edge")}, [], HALL_CLEAR)
-        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
         self.assertIn('[node name="Underside" type="Sprite2D" parent="Walls"]', text, "a hit on the edge sheds the rock's colours")
         self.assertTrue(any(d.under[3::4]), "the rock is drawn")
+
+
+class FineArtTest(unittest.TestCase):
+    """The ground at 2x (ArtDetail; ART3): the same outline as the 1x art, pixel for pixel, so the art
+    and the walls never disagree, with real new detail drawn on it (not the 1x art made bigger)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.hall = gs.Drawing(HALL, [], HALL_CLEAR)
+        cls.island = gs.Drawing(ISLAND)
+
+    def _alpha_matches(self, coarse: bytearray, fine: bytearray, d: "gs.Drawing", what: str) -> None:
+        f = d.fine
+        for y in range(f.h):
+            for x in range(f.w):
+                self.assertEqual(fine[(y * f.w + x) * 4 + 3], coarse[((y // gs.DETAIL) * d.w + x // gs.DETAIL) * 4 + 3],
+                                 f"{what} at {x},{y}: opaque exactly where its 1x pixel is")
+
+    def test_the_same_outline_at_2x(self) -> None:
+        for d in (self.hall, self.island):
+            self.assertEqual((d.fine.w, d.fine.h), (d.w * gs.DETAIL, d.h * gs.DETAIL))
+            self._alpha_matches(d.floor, d.fine.floor, d, "the floor")
+        self._alpha_matches(self.hall.wall_art, self.hall.fine.wall_art, self.hall, "the wall art")
+
+    def test_not_the_1x_art_made_bigger(self) -> None:
+        for d, images in ((self.hall, ("floor", "wall_art")), (self.island, ("floor", "under"))):
+            f = d.fine
+            for name in images:
+                image = getattr(f, name)
+                drawn = mixed = 0
+                for y in range(0, f.h, 2):
+                    for x in range(0, f.w, 2):
+                        block = {bytes(image[((y + j) * f.w + x + i) * 4:((y + j) * f.w + x + i) * 4 + 4]) for j in (0, 1) for i in (0, 1)}
+                        if any(b[3] for b in block):
+                            drawn += 1
+                            mixed += len(block) > 1
+                self.assertGreater(mixed, drawn * 0.05, f"{name}: many world pixels hold more than one colour at 2x")
+
+    def test_the_rock_face_hangs_as_deep(self) -> None:
+        for d in (self.hall, self.island):
+            coarse = sum(1 for a in d.under[3::4] if a)
+            fine = sum(1 for a in d.fine.under[3::4] if a)
+            self.assertAlmostEqual(fine / (coarse * gs.DETAIL * gs.DETAIL), 1.0, delta=0.2, msg="the 2x rock face covers what the 1x one does")
+
+    def test_the_scene_shows_the_2x_art_at_its_size(self) -> None:
+        d = self.hall
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "fine_floor", "under", "glow", "wall")}, "abc")
+        floor = text.index('[node name="Floor" type="Sprite2D"]')
+        detail = text.index('[node name="Detail" type="Sprite2D" parent="."]')
+        self.assertLess(floor, detail)
+        self.assertLess(detail, text.index('[node name="Glow"'), "the floor's first child, under its glow")
+        self.assertIn('texture = ExtResource("1_floor")', text[floor:detail], "the floor keeps its 1x art, which readers measure")
+        for name in ("Detail", "WallArt", "Underside"):
+            node = text[text.index(f'[node name="{name}"'):]
+            node = node[:node.index("\n\n")]
+            self.assertIn("scale = Vector2(0.5, 0.5)", node, f"{name} drawn at half its size (ArtDetail)")
+        self.assertEqual(gs.outputs_of(Path("content/rooms/x/y.shape.json"))["fine_floor"].name, "y_ground_floor@2x.png")
 
 
 class FixtureHashesTest(unittest.TestCase):

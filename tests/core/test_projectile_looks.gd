@@ -695,7 +695,9 @@ func test_a_shot_core_is_drawn_at_the_arts_detail() -> void:
 ## ART_DETAIL a world pixel, ArtDetail's), so a curve steps by the finer pixel at the same world size.
 func test_the_shot_shaders_sample_art_pixels() -> void:
 	var palette: String = FileAccess.get_file_as_string("res://core/projectiles/shot_palette.gdshaderinc")
-	check(palette.contains("const float ART_DETAIL = %d.0;" % ArtDetail.DETAIL), "ART_DETAIL is ArtDetail.DETAIL")
+	var detail: String = FileAccess.get_file_as_string("res://core/display/art_detail.gdshaderinc")
+	check(palette.contains("#include \"res://core/display/art_detail.gdshaderinc\""), "the palette takes the shared art detail (ART3)")
+	check(detail.contains("const float ART_DETAIL = %d.0;" % ArtDetail.DETAIL), "ART_DETAIL is ArtDetail.DETAIL")
 	for path: String in ["shot_blast.gdshader", "shot_arc.gdshader", "shot_still.gdshader", "shot_beam.gdshaderinc", "shot_swing.gdshaderinc", "shot_portal.gdshaderinc", "shot_orbit.gdshaderinc"]:
 		var code: String = FileAccess.get_file_as_string("res://core/projectiles/" + path)
 		check(code.contains("art_centre("), "%s samples art pixels" % path)

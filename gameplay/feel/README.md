@@ -35,7 +35,7 @@ A job reads Feel's containers (packed arrays, arrays, dictionaries, helpers made
 
 ### Motes, marks and light
 
-Motes (`mote.gd`): single-pixel particles in a ring of `mote_cap` rows, one writer (`burst`), flight worked out in `mote.gdshader` and `Motes.flight` alike; a hit's motes are shared by staff (`hit_shares.gd`); chunks boxed per room (`mote_regions.gd`). Floor marks: `marks.gd`, a layer a place. Spell light: `spell_light.gd` on a grid of world cells (`light_grid.gd`), applied in one pass (`light_apply.gdshader`), blocked by `light_blockers.gd`; carried lights, room air (`air_motes.gd`), stirs (`stirs.gd`), mist (`mist.gd`). Cost is one table (`effects_quality.gd`), chosen by the "Effects" setting or `effects_auto.gd`. Per-frame pieces may run on threads through `feel_jobs.gd` only; a piece touches no node, texture or RenderingServer.
+Motes (`mote.gd`): single-pixel particles in a ring of `mote_cap` rows, one writer (`burst`), flight worked out in `mote.gdshader` and `Motes.flight` alike; a hit's motes are shared by staff (`hit_shares.gd`); chunks boxed per room (`mote_regions.gd`). Floor marks: `marks.gd`, a layer a place, made at its place's first mark and freed with its biome, at the art's detail (its texels 2 a world pixel each way, `mark.gdshader` working each shape out at art pixels; ART3). Spell light: `spell_light.gd` on a grid of world cells (`light_grid.gd`), applied in one pass (`light_apply.gdshader`), blocked by `light_blockers.gd`; carried lights, room air (`air_motes.gd`), stirs (`stirs.gd`), mist (`mist.gd`). Cost is one table (`effects_quality.gd`), chosen by the "Effects" setting or `effects_auto.gd`. Per-frame pieces may run on threads through `feel_jobs.gd` only; a piece touches no node, texture or RenderingServer.
 
 ### The light grid on the GPU
 
@@ -47,7 +47,9 @@ On a real GPU with compute (`GpuCompute.available`) the grid is worked out by `l
 
 ### The ground, drawn as a room is laid out
 
-`ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped. `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
+`ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped. `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** **At 2x** (ArtDetail; ART3): the floor, the rock face and the walls' art are drawn again on the same outline at 2 art pixels a world pixel (`GroundDrawing._fine`, the tool's `Drawing._fine`, `GroundKernel`'s `draw_fine`); the floor keeps its 1x texture, which the room's readers measure and sample, under its `Detail` child (the 2x art at half size); the rock face and walls are 2x only. A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
+
+**The room's looks drawn by code or shaders are at 2x too** (ART3 part 4): a shader works its shapes out at the middle of each art pixel (`art_centre`, `core/display/art_detail.gdshaderinc`: the marks, the mist, the light's apply rect and the rooms' tints, the bodies' shadows); a `_draw` draws in art pixels, each a rect 1 / `ArtDetail.DETAIL` a side (the secret runes) or under `draw_set_transform` at 1 / `ArtDetail.DETAIL` (the mouths' shimmer, flares and seals, the key doors' bars; a stone bar is `stone_bars.gd`'s, the caller setting and restoring the transform).
 
 ### Damage numbers
 

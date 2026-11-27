@@ -23,6 +23,7 @@ extends Node2D
 
 const EventsScript := preload("res://core/events/events.gd")
 const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
+const StoneBarsScript := preload("res://gameplay/feel/stone_bars.gd")
 
 ## Over the floor and the doors' bars (the gather doors' 2), under the labels.
 const Z: int = 3
@@ -366,24 +367,31 @@ func _draw_key_door(door: int) -> void:
 			draw_rect(Rect2(Rect2i(middle.x, body.position.y + 2 + 0, 1, 2)), Palette.OUTLINE)
 
 
-## A door's stone bars across its mouth, `sunk` of BAR_FRAMES into the floor.
-func _draw_bars(area: Rect2i, sunk: int) -> void:
+## A door's stone bars across its mouth, `sunk` of BAR_FRAMES into the floor, drawn at the art's
+## detail (ART3: in art pixels, sinking by them, each bar lit on its top-left side and shaded on the
+## other, as a seal's: StoneBars).
+func _draw_bars(area_world: Rect2i, sunk: int) -> void:
+	var d: int = ArtDetail.DETAIL
+	var area := Rect2i(area_world.position * d, area_world.size * d)
 	var wide: bool = area.size.x >= area.size.y
 	var length: int = area.size.y if wide else area.size.x
 	var left: int = length - (length * sunk) / BAR_FRAMES
 	if left <= 0:
 		return
 	var across: int = area.size.x if wide else area.size.y
-	var at: int = BAR_GAP / 2
-	while at + BAR <= across:
+	var bar_w: int = BAR * d
+	var gap: int = BAR_GAP * d
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE / float(d))
+	var at: int = gap / 2
+	while at + bar_w <= across:
 		var bar: Rect2i
 		if wide:
-			bar = Rect2i(area.position.x + at, area.position.y + length - left, BAR, left)
+			bar = Rect2i(area.position.x + at, area.position.y + length - left, bar_w, left)
 		else:
-			bar = Rect2i(area.position.x + length - left, area.position.y + at, left, BAR)
-		draw_rect(Rect2(bar), bar_colours[1])
-		draw_rect(Rect2(Rect2i(bar.position, Vector2i(1, bar.size.y) if wide else Vector2i(bar.size.x, 1))), bar_colours[2])
-		at += BAR + BAR_GAP
+			bar = Rect2i(area.position.x + length - left, area.position.y + at, left, bar_w)
+		StoneBarsScript.draw(self, bar, wide, bar_colours)
+		at += bar_w + gap
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_rock(rock: int) -> void:

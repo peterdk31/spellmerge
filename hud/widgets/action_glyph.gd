@@ -11,6 +11,13 @@ extends Control
 ## from an Xbox pad to a PlayStation pad or to the keyboard (a leave and a join) and from the
 ## keyboard to the mouse (the mouse aim turning on) as it happens. It allocates only when the
 ## kind changes, never per frame.
+##
+## **At the art's detail** (ART4 part 3; docs/STYLE.md, "UI"): each glyph is pixel art at half a layout
+## pixel, its body baked as the kind changes (`PixelShape`: the Outline an art pixel round it, its
+## corners cut, lit from the top-left): a key cap standing on its darker lip, a bumper with its top
+## rounded, a trigger with its top cut away, a round face button shaded in its colour, a PlayStation
+## symbol drawn from its strokes on a stone disc, the mouse with its button lit and the d-pad's cross
+## with the arm's arrow lit. It sits on the game with no box behind it, as the clean HUD.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GlyphsScript := preload("res://core/input/input_glyphs.gd")
@@ -23,17 +30,47 @@ const KEY_MARGIN: float = 4.0
 const ROUND_WIDTH: float = 10.0
 const SHOULDER_MIN_WIDTH: float = 12.0
 const MOUSE_WIDTH: float = 8.0
-const OUTLINE: Color = Color(0.05, 0.05, 0.08)
-const KEY_FACE: Color = Color(0.22, 0.24, 0.3)
-const TEXT_ON_PLAIN: Color = Color(0.95, 0.96, 0.98)
-const TEXT_ON_COLOR: Color = Color(0.06, 0.06, 0.1)
-## The lit tip of each d-pad arm, from the cross's middle (its top left pixel).
-const DPAD_ARMS: Dictionary = {"up": Vector2(-1.0, -4.0), "right": Vector2(2.0, -1.0), "down": Vector2(-1.0, 2.0), "left": Vector2(-4.0, -1.0)}
+const OUTLINE: Color = Palette.OUTLINE
+const KEY_FACE: Color = Color("#4a4663")
+const TEXT_ON_PLAIN: Color = Palette.WHITE_HOT
+const TEXT_ON_COLOR: Color = Palette.OUTLINE
+## The tones (`PixelShape`: Outline, light, base, shadow) of a key cap and the mouse (stone), and of
+## a bumper or a trigger (a step darker, so they read apart from a key).
+const STONE_TONES: PackedColorArray = [Color("#14121f"), Color("#7a7694"), Color("#4a4663"), Color("#2b2840")]
+const DARK_TONES: PackedColorArray = [Color("#14121f"), Color("#4a4663"), Color("#2b2840"), Color("#14121f")]
+## The art pixel, in layout pixels; a key cap's lip under its face and how far its label rises over
+## it, in art pixels; how far each shape's top (and bottom) corners are cut, in art pixels.
+const ART: float = PixelShape.ART_PIXEL
+const LIP: int = 2
+const CUT_KEY: int = 1
+const CUT_SHOULDER: int = 2
+const CUT_TRIGGER: int = 7
+const CUT_MOUSE: int = 4
+## The d-pad: its arms' width in art pixels, and the lit arrow at an arm's tip: DPAD_ARROW_ROWS rows,
+## two art pixels wide at its point and two wider a row, its point DPAD_ARROW_IN art pixels in from
+## the arm's end (worked out from the cross's size, so it stays centred in the arm).
+const DPAD_ARM: int = 6
+const DPAD_ARROW_ROWS: int = 3
+const DPAD_ARROW_IN: int = 2
+const DPAD_TURNS: Array[String] = ["up", "right", "down", "left"]
+## The PlayStation symbols, 8 × 8 art pixels, strokes two art pixels thick (`#` lit); the circle is a
+## ring of the same band.
+const SYMBOL_ROWS: Dictionary = {
+	"cross": ["##....##", "###..###", ".######.", "..####..", "..####..", ".######.", "###..###", "##....##"],
+	"square": ["########", "########", "##....##", "##....##", "##....##", "##....##", "########", "########"],
+	"triangle": ["...##...", "..####..", "..####..", ".##..##.", ".##..##.", "##....##", "########", "########"],
+}
+const SYMBOL_SIDE: int = 8
 
 var _input: InputManagerScript = null
 var _player: int = 0
 var _action: StringName = &""
 var _glyph: Dictionary = GlyphsScript.NO_GLYPH
+## The glyph's body and its symbol (a PlayStation glyph's) at the art's detail, baked as the kind
+## changes; and the tones a face button is drawn in.
+var _body: PixelShape = null
+var _symbol: PixelShape = null
+var _tones: PackedColorArray = PackedColorArray(STONE_TONES)
 
 
 func _init() -> void:
@@ -84,8 +121,80 @@ func _on_kind_changed(player: int) -> void:
 func _refresh() -> void:
 	var kind: int = GlyphsScript.Kind.KEYBOARD if _input == null else _input.glyph_kind(_player)
 	_glyph = GlyphsScript.glyph(kind, _action)
-	custom_minimum_size = Vector2(_glyph_width(), GLYPH_HEIGHT)
+	custom_minimum_size = Vector2(ceilf(_glyph_width()), GLYPH_HEIGHT)
+	_bake()
 	queue_redraw()
+
+
+## The glyph's body at the art's detail (for tests).
+func body() -> PixelShape:
+	return _body
+
+
+## The body (and the symbol) of the glyph shown, at the art's detail, its Outline in its own size.
+func _bake() -> void:
+	var wide: int = roundi(custom_minimum_size.x / ART) - 2
+	var tall: int = roundi(GLYPH_HEIGHT / ART) - 2
+	_symbol = null
+	var color: Color = _glyph["color"]
+	_tones = PackedColorArray(STONE_TONES)
+	match int(_glyph["shape"]):
+		GlyphsScript.Shape.KEY:
+			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_KEY, CUT_KEY), true)
+		GlyphsScript.Shape.SHOULDER:
+			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_SHOULDER, CUT_KEY), true)
+			_tones = PackedColorArray(DARK_TONES)
+		GlyphsScript.Shape.TRIGGER:
+			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_TRIGGER, CUT_KEY), true)
+			_tones = PackedColorArray(DARK_TONES)
+		GlyphsScript.Shape.MOUSE:
+			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_MOUSE, CUT_MOUSE), true)
+		GlyphsScript.Shape.DPAD:
+			_body = PixelShape.from_rows(dpad_rows(tall), true)
+		GlyphsScript.Shape.FACE:
+			_body = PixelShape.disc(tall)
+			_tones[PixelShape.LIGHT] = color.lightened(0.35)
+			_tones[PixelShape.BASE] = color
+			_tones[PixelShape.SHADOW] = color.darkened(0.4)
+		GlyphsScript.Shape.SYMBOL:
+			_body = PixelShape.disc(tall)
+			var symbol: String = String(_glyph["label"])
+			if SYMBOL_ROWS.has(symbol):
+				_symbol = PixelShape.from_rows(PackedStringArray(SYMBOL_ROWS[symbol]), false, false)
+			else:
+				_symbol = PixelShape.ring(SYMBOL_SIDE, 2, false, false)
+
+
+## A cap's rows, `wide` × `tall` art pixels (`#` filled), its top corners cut by `top` stepping in a
+## pixel a row and its bottom ones by `bottom`.
+static func cap_rows(wide: int, tall: int, top: int, bottom: int) -> PackedStringArray:
+	var rows := PackedStringArray()
+	for y in tall:
+		var inset: int = _inset(y, tall, top, bottom)
+		rows.append(".".repeat(inset) + "#".repeat(maxi(wide - 2 * inset, 0)) + ".".repeat(inset))
+	return rows
+
+
+## How far row `y` of a cap `tall` rows high is cut in at each end.
+static func _inset(y: int, tall: int, top: int, bottom: int) -> int:
+	if y < top:
+		return top - y
+	if y >= tall - bottom:
+		return bottom - (tall - 1 - y)
+	return 0
+
+
+## The d-pad's cross, `side` × `side` art pixels, its arms DPAD_ARM wide.
+static func dpad_rows(side: int) -> PackedStringArray:
+	var rows := PackedStringArray()
+	var from: int = (side - DPAD_ARM) / 2
+	for y in side:
+		var row: String = ""
+		for x in side:
+			var in_arm: bool = (x >= from and x < from + DPAD_ARM) or (y >= from and y < from + DPAD_ARM)
+			row += "#" if in_arm else "."
+		rows.append(row)
+	return rows
 
 
 func _glyph_width() -> float:
@@ -109,38 +218,36 @@ func _font() -> Font:
 
 
 func _draw() -> void:
-	var color: Color = _glyph["color"]
+	if _body == null:
+		return
 	var area := Rect2(Vector2.ZERO, Vector2(custom_minimum_size.x, GLYPH_HEIGHT))
+	var color: Color = _glyph["color"]
+	_body.draw_at(self, Vector2.ZERO, _tones)
 	match int(_glyph["shape"]):
 		GlyphsScript.Shape.KEY:
-			_draw_cap(area, KEY_FACE, TEXT_ON_PLAIN)
-		GlyphsScript.Shape.SHOULDER:
-			_draw_cap(area, color.darkened(0.55), TEXT_ON_PLAIN)
-		GlyphsScript.Shape.TRIGGER:
-			_draw_trigger(area, color.darkened(0.55))
+			_draw_lip(area)
+			_draw_label(Rect2(area.position, area.size - Vector2(0.0, ART)), _glyph["label"], TEXT_ON_PLAIN)
+		GlyphsScript.Shape.SHOULDER, GlyphsScript.Shape.TRIGGER:
+			_draw_label(area, _glyph["label"], TEXT_ON_PLAIN)
 		GlyphsScript.Shape.FACE:
-			_draw_disc(area, color)
 			_draw_label(area, _glyph["label"], TEXT_ON_COLOR)
 		GlyphsScript.Shape.SYMBOL:
-			_draw_disc(area, KEY_FACE)
-			_draw_symbol(area, String(_glyph["label"]), color)
+			if _symbol != null:
+				_tones[PixelShape.BASE] = color
+				_symbol.draw(self, area.get_center(), _tones)
+				_tones[PixelShape.BASE] = STONE_TONES[PixelShape.BASE]
 		GlyphsScript.Shape.MOUSE:
 			_draw_mouse(area)
 		GlyphsScript.Shape.DPAD:
-			_draw_dpad(area)
+			_draw_dpad()
 
 
-func _draw_cap(area: Rect2, face: Color, text_color: Color) -> void:
-	draw_rect(area, OUTLINE)
-	draw_rect(area.grow(-1.0), face)
-	_draw_label(area, _glyph["label"], text_color)
-
-
-func _draw_disc(area: Rect2, face: Color) -> void:
-	var center: Vector2 = area.get_center()
-	var radius: float = minf(area.size.x, area.size.y) * 0.5
-	draw_circle(center, radius, OUTLINE)
-	draw_circle(center, radius - 1.0, face)
+## A key cap's lip: the LIP art rows above its bottom one in the stone's shadow, so the cap stands on
+## it (its bottom row is in shadow already).
+func _draw_lip(area: Rect2) -> void:
+	var tall: int = roundi(area.size.y / ART)
+	var wide: int = roundi(area.size.x / ART)
+	draw_rect(Rect2(2.0 * ART, (tall - 2 - LIP) * ART, (wide - 4) * ART, LIP * ART), STONE_TONES[PixelShape.SHADOW])
 
 
 func _draw_label(area: Rect2, text: String, text_color: Color) -> void:
@@ -152,51 +259,48 @@ func _draw_label(area: Rect2, text: String, text_color: Color) -> void:
 	draw_string(font, origin.round(), text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, text_color)
 
 
-## The four PlayStation symbols, each in its own colour inside the dark disc.
-func _draw_symbol(area: Rect2, symbol: String, color: Color) -> void:
-	var c: Vector2 = area.get_center()
-	var r: float = 2.5
-	match symbol:
-		"cross":
-			draw_line(c + Vector2(-r, -r), c + Vector2(r, r), color, 1.0)
-			draw_line(c + Vector2(-r, r), c + Vector2(r, -r), color, 1.0)
-		"circle":
-			draw_arc(c, r, 0.0, TAU, 12, color, 1.0)
-		"square":
-			draw_rect(Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), color, false, 1.0)
-		"triangle":
-			var points := PackedVector2Array([c + Vector2(0.0, -r), c + Vector2(r, r * 0.8), c + Vector2(-r, r * 0.8), c + Vector2(0.0, -r)])
-			draw_polyline(points, color, 1.0)
+## The d-pad's lit arm (its label: `up`, `right`, `down`, `left`), or every arm (`all`): an arrow at
+## its tip in Bone's white heat, pointing out.
+func _draw_dpad() -> void:
+	draw_dpad_arrows(self, String(_glyph["label"]), roundi(GLYPH_HEIGHT / ART) - 2)
 
 
-## A trigger: a shoulder cap with its top corners cut, so LT and RT read apart from LB and RB
-## by shape too, not only by their label.
-func _draw_trigger(area: Rect2, face: Color) -> void:
-	_draw_cap(area, face, TEXT_ON_PLAIN)
-	draw_rect(Rect2(area.position, Vector2(2.0, 2.0)), OUTLINE)
-	draw_rect(Rect2(Vector2(area.end.x - 2.0, area.position.y), Vector2(2.0, 2.0)), OUTLINE)
-	draw_line(Vector2(area.position.x + 2.0, area.position.y + 2.5), Vector2(area.end.x - 2.0, area.position.y + 2.5), TEXT_ON_PLAIN.darkened(0.3), 1.0)
+## The d-pad's arrows for `label` on `target` (anything with `draw_rect`), the cross `side` art pixels
+## square inside its Outline: each arrow's rows mirrored about the cross's middle for each arm, so
+## every arm's is the up arm's turned.
+static func draw_dpad_arrows(target: Object, label: String, side: int) -> void:
+	for turn in DPAD_TURNS.size():
+		if label != DPAD_TURNS[turn] and label != "all":
+			continue
+		for row in DPAD_ARROW_ROWS:
+			var length: int = 2 + 2 * row
+			var x: int = side / 2 - 1 - row
+			var y: int = DPAD_ARROW_IN + row
+			var run := Rect2(x, y, length, 1)
+			match turn:
+				1:
+					run = Rect2(side - 1 - y, x, 1, length)
+				2:
+					run = Rect2(side - x - length, side - 1 - y, length, 1)
+				3:
+					run = Rect2(y, side - x - length, 1, length)
+			# The cross sits inside its Outline, an art pixel in.
+			target.draw_rect(Rect2((run.position + Vector2.ONE) * ART, run.size * ART), TEXT_ON_PLAIN)
 
 
-## The d-pad: a cross with the arm of its label (`up`, `right`, `down`, `left`) lit, or every arm's
-## tip (`all`: the whole d-pad).
-func _draw_dpad(area: Rect2) -> void:
-	var c: Vector2 = area.get_center().floor()
-	draw_rect(Rect2(c.x - 5.0, c.y - 2.0, 10.0, 4.0), OUTLINE)
-	draw_rect(Rect2(c.x - 2.0, c.y - 5.0, 4.0, 10.0), OUTLINE)
-	draw_rect(Rect2(c.x - 4.0, c.y - 1.0, 8.0, 2.0), KEY_FACE)
-	draw_rect(Rect2(c.x - 1.0, c.y - 4.0, 2.0, 8.0), KEY_FACE)
-	var label: String = String(_glyph["label"])
-	for arm: String in DPAD_ARMS:
-		if label == arm or label == "all":
-			draw_rect(Rect2(c + DPAD_ARMS[arm], Vector2(2.0, 2.0)), TEXT_ON_PLAIN)
-
-
-## The mouse: a body with the button of its label lit (LMB the left, RMB the right), the way a
-## player reads "click".
+## The mouse: its body with the button of its label lit (LMB the left, RMB the right), split down
+## the middle and from the palm by the Outline, the way a player reads "click".
 func _draw_mouse(area: Rect2) -> void:
-	draw_rect(area, OUTLINE)
-	draw_rect(area.grow(-1.0), KEY_FACE)
-	var left: float = 1.0 if String(_glyph["label"]) != "RMB" else area.size.x * 0.5
-	draw_rect(Rect2(area.position + Vector2(left, 1.0), Vector2(area.size.x * 0.5 - 1.0, 4.0)), GlyphsScript.FACE_YELLOW)
-	draw_line(Vector2(area.size.x * 0.5, 1.0), Vector2(area.size.x * 0.5, 5.0), OUTLINE, 1.0)
+	var wide: int = roundi(area.size.x / ART) - 2
+	var tall: int = roundi(area.size.y / ART) - 2
+	var half: int = wide / 2
+	var right: bool = String(_glyph["label"]) == "RMB"
+	var rows: int = tall / 2 - 1
+	for y in rows:
+		var inset: int = _inset(y, tall, CUT_MOUSE, CUT_MOUSE)
+		var from: int = half + 1 if right else inset
+		var to: int = wide - inset if right else half
+		if to > from:
+			draw_rect(Rect2((from + 1) * ART, (y + 1) * ART, (to - from) * ART, ART), GlyphsScript.FACE_YELLOW)
+	draw_rect(Rect2((half + 1) * ART, ART, ART, rows * ART), OUTLINE)
+	draw_rect(Rect2(2.0 * ART, (rows + 1) * ART, (wide - 2) * ART, ART), OUTLINE)

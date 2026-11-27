@@ -43,13 +43,23 @@ const FPS: float = 20.0
 ## A count's nod: its cell's offsets (pixels, negative up), a pose a step.
 const NOD_UP: PackedInt32Array = [-1, -1, 0]
 const NOD_DOWN: PackedInt32Array = [1, 1, 0]
-## The digits, 3 × 5 pixels each: digit d's rows are DIGITS[d * 5] to DIGITS[d * 5 + 4] (`#` lit).
+## The digits at the art's detail (ART4), DIGIT_ART wide and DIGIT_ART_TALL tall in art pixels (3 × 5
+## layout pixels, as before), strokes two art pixels thick with their corners rounded: digit d's
+## rows are DIGITS[d * DIGIT_ART_TALL] onwards (`#` lit). Each is drawn in its colour with the
+## Outline an art pixel round it (`PixelShape`), on the game with no box behind it.
+const DIGIT_ART: int = 6
+const DIGIT_ART_TALL: int = 10
 const DIGITS: PackedStringArray = [
-	"###", "#.#", "#.#", "#.#", "###", ".#.", "##.", ".#.", ".#.", "###",
-	"###", "..#", "###", "#..", "###", "###", "..#", "###", "..#", "###",
-	"#.#", "#.#", "###", "..#", "..#", "###", "#..", "###", "..#", "###",
-	"###", "#..", "###", "#.#", "###", "###", "..#", ".#.", ".#.", ".#.",
-	"###", "#.#", "###", "#.#", "###", "###", "#.#", "###", "..#", "###",
+	".####.", "##..##", "##..##", "##..##", "##..##", "##..##", "##..##", "##..##", "##..##", ".####.",
+	"..##..", ".###..", "####..", "..##..", "..##..", "..##..", "..##..", "..##..", "..##..", "######",
+	".####.", "##..##", "....##", "....##", "...##.", "..##..", ".##...", "##....", "##....", "######",
+	".####.", "##..##", "....##", "....##", "..###.", "....##", "....##", "....##", "##..##", ".####.",
+	"...##.", "..###.", ".####.", "##.##.", "##.##.", "######", "...##.", "...##.", "...##.", "...##.",
+	"######", "##....", "##....", "#####.", "....##", "....##", "....##", "....##", "##..##", ".####.",
+	".####.", "##..##", "##....", "##....", "#####.", "##..##", "##..##", "##..##", "##..##", ".####.",
+	"######", "....##", "....##", "...##.", "...##.", "..##..", "..##..", "..##..", "..##..", "..##..",
+	".####.", "##..##", "##..##", "##..##", ".####.", "##..##", "##..##", "##..##", "##..##", ".####.",
+	".####.", "##..##", "##..##", "##..##", ".#####", "....##", "....##", "....##", "##..##", ".####.",
 ]
 const OUTLINE: Color = Color("#14121f")
 const CELL_FACE: Color = Color("#2b2840")
@@ -71,6 +81,10 @@ var _clock: float = 0.0
 ## By slot: the shutter rows told (its item's recharge) and the rows drawn, stepping toward them.
 var _charge_told: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _charge_rows: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## The count's digits baked once (`digit_shape`), shared by every cross, and the tones they are drawn
+## in (the Outline, then the count's colour).
+static var _digit_shapes: Array[PixelShape] = []
+var _digit_tones: PackedColorArray = PackedColorArray([OUTLINE, TEXT, TEXT, TEXT])
 
 
 func _init() -> void:
@@ -223,19 +237,24 @@ func _draw_slot(slot: int) -> void:
 		_draw_count(cell, _drawn_count[slot], TEXT if _drawn_count[slot] > 0 else DIM)
 
 
-## `count` in the 3 × 5 digits at `cell`'s lower right, on a dark backing (99 at most).
+## `count` in the digits at `cell`'s lower right, each in its Outline (99 at most).
 func _draw_count(cell: Rect2, count: int, colour: Color) -> void:
 	var shown: int = mini(count, 99)
 	var digits: int = 2 if shown >= 10 else 1
 	var width: int = digits * 4 - 1
-	var corner := Vector2(cell.end.x - width - 1.0, cell.end.y - 6.0)
-	draw_rect(Rect2(corner - Vector2(1, 1), Vector2(width + 2, 7)), OUTLINE)
-	var at: Vector2 = corner
+	var at := Vector2(cell.end.x - width - 1.0, cell.end.y - 6.0) - Vector2(PixelShape.ART_PIXEL, PixelShape.ART_PIXEL)
+	_digit_tones[PixelShape.LIGHT] = colour
+	_digit_tones[PixelShape.BASE] = colour
+	_digit_tones[PixelShape.SHADOW] = colour
 	for place in digits:
 		var digit: int = (shown / 10) if digits == 2 and place == 0 else shown % 10
-		for y in 5:
-			var row: String = DIGITS[digit * 5 + y]
-			for x in row.length():
-				if row.unicode_at(x) == 35:
-					draw_rect(Rect2(at + Vector2(x, y), Vector2.ONE), colour)
+		digit_shape(digit).draw_at(self, at, _digit_tones)
 		at.x += 4.0
+
+
+## Digit `digit`'s shape with its Outline (baked the first time).
+static func digit_shape(digit: int) -> PixelShape:
+	if _digit_shapes.is_empty():
+		for d in 10:
+			_digit_shapes.append(PixelShape.from_rows(DIGITS.slice(d * DIGIT_ART_TALL, (d + 1) * DIGIT_ART_TALL)))
+	return _digit_shapes[clampi(digit, 0, 9)]

@@ -133,10 +133,12 @@ func test_the_loading_screen_is_under_only_the_pause_menu_the_pad_line_and_the_f
 # --- One panel ---------------------------------------------------------------------------------
 
 
-func test_each_panel_uses_its_players_theme_variation() -> void:
+## The corner panel's fill is the theme's (`FramedPanel`); its border is its player's ramp, drawn at
+## the art's detail by the panel itself (ART4, `hud/widgets/hud_art.gd`; tests/hud/test_hud_art.gd).
+func test_each_panel_uses_the_framed_panel_variation() -> void:
 	for player in 4:
 		var panel: PlayerPanelScript = _panel(player)
-		check_equal(panel.theme_type_variation, StringName("PlayerPanel%d" % (player + 1)), "panel %d uses its theme variation" % player)
+		check_equal(panel.theme_type_variation, PlayerPanelScript.FRAMED_PANEL, "panel %d uses the framed panel's fill" % player)
 
 
 func test_the_health_line_shows_the_health() -> void:

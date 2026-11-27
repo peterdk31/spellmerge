@@ -1,7 +1,8 @@
 extends Control
 ## A thin meter line (owner, 2026-11-19): the corner panel's red health line and each staff row's
 ## blue mana line. A dark track the whole width, the fill from the left in `fill_color`, both in
-## whole pixels and no taller than the control.
+## whole pixels and no taller than the control; drawn at the art's detail (`hud_art.gd`): the track
+## sunk under an Outline art row, the fill with its shade along its bottom art row.
 ##
 ## Smooth (docs/STYLE.md): the fill never jumps. `set_value` sets where it is going, and each
 ## frame the drawn fill steps a third of the way there (at least one pixel), so a change of three
@@ -15,12 +16,19 @@ extends Control
 ## is a strong red, the one colour outside the palette, by the owner's word ("a very red line",
 ## 2026-11-19; docs/STYLE.md, "UI"); mana is the palette's Mana light, an ultramarine built to read
 ## apart from Player 1's blue.
+const HudArt := preload("res://hud/widgets/hud_art.gd")
+
 const HEALTH_COLOR: Color = Color("#e01a2b")
 const MANA_COLOR: Color = Color("#6f86f0")
 const TRACK_COLOR: Color = Color(0.07, 0.06, 0.1, 0.9)
+## The shade under each fill, its bottom art row (ART4: drawn at the art's detail, `hud_art.gd`):
+## health's in the Fire shadow, the nearest red of the palette; mana's in the Mana base under its light.
+const HEALTH_SHADE: Color = Color("#8f2d2a")
+const MANA_SHADE: Color = Color("#2c3aa8")
 
-## The fill's colour, and the track's behind it.
+## The fill's colour, the shade along its bottom art row, and the track's behind it.
 @export var fill_color: Color = HEALTH_COLOR
+@export var fill_shade: Color = HEALTH_SHADE
 @export var track_color: Color = TRACK_COLOR
 
 ## Drawn by another (`draw_onto`, over a cached panel's picture: `player_panel.gd`): its own
@@ -118,9 +126,10 @@ func draw_onto(target: CanvasItem, at: Vector2) -> void:
 	var width: float = floorf(size.x)
 	if height <= 0.0 or width <= 0.0:
 		return
-	target.draw_rect(Rect2(at.x, at.y, width, height), track_color)
+	var track := Rect2(at.x, at.y, width, height)
+	HudArt.trough(target, track, track_color)
 	if _shown > 0:
-		target.draw_rect(Rect2(at.x, at.y, float(_shown), height), fill_color)
+		HudArt.line_fill(target, HudArt.under_lip(Rect2(at.x, at.y, float(_shown), height)), fill_color, fill_shade)
 
 
 func _redraw() -> void:

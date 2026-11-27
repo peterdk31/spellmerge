@@ -20,8 +20,10 @@ extends PanelContainer
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
-## the same for any player index 0-3. Colours come from the shared theme (type variations
-## PlayerPanel1-4) and the lines' own. Updating only changes text when a number changed, and
+## the same for any player index 0-3. Its fill comes from the shared theme (type variation
+## FramedPanel), its frame is drawn at the art's detail in the player's ramp (`_draw`,
+## `HudArt.frame`: the outline cut at the corners, the light top and left edge, the shaded bottom
+## and right one), and the lines' colours are their own. Updating only changes text when a number changed, and
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
 ## Beside the staff rows, the seat's four quick-use slots (`set_quick`; `hud/widgets/quick_cross.gd`, a
@@ -47,12 +49,15 @@ const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 const QuickCrossScript := preload("res://hud/widgets/quick_cross.gd")
 const CachedViewScript := preload("res://hud/widgets/cached_view.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 ## The staff rows' least width: all of a 96 px panel inside its 4 px margins, as before the quick-use
 ## cross stood beside them always, so a short staff still shows whole and the panel grows by the
 ## cross instead (inside a quarter pane of the Equal split).
 const STAFFS_WIDTH: float = 88.0
 
 const PLAYER_COUNT: int = 4
+## The theme's variation of the panel's fill and margins; its frame is `_draw`'s.
+const FRAMED_PANEL: StringName = &"FramedPanel"
 const STAFF_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
@@ -103,7 +108,8 @@ var _live: Control = null
 
 func _ready() -> void:
 	var player: int = clampi(index, 0, PLAYER_COUNT - 1)
-	theme_type_variation = StringName("PlayerPanel%d" % (player + 1))
+	theme_type_variation = FRAMED_PANEL
+	queue_redraw()
 	for staff in STAFF_COUNT:
 		var row := StaffRowScript.new()
 		row.name = "StaffRow%d" % (staff + 1)
@@ -173,6 +179,11 @@ func _ready() -> void:
 
 ## The live layer over the picture: each shown row's glyph shade and rim and its mana line, at the
 ## row's place in the content (the same place in the picture and drawn live).
+## The frame round the panel, in the player's ramp at the art's detail (over the theme's fill).
+func _draw() -> void:
+	HudArt.frame(self, Rect2(Vector2.ZERO, size), HudArt.player_ramp(index))
+
+
 func _draw_live() -> void:
 	var origin: Vector2 = _cache.content().get_global_transform().origin
 	for row in _rows:

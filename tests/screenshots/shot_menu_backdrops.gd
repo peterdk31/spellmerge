@@ -38,24 +38,29 @@ const PAUSE_AT := Vector2(640, 250)
 const HALF := Vector2i(60, 45)
 
 
-## Draws the bands over the whole layout (a Control under a layer between the world and the HUD).
+## Draws the bands over the whole layout (a Control under a layer between the world and the HUD), as
+## one texture painted once: a draw call per checker square would be thousands.
 class Backdrop extends Control:
+	var _bands: ImageTexture = null
+
+	func _ready() -> void:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var image := Image.create(int(LAYOUT.x), int(LAYOUT.y), false, Image.FORMAT_RGBA8)
+		var half: int = int(BAND * 0.5)
+		for x in int(LAYOUT.x):
+			var colours: PackedColorArray = BANDS[(x / int(BAND)) % BANDS.size()]
+			var across: int = x % int(BAND)
+			for y in int(LAYOUT.y):
+				var colour: Color = colours[0]
+				if across >= half:
+					colour = colours[1 + ((across - half) / int(SQUARE) + y / int(SQUARE)) % 2]
+				image.set_pixel(x, y, colour)
+		_bands = ImageTexture.create_from_image(image)
+		queue_redraw()
+
 	func _draw() -> void:
-		var x: float = 0.0
-		var band: int = 0
-		while x < LAYOUT.x:
-			var colours: PackedColorArray = BANDS[band % BANDS.size()]
-			var half: float = floorf(BAND * 0.5)
-			draw_rect(Rect2(x, 0.0, half, LAYOUT.y), colours[0])
-			var row: int = 0
-			var y: float = 0.0
-			while y < LAYOUT.y:
-				for column in int(half / SQUARE):
-					draw_rect(Rect2(x + half + float(column) * SQUARE, y, SQUARE, SQUARE), colours[1 + (row + column) % 2])
-				y += SQUARE
-				row += 1
-			x += BAND
-			band += 1
+		if _bands != null:
+			draw_texture(_bands, Vector2.ZERO)
 
 
 func take() -> void:

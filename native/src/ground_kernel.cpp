@@ -97,6 +97,50 @@ double noise2(double x, double y, double scale, int64_t seed) {
 	return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty;
 }
 
+// `noise2` at one scale and seed over a w by h room, its cells' corners worked out once: the same
+// numbers, read back (a material asks it of every pixel).
+struct Lattice {
+	double scale = 1.0;
+	int64_t ix0 = 0, iy0 = 0, cols = 0;
+	std::vector<double> corners;
+
+	Lattice(double p_scale, int64_t seed, int64_t w, int64_t h) : scale(p_scale) {
+		ix0 = floori(0.0 / scale);
+		iy0 = floori(0.0 / scale);
+		cols = floori((double)(w - 1) / scale) + 2 - ix0;
+		const int64_t rows = floori((double)(h - 1) / scale) + 2 - iy0;
+		corners.resize(cols * rows);
+		for (int64_t r = 0; r < rows; r++) {
+			for (int64_t c = 0; c < cols; c++) {
+				corners[r * cols + c] = unit3(seed, ix0 + c, iy0 + r);
+			}
+		}
+	}
+
+	double at(double x, double y) const {
+		const double fx = x / scale, fy = y / scale;
+		const int64_t ix = floori(fx), iy = floori(fy);
+		const double tx = smooth(fx - (double)ix), ty = smooth(fy - (double)iy);
+		const int64_t i = (iy - iy0) * cols + ix - ix0;
+		const double a = corners[i];
+		const double b = corners[i + 1];
+		const double c = corners[i + cols];
+		const double d = corners[i + cols + 1];
+		return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty;
+	}
+};
+
+// `fbm2` read from its octaves' lattices (`Lattice`), each built with `seed + i` as `fbm2` seeds them.
+double fbm2_of(double x, double y, const std::vector<Lattice> &octaves) {
+	double total = 0.0, weight = 0.0, amp = 1.0;
+	for (size_t i = 0; i < octaves.size(); i++) {
+		total += octaves[i].at(x, y) * amp;
+		weight += amp;
+		amp *= 0.5;
+	}
+	return total / weight;
+}
+
 double fbm2(double x, double y, const std::vector<double> &scales, int64_t seed) {
 	double total = 0.0, weight = 0.0, amp = 1.0;
 	for (size_t i = 0; i < scales.size(); i++) {
@@ -553,6 +597,13 @@ struct Material {
 	int64_t stroke_colour = 0;
 	double stroke_spacing = 10.0, stroke_share = 0.4, stroke_inner = 24.0;
 	double centre_x = 0.0, centre_y = 0.0;
+	// Every slab cell the room's pixels look at, worked out once (its jittered middle and its tone,
+	// by the same expressions `slab` used per pixel): cells cell_x0.. and cell_y0.., row by row.
+	std::vector<double> cell_px, cell_py;
+	std::vector<int64_t> cell_tone;
+	int64_t cell_x0 = 0, cell_y0 = 0, cell_cols = 0;
+	// The grit toward the edge's noise (`edge_scales`, seed + 77), read back (`Lattice`).
+	std::vector<Lattice> grit_octaves;
 
 	Material(const Dictionary &spec, int64_t index, int64_t room_seed, int64_t w, int64_t h, double cx, double cy, const Dictionary &palette,
 			int64_t fine = 1) {
@@ -607,6 +658,25 @@ struct Material {
 			has_light = slabs.has("light");
 			light = has_light ? colour_of(slabs["light"], palette) : 0;
 			light_width = num(slabs, "light_width", 1.0) * d;
+			const double s = slab_size, sq = slab_squash;
+			cell_x0 = floori(0.5 / s) - 1;
+			cell_y0 = floori(0.5 / (s * sq)) - 1;
+			cell_cols = floori(((double)(w - 1) + 0.5) / s) + 2 - cell_x0;
+			const int64_t cell_rows = floori(((double)(h - 1) + 0.5) / (s * sq)) + 2 - cell_y0;
+			cell_px.resize(cell_cols * cell_rows);
+			cell_py.resize(cell_cols * cell_rows);
+			cell_tone.resize(cell_cols * cell_rows);
+			for (int64_t r = 0; r < cell_rows; r++) {
+				const int64_t cy = cell_y0 + r;
+				const double shift = cy % 2 != 0 ? 0.5 : 0.0;
+				for (int64_t c = 0; c < cell_cols; c++) {
+					const int64_t cx = cell_x0 + c;
+					const int64_t i = r * cell_cols + c;
+					cell_px[i] = ((double)cx + shift + 0.5 + (unit4(seed, cx, cy, 1) - 0.5) * slab_jitter) * s;
+					cell_py[i] = ((double)cy + 0.5 + (unit4(seed, cx, cy, 2) - 0.5) * slab_jitter) * s * sq;
+					cell_tone[i] = mix(base, slab_tone, unit4(seed, cx, cy, 3) * slab_vary);
+				}
+			}
 		}
 		if (spec.has("toward_edge")) {
 			const Dictionary edge = dict(spec, "toward_edge");
@@ -619,6 +689,9 @@ struct Material {
 			}
 			for (double &v : edge_scales) {
 				v *= d;
+			}
+			for (size_t i = 0; i < edge_scales.size(); i++) {
+				grit_octaves.emplace_back(edge_scales[i], seed + 77 + (int64_t)i, w, h);
 			}
 		}
 		if (spec.has("strokes")) {
@@ -661,7 +734,7 @@ struct Material {
 		}
 		if (has_edge && edge_distance < edge_reach) {
 			const double near = 1.0 - edge_distance / edge_reach;
-			const double grit = fbm2((double)x, (double)y, edge_scales, seed + 77);
+			const double grit = fbm2_of((double)x, (double)y, grit_octaves);
 			const double share = minf(edge_most, maxf(0.0, near * 1.6 * grit - 0.25));
 			if (share > 0.08) {
 				rgb = mix(rgb, edge_colour, share);
@@ -677,10 +750,10 @@ struct Material {
 		double best = 1e18, second = 1e18, best_dy = 0.0;
 		int64_t best_cx = 0, best_cy = 0;
 		for (int64_t cy = cy0 - 1; cy < cy0 + 2; cy++) {
-			const double shift = cy % 2 != 0 ? 0.5 : 0.0;
+			const int64_t row = (cy - cell_y0) * cell_cols - cell_x0;
 			for (int64_t cx = cx0 - 1; cx < cx0 + 2; cx++) {
-				const double px = ((double)cx + shift + 0.5 + (unit4(seed, cx, cy, 1) - 0.5) * slab_jitter) * s;
-				const double py = ((double)cy + 0.5 + (unit4(seed, cx, cy, 2) - 0.5) * slab_jitter) * s * sq;
+				const double px = cell_px[row + cx];
+				const double py = cell_py[row + cx];
 				const double dx = (double)x + 0.5 - px;
 				const double dy = ((double)y + 0.5 - py) / sq;
 				const double d = dx * dx + dy * dy;
@@ -697,12 +770,12 @@ struct Material {
 		}
 		const double edge = std::sqrt(second) - std::sqrt(best);
 		if (detail > 1) {
-			return fine_slab(x, y, edge, mix(base, slab_tone, unit4(seed, best_cx, best_cy, 3) * slab_vary), best_dy);
+			return fine_slab(x, y, edge, cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0], best_dy);
 		}
 		if (edge < joint_width) {
 			return joint;
 		}
-		int64_t rgb = mix(base, slab_tone, unit4(seed, best_cx, best_cy, 3) * slab_vary);
+		int64_t rgb = cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0];
 		if (has_light && edge < joint_width + light_width && best_dy < 0.0) {
 			rgb = light;
 		}
@@ -1053,9 +1126,19 @@ struct Drawing {
 	std::vector<T> upsampled(const std::vector<T> &mask, int64_t d) const {
 		const int64_t wide = w * d;
 		std::vector<T> out(wide * h * d);
-		for (int64_t y = 0; y < h * d; y++) {
-			for (int64_t x = 0; x < wide; x++) {
-				out[y * wide + x] = mask[(y / d) * w + x / d];
+		for (int64_t y = 0; y < h; y++) {
+			// One row made wide, then copied to the d rows it is.
+			T *first = out.data() + y * d * wide;
+			const T *from = mask.data() + y * w;
+			for (int64_t x = 0; x < w; x++) {
+				for (int64_t k = 0; k < d; k++) {
+					first[x * d + k] = from[x];
+				}
+			}
+			for (int64_t k = 1; k < d; k++) {
+				for (int64_t x = 0; x < wide; x++) {
+					first[k * wide + x] = first[x];
+				}
 			}
 		}
 		return out;

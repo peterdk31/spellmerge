@@ -72,6 +72,10 @@ const GHOST_GLOW: float = 0.7
 ## The reticle: its distance from the hand and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
 const RETICLE_SIZE: float = 4.0
+## The reticle at the art's detail (ART4): a chevron RETICLE_SIZE deep, its arms RETICLE_ARM art
+## pixels thick, drawn pointing the nearest of RETICLE_WAYS to the aim, in the ramp with the Outline.
+const RETICLE_WAYS: int = 16
+const RETICLE_ARM: float = 3.0
 ## The protect ring closes over this many seconds at most (it shows how much is left); the
 ## body's opacity and the ring's size while it shows.
 const INVULNERABLE_TIME: float = 2.0
@@ -254,6 +258,13 @@ func ghosts() -> Array[Sprite2D]:
 ## Where the reticle's point is drawn, on the line of the shot.
 func reticle_position() -> Vector2:
 	return actor.aim_pivot() + actor.aim * RETICLE_DISTANCE
+
+
+## Not state, as every look: the reticle's chevrons baked once (`PixelShape.arrows`), by way, shared by
+## every staff.
+static var _chevrons: Array[PixelShape] = []
+## The reticle's tones (Outline, light, base, shadow), set as it is drawn.
+var _reticle_tones: PackedColorArray = PackedColorArray([OUTLINE_COLOR, Color.WHITE, Color.WHITE, Color.WHITE])
 
 
 ## The light shade of the actor's ramp (the reticle, the rings).
@@ -597,15 +608,31 @@ func _draw() -> void:
 	if actor.aim == Vector2.ZERO:
 		return
 	_draw_invulnerable_ring()
+	_draw_reticle()
+
+
+## The aim reticle: a chevron at the art's detail (`reticle_shape`) with its tip on the line of the
+## shot, in the ramp's light over its base, the Outline round it.
+func _draw_reticle() -> void:
 	var aim: Vector2 = actor.aim
-	var tip: Vector2 = reticle_position() - actor.global_position
-	var side: Vector2 = aim.orthogonal()
-	var back: Vector2 = tip - aim * RETICLE_SIZE
-	var color: Color = light_color()
-	draw_line(back + side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
-	draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
-	draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
-	draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+	var shape: PixelShape = reticle_shape(aim)
+	var pixel: float = 1.0 / ArtDetail.DETAIL
+	_reticle_tones[PixelShape.LIGHT] = light_color()
+	_reticle_tones[PixelShape.BASE] = ProjectilesScript.ramp_color(actor.ramp)
+	_reticle_tones[PixelShape.SHADOW] = PixelShape.shadow_of(_reticle_tones[PixelShape.BASE])
+	# Its corner snapped to the art pixel in the world, not under the body, so it never stands
+	# between two.
+	var middle: Vector2 = reticle_position() - aim * (RETICLE_SIZE * 0.5)
+	var corner: Vector2 = middle - Vector2(shape.width, shape.height) * (pixel * 0.5)
+	shape.draw_at(self, (corner / pixel).round() * pixel - actor.global_position, _reticle_tones, pixel)
+
+
+## The reticle's chevron pointing nearest `aim` (baked the first time).
+static func reticle_shape(aim: Vector2) -> PixelShape:
+	if _chevrons.is_empty():
+		var art: float = float(ArtDetail.DETAIL)
+		_chevrons = PixelShape.arrows(RETICLE_SIZE * art, RETICLE_SIZE * art, RETICLE_SIZE * art - RETICLE_ARM, RETICLE_WAYS)
+	return _chevrons[PixelShape.way_index(aim, RETICLE_WAYS)]
 
 
 ## A ring round the body that closes as the protected time runs out.

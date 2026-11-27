@@ -351,3 +351,20 @@ func test_an_infused_glow_takes_the_infusions_colour() -> void:
 	_world.run(1, false)
 	var material := sprite.material as ShaderMaterial
 	check(material != null and (material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(Color("e0592f")), "a fire charge glows fire")
+
+
+## ART4 part 3: the aim reticle is a chevron at the art's detail, turning by whole steps
+## (RETICLE_WAYS) to the nearest way to the aim, its Outline round it, open at its back.
+func test_the_reticle_is_a_chevron_at_the_arts_detail() -> void:
+	var right: PixelShape = StaffLook.reticle_shape(Vector2.RIGHT)
+	var down: PixelShape = StaffLook.reticle_shape(Vector2.DOWN)
+	check(right != down, "a chevron a way")
+	check(StaffLook.reticle_shape(Vector2(1.0, 0.05).normalized()) == right, "a nearly level aim draws the level one")
+	check(right.height > right.width and down.width > down.height, "its arms spread across its way")
+	var middle: int = right.height / 2
+	check_equal(right.tone_at(1, middle), -1, "open at its back (a chevron, not a triangle)")
+	var filled: int = 0
+	for y in right.height:
+		for x in right.width:
+			filled += 1 if right.tone_at(x, y) > PixelShape.OUTLINE else 0
+	check(filled > 8, "its arms drawn (%d art pixels)" % filled)

@@ -428,3 +428,18 @@ func test_the_panel_hears_a_recharge_for_the_slot_bound_to_it() -> void:
 	for _step in 3:
 		_frame()
 	check_equal(cross.recharge_rows(0), 0, "ready: open")
+
+
+## ART4 part 3: a count's digits are pixel art at the art's detail, each in its own Outline (no box
+## behind it), in the 3 × 5 layout pixels the old digits took.
+func test_a_counts_digits_are_drawn_in_their_outline_at_the_arts_detail() -> void:
+	for digit in 10:
+		var shape: PixelShape = QuickCrossScript.digit_shape(digit)
+		check_equal([shape.width, shape.height], [QuickCrossScript.DIGIT_ART + 2, QuickCrossScript.DIGIT_ART_TALL + 2], "digit %d: 3 × 5 layout pixels and its Outline" % digit)
+		var lit: int = 0
+		for y in shape.height:
+			for x in shape.width:
+				lit += 1 if shape.tone_at(x, y) == PixelShape.BASE else 0
+		check(lit >= 14, "digit %d has its strokes (%d art pixels)" % [digit, lit])
+		check_equal(shape.tone_at(0, 0), -1, "digit %d: its corner cut, no box" % digit)
+	check(QuickCrossScript.digit_shape(8).tone_at(3, 5) != QuickCrossScript.digit_shape(0).tone_at(3, 5), "8 and 0 told apart by their waist")

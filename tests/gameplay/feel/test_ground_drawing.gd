@@ -9,7 +9,10 @@ extends "res://tests/support/suite.gd"
 ## is drawn again, not flipped: the floor a body stands on is the exact mirror of the unmirrored
 ## one, its art differs, and its rock face still hangs below its edges. The 2x art (ArtDetail; ART3)
 ## is held to the baked @2x files and the tool's hashes the same way, and is opaque exactly where
-## its 1x pixel is.
+## its 1x pixel is. And the baked art as the game shows it (its imported textures, the sprites'
+## filters) is the drawing as applied (`GroundShape.apply`), so an unmirrored room keeps its baked art
+## and is never drawn at layout (#972, ground_layout.gd): every pixel the same, but the colour of a
+## clear one in a sprite sampled nearest (never seen).
 ##
 ## A baked PNG is read from its file (its import fills the colour of clear pixels, `fix_alpha_border`):
 ## every pixel's alpha must be the same, and the colour of every pixel that is not clear.
@@ -126,6 +129,14 @@ func _check_baked(room: Dictionary, spec: Dictionary, art: Dictionary) -> void:
 	var drawn_ground := ground.duplicate() as Sprite2D
 	ShapeScript.apply(drawn_ground, art, spec)
 	check_equal(_lines(drawn_ground), _lines(ground), "%s: the drawn rims and drips are the baked scene's" % room["id"])
+	for kind: String in SPRITES:
+		var shown := (ground if SPRITES[kind] == "." else ground.find_child(SPRITES[kind], true, false)) as Sprite2D
+		var applied := (drawn_ground if SPRITES[kind] == "." else drawn_ground.find_child(SPRITES[kind], true, false)) as Sprite2D
+		if shown == null or shown.texture == null:
+			check(applied == null or applied.texture == null or not applied.visible, "%s: no %s shown baked, none drawn" % [room["id"], kind])
+			continue
+		var why: String = _shown_differs(applied, shown)
+		check(why == "", "%s: the baked %s as shown is the drawn one (%s)" % [room["id"], kind, why])
 	drawn_ground.free()
 	baked.free()
 
@@ -142,6 +153,33 @@ func _differs(got: PackedByteArray, want: PackedByteArray) -> String:
 			if first < 0:
 				first = i / 4
 	return "" if count == 0 else "%d pixels differ, the first the %dth" % [count, first]
+
+
+## Where a drawn sprite (`applied`, by `GroundShape.apply`) would show other pixels than the baked
+## one (`shown`, its imported texture): "" when every alpha is the same and every colour that can be
+## seen (any, in a sprite sampled between pixels; a clear pixel's not, in one sampled nearest).
+func _shown_differs(applied: Sprite2D, shown: Sprite2D) -> String:
+	if applied == null or applied.texture == null or not applied.visible:
+		return "nothing drawn"
+	if applied.texture_filter != shown.texture_filter or applied.material != shown.material or not applied.transform.is_equal_approx(shown.transform) \
+			or applied.centered != shown.centered or applied.offset != shown.offset or applied.z_index != shown.z_index or (applied.get_parent() != null and applied.get_index() != shown.get_index()):
+		return "drawn otherwise"
+	if ArtDetail.of(applied.texture) != ArtDetail.of(shown.texture):
+		return "at detail %d, not %d" % [ArtDetail.of(applied.texture), ArtDetail.of(shown.texture)]
+	var a: Image = applied.texture.get_image()
+	var b: Image = shown.texture.get_image()
+	a.convert(Image.FORMAT_RGBA8)
+	b.convert(Image.FORMAT_RGBA8)
+	var got: PackedByteArray = a.get_data()
+	var want: PackedByteArray = b.get_data()
+	if got.size() != want.size():
+		return "%d bytes, not %d" % [got.size(), want.size()]
+	var nearest: bool = shown.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST
+	var count: int = 0
+	for i in range(0, got.size(), 4):
+		if got[i + 3] != want[i + 3] or ((got[i + 3] != 0 or not nearest) and (got[i] != want[i] or got[i + 1] != want[i + 1] or got[i + 2] != want[i + 2])):
+			count += 1
+	return "" if count == 0 else "%d pixels differ" % count
 
 
 ## A ground's mote lines as data: name, closed, points, and its source's kind, rate, colours, bands.

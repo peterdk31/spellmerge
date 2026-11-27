@@ -41,8 +41,20 @@ const OUT: float = 0.002
 var boxes: PackedVector4Array = PackedVector4Array()
 var bodies: PackedVector4Array = PackedVector4Array()
 var count: int = 0
-## The room's standing walls (`use_walls`). Read only.
-var walls: Array[Rect2] = []
+## The room's standing walls (`use_walls`), worked out when first read after it (a biome hands its
+## world's walls over again with each piece it lays, all in one frame: worked out each time, that was
+## a few hundred milliseconds at a run's start on the web, #972). Read only.
+var walls: Array[Rect2]:
+	get:
+		if _walls_stale:
+			_walls_stale = false
+			_walls = standing(_wall_rects)
+			_wall_rects = []
+		return _walls
+var _walls: Array[Rect2] = []
+## The walls `use_walls` was last handed (a copy), while `walls` is not worked out from them yet.
+var _wall_rects: Array[Rect2] = []
+var _walls_stale: bool = false
 ## Each actor's prop box as drawn: its strength (-1: not a prop that blocks light), and its base and
 ## full column (x0, top, x1) as last seen. Read only.
 var strength: PackedFloat32Array = PackedFloat32Array()
@@ -97,7 +109,8 @@ func set_share(next: float) -> void:
 ## A room was laid out: its walls (`RoomPlaces.wall_rects` of its layout, room pixels), of which the
 ## standing ones block light from now on. Its props are found as they come (`step`).
 func use_walls(rects: Array[Rect2]) -> void:
-	walls = standing(rects)
+	_wall_rects = rects.duplicate()
+	_walls_stale = true
 	# The last room's props are forgotten: the new room's come as they stand.
 	strength.fill(-1.0)
 	_prop_count = 0
@@ -112,7 +125,7 @@ func refresh() -> void:
 
 
 ## The walls of `rects` that stand inside the room: those not joined to the edge of the box round
-## them all through walls that touch (within JOIN). Made each call (once a room).
+## them all through walls that touch (within JOIN). Made each call (once a room: `walls`).
 static func standing(rects: Array[Rect2]) -> Array[Rect2]:
 	var found: Array[Rect2] = []
 	if rects.is_empty():

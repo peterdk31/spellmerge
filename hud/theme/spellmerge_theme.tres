@@ -80,6 +80,7 @@ BareButton/base_type = &"Button"
 BareButton/colors/font_outline_color = Color(0.0784314, 0.0705882, 0.121569, 1)
 BareButton/constants/outline_size = 2
 BareButton/styles/disabled = SubResource("button_bare")
+BareButton/styles/focus = SubResource("button_bare")
 BareButton/styles/hover = SubResource("button_bare")
 BareButton/styles/normal = SubResource("button_bare")
 BareButton/styles/pressed = SubResource("button_bare")

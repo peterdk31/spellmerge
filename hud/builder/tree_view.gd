@@ -41,6 +41,8 @@ const HEADER_TEXT: String = "Tree"
 const EMPTY_TEXT: String = "No casts"
 
 const OUTLINE: Color = Color("#14121f")
+## The words' outline, as the ring menus' (`RadialMenu.TEXT_OUTLINE`).
+const TEXT_OUTLINE: int = 2
 const TILE: Color = Color("#2b2840")
 const LINE: Color = Color("#4a4663")
 const TEXT: Color = Color("#f4f1ea")
@@ -269,9 +271,13 @@ func _text_width(text: String) -> float:
 	return _font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 
 
+## `text` with its top left at `at`, in an outline as the ring menus' words are (it sits on their
+## light backdrop, `RadialMenu.SHADE`).
 func _text(text: String, at: Vector2, color: Color) -> void:
 	var font: Font = _font()
-	draw_string(font, Vector2(at.x, at.y + font.get_ascent(FONT_SIZE)).round(), text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
+	var baseline: Vector2 = Vector2(at.x, at.y + font.get_ascent(FONT_SIZE)).round()
+	draw_string_outline(font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_OUTLINE, OUTLINE)
+	draw_string(font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
 
 
 func _fit(text: String, width: float) -> String:

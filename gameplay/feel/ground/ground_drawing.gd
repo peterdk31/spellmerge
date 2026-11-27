@@ -40,7 +40,7 @@ const SIDE_REACH: int = 130
 const DETAIL: int = 2
 
 ## Art pixels a world pixel of what this drawing draws (1; its fine twin's `DETAIL`), and the 1x
-## drawing a fine one is drawn on (null for the 1x one).
+## drawing a fine one is drawn on (only while it is drawn; null for the 1x one).
 var detail: int = 1
 var coarse: GroundDrawing = null
 ## The fine twin (`_fine`), drawn after this one.
@@ -209,6 +209,9 @@ func _fine(d: int) -> GroundDrawing:
 	out._draw_edges()
 	out._draw_under()
 	out._draw_wall_art()
+	# Let go of the 1x drawing: it holds the fine one (`fine`), so keeping it would be a cycle of
+	# references, and both would leak.
+	out.coarse = null
 	return out
 
 

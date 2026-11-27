@@ -3,5 +3,6 @@
 	"base": "#48435e",
 	"patches": {"colour": "#4b4661", "scales": [22, 8], "above": 0.5},
 	"toward_edge": {"colour": "#524c67", "reach": 30, "most": 0.7, "scales": [12, 5]},
-	"speckle": [["stone.shadow", 0.004], ["#524c67", 0.004], ["bone.shadow", 0.0015]]
+	"speckle": [["stone.shadow", 0.004], ["#524c67", 0.004], ["bone.shadow", 0.0015]],
+	"fine": {"grains": [["#524c67", "#3e3a52", 0.004]]}
 }

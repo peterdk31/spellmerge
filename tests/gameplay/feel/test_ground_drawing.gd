@@ -7,7 +7,9 @@ extends "res://tests/support/suite.gd"
 ## island's outline, cracks from it, patches and strokes, and a room with pits), and the GDScript draws
 ## those fixtures as the tool does (its hashes, `ground_fixtures.json`); and a mirrored room
 ## is drawn again, not flipped: the floor a body stands on is the exact mirror of the unmirrored
-## one, its art differs, and its rock face still hangs below its edges.
+## one, its art differs, and its rock face still hangs below its edges. The 2x art (ArtDetail; ART3)
+## is held to the baked @2x files and the tool's hashes the same way, and is opaque exactly where
+## its 1x pixel is.
 ##
 ## A baked PNG is read from its file (its import fills the colour of clear pixels, `fix_alpha_border`):
 ## every pixel's alpha must be the same, and the colour of every pixel that is not clear.
@@ -26,7 +28,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 
 const ROOMS: StringName = &"rooms"
 ## The baked art's sprites, by what the drawing calls them.
-const SPRITES: Dictionary = {"floor": ".", "glow": "Glow", "under": "Underside", "wall": "WallArt"}
+## The rock face and the walls' art are baked at 2x only; the floor at 1x (its texture) and 2x (`Detail`).
+const SPRITES: Dictionary = {"floor": ".", "fine_floor": "Detail", "glow": "Glow", "fine_under": "Underside", "fine_wall": "WallArt"}
 const MIRRORINGS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
 
 
@@ -106,7 +109,7 @@ func _check_baked(room: Dictionary, spec: Dictionary, art: Dictionary) -> void:
 		var sprite := (ground if SPRITES[kind] == "." else ground.find_child(SPRITES[kind], true, false)) as Sprite2D
 		var drawn: PackedByteArray = art[kind]
 		if sprite == null:
-			check(drawn.is_empty() or kind != "wall", "%s: no wall art baked, none drawn" % room["id"])
+			check(drawn.is_empty() or kind != "fine_wall", "%s: no wall art baked, none drawn" % room["id"])
 			continue
 		var image := Image.new()
 		image.load_png_from_buffer(FileAccess.get_file_as_bytes(sprite.texture.resource_path))
@@ -154,7 +157,7 @@ func test_the_fixtures_are_drawn_as_the_tool_draws_them() -> void:
 	for case: Array in [["ground_hall", Hall], ["ground_island", Island]]:
 		var art: Dictionary = ShapeScript.draw(_spec((case[1] as JSON).data, null), false)
 		var want: Dictionary = expected[case[0]]
-		for kind: String in ["floor", "under", "glow", "wall"]:
+		for kind: String in ["floor", "under", "glow", "wall", "fine_floor", "fine_under", "fine_wall"]:
 			check_equal(_sha(art[kind]), want[kind], "%s: the %s is the tool's" % [case[0], kind])
 		var lines := PackedStringArray()
 		for points: PackedVector2Array in (art["rims"] as Array) + (art["drips"] as Array):
@@ -229,6 +232,24 @@ func test_a_mirrored_room_is_drawn_again_not_flipped() -> void:
 			check(opaque, "%s: the floor art is opaque exactly where a body stands" % what)
 			check(floor_art != _mirrored(plain["floor"], w, h, mirror, 4), "%s: the floor is drawn again, not flipped" % what)
 			check(_hangs_below(art["under"], solid, w, h), "%s: the rock face hangs below the floor's edges (lit from above)" % what)
+			var d: int = art["detail"]
+			var fine_solid: PackedByteArray = _upsampled(solid, w, h, d)
+			var fine_floor: PackedByteArray = art["fine_floor"]
+			var fine_opaque: bool = fine_floor.size() == fine_solid.size() * 4
+			for p in fine_solid.size() if fine_opaque else 0:
+				fine_opaque = fine_opaque and fine_floor[p * 4 + 3] == (255 if fine_solid[p] != 0 else 0)
+			check(fine_opaque, "%s: the 2x floor is opaque exactly where its 1x pixel is" % what)
+			check(_hangs_below(art["fine_under"], fine_solid, w * d, h * d), "%s: the 2x rock face hangs below the floor's edges" % what)
+
+
+## `mask` (w by h) with every value `d` by `d` times.
+func _upsampled(mask: PackedByteArray, w: int, h: int, d: int) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(w * d * h * d)
+	for y in h * d:
+		for x in w * d:
+			out[y * w * d + x] = mask[(y / d) * w + x / d]
+	return out
 
 
 ## Whether every pixel of the rock face `under` hangs from solid ground above it in its column.

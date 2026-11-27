@@ -1,6 +1,6 @@
 extends RefCounted
 ## A laid room's floor baked into one texture (the owner's choice of 2026-11-21, after #900: "bake
-## each room's floor"), so a room in view draws its floor in one call, not seven: the floor art, the
+## each room's floor"), so a room in view draws its floor in one call, not seven: the floor art (its 2x `Detail` over it), the
 ## rock face under it (`Underside`), the edges' glow (`Glow`, added) and the shades its walls cast
 ## (`Shade`'s polygons) are drawn once, in that order (the order the screen draws them in), into a
 ## viewport of the floor's size (`bake`), and from the frame after it was drawn (`step`) a sprite under the `Floor`
@@ -34,6 +34,8 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## The layout's nodes it bakes (the ground scene's, `GroundShape`; the template's shades).
 const FLOOR: StringName = &"Floor"
 const GLOW: StringName = &"Glow"
+## The floor's 2x art over its 1x texture (`GroundShape.DETAIL`), baked first of its layers.
+const DETAIL: StringName = &"Detail"
 const UNDERSIDE: StringName = &"Underside"
 const SHADE: StringName = &"Shade"
 ## The viewport's name on the layout root (one a layout).
@@ -181,9 +183,10 @@ static func unshow(root: Node) -> bool:
 		shown_sprite.queue_free()
 	ground.texture = ground.get_meta(KEPT_META)
 	ground.remove_meta(KEPT_META)
+	var detail := ground.get_node_or_null(NodePath(DETAIL)) as Sprite2D
 	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D
 	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
-	for layer: Sprite2D in [under, glow]:
+	for layer: Sprite2D in [detail, under, glow]:
 		if layer != null and layer.texture != null:
 			layer.visible = true
 	var holder := root.get_node_or_null(NodePath(SHADE)) as CanvasItem
@@ -209,6 +212,9 @@ static func bakeable(root: Node) -> bool:
 	if ground == null or ground.texture == null or not _plain(ground) or ground.material != null \
 			or ground.modulate != Color.WHITE or ground.self_modulate != Color.WHITE:
 		return false
+	var detail := ground.get_node_or_null(NodePath(DETAIL)) as Sprite2D
+	if detail != null and (not _plain(detail) or detail.material != null or detail.top_level):
+		return false
 	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D
 	if under != null and (not _plain(under) or under.material != null or under.top_level):
 		return false
@@ -231,15 +237,17 @@ static func bakeable(root: Node) -> bool:
 	return true
 
 
-## The floor's layers baked with it, in the order drawn: its rock face, then its glow (shown ones).
+## The floor's layers baked with it, in the order drawn: its 2x art, its rock face, then its glow
+## (shown ones).
 static func layers(root: Node) -> Array[Sprite2D]:
 	var found: Array[Sprite2D] = []
 	var ground := root.get_node_or_null(NodePath(FLOOR)) as Sprite2D
 	if ground == null:
 		return found
+	var detail := ground.get_node_or_null(NodePath(DETAIL)) as Sprite2D
 	var under := ground.find_child(String(UNDERSIDE), true, false) as Sprite2D
 	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
-	for layer: Sprite2D in [under, glow]:
+	for layer: Sprite2D in [detail, under, glow]:
 		if layer != null and layer.visible and layer.texture != null and _plain(layer):
 			found.append(layer)
 	return found

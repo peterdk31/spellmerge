@@ -18,7 +18,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## Not Feel's own: Feel, the other jobs this one calls and Feel's containers it works on, each
 ## Feel's own (shared, never a copy), linked by `link`.
-const LINKED: Array[StringName] = [&"feel", &"_job_casts", &"_job_cues", &"_live_beams", &"_carrier_card_looks", &"_live_paths", &"_thin_points", &"_thin_keep", &"_thin_turn", &"_thin_sorted", &"_shown_beams", &"_shown_beam_paths", &"_shown_beam_left", &"_shown_beam_total", &"_shown_beam_body", &"_shown_beam_ramp", &"_shown_beam_look", &"_shown_beam_tint", &"_shown_beam_tag", &"_next_shown_beam"]
+const LINKED: Array[StringName] = [&"feel", &"_job_casts", &"_job_cues", &"_live_beams", &"_carrier_card_looks", &"_live_paths", &"_live_set", &"_thin_points", &"_thin_keep", &"_thin_turn", &"_thin_sorted", &"_shown_beams", &"_shown_beam_paths", &"_shown_beam_left", &"_shown_beam_total", &"_shown_beam_body", &"_shown_beam_ramp", &"_shown_beam_look", &"_shown_beam_tint", &"_shown_beam_tag", &"_next_shown_beam"]
 
 static var _beam_mesh: ArrayMesh = null
 static var _swing_mesh: ArrayMesh = null
@@ -42,32 +42,10 @@ var _shown_beam_look: PackedInt32Array
 var _shown_beam_tint: PackedColorArray
 var _shown_beam_tag: PackedInt64Array
 var _next_shown_beam: PackedInt32Array
-## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
-## change, in `LiveSet`'s order: `_draw_live_beams` sets one only when its value changes (a fan of
-## split beams is dozens of nodes, #972), and every one again when the node's shader changes. Feel's
-## own; an entry is made with its node.
-var _live_set: Array[Array] = []
-## The order of `_live_set`'s entries.
-enum LiveSet { SHADER, CORE, BODY, LEAD, WIDTH, PLAYER, LOOK, INFUSIONS, INFUSION_COUNT, FADE, SWELL, GLOW, FROM, SIZE }
-## A fan (+2, +3 on a beam) drawn as one (the owner, 2026-11-27, on #977): its trunk's node draws it
-## all, the nearest of its segments taking each pixel (the beam shaders' `fan_*`), and its beams'
-## nodes draw nothing of their own. Only a fan whose trunk and beams all run straight, FAN_MOST of
-## them at most, of GROUPS_MOST fans a frame; any other draws beam by beam. This frame's groups
-## (`_group_*`, by `beam_fan_id`): the trunk's row, the beams' count, whether one is bent, the trunk's
-## segment and its length (its beams' start along it), and the beams' segments, FAN_MOST a group;
-## each row's group (-1: none). Feel's own scratch, sized once.
-const FAN_MOST: int = 48
-const GROUPS_MOST: int = 16
-var _row_group: PackedInt32Array = PackedInt32Array()
-var _group_id: PackedInt64Array = PackedInt64Array()
-var _group_trunk: PackedInt32Array = PackedInt32Array()
-var _group_count: PackedInt32Array = PackedInt32Array()
-var _group_bent: PackedByteArray = PackedByteArray()
-var _group_base: PackedFloat32Array = PackedFloat32Array()
-var _group_segs: PackedVector4Array = PackedVector4Array()
-## Each live beam's node's own fan segments (a material keeps the array it is given, not a copy, so
-## no two nodes share one), made with the node.
-var _live_fan_segs: Array[PackedVector4Array] = []
+var _live_set: Array[Array]
+## The order of the entries of Feel's `_live_set`: what each live beam's node was last given of the
+## uniforms that seldom change, set again only when one does (a fan of beams is dozens of nodes, #972).
+enum LiveSet { SHADER, CORE, BODY, LEAD, WIDTH, PLAYER, LOOK, INFUSIONS, INFUSION_COUNT, FADE, SWELL, GLOW, SIZE }
 
 
 ## Takes Feel and its containers and jobs, by the names in LINKED (`Feel._link_jobs`).
@@ -327,18 +305,12 @@ func _draw_live_beams(real_delta: float) -> void:
 		var last: Array = []
 		last.resize(LiveSet.SIZE)
 		_live_set.append(last)
-		var segs := PackedVector4Array()
-		segs.resize(FAN_MOST)
-		_live_fan_segs.append(segs)
 	# What the beams' rows can tell, asked once a frame (a stand-in may lack some).
 	var has_look: bool = beams != null and beams.has_method(&"beam_look")
 	var has_card: bool = beams != null and beams.has_method(&"beam_carrier_card")
 	var has_growth: bool = beams != null and beams.has_method(&"beam_growth")
 	var has_infusions: bool = beams != null and beams.has_method(&"beam_infusions")
 	var has_tag: bool = beams != null and beams.has_method(&"beam_tag")
-	var has_role: bool = beams != null and beams.has_method(&"beam_role")
-	var has_fan: bool = has_role and beams.has_method(&"beam_fan_id")
-	_group_fans(beams, count, has_fan)
 	for i in _live_beams.size():
 		var node: MeshInstance2D = _live_beams[i]
 		if i >= count or not bool(beams.call(&"beam_on", i)):
@@ -399,166 +371,71 @@ func _draw_live_beams(real_delta: float) -> void:
 		var tint: Color = beams.call(&"beam_tint", i)
 		var ramp: int = _beam_ramp(feel._ramp_of(caster))
 		var look_id: int = int(beams.call(&"beam_look", i)) if has_look else 0
-		# A fan (+2, +3 on a beam) is drawn as one beam that splits: its trunk has no flare where its
-		# beams leave, and they none where they leave it, lighting up from there.
-		var role: int = int(beams.call(&"beam_role", i)) if has_role else CarrierBeam.ROLE_ALONE
-		# Its fan's group when the fan is drawn as one (-1: drawn by itself); a beam of such a fan draws
-		# nothing of its own (its trunk draws it), only its motes, sound and light.
-		var group: int = _row_group[i] if has_fan and _fan_whole(_row_group[i]) else -1
 		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
 		var look: CardLook = _carrier_card_look_of(beams.call(&"beam_carrier_card", i) as StringName if has_card else &"", Carrier.LOOK_BEAM)
-		if group >= 0 and role == CarrierBeam.ROLE_FAN:
-			if node.visible:
-				node.visible = false
-		else:
-			var shader: Shader = look.shader if look.shader != null else BEAM_SHADER
-			var last: Array = _live_set[i]
-			if last[LiveSet.SHADER] != shader:
-				# Another shader: every uniform is given again.
-				_use_shader(node, shader)
-				last.fill(null)
-				last[LiveSet.SHADER] = shader
-			var material: ShaderMaterial = node.material as ShaderMaterial
-			var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
-			if last[LiveSet.CORE] != core:
-				material.set_shader_parameter(&"core_override", core)
-				last[LiveSet.CORE] = core
-			var body_tint: Color = Color(body.r, body.g, body.b, fade * preset.beam_alpha)
-			if last[LiveSet.BODY] != body_tint:
-				material.set_shader_parameter(&"body_tint", body_tint)
-				last[LiveSet.BODY] = body_tint
-			material.set_shader_parameter(&"beam_path", path)
-			material.set_shader_parameter(&"beam_points", used)
-			material.set_shader_parameter(&"beam_length", walked)
-			if last[LiveSet.LEAD] != FeelScript.BEAM_LEAD:
-				material.set_shader_parameter(&"beam_lead", FeelScript.BEAM_LEAD)
-				last[LiveSet.LEAD] = FeelScript.BEAM_LEAD
-			material.set_shader_parameter(&"beam_start", origin if role != CarrierBeam.ROLE_FAN else FeelScript.BEAM_NO_FLARE)
-			material.set_shader_parameter(&"beam_end", end_at if role != CarrierBeam.ROLE_TRUNK else FeelScript.BEAM_NO_FLARE)
-			# A fan drawn as one: the trunk's node takes its segments; its light needs no rise.
-			var fan_count: int = 0
-			if group >= 0:
-				fan_count = _fan_segments(group, _live_fan_segs[i])
-				material.set_shader_parameter(&"fan_segs", _live_fan_segs[i])
-				material.set_shader_parameter(&"fan_base", _group_base[group])
-			material.set_shader_parameter(&"fan_count", fan_count)
-			var from: float = FeelScript.BEAM_FAN_IN if role == CarrierBeam.ROLE_FAN else 0.0
-			if last[LiveSet.FROM] != from:
-				material.set_shader_parameter(&"beam_from", from)
-				last[LiveSet.FROM] = from
-			material.set_shader_parameter(&"sim_time", feel._clock)
-			# A growing beam is drawn wider as it hits wider (growth, rules R4f).
-			var grown: float = float(beams.call(&"beam_growth", i)) if has_growth else 1.0
-			var width: float = FeelScript.BEAM_WIDTH * grown
-			if last[LiveSet.WIDTH] != width:
-				material.set_shader_parameter(&"beam_width", width)
-				last[LiveSet.WIDTH] = width
-			if last[LiveSet.PLAYER] != ramp:
-				material.set_shader_parameter(&"beam_player", ramp)
-				last[LiveSet.PLAYER] = ramp
-			if last[LiveSet.LOOK] != look_id:
-				material.set_shader_parameter(&"beam_look", look_id)
-				last[LiveSet.LOOK] = look_id
-			# Every infusion on it, in slot order, for a look that shows each (the beam card's strands).
-			var infusions: PackedColorArray = beams.call(&"beam_infusions", i) if has_infusions else PackedColorArray()
-			if last[LiveSet.INFUSIONS] != infusions:
-				material.set_shader_parameter(&"beam_infusions", infusions)
-				last[LiveSet.INFUSIONS] = infusions
-			var infusion_count: int = mini(infusions.size(), FeelScript.BEAM_INFUSIONS_MOST)
-			if last[LiveSet.INFUSION_COUNT] != infusion_count:
-				material.set_shader_parameter(&"beam_infusion_count", infusion_count)
-				last[LiveSet.INFUSION_COUNT] = infusion_count
-			if last[LiveSet.FADE] != fade:
-				material.set_shader_parameter(&"beam_fade", fade)
-				last[LiveSet.FADE] = fade
-			var swell: float = maxf(fade, 0.35) * flare * flicker * grown
-			if last[LiveSet.SWELL] != swell:
-				material.set_shader_parameter(&"beam_swell", swell)
-				last[LiveSet.SWELL] = swell
-			if last[LiveSet.GLOW] != preset.beam_alpha:
-				material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
-				last[LiveSet.GLOW] = preset.beam_alpha
-			node.visible = true
+		var shader: Shader = look.shader if look.shader != null else BEAM_SHADER
+		var last: Array = _live_set[i]
+		if last[LiveSet.SHADER] != shader:
+			# Another shader: every uniform is given again.
+			_use_shader(node, shader)
+			last.fill(null)
+			last[LiveSet.SHADER] = shader
+		var material: ShaderMaterial = node.material as ShaderMaterial
+		var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
+		if last[LiveSet.CORE] != core:
+			material.set_shader_parameter(&"core_override", core)
+			last[LiveSet.CORE] = core
+		var body_tint: Color = Color(body.r, body.g, body.b, fade * preset.beam_alpha)
+		if last[LiveSet.BODY] != body_tint:
+			material.set_shader_parameter(&"body_tint", body_tint)
+			last[LiveSet.BODY] = body_tint
+		material.set_shader_parameter(&"beam_path", path)
+		material.set_shader_parameter(&"beam_points", used)
+		material.set_shader_parameter(&"beam_length", walked)
+		if last[LiveSet.LEAD] != FeelScript.BEAM_LEAD:
+			material.set_shader_parameter(&"beam_lead", FeelScript.BEAM_LEAD)
+			last[LiveSet.LEAD] = FeelScript.BEAM_LEAD
+		material.set_shader_parameter(&"beam_start", origin)
+		material.set_shader_parameter(&"beam_end", end_at)
+		material.set_shader_parameter(&"sim_time", feel._clock)
+		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
+		var grown: float = float(beams.call(&"beam_growth", i)) if has_growth else 1.0
+		var width: float = FeelScript.BEAM_WIDTH * grown
+		if last[LiveSet.WIDTH] != width:
+			material.set_shader_parameter(&"beam_width", width)
+			last[LiveSet.WIDTH] = width
+		if last[LiveSet.PLAYER] != ramp:
+			material.set_shader_parameter(&"beam_player", ramp)
+			last[LiveSet.PLAYER] = ramp
+		if last[LiveSet.LOOK] != look_id:
+			material.set_shader_parameter(&"beam_look", look_id)
+			last[LiveSet.LOOK] = look_id
+		# Every infusion on it, in slot order, for a look that shows each (the beam card's strands).
+		var infusions: PackedColorArray = beams.call(&"beam_infusions", i) if has_infusions else PackedColorArray()
+		if last[LiveSet.INFUSIONS] != infusions:
+			material.set_shader_parameter(&"beam_infusions", infusions)
+			last[LiveSet.INFUSIONS] = infusions
+		var infusion_count: int = mini(infusions.size(), FeelScript.BEAM_INFUSIONS_MOST)
+		if last[LiveSet.INFUSION_COUNT] != infusion_count:
+			material.set_shader_parameter(&"beam_infusion_count", infusion_count)
+			last[LiveSet.INFUSION_COUNT] = infusion_count
+		if last[LiveSet.FADE] != fade:
+			material.set_shader_parameter(&"beam_fade", fade)
+			last[LiveSet.FADE] = fade
+		var swell: float = maxf(fade, 0.35) * flare * flicker * grown
+		if last[LiveSet.SWELL] != swell:
+			material.set_shader_parameter(&"beam_swell", swell)
+			last[LiveSet.SWELL] = swell
+		if last[LiveSet.GLOW] != preset.beam_alpha:
+			material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
+			last[LiveSet.GLOW] = preset.beam_alpha
+		node.visible = true
 		_sound_beam(beams, i, caster, origin, fade)
-		_beam_motes(path, used, walked, end_at, end_dir, fade, ramp, look_id, tint, int(beams.call(&"beam_tag", i)) if has_tag else 0, real_delta, role != CarrierBeam.ROLE_TRUNK)
+		_beam_motes(path, used, walked, end_at, end_dir, fade, ramp, look_id, tint, int(beams.call(&"beam_tag", i)) if has_tag else 0, real_delta)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if spectacle != null:
 			spectacle.light_beam(i, path, used, ramp, look_id, tint, fade, look.light_intensity, look.light_reach)
-
-
-## Groups this frame's fans by `beam_fan_id` (`_group_*`, `_row_group`): each fan's trunk and beams,
-## each one's segment from where it leaves to where it got when its path is straight (two points),
-## else the group marked bent. Nothing is allocated once the scratch has its size.
-func _group_fans(beams: Object, count: int, has_fan: bool) -> void:
-	if _row_group.size() < count:
-		_row_group.resize(count)
-	if _group_id.size() < GROUPS_MOST:
-		_group_id.resize(GROUPS_MOST)
-		_group_trunk.resize(GROUPS_MOST)
-		_group_count.resize(GROUPS_MOST)
-		_group_bent.resize(GROUPS_MOST)
-		_group_base.resize(GROUPS_MOST)
-		_group_segs.resize(GROUPS_MOST * FAN_MOST)
-	if not has_fan:
-		return
-	var groups: int = 0
-	for i in count:
-		_row_group[i] = -1
-		if not bool(beams.call(&"beam_on", i)):
-			continue
-		var role: int = int(beams.call(&"beam_role", i))
-		if role == CarrierBeam.ROLE_ALONE:
-			continue
-		var id: int = int(beams.call(&"beam_fan_id", i))
-		var g: int = -1
-		for k in groups:
-			if _group_id[k] == id:
-				g = k
-				break
-		if g < 0:
-			if groups == GROUPS_MOST:
-				continue
-			g = groups
-			groups += 1
-			_group_id[g] = id
-			_group_trunk[g] = -1
-			_group_count[g] = 0
-			_group_bent[g] = 0
-		_row_group[i] = g
-		var reach: float = beams.call(&"beam_reach", i)
-		if int(beams.call(&"beam_point_count", i)) != 2 or reach <= 0.0:
-			_group_bent[g] = 1
-			continue
-		var a: Vector2 = beams.call(&"beam_point", i, 0)
-		var b: Vector2 = beams.call(&"beam_point", i, 1)
-		var piece: float = a.distance_to(b)
-		var e: Vector2 = a.move_toward(b, minf(reach, piece))
-		var seg := Vector4(a.x, a.y, e.x, e.y)
-		if role == CarrierBeam.ROLE_TRUNK:
-			_group_trunk[g] = i
-			_group_segs[g * FAN_MOST] = seg
-			_group_base[g] = minf(reach, piece)
-		elif _group_count[g] >= FAN_MOST - 1:
-			_group_bent[g] = 1
-		else:
-			_group_count[g] += 1
-			_group_segs[g * FAN_MOST + _group_count[g]] = seg
-	for i in range(count, _row_group.size()):
-		_row_group[i] = -1
-
-
-## True when fan group `group` is drawn as one: it has its trunk and a beam, all straight.
-func _fan_whole(group: int) -> bool:
-	return group >= 0 and _group_trunk[group] >= 0 and _group_bent[group] == 0 and _group_count[group] > 0
-
-
-## Fan group `group`'s segments into `into` (the trunk's first); how many.
-func _fan_segments(group: int, into: PackedVector4Array) -> int:
-	var n: int = _group_count[group] + 1
-	for k in n:
-		into[k] = _group_segs[group * FAN_MOST + k]
-	return n
 
 
 ## The sound of live beam `i` of `beams` (its card's hum and its infusions' loops, `beam_sounds.gd`)
@@ -587,13 +464,12 @@ func _sound_beam(beams: Object, i: int, caster: int, origin: Vector2, fade: floa
 ## while motes are on: its path is the first `points` of `path` (x, y and how far along), `length`
 ## pixels long, landing at `end_at` going `end_dir`, `fade` whole (1 to 0), of the shader ramp
 ## `ramp` (0-3 a hat ramp, -1 the enemies'), the look `look`, the tint `tint`, the spell of `tag`.
-func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: Vector2, end_dir: Vector2, fade: float, ramp: int, look: int, tint: Color, tag: int, seconds: float, splash: bool = true) -> void:
+func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: Vector2, end_dir: Vector2, fade: float, ramp: int, look: int, tint: Color, tag: int, seconds: float) -> void:
 	if seconds <= 0.0 or points < 2 or not feel._spectacle.motes_on():
 		return
 	var births: BirthsScript = feel._spectacle.births
 	var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
-	# A fan's trunk splashes nothing where its beams leave it (`splash` false).
-	if splash and fade > FeelScript.BEAM_SPLASH_FADE:
+	if fade > FeelScript.BEAM_SPLASH_FADE:
 		for n in births.roll(FeelScript.BEAM_SPLASH_RATE * seconds):
 			if not births.add(end_at, -end_dir, 0, ramp, look, core, tag):
 				return

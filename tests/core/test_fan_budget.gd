@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## add shots (the owner's decision of 2026-11-27); stacked late in a run they make dozens: 1, 6 (+2
 ## +3), 16 (five +3) and 46 (fifteen +3) shots. In the combo arena (Spells, the projectile manager,
 ## Combat), with a room of imps off to one side:
-## - **a held beam** of that many beams, fanned from one trunk (`CarrierBeam.launch`), cast once toward
+## - **a held beam** of that many beams, fanned from the caster, cast once toward
 ##   the empty side (the rays walk the targets' grid and hit nothing), its runtime stepped through a
 ##   whole round of its hits (`SpellLimits.BEAM_TICK`: the steps between and one that hits);
 ## - **a bolt** of that many shots, cast and flown for ROUND steps (the runtime and the manager).
@@ -47,16 +47,14 @@ func _arena(native: bool) -> ArenaScript:
 	return arena
 
 
-## A round of a held beam with `cards` before it (`shots` beams, fanned from a trunk when more than
-## one), timed.
+## A round of a held beam with `cards` before it (`shots` beams), timed.
 func _beam_round(shots: int, cards: Array, native: bool) -> WallClock.Timed:
 	var arena: ArenaScript = _arena(native)
 	arena.install_cards(0, 0, ["hold"] + cards + ["beam"])
 	check(arena.cast(0, 0, Vector2.RIGHT), "%d beams: cast" % shots)
 	arena.run(DT * 3.0)
 	var beams: CarrierBeam = CarrierBeam.of(arena.spells)
-	# A fan is its beams and their trunk.
-	var rows: int = shots + (1 if shots > 1 else 0)
+	var rows: int = shots
 	check_equal(beams.beam_count(), rows, "%d beams: %d rows on" % [shots, rows])
 	var spells: Node = arena.spells
 	var cost: WallClock.Timed = WallClock.against(func() -> void:

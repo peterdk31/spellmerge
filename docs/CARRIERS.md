@@ -336,19 +336,10 @@ its own beside the runtime, not code in each carrier: `core/spells/skyfall.gd` a
 folder and those lines. What the card sets that any card could set is a general field, not the
 module's (Orbit's 3 s is `ModifierBase.lifetime_base`).
 
-## A beam's fan (+2, +3)
+## Added shots (+2, +3)
 
 +2 and +3 add shots (`ModifierBase.shot_add`; the owner's decision of 2026-11-27, #972, in place of
 Split's three weaker shots): each added shot has the spell's whole damage and costs
 `SpellLimits.SHOT_ADD_MANA` of its mana, added over the cards, and they fan over the spread as every
-carrier's shots do (`SHOTS`, `SPREAD`). A beam takes them its own way (`CarrierBeam.launch`): one
-trunk from the staff, `SpellLimits.BEAM_TRUNK` pixels along the aim, walked once (what stands on it
-is hit once a beam tick), and the fan's beams from its end, each the trunk's length shorter and
-turned off it by its place in the fan, each with all the beam's cards from there (it bends, turns at
-walls, waves and fires its payloads). The trunk ends at a wall it meets first, and so does the fan;
-its end is no carrier's end (no blast, no `on expire`, no pour onto the floor there).
-Its look is one beam that splits (the owner, 2026-11-27, on #977): when its trunk and beams all run
-straight, the trunk's node draws the whole fan in one draw, every pixel taking the nearest of its
-segments (`fan_*` in `shot_beam.gdshaderinc` and the beam card's shader, the way pools merge), so
-it has one edge round it and one light; a fan with a bent beam draws beam by beam, its join kept
-clean (no flares there, its beams' light rising from it, `beam_from`).
+carrier's shots do (`SHOTS`, `SPREAD`). On a beam each is a beam of its own from the caster, with all
+the beam's cards and the usual rules for its hits (the owner, 2026-11-27, on #977: no shared stem).

@@ -258,8 +258,8 @@ static func stacks(behaviour: int) -> Stack:
 @export var shot_mult: int = 1
 ## Shots added to each cast, in slot order with `shot_mult` (+2, +3: the owner's decision of
 ## 2026-11-27, #972), spread in a fan as one; each keeps the spell's whole damage and costs
-## `SpellLimits.SHOT_ADD_MANA` of the spell's mana, added over the cards. A beam's fan leaves from one
-## short trunk (`CarrierBeam.launch`).
+## `SpellLimits.SHOT_ADD_MANA` of the spell's mana, added over the cards. On a beam each
+## is a beam of its own.
 @export var shot_add: int = 0
 ## Targets added to each shot's pierce.
 @export var extra_pierce: int = 0

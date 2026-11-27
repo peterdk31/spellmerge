@@ -1,7 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The +2 card (content/spells/modifiers/plus_two/; the owner's decision of 2026-11-27, #972, in
 ## place of Split): two more shots in a fan, each with the spell's whole damage, for twice the mana;
-## stacked, the shots add (+2 +2 is five), and a beam's fan leaves from one short trunk.
+## stacked, the shots add (+2 +2 is five), and a beam fans into a beam a shot.
 func test_the_card_is_plus_two() -> void:
 	_check_card(&"plus_two", 2)
 	check_equal(_modifier(&"plus_two").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

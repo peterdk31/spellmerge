@@ -1,7 +1,7 @@
 {
 	"id": "plus_three_beam_crown",
 	"name": "Crown of six",
-	"does": "+2 and +3 together fan a beam into six from one trunk near the hand: the outer imps on either side are caught.",
+	"does": "+2 and +3 together fan a beam into six from the hand: the outer imps on either side are caught.",
 	"casts": [{"staff": 0, "cards": ["hold", "plus_two", "plus_three", "beam"]}],
 	"imps": [[150, -38], [150, 38]],
 	"seconds": 1.0,

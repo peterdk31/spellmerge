@@ -67,11 +67,8 @@ const MAGNET_PULL: float = 200.0
 const SPLIT_SPREAD: float = 30.0
 ## The share of a spell's mana each shot a card adds (+2, +3) costs, added up over its cards: +2 costs
 ## twice the mana, +3 two and a half times, +2 and +3 together three and a half (the owner's decision
-## of 2026-11-27: every shot at full damage, paid in mana; the share is a proposal, #972).
+## of 2026-11-27: every shot at full damage, paid in mana; #972).
 const SHOT_ADD_MANA: float = 0.5
-## Pixels of a beam fan's trunk (+2, +3 on a beam: the owner's decision of 2026-11-27, #972): one beam
-## this long from the staff, the fan's beams from its end (`CarrierBeam.launch`).
-const BEAM_TRUNK: float = 24.0
 ## Builds of one staff (the generations) whose shots can be in the air at once.
 const GENERATIONS: int = 8
 ## Staffs per caster, one per button for a seat: A, X, Y and B.

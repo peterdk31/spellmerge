@@ -8,7 +8,7 @@
 script = ExtResource("1_base")
 id = &"plus_two"
 display_name = "+2"
-description = "Two more shots, full strength; a beam fans from its trunk."
+description = "Two more shots, each at full strength."
 complexity = 2
 icon = ExtResource("2_icon_2x")
 icon_small = ExtResource("2_icon")

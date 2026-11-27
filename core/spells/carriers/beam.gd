@@ -14,10 +14,6 @@ extends Carrier
 ## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
 const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
-## What a live beam is of a fan (`_bm_role`): a beam of its own, a fan's trunk, or a beam of its fan.
-const ROLE_ALONE: int = 0
-const ROLE_TRUNK: int = 1
-const ROLE_FAN: int = 2
 ## What `beam_elements` gives for a beam with no spell.
 const NO_ELEMENTS: Array[StringName] = []
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
@@ -76,14 +72,6 @@ var _bm_dir: PackedVector2Array = PackedVector2Array()
 ## How far each live beam has swept round its caster (Orbit, `CarrierKit.orbit_sweep`): its staff
 ## turns as far round the hand, so it starts from the turned staff's tip.
 var _bm_swept: PackedFloat32Array = PackedFloat32Array()
-## A beam split into a fan (Split, the owner's decision of 2026-11-27, #972): one trunk from the
-## staff, SpellLimits.BEAM_TRUNK pixels along the aim, and the fan's beams from its end (`launch`).
-## What live beam `at` is of it (ROLE_*), and a fan beam's angle off its trunk (0 for the others).
-var _bm_role: PackedByteArray = PackedByteArray()
-var _bm_fan: PackedFloat32Array = PackedFloat32Array()
-## Which fan live beam `at` is of: its trunk's birth (-1 for a beam of its own), so its look draws the
-## fan as one (`beam_fan_id`).
-var _bm_fan_id: PackedInt64Array = PackedInt64Array()
 var _bm_bend: PackedVector2Array = PackedVector2Array()
 var _bm_end: PackedVector2Array = PackedVector2Array()
 var _bm_reach: PackedFloat32Array = PackedFloat32Array()
@@ -201,7 +189,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring, _bm_swept, _bm_role, _bm_fan, _bm_fan_id]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring, _bm_swept]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -438,7 +426,7 @@ func hits_per_target(lifetime: float) -> int:
 ## Its `blast` and `on expire` payload happen where it ends when its life is over. Returns false
 ## when it could not start (no direction). `caster` and `caster_seq` are who casts it (`Spells._caster`:
 ## the wizard, a point or a shot), `echoed` whether it is an echo's firing (half damage).
-func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float, caster: int, caster_seq: int, echoed: bool, role: int = ROLE_ALONE, fan: float = 0.0, fan_id: int = -1) -> bool:
+func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float, caster: int, caster_seq: int, echoed: bool) -> bool:
 	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
 		return false
 	# A free row, or new rows when every one is on: no beam ends another.
@@ -469,21 +457,10 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_reach[at] = 0.0
 	_bm_hit_at[at] = kit.clock()
 	_bm_length[at] = spell.ray_length
-	_bm_role[at] = role
-	_bm_fan[at] = fan
-	# A trunk is its fan's: its own birth names the fan.
-	_bm_fan_id[at] = _bm_born[at] if role == ROLE_TRUNK else fan_id
-	# A fan's trunk is its first BEAM_TRUNK pixels; each beam of its fan the rest, from the trunk's end.
-	var from: Vector2 = origin
-	if role == ROLE_TRUNK:
-		_bm_length[at] = SpellLimits.BEAM_TRUNK
-	elif role == ROLE_FAN:
-		_bm_length[at] = spell.ray_length - SpellLimits.BEAM_TRUNK
-		from = _fan_start(origin, DMath.rotated(_bm_dir[at], -fan))
 	# Skyfall: a beam cast down from its hole reaches its floor line and no further.
 	_bm_floor[at] = kit.floor_now()
 	if is_finite(_bm_floor[at]) and _bm_dir[at].y > 0.0:
-		_bm_length[at] = maxf(minf(_bm_length[at], (_bm_floor[at] - from.y) / _bm_dir[at].y), 0.0)
+		_bm_length[at] = minf(_bm_length[at], (_bm_floor[at] - origin.y) / _bm_dir[at].y)
 	_bm_gate[at] = -1
 	_bm_parent[at] = -1
 	_bm_steer[at] = spell
@@ -500,12 +477,9 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
 	_bm_count[at] = 0
 	var holder: int = SpellRuntime.body_of(caster, actor)
-	# Whether its turn was taken off its caster's way (an aim, a flight) now.
-	var turned: bool = false
 	if holder >= 0:
 		if kit.aim_dir(holder).is_finite():
 			_bm_turn[at] = DMath.angle_to(kit.aim_dir(holder), heading)
-			turned = true
 	else:
 		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = kit.live_caster_shot(caster, caster_seq)
@@ -514,23 +488,11 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 		elif not way.is_zero_approx():
 			_bm_turn[at] = DMath.angle_to(way, heading)
-			turned = true
-	if role == ROLE_FAN and not turned:
-		# A fan's beam keeps its place in the fan off whatever way it later follows (a Penta ring's
-		# centre, a shot that starts to fly), as its trunk does.
-		_bm_turn[at] = fan
 	kit.shot_started(tag)
 	_beam_step(at, 0.0)
-	# A trunk is no carrier of its own: its fan's beams are (a timer fires from each of their ends).
-	if _bm_on[at] != 0 and role != ROLE_TRUNK:
+	if _bm_on[at] != 0:
 		kit.live_join(spell, tag, SpellRuntime.LC_ROW, at, _bm_born[at], true, lifetime, _bm_tip[at], _bm_dir[at])
 	return true
-
-
-## Where a fan's beams start: the end of its trunk from `origin` along `way` (BEAM_TRUNK pixels),
-## short of a wall.
-func _fan_start(origin: Vector2, way: Vector2) -> Vector2:
-	return kit.projectiles.grid().clip_to_walls(origin, origin + way * SpellLimits.BEAM_TRUNK)
 
 
 ## Runs live beam `at` on by `delta`: its life, where its caster holds it, its path and its hit.
@@ -557,14 +519,13 @@ func _beam_step(at: int, delta: float) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	_beam_cast(at, hit)
-	# A trunk's end is its fan's start: it opens no leg through a portal (its fan's beams do).
-	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag and _bm_role[at] != ROLE_TRUNK:
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_open_legs(at)
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at], id())
-	# Its end pours onto the floor every step (the floor's first slice); a trunk's end is its fan's start.
-	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag and _bm_role[at] != ROLE_TRUNK:
+	# Its end pours onto the floor every step (the floor's first slice).
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		kit.pass_floor(spell, tag, _bm_actor[at], _bm_end[at], _bm_end[at])
 
 
@@ -628,8 +589,7 @@ func _flush_walks() -> void:
 		_bm_gate[at] = -1
 		_bm_gate_heading[at] = Vector2.ZERO
 		_bm_gate_left[at] = 0.0
-		if _bm_role[at] != ROLE_TRUNK:
-			kit.pass_floor(_bm_spell[at], _bm_tag[at], _bm_actor[at], _bm_end[at], _bm_end[at])
+		kit.pass_floor(_bm_spell[at], _bm_tag[at], _bm_actor[at], _bm_end[at], _bm_end[at])
 
 
 ## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its
@@ -700,9 +660,6 @@ func _beam_path(at: int) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var origin: Vector2 = _bm_origin[at]
 	var way: Vector2 = _bm_dir[at]
-	if _bm_role[at] == ROLE_FAN:
-		# A fan's beam starts where its trunk ends, the trunk turned back off it.
-		origin = _fan_start(origin, DMath.rotated(way, -_bm_fan[at]))
 	var length: float = _bm_length[at]
 	var steer: CompiledSpell = _bm_steer[at] if _bm_steer[at] != null else spell
 	var legs: int = maxi(spell.pierce, 0) + 1 if steer.homing_range > 0.0 else 0
@@ -911,9 +868,7 @@ func _air(at: int) -> float:
 	var floor_y: float = _bm_floor[at]
 	if not is_finite(floor_y) or _bm_dir[at].y <= 0.0:
 		return 0.0
-	# A fan's beam from where its path starts, its trunk's end.
-	var from: Vector2 = _bm_points[at * _bm_stride] if _bm_role[at] == ROLE_FAN else _bm_origin[at]
-	return maxf((floor_y - SpellRuntime.ProjectilesScript.FALL_BAND - from.y) / _bm_dir[at].y, 0.0)
+	return maxf((floor_y - SpellRuntime.ProjectilesScript.FALL_BAND - _bm_origin[at].y) / _bm_dir[at].y, 0.0)
 
 
 ## Live beam `at` stopped at a gate: a leg goes on from every gate it leads to (P4), each a full
@@ -982,9 +937,6 @@ func _start_leg(parent: int, gate: int, out: int) -> void:
 	_bm_gate_in[at] = gate
 	_bm_gate_out[at] = out
 	_bm_floor[at] = INF
-	_bm_role[at] = ROLE_ALONE
-	_bm_fan[at] = 0.0
-	_bm_fan_id[at] = -1
 	# Its own homing, or else the portal's: a portal's homing steers what comes out of it.
 	_bm_steer[at] = portal if portal != null and portal.homing_range > 0.0 and _bm_steer[parent] != null and _bm_steer[parent].homing_range <= 0.0 else _bm_steer[parent]
 	var legs: int = maxi(spell.pierce, 0) + 1
@@ -1113,8 +1065,7 @@ func _end_beam(at: int, finished: bool) -> void:
 	_bm_zap_hit[at] = null
 	_drop_zaps(at)
 	var tip: Vector2 = _bm_tip[at]
-	# A trunk's end is where its fan starts: it lands nothing and fires nothing there.
-	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite() and _bm_role[at] != ROLE_TRUNK:
+	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
 		kit.land(spell, tag, actor, tip)
 		if spell.fires_on(TriggerBase.Event.EXPIRE):
 			kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, tip, _bm_tip_dir[at] if not _bm_tip_dir[at].is_zero_approx() else _bm_dir[at], null)
@@ -1153,7 +1104,7 @@ func _grow_beams() -> void:
 	_bm_tip.resize(size)
 	_bm_tip_dir.resize(size)
 	_bm_hit_at.resize(size)
-	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_role, _bm_fan, _bm_fan_id]:
+	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer]:
 		column.resize(size)
 	_bm_zap_hit.resize(size)
 	_bm_zap_rolls.resize(size)
@@ -1304,18 +1255,6 @@ func beam_tag(at: int) -> int:
 	return _bm_tag[at]
 
 
-## What live beam `at` is of a fan (ROLE_*: its own, a fan's trunk, a beam of a fan), for its look:
-## a fan is drawn as one beam that splits at its trunk's end.
-func beam_role(at: int) -> int:
-	return _bm_role[at]
-
-
-## Which fan live beam `at` is of (its trunk's birth), -1 for a beam of its own: a fan's trunk and
-## beams share it, so its look draws them as one (`FeelBeams`).
-func beam_fan_id(at: int) -> int:
-	return _bm_fan_id[at]
-
-
 func beam_since_hit(at: int) -> float:
 	return kit.clock() - _bm_hit_at[at]
 
@@ -1331,31 +1270,6 @@ func beam_left(at: int) -> float:
 ## Live beams on now (tests).
 func beam_count() -> int:
 	return _bm_on.count(1)
-
-
-## A launch (`Carrier.launch`). A beam split into a fan (Split's shots, a spread short of a ring,
-## longer than its trunk; the owner's decision of 2026-11-27, #972) is one trunk from the staff along
-## the aim and the fan's beams from its end, each turned off the trunk by its place in the fan as
-## Split turns its shots (`fan_angle`) and BEAM_TRUNK pixels shorter: each is the beam with all its
-## cards from there (it bends, turns at walls, waves, fires its payloads), and the trunk is walked
-## once, so what it meets is hit once. The trunk takes the staff's spread for the whole fan.
-func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
-	var count: int = spell.shots
-	if count < 2 or spell.spread >= 360.0 or spell.ray_length <= SpellLimits.BEAM_TRUNK:
-		return super(spell, tag, actor, origin, direction, source, lifetime, chain, prev)
-	var angle: float = DMath.angle(direction) + kit.staff_spread(tag, spell)
-	var caster: int = kit.caster()
-	var caster_seq: int = kit.caster_seq()
-	var echoed: bool = kit.is_echo(spell)
-	var fan_id: int = _bm_next_born
-	if not start(spell, tag, actor, origin, DMath.from_angle(angle), chain, prev, source, lifetime, caster, caster_seq, echoed, ROLE_TRUNK):
-		return 0
-	var made: int = 0
-	for n in count:
-		var off: float = kit.fan_angle(n, count, spell)
-		if start(spell, tag, actor, origin, DMath.from_angle(angle + off), chain, prev, source, lifetime, caster, caster_seq, echoed, ROLE_FAN, off, fan_id):
-			made += 1
-	return made
 
 
 ## A beam of its own along `heading`, cast by whoever casts this launch (`Spells._caster`).

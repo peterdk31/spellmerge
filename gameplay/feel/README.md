@@ -27,7 +27,7 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is the game's (`
 | cues | `feel_cues.gd` | `play_cue`, the part players, the cues and plans, the events that only play a cue |
 | hits | `feel_hits.gd` | a hit's look, shake and sound, impacts on bodies and walls, the squash, a death's break and remnant |
 | statuses | `feel_statuses.gd` | a status shown on its body, a reaction's cue and name, a discharge's arc, a downed note |
-| beams | `feel_beams.gd` | live and shown beams, their motes and sounds, the beam and swing meshes, the cards' own looks; a beam fan (+2, +3) drawn as one merged shape by its trunk's node (`fan_*` in the beam shaders) |
+| beams | `feel_beams.gd` | live and shown beams, their motes and sounds, the beam and swing meshes, the cards' own looks |
 | casts | `feel_casts.gd` | a cast's cue, a wind-up's telegraph, a cast's sounds, `lane` and `held` parts, a barrier's shell |
 | view | `feel_view.gd` | shake and kick, the picture and views, the "Effects" row, the HUD's corners, a biome's rooms (`_step_rooms`) |
 

@@ -317,11 +317,6 @@ const STATUS_RISE: float = 8.0
 const BEAM_WIDTH: float = 16.0
 ## How far a beam's quad reaches past each end, so its flares are whole (the shader's beam_lead).
 const BEAM_LEAD: float = 8.0
-## The pixels over which a fan's beam (+2, +3 on a beam) lights up from its trunk's end (the
-## shader's beam_from): the fan reads as one beam that splits, its lights never stacked at the join.
-const BEAM_FAN_IN: float = 12.0
-## Where a flare that is not drawn is put (the shader's default: off every screen).
-const BEAM_NO_FLARE: Vector2 = Vector2(-100000.0, -100000.0)
 ## The most infusions a live beam hands its look (the shader's `beam_infusions[8]`); more are left
 ## out of its drawing only.
 const BEAM_INFUSIONS_MOST: int = 8
@@ -678,6 +673,10 @@ var unknown_cue_parts: int = 0
 var _cue_flash: int = -1
 var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
+## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
+## change, in `FeelBeams.LiveSet`'s order: the beams job sets one only when its value changes, and
+## every one again when the node's shader changes. An entry is made with its node.
+var _live_set: Array[Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
 var _thin_points: PackedVector2Array = PackedVector2Array()

@@ -1,8 +1,8 @@
 extends "res://tests/support/card_rig.gd"
 ## The +3 card (content/spells/modifiers/plus_three/; the owner's decision of 2026-11-27, #972): three
 ## more shots in a fan, each with the spell's whole damage, for two and a half times the mana, rarer
-## than +2 (complexity 3); stacked, the shots add (+2 +3 is six), and a beam's fan leaves from one
-## short trunk.
+## than +2 (complexity 3); stacked, the shots add (+2 +3 is six), and a beam fans into a beam a
+## shot.
 func test_the_card_is_plus_three() -> void:
 	_check_card(&"plus_three", 3)
 	check_equal(_modifier(&"plus_three").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

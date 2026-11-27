@@ -1,28 +1,31 @@
 {
 	"assets": [
 		{
-			"path": "content/props/dust_heap/heap.svg",
+			"path": "content/props/dust_heap/burnt@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from heap.grid.json, 2026-11-15)",
-			"prompt": "A heap of swept-up dust prop, 24x16: a low grey mound, Bone-lit on its left, Stone in its shade on the right. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The dust heap burnt: a low slab of dark ash in raised Stone, pitted, with embers of Fire shadow and base in it, 32x16 units. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
-			"path": "content/props/dust_heap/scattered.svg",
+			"path": "content/props/dust_heap/heap@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from scattered.grid.json, 2026-11-15)",
-			"prompt": "The dust heap scattered: a flat grey spread of dust on the floor with a few loose specks round it, 32x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "A heap of pale bone dust, 24x16 units: a peaked mound of Bone, pitted, lit on its upper left and shaded on its lower right, a lump or two in it. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		},
 		{
-			"path": "content/props/dust_heap/burnt.svg",
+			"path": "content/props/dust_heap/scattered@2x.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from burnt.grid.json, 2026-11-15)",
-			"prompt": "The dust heap burnt: a dark Stone scorch mark on the floor with a few Fire embers, 32x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+			"tool": "Claude (drawn by tools/prop_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+			"prompt": "The dust heap kicked flat: a thin low drift of Bone dust and a few flecks round it, 32x16 units. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a barrel's drum, a column or a heap: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone and stone pores, water streaks, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+			"tier": "good"
 		}
 	]
 }

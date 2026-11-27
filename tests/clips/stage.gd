@@ -33,7 +33,7 @@ const HIT_SPRAYS: bool = false
 const SHOT_CAP: int = 512
 ## The world the projectile manager draws in.
 const BOUNDS: Rect2 = Rect2(-640.0, -400.0, 1280.0, 800.0)
-const FLOOR: Texture2D = preload("res://art/tilesets/crypt/floor.svg")
+const FLOOR: Texture2D = preload("res://art/tilesets/crypt/floor@2x.svg")
 const IMP_ART: Texture2D = preload("res://content/enemies/ember_imp/idle@2x.svg")
 const WIZARD_ART: Texture2D = preload("res://content/wizard/base/wizard_idle@2x.svg")
 const HATS: Array[Texture2D] = [
@@ -274,7 +274,8 @@ func _floor() -> Sprite2D:
 	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	floor_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	floor_sprite.region_enabled = true
-	floor_sprite.region_rect = Rect2(Vector2.ZERO, BOUNDS.size)
+	floor_sprite.region_rect = Rect2(Vector2.ZERO, BOUNDS.size * float(ArtDetail.of(FLOOR)))
+	floor_sprite.scale = ArtDetail.draw_scale(FLOOR)
 	floor_sprite.position = BOUNDS.position
 	floor_sprite.z_index = -10
 	return floor_sprite

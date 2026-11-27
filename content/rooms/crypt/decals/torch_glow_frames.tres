@@ -1,18 +1,18 @@
 [gd_resource type="SpriteFrames" load_steps=5 format=3]
 
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch_glow_core.svg" id="1_strip"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch_glow_core@2x.svg" id="1_strip"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_g0"]
 atlas = ExtResource("1_strip")
-region = Rect2(0, 0, 32, 32)
+region = Rect2(0, 0, 64, 64)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_g1"]
 atlas = ExtResource("1_strip")
-region = Rect2(32, 0, 32, 32)
+region = Rect2(64, 0, 64, 64)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_g2"]
 atlas = ExtResource("1_strip")
-region = Rect2(64, 0, 32, 32)
+region = Rect2(128, 0, 64, 64)
 
 [resource]
 animations = [{

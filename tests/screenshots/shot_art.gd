@@ -8,7 +8,7 @@ extends "res://tests/support/screenshot.gd"
 const SCALE := 2.0
 const FRAME := 32.0
 
-const WALL := preload("res://art/tilesets/crypt/wall.svg")
+const WALL := preload("res://art/tilesets/crypt/wall@2x.svg")
 const IDLE := preload("res://content/wizard/base/wizard_idle@2x.svg")
 const HATS: Array[Texture2D] = [
 	preload("res://content/wizard/base/wizard_hat_p1@2x.svg"),
@@ -21,14 +21,14 @@ const SPLINTER := preload("res://content/enemies/splinter/idle@2x.svg")
 const FORK := preload("res://content/enemies/storm_fork/idle@2x.svg")
 const CROOK := preload("res://content/enemies/rime_crook/idle@2x.svg")
 const SCEPTER := preload("res://content/enemies/bone_scepter/idle@2x.svg")
-const WALL_TOP := preload("res://art/tilesets/crypt/wall_top.svg")
-const PILLAR := preload("res://art/tilesets/crypt/pillar.svg")
-const PILLAR_TOP := preload("res://art/tilesets/crypt/pillar_top.svg")
-const TORCH_FLAME := preload("res://art/tilesets/crypt/torch_flame.svg")
-const DOOR := preload("res://art/tilesets/crypt/door.svg")
-const TORCH := preload("res://art/tilesets/crypt/torch.svg")
-const RUBBLE := preload("res://art/tilesets/crypt/rubble.svg")
-const SKULL := preload("res://art/tilesets/crypt/skull.svg")
+const WALL_TOP := preload("res://art/tilesets/crypt/wall_top@2x.svg")
+const PILLAR := preload("res://art/tilesets/crypt/pillar@2x.svg")
+const PILLAR_TOP := preload("res://art/tilesets/crypt/pillar_top@2x.svg")
+const TORCH_FLAME := preload("res://art/tilesets/crypt/torch_flame@2x.svg")
+const DOOR := preload("res://art/tilesets/crypt/door@2x.svg")
+const TORCH := preload("res://art/tilesets/crypt/torch@2x.svg")
+const RUBBLE := preload("res://art/tilesets/crypt/rubble@2x.svg")
+const SKULL := preload("res://art/tilesets/crypt/skull@2x.svg")
 const DASH := preload("res://art/vfx/telegraph_dash.svg")
 const BOLT := preload("res://art/vfx/bolt.svg")
 const SPARK := preload("res://art/vfx/hit_spark.svg")

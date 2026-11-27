@@ -29,7 +29,7 @@ func _pillar() -> Actor:
 
 ## Frame `i` of `layer`'s strip, as an image.
 func _frame(layer: PropLayer, i: int) -> Image:
-	var size: Vector2i = layer.frame_size()
+	var size: Vector2i = layer.frame_px()
 	return layer.texture.get_image().get_region(Rect2i(size.x * i, 0, size.x, size.y))
 
 

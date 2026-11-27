@@ -5,7 +5,7 @@
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar_states.tres" id="3_states"]
 [ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="4_look"]
 [ext_resource type="Script" path="res://core/base/prop_layer.gd" id="5_layer"]
-[ext_resource type="Texture2D" path="res://content/props/hub_altar/altar.svg" id="6_altar"]
+[ext_resource type="Texture2D" path="res://content/props/hub_altar/altar@2x.png" id="6_altar"]
 
 [sub_resource type="Resource" id="dais"]
 script = ExtResource("5_layer")

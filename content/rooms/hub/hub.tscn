@@ -1,6 +1,6 @@
 [gd_scene load_steps=23 format=3]
 
-[ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/void@2x.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/hub/hub_ground.tscn" id="3_ground"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Script" path="res://tools/enemy_stand_in.gd" id="11_enemy_stand_in"]
@@ -30,10 +30,11 @@ z_index = -3
 texture_filter = 1
 texture_repeat = 2
 position = Vector2(0, 0)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("1_void")
 centered = false
 region_enabled = true
-region_rect = Rect2(0, 0, 1600, 1088)
+region_rect = Rect2(0, 0, 3200, 2176)
 
 
 [node name="Floor" parent="." instance=ExtResource("3_ground")]

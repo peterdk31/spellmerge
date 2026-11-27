@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam.png" id="1_beam"]
-[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam_pool.png" id="2_pool"]
+[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam@2x.png" id="1_beam"]
+[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam_pool@2x.png" id="2_pool"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="3_motes"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
@@ -25,6 +25,7 @@ colours = Array[StringName]([&"bone"])
 z_index = -1
 material = SubResource("CanvasItemMaterial_add")
 texture_filter = 1
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_pool")
 
 [node name="Column" type="Sprite2D" parent="."]
@@ -32,6 +33,7 @@ z_index = 4
 material = SubResource("CanvasItemMaterial_add")
 texture_filter = 1
 position = Vector2(0, -100)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("1_beam")
 
 [node name="Light" type="Marker2D" parent="." groups=["light_spot"]]

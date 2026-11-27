@@ -47,7 +47,7 @@ Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`u
 
 ## Example to copy
 
-`art/vfx/hit_spark.svg` with its `.import` and its manifest entry (a placeholder SVG of rects: docs/STYLE.md, "Placeholder SVGs"). More: `art/tilesets/crypt/floor.svg` (flat) and `wall.svg` (lit and shaded). The title type `art/ui/fonts/title.svg` is drawn from `title.grid.json` by `tools/pixel_grid.py` and imported as an image font (`importer="font_data_image"`, ranges `32-126`, 16 columns); redraw a glyph in the grid and run the tool; a character past ASCII is a cell after the last and its own entry in `character_ranges`.
+`art/vfx/hit_spark.svg` with its `.import` and its manifest entry (a placeholder SVG of rects: docs/STYLE.md, "Placeholder SVGs"). More: `art/tilesets/crypt/floor@2x.svg` (flat) and `wall@2x.svg` (lit and shaded), both drawn by `tools/room_art.py`. The title type `art/ui/fonts/title.svg` is drawn from `title.grid.json` by `tools/pixel_grid.py` and imported as an image font (`importer="font_data_image"`, ranges `32-126`, 16 columns); redraw a glyph in the grid and run the tool; a character past ASCII is a cell after the last and its own entry in `character_ranges`.
 
 ## Validate
 
@@ -70,7 +70,7 @@ Every sprite is redrawn at 64×64 for its 32-unit cell (docs/STYLE.md, "The pict
 
 **Drawn by a shader** (no file to rename): the flat floor states (`gameplay/feel/cover_flat.gdshader`, `CoverFlat.DETAIL`), shot cores (`shot_head.gdshaderinc`, `ART_DETAIL`), motes (a kind's `shape_2x`, content/motes/README.md) and flashes (`shot_flash.gdshader`, `ART_DETAIL`) work in art pixels already.
 
-**Generators** (palette colours; an SVG of rects, one a run along a row, or a PNG past 1 MB): `tools/staff_art.py` (the curl's head), `tools/face_art.py` (faces), `tools/head_art.py` (other staff heads), `tools/redraw_2x.py` (a 1x sheet of rects at 2x, to touch up by hand), `tools/enemy_art.py` (enemies, on `tools/sprite_rules.py`; `--check` holds the files to the rules), `tools/pixel_grid.py` (a grid of characters), `tools/pickup_art.py` (pickups) and `tools/icon_art.py` (cards' and sigils' `icon@2x.svg` and `icon.svg`). Change a generated sprite in its rules, not by hand. Their tests: `python3 -m unittest discover -s tools`.
+**Generators** (palette colours; an SVG of rects, one a run along a row, or a PNG past 1 MB): `tools/staff_art.py` (the curl's head), `tools/face_art.py` (faces), `tools/head_art.py` (other staff heads), `tools/redraw_2x.py` (a 1x sheet of rects at 2x, to touch up by hand), `tools/enemy_art.py` (enemies, on `tools/sprite_rules.py`; `--check` holds the files to the rules), `tools/prop_art.py` (props and their crumbles, on the same rules; a raised stone part takes its shadow shade), `tools/room_art.py` (the crypt's tiles and set pieces, torches and candles with their flames and glows, the hub's void, stone and altar, and the shaft of light; on the same rules, a tile repeating with no seam and a light with no outline), `tools/pixel_grid.py` (a grid of characters), `tools/pickup_art.py` (pickups) and `tools/icon_art.py` (cards' and sigils' `icon@2x.svg` and `icon.svg`). Change a generated sprite in its rules, not by hand. Their tests: `python3 -m unittest discover -s tools`.
 
 ## Review questions
 

@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-27: what D3 waits for (owner)
+
+- **AI10 moves to M3:** the enemies' skill follows a difficulty setting, which M3 builds; until then nothing sends `difficulty_changed`. In docs/BACKLOG.md.
+- **L7, strays with roles:** the plan's four second staffs (the Splinter a dash and a swing, the Rime Crook a pull bolt beside its frost bolt, the Bone Scepter a rain and a dash away, the Storm Fork a triple bolt and a wall); the bot builds it before D3.
+- **The netcode spike's S5** (the owner's measured runs and the write-up) runs beside D3, as shot scale does; D3 does not wait for it.
+
 ## 2026-11-27: a blast's hits do not pull; card rules R4 closed (owner)
 
 - **The owner** (2026-11-27, asked with a recommendation): a blast's hits keep moving nothing, so `blast · pull · bolt` pulls its caster only to what the bolt itself hits, never to the bodies its blast catches. Pull keeps one clear target, and one blast catching six bodies does not pull six ways at once. This makes F1's guard (`_blasting`) the rule; no code changes. It was the last open question of R4, so R4 is closed (#467), and D3 (stress and C2) no longer waits for it.

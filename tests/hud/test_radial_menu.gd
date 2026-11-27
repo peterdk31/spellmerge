@@ -167,3 +167,13 @@ func test_it_points_with_its_own_players_stick_only() -> void:
 	var unbound := RadialMenuScript.new(_host)
 	check_equal(unbound.aim(), Vector2.ZERO, "no input, no aim")
 	check_equal(unbound.stick_tilt(), Vector2.ZERO, "and no tilt")
+
+
+## The builder's and the inventory's backdrop is light, the game showing through, and every word is
+## drawn in an outline (ART4, the owner, 2026-11-27: lighter or none, the text relying on its outline).
+func test_the_backdrop_is_light_and_the_words_have_an_outline() -> void:
+	check(RadialMenuScript.SHADE.a <= 0.5, "the quarter's shade is light, alpha %s" % RadialMenuScript.SHADE.a)
+	check(RadialMenuScript.TEXT_OUTLINE >= 2, "the words are drawn in an outline")
+	# The dimmest words a step lighter than the Stone ramp's light, so they read on it over bright
+	# floors (the owner, 2026-11-27: readability first).
+	check(RadialMenuScript.DIM.get_luminance() > Color("#7a7694").get_luminance(), "the dim words are lifted a step")

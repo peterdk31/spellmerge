@@ -704,8 +704,10 @@ static func _fits(views: ScreenViewsScript, view: int, anchor: Vector2, size: Ve
 func draw_map(canvas: SeatMap, seat: int) -> void:
 	var size: Vector2 = Vector2(_frame[seat].size)
 	var shift := Vector2(0.0, -canvas.top)
-	canvas.draw_rect(Rect2(shift, size), _stone[1])
-	canvas.draw_rect(Rect2(shift + Vector2.ONE, size - Vector2(2, 2)), Palette.OUTLINE)
+	# Its dark field with no frame round it, its corners cut by a pixel (ART4, the owner, 2026-11-27:
+	# "The border is too much"; the HUD's menus are drawn the same way).
+	canvas.draw_rect(Rect2(shift + Vector2(1.0, 0.0), size - Vector2(2.0, 0.0)), Palette.OUTLINE)
+	canvas.draw_rect(Rect2(shift + Vector2(0.0, 1.0), size - Vector2(0.0, 2.0)), Palette.OUTLINE)
 	var scale: int = _scale[seat]
 	var origin: Vector2 = _origin[seat] + shift
 	var places: int = _rects.size()

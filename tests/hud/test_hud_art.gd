@@ -190,3 +190,35 @@ func test_a_drop_shadow_of_nothing_draws_nothing() -> void:
 	HudArt.drop_shadow(pen, Rect2(1.0, 1.0, 2.0, 0.0))
 	check_equal(pen.off_grid, 0, "nothing off the grid")
 	check(pen.image.is_invisible(), "nothing drawn")
+
+
+## A meter (the menus' and the boss bar's lines, ART4 part 2): a trough filled to its share by
+## whole layout pixels, the rest the track.
+func test_a_meter_fills_its_trough_to_its_share_by_whole_layout_pixels() -> void:
+	var pen := Recorder.new(Vector2i(12, 4))
+	HudArt.meter(pen, Rect2(0.0, 0.0, 10.0, 3.0), 0.44, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
+	check_equal(pen.off_grid, 0, "every rect on whole art pixels")
+	check(_same(pen.at(0, 0), HudArt.OUTLINE), "the lip")
+	check(_same(pen.at(7, 1), HudArt.FIRE[HudArt.BASE]), "the fill to 4 layout pixels (0.44 of 10, rounded)")
+	check(_same(pen.at(7, 5), HudArt.FIRE[HudArt.SHADOW]), "the fill's bottom art row in its shade")
+	check(_same(pen.at(8, 1), HudArt.OUTLINE), "the track past the fill")
+	check(_same(pen.at(5, 6), HudArt.OUTLINE), "the hard shadow under the trough")
+	var empty := Recorder.new(Vector2i(12, 4))
+	HudArt.meter(empty, Rect2(0.0, 0.0, 10.0, 3.0), -1.0, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
+	check(_same(empty.at(1, 2), HudArt.OUTLINE), "a share under 0 fills nothing")
+	var full := Recorder.new(Vector2i(12, 4))
+	HudArt.meter(full, Rect2(0.0, 0.0, 10.0, 3.0), 2.0, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
+	check(_same(full.at(19, 1), HudArt.FIRE[HudArt.BASE]), "a share over 1 fills it whole and no further")
+	check(full.at(20, 1).a == 0.0, "nothing past the trough")
+
+
+## A rule (where a box round a heading or a note was): one art pixel tall.
+func test_a_rule_is_one_art_pixel_tall_and_nothing_when_it_has_no_width() -> void:
+	var pen := Recorder.new(Vector2i(6, 2))
+	HudArt.rule(pen, Vector2(1.0, 1.0), 4.0, HudArt.STONE[HudArt.BASE])
+	check_equal(pen.off_grid, 0, "on whole art pixels")
+	check(_same(pen.at(2, 2), HudArt.STONE[HudArt.BASE]) and _same(pen.at(9, 2), HudArt.STONE[HudArt.BASE]), "its art row")
+	check(pen.at(2, 3).a == 0.0 and pen.at(10, 2).a == 0.0, "one art pixel tall, 4 layout pixels long")
+	var none := Recorder.new(Vector2i(2, 2))
+	HudArt.rule(none, Vector2.ZERO, 0.0, HudArt.STONE[HudArt.BASE])
+	check_equal(_strays(none.image, []), 0, "a rule of no width draws nothing")

@@ -7,6 +7,9 @@ extends VBoxContainer
 ## with the rest (`clear`: a run starting or ending, the main menu). With more than one boss in play
 ## it shows the first shown that is still in play. Display only: it takes no input.
 ##
+## The bar is drawn as the HUD's lines are (ART4, `HudArt.meter`): a sunken trough with a hard shadow
+## and no frame, the health in it on the Fire ramp; the theme's HealthBar draws nothing of its own.
+##
 ## Marks are drawn on the bar as notches (a shape, so a phase is never shown by colour alone); a
 ## mark the health has fallen past is drawn dim.
 ##
@@ -16,6 +19,7 @@ extends VBoxContainer
 ## health is followed meanwhile, so it shows the right share as it comes.
 
 const EventsScript := preload("res://core/events/events.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const FONT_SIZE: int = 8
 const OUTLINE: int = 3
@@ -193,6 +197,8 @@ func _refresh() -> void:
 
 func _draw_marks() -> void:
 	var size: Vector2 = _marks.size
+	if visible:
+		HudArt.meter(_marks, Rect2(Vector2.ZERO, size), _bar.value, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
 	for mark in _shown_marks:
 		var x: float = roundf(size.x * mark)
 		var color: Color = MARK_PASSED if is_passed(mark) else MARK_COLOR

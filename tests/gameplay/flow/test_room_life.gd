@@ -152,9 +152,26 @@ func test_every_piece_is_announced_so_a_mirrored_one_is_drawn_mirrored() -> void
 	var map: BiomeMap = BiomeMaps.split(registry, [0, PieceShape.MIRROR_X | PieceShape.MIRROR_Y, 0] as Array[int])
 	check_equal(map.problems(BiomeMaps.shapes(registry, map)), PackedStringArray(), "the nave mirrored both ways makes a sound map")
 	var before: int = int(ground.get(&"drawn"))
+	var laid: Array[Node] = []
+	var hear: Callable = func(_room_id: StringName, _room: int, layout: Node) -> void: laid.append(layout)
+	events.connect("room_built", hear)
 	input.add_virtual_device(0)
 	check(flow.start_biome(0, map, [] as Array[RoomFight]), "the biome starts")
-	check_equal(int(ground.get(&"drawn")) - before, 5, "every room's and bridge's ground is drawn as it is laid")
+	events.disconnect("room_built", hear)
+	# Every piece is announced (`room_built`), so Feel's ground hears each one as it is laid.
+	check_equal(laid.size(), map.rooms() + map.bridges(), "every room and bridge is announced as it is laid")
+	# Each mirrored piece is drawn mirrored; an unmirrored one keeps its baked art, which is the
+	# drawing as shown (test_ground_drawing.gd), so it is not drawn again (#972).
+	var mirrored: int = 0
+	for layout: Node in laid:
+		var floor_sprite := layout.get_node("Floor") as Sprite2D
+		if layout.get_meta(PieceShape.GROUND_MIRROR_META, Vector2i.ZERO) != Vector2i.ZERO:
+			mirrored += 1
+			check(floor_sprite.texture is ImageTexture, "%s: mirrored, its floor is the one drawn mirrored" % layout.name)
+		else:
+			check(not (floor_sprite.texture is ImageTexture), "%s: unmirrored, its floor is its baked art" % layout.name)
+	check(mirrored >= 1, "the map lays a mirrored piece")
+	check_equal(int(ground.get(&"drawn")) - before, mirrored, "every mirrored piece's ground is drawn as it is laid, and only those")
 	var nave: Node = flow.biome.room_layout(0)
 	check_equal(nave.get_meta(PieceShape.GROUND_MIRROR_META), Vector2i(1, 1), "the nave says it is mirrored")
 	check((nave.get_node("Floor") as Sprite2D).texture is ImageTexture, "and its floor is the one drawn mirrored")

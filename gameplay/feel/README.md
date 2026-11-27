@@ -47,7 +47,7 @@ On a real GPU with compute (`GpuCompute.available`) the grid is worked out by `l
 
 ### The ground, drawn as a room is laid out
 
-`ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped. `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
+`ground/` draws a mirrored room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped; an unmirrored room keeps its baked art, which is that drawing (`test_ground_drawing.gd` holds them the same as shown), so it is never drawn at layout (#972). `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
 
 ### Damage numbers
 

@@ -27,7 +27,7 @@ const POSSESSED_SECONDS: float = 60.0
 const STORM: Dictionary = {
 	"id": "sim_storm",
 	"casts": [
-		{"player": 0, "staff": 0, "cards": ["split", "frost", "nova", "bolt"], "at": 0.0, "origin": Vector2(-80.0, 0.0), "aim": Vector2.RIGHT},
+		{"player": 0, "staff": 0, "cards": ["plus_two", "frost", "nova", "bolt"], "at": 0.0, "origin": Vector2(-80.0, 0.0), "aim": Vector2.RIGHT},
 		{"player": 1, "staff": 0, "cards": ["chain", "fire", "bolt"], "at": 0.5, "origin": Vector2(-80.0, 40.0), "aim": Vector2.RIGHT},
 		{"player": 2, "staff": 0, "cards": ["homing", "lightning", "bolt"], "at": 0.2, "origin": Vector2(-60.0, -60.0), "aim": Vector2.UP},
 	],

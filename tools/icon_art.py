@@ -639,14 +639,29 @@ def spiral() -> list[Part]:
     return [rod(pts[i], pts[i + 1], 0.7, material="Bone", seam=False) for i in range(20)]
 
 
-def split() -> list[Part]:
-    """One shot parting into three."""
-    return [
-        rod((4.0, 8.0), (11.0, 3.0), 0.5, material="Stone", seam=False),
-        rod((4.0, 8.0), (11.0, 8.0), 0.5, material="Stone", seam=False),
-        rod((4.0, 8.0), (11.0, 13.0), 0.5, material="Stone", seam=False),
-        _shot((3.6, 8.0), 2.4),
-        _shot((12.4, 3.0), 1.8), _shot((12.4, 8.0), 1.8), _shot((12.4, 13.0), 1.8),
+def _plus() -> list[Part]:
+    """The plus of a card that adds shots, on the left."""
+    return [box(1.4, 7.0, 7.6, 9.0, bevel=0.4, material="Spark", seam=False), box(3.5, 4.9, 5.5, 11.1, bevel=0.4, material="Spark", glint=True, seam=False)]
+
+
+def plus_two() -> list[Part]:
+    """A plus and a 2: two more shots."""
+    return _plus() + [
+        box(9.0, 2.6, 14.6, 4.4, bevel=0.3, material="Bone", seam=False),
+        box(12.8, 2.6, 14.6, 8.9, bevel=0.3, material="Bone", seam=False),
+        box(9.0, 7.1, 14.6, 8.9, bevel=0.3, material="Bone", seam=False),
+        box(9.0, 7.1, 10.8, 13.4, bevel=0.3, material="Bone", seam=False),
+        box(9.0, 11.6, 14.6, 13.4, bevel=0.3, material="Bone", glint=True, seam=False),
+    ]
+
+
+def plus_three() -> list[Part]:
+    """A plus and a 3: three more shots."""
+    return _plus() + [
+        box(9.0, 2.6, 14.6, 4.4, bevel=0.3, material="Bone", seam=False),
+        box(10.0, 7.1, 14.6, 8.9, bevel=0.3, material="Bone", seam=False),
+        box(9.0, 11.6, 14.6, 13.4, bevel=0.3, material="Bone", seam=False),
+        box(12.8, 2.6, 14.6, 13.4, bevel=0.3, material="Bone", glint=True, seam=False),
     ]
 
 
@@ -850,7 +865,8 @@ ICONS: dict[str, tuple[Path, Callable[[], list[Part]]]] = {
     "slow": (SPELLS / "modifiers/slow", slow),
     "sniper": (SPELLS / "modifiers/sniper", sniper),
     "spiral": (SPELLS / "modifiers/spiral", spiral),
-    "split": (SPELLS / "modifiers/split", split),
+    "plus_two": (SPELLS / "modifiers/plus_two", plus_two),
+    "plus_three": (SPELLS / "modifiers/plus_three", plus_three),
     "sticky": (SPELLS / "modifiers/sticky", sticky),
     "zap": (SPELLS / "modifiers/zap", zap),
     "burst": (SPELLS / "multicasts/burst", burst),

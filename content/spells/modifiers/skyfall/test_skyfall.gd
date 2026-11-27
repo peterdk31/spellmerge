@@ -71,7 +71,7 @@ func test_it_falls_over_a_wall_in_the_column() -> void:
 
 func test_a_split_lands_side_by_side() -> void:
 	var row: Array[Node2D] = [_target(SPOT + Vector2(-15.0, 0.0), 6.0), _target(SPOT, 6.0), _target(SPOT + Vector2(15.0, 0.0), 6.0)]
-	_cast([&"skyfall", &"split"])
+	_cast([&"skyfall", &"plus_two"])
 	_tick(FALLEN)
 	for target in row:
 		check(_hit_targets().has(target), "each bolt of the fan lands beside the others (%s)" % target.position)

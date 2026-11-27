@@ -253,9 +253,14 @@ static func stacks(behaviour: int) -> Stack:
 ## the slot order (faster casting; docs/milestones/cast-timing.md, T9).
 @export var wind_up_mult: float = 1.0
 @export var mana_mult: float = 1.0
-## Factor on the number of shots per cast, spread in a fan (split). The compiled spell is
+## Factor on the number of shots per cast, spread in a fan. The compiled spell is
 ## clamped to the shot limit.
 @export var shot_mult: int = 1
+## Shots added to each cast, in slot order with `shot_mult` (+2, +3: the owner's decision of
+## 2026-11-27, #972), spread in a fan as one; each keeps the spell's whole damage and costs
+## `SpellLimits.SHOT_ADD_MANA` of the spell's mana, added over the cards. A beam's fan leaves from one
+## short trunk (`CarrierBeam.launch`).
+@export var shot_add: int = 0
 ## Targets added to each shot's pierce.
 @export var extra_pierce: int = 0
 ## For HOMING the radius in pixels of the tightest curve it turns on (at any speed: a fast shot
@@ -356,6 +361,7 @@ func ranges() -> Dictionary:
 		"wind_up_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
 		"shot_mult": Vector2(1, 8),
+		"shot_add": Vector2(0, 16),
 		"extra_pierce": Vector2(0, 8),
 		"behaviour_strength": Vector2(0.0, 256.0),
 		"behaviour_reach": Vector2(0.0, 360.0),

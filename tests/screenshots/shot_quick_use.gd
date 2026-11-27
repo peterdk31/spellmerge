@@ -52,7 +52,7 @@ func take() -> void:
 		inventory.add(ItemStack.of(ItemKinds.POTION, &"small_healing", 1))
 		var number: int = inventory.hands()[0]
 		if crystal != null and inventory.set_hand(number, Inventory.NO_HAND) == Inventory.Refusal.NONE:
-			inventory.add(ItemStack.of_staff(crystal, [&"bolt", &"split", &"bolt", &"bolt", &"split", &"bolt"] as Array[StringName]))
+			inventory.add(ItemStack.of_staff(crystal, [&"bolt", &"plus_two", &"bolt", &"bolt", &"plus_two", &"bolt"] as Array[StringName]))
 			var numbers: PackedInt32Array = inventory.numbers()
 			inventory.set_hand(numbers[numbers.size() - 1], 0)
 		# Taken, each potion filled a free arm (the owner, 2026-11-20); laid out by hand here.

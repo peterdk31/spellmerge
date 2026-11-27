@@ -40,7 +40,7 @@ var _hands: Array = []
 func before_each() -> void:
 	_world = Fixture.new(root, true)
 	_registry = FakeRegistry.new()
-	for id: StringName in [&"dash", &"fire", &"bolt", &"rune", &"split"]:
+	for id: StringName in [&"dash", &"fire", &"bolt", &"rune", &"plus_two"]:
 		var card := SpellComponent.new()
 		card.id = id
 		_registry.items[id] = card
@@ -86,7 +86,7 @@ func _last(bag: StringName) -> Array:
 func test_without_a_bag_it_holds_dev_copies_of_every_card() -> void:
 	var body := _wizard(0)
 	check_equal(body.inventory.stacks_in(CARDS).size(), 5, "every card of the registry")
-	check_equal(body.inventory.count_of(CARDS, &"split"), Inventory.DEV_COPIES, "each the dev bag's copies")
+	check_equal(body.inventory.count_of(CARDS, &"plus_two"), Inventory.DEV_COPIES, "each the dev bag's copies")
 
 
 func test_seat_wizard_gives_the_counted_bag_and_every_bag_is_announced() -> void:

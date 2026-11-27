@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Frostfire Cascade (crypt rework CR-S, content/items/staffs/frostfire_cascade): the most shots,
-## on the hub's rack. A fire nova of bolts split three times (216 shots) whose every shot, when it
-## ends, fires a frost nova of bolts split three times (216 each): far past the projectile cap,
+## on the hub's rack. A fire nova of bolts with three +2 (56 shots) whose every shot, when it ends,
+## fires a frost nova of bolts with three +2 (56 each, 3,136 in all): past the web's projectile cap,
 ## which it holds for a few seconds. Two payload levels only: a third would queue a million shots.
 ## Its data is sound, every card it names is a card, and its build wastes none of them.
 const SpellsScript := preload("res://core/spells/spells.gd")

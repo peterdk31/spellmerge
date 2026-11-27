@@ -136,7 +136,7 @@ func test_its_end_is_where_a_wall_cuts_it_and_its_payload_goes_off_there() -> vo
 
 
 func test_two_cones_of_a_split_spray_each_strike() -> void:
-	var out: Array = _cast(["split", "spray"], [Vector2(50.0, -22.0), Vector2(50.0, 22.0)])
+	var out: Array = _cast(["plus_two", "spray"], [Vector2(50.0, -22.0), Vector2(50.0, 22.0)])
 	var lost: Array[int] = out[0]
 	check(lost[0] > 0 and lost[1] > 0, "a cone either way, each striking its imp (%s)" % [lost])
 

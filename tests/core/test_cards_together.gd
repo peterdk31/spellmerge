@@ -10,7 +10,7 @@ func before_each() -> void:
 
 
 func test_many_modifiers_all_attach_to_one_carrier() -> void:
-	var spell: CompiledSpell = _compile_with(&"bolt", [&"split", &"homing", &"chain", &"pierce", &"bigger"])
+	var spell: CompiledSpell = _compile_with(&"bolt", [&"plus_two", &"homing", &"chain", &"pierce", &"bigger"])
 	check_equal(spell.modifier_ids.size(), 5, "no cap on modifiers: all five are on the bolt")
 
 
@@ -93,7 +93,7 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 func test_fires_past_a_steps_room_wait_for_the_next_step_with_the_real_triggers() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 40.0, 3.0)
-	var hold: Dictionary = {"carrier": &"bolt", "modifiers": [&"nova", &"split"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}}
+	var hold: Dictionary = {"carrier": &"bolt", "modifiers": [&"nova", &"plus_two"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}}
 	check_equal(_compile_recipe(hold).shots * _compile_recipe(hold).nova_ways(), 24, "the nova is 8 fans of 3 shots")
 	_spells.fire_shots_per_step = 32
 	_build_and_cast(0, 0, hold)

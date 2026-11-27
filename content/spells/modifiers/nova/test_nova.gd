@@ -133,7 +133,7 @@ func test_the_ring_shows_once_at_its_caster() -> void:
 
 
 func test_a_split_nova_is_eight_fans() -> void:
-	var tag: int = _cast_with(&"bolt", [&"split", &"nova"], 0, Vector2.ZERO)
+	var tag: int = _cast_with(&"bolt", [&"plus_two", &"nova"], 0, Vector2.ZERO)
 	check_equal(_spells.live_shots(tag), 24, "eight fans of three")
 
 

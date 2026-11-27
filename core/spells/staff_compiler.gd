@@ -389,7 +389,7 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 		any = true
 		if not payload:
 			return true
-	if modifier.shot_mult != 1:
+	if modifier.shot_mult != 1 or modifier.shot_add != 0:
 		any = true
 		if on.has(Carrier.SHOTS):
 			return true
@@ -437,6 +437,8 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	var later_ids: Array[StringName] = []
 	# Every `wind_up_mult` on the carrier, applied to its whole wind-up once all are read.
 	var wind_up_mult: float = 1.0
+	# The shots every `shot_add` added: their mana is added once all are read (SHOT_ADD_MANA).
+	var added: int = 0
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	var carrier: Carrier = on
@@ -495,6 +497,8 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		radius *= modifier.radius_mult
 		spell.radius_scale *= modifier.radius_mult
 		shots *= modifier.shot_mult
+		shots += modifier.shot_add
+		added += modifier.shot_add
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
 		spell.speed_start *= modifier.speed_start
@@ -530,6 +534,10 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		spell.lifetime = minf(spell.lifetime, life_most)
 	spell.look = _look_of(elements, modifiers)
 	spell.damage = maxf(damage, SpellLimits.MIN_DAMAGE)
+	# Each added shot costs a share of the spell's mana (+2, +3), added, so stacking them grows its cost
+	# with the shots, never by a factor a card.
+	if added > 0:
+		mana *= 1.0 + SpellLimits.SHOT_ADD_MANA * added
 	spell.mana_cost = mana
 	# Below 0 allowed: the cast floors its sum (`_read_cast`).
 	spell.wind_down = maxf(wind_down, 0.0) + wind_down_add

@@ -37,7 +37,7 @@ func before_each() -> void:
 	fire.damage_scale = 1.5
 	fire.status_id = &"burn"
 	_element(&"frost", 1)
-	var split: ModifierBase = _modifier(&"split", 2)
+	var split: ModifierBase = _modifier(&"plus_two", 2)
 	split.shot_mult = 3
 	var homing: ModifierBase = _modifier(&"homing", 2)
 	homing.behaviour = ModifierBase.Behaviour.HOMING

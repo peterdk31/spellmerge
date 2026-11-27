@@ -32,7 +32,7 @@ const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
 ## The four-player clips: where the wizards stand, the cards they all cast, how often and how long.
 const FOUR_ORIGINS: Array[Vector2] = [Vector2(0.0, -42.0), Vector2(0.0, -14.0), Vector2(0.0, 14.0), Vector2(0.0, 42.0)]
 const FOUR_PLAYER_CARDS: Array = [&"fire", &"frost", &"bigger", &"bolt"]
-const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova", &"bolt"]
+const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"plus_two", &"nova", &"bolt"]
 ## A card that does something only with others round it has its own row: Spill splashes an
 ## infusion wider where it lands, so its bolt carries Water (docs/milestones/oil-spill.md).
 const OWN_ROWS: Dictionary = {&"spill": [&"spill", &"water", &"bolt"]}

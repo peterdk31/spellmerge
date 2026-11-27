@@ -37,7 +37,7 @@ func take() -> void:
 	lay_floor()
 	await settle()
 	_install(wizard, FIELD_STAFF, [&"fire", &"field"])
-	_install(wizard, BOLT_STAFF, [&"split", &"split", &"bolt"])
+	_install(wizard, BOLT_STAFF, [&"plus_two", &"plus_two", &"bolt"])
 	var from := Vector2(120.0, 180.0)
 	var middle: Vector2 = from + Vector2(72.0, 0.0)
 	_cast(wizard, FIELD_STAFF, from, Vector2.RIGHT)

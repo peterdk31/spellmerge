@@ -1,0 +1,9 @@
+{
+	"id": "plus_two_beam_fan",
+	"name": "Beam fan",
+	"does": "A beam leaves the staff as one short trunk and fans into three at its end: the imps either side of the aim burn in the outer beams.",
+	"casts": [{"staff": 0, "cards": ["hold", "plus_two", "beam"]}],
+	"imps": [[150, -38], [150, 38]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

@@ -685,9 +685,10 @@ func test_every_chain_jump_happens_however_many_in_one_step() -> void:
 	check(spell.shots * spell.chain_jumps > SpellsScript.JUMP_QUEUE, "more jumps in one step than the jump ring starts with (%d)" % (spell.shots * spell.chain_jumps))
 	_build(0, 0, recipe)
 	_cast(0)
-	# Up to shots x (jumps + 1); a beam at the fan's edge that misses the crowd makes none.
+	# Up to (shots + 1) x (jumps + 1): the fan's beams and its trunk (CarrierBeam.launch); a beam at
+	# the fan's edge that misses the crowd makes none.
 	check(_hits.size() > spell.shots + SpellsScript.JUMP_QUEUE, "more jumps landed in this one step than the ring starts with (%d hits)" % _hits.size())
-	check(_hits.size() <= spell.shots * (spell.chain_jumps + 1), "and no more than the cards give")
+	check(_hits.size() <= (spell.shots + 1) * (spell.chain_jumps + 1), "and no more than the cards give")
 
 func test_the_spell_runtime_steps_after_the_projectile_manager() -> void:
 	check(ProjectSettings.get_order("autoload/Projectiles") < ProjectSettings.get_order("autoload/Spells"), "Projectiles is listed before Spells in project.godot")

@@ -115,7 +115,7 @@ func test_it_lasts_the_cards_time_and_slow_or_reach_stretch_it() -> void:
 
 
 func test_split_circles_as_a_cluster_and_nova_as_a_ring() -> void:
-	var cluster: int = _cast([&"orbit", &"split"])
+	var cluster: int = _cast([&"orbit", &"plus_two"])
 	var slots: Array[int] = _slots(cluster)
 	check(slots.size() > 1, "split makes more of it (%d)" % slots.size())
 	for slot in slots:

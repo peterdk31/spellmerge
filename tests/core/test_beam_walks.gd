@@ -14,20 +14,20 @@ const DT: float = 1.0 / 60.0
 const TICKS: int = 100
 ## The builds: each player's cards, and the room (walls, floor).
 const BUILDS: Array[Dictionary] = [
-	{"cards": [["split", "split", "split", "beam"]]},
-	{"cards": [["fire", "split", "split", "beam"]], "floor": true},
-	{"cards": [["homing", "split", "split", "beam"]], "walls": true},
-	{"cards": [["pierce", "pierce", "split", "split", "beam"]], "walls": true},
-	{"cards": [["bounce", "split", "beam"]], "walls": true},
-	{"cards": [["spiral", "split", "split", "beam"]]},
-	{"cards": [["storm", "split", "split", "beam"]]},
-	{"cards": [["frost", "growth", "split", "beam"]], "walls": true},
-	{"cards": [["hold", "split", "split", "beam"]], "walls": true},
-	{"cards": [["split", "split", "beam"], ["fire", "split", "beam"]], "floor": true, "walls": true},
-	{"cards": [["blast", "split", "split", "beam"]]},
-	{"cards": [["blast", "split", "beam"], ["split", "split", "beam"]], "walls": true},
-	{"cards": [["shield", "split", "split", "beam"], ["split", "beam"]]},
-	{"cards": [["split", "split", "beam"], ["portal"]], "walls": true},
+	{"cards": [["plus_two", "plus_two", "plus_two", "beam"]]},
+	{"cards": [["fire", "plus_two", "plus_two", "beam"]], "floor": true},
+	{"cards": [["homing", "plus_two", "plus_two", "beam"]], "walls": true},
+	{"cards": [["pierce", "pierce", "plus_two", "plus_two", "beam"]], "walls": true},
+	{"cards": [["bounce", "plus_two", "beam"]], "walls": true},
+	{"cards": [["spiral", "plus_two", "plus_two", "beam"]]},
+	{"cards": [["storm", "plus_two", "plus_two", "beam"]]},
+	{"cards": [["frost", "growth", "plus_two", "beam"]], "walls": true},
+	{"cards": [["hold", "plus_two", "plus_two", "beam"]], "walls": true},
+	{"cards": [["plus_two", "plus_two", "beam"], ["fire", "plus_two", "beam"]], "floor": true, "walls": true},
+	{"cards": [["blast", "plus_two", "plus_two", "beam"]]},
+	{"cards": [["blast", "plus_two", "beam"], ["plus_two", "plus_two", "beam"]], "walls": true},
+	{"cards": [["shield", "plus_two", "plus_two", "beam"], ["plus_two", "beam"]]},
+	{"cards": [["plus_two", "plus_two", "beam"], ["portal"]], "walls": true},
 ]
 
 

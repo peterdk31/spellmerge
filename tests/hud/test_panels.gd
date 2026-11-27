@@ -104,6 +104,10 @@ func test_the_menu_panels_and_buttons_have_no_borders_and_a_quiet_readable_fill(
 		check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "%s %s is translucent but readable, alpha %s" % [pair[1], pair[0], box.bg_color.a])
 	var focus := SpellmergeTheme.get_stylebox("focus", "Button") as StyleBoxFlat
 	check(focus != null and not focus.draw_center and focus.border_width_top == 1, "a button's focus is a thin gold line")
+	# The menu tabs outline their selected tab and their words in the face's border colour
+	# (`menu_tabs.gd`), kept the Outline though the face draws no border.
+	var face := SpellmergeTheme.get_stylebox("normal", "Button") as StyleBoxFlat
+	check(face != null and face.border_color.to_rgba32() == Color("#14121f").to_rgba32(), "a button's face keeps the Outline as its border colour for the tabs")
 
 
 func test_the_theme_fonts_are_no_smaller_than_designed() -> void:

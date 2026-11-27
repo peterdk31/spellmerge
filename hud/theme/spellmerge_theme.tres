@@ -35,7 +35,6 @@ content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
 bg_color = Color(0.290196, 0.27451, 0.388235, 0.7)
-border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
 
 [sub_resource type="StyleBoxFlat" id="button_pressed"]
 content_margin_left = 8.0
@@ -43,7 +42,6 @@ content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
 bg_color = Color(0.0784314, 0.0705882, 0.121569, 0.85)
-border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
 
 [sub_resource type="StyleBoxFlat" id="button_focus"]
 draw_center = false
@@ -59,7 +57,6 @@ content_margin_top = 4.0
 content_margin_right = 6.0
 content_margin_bottom = 4.0
 bg_color = Color(0.0784314, 0.0705882, 0.121569, 0.8)
-border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
 
 [resource]
 default_font_size = 12

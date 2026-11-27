@@ -63,7 +63,6 @@ const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
 const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const NONE: int = -1
-const PLAYER_COUNT: int = 4
 const HANDS: int = 4
 ## Each hand's button, by hand (0 RB, 1 RT, 2 LB, 3 LT).
 const HAND_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]

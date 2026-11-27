@@ -81,6 +81,9 @@ var _bm_swept: PackedFloat32Array = PackedFloat32Array()
 ## What live beam `at` is of it (ROLE_*), and a fan beam's angle off its trunk (0 for the others).
 var _bm_role: PackedByteArray = PackedByteArray()
 var _bm_fan: PackedFloat32Array = PackedFloat32Array()
+## Which fan live beam `at` is of: its trunk's birth (-1 for a beam of its own), so its look draws the
+## fan as one (`beam_fan_id`).
+var _bm_fan_id: PackedInt64Array = PackedInt64Array()
 var _bm_bend: PackedVector2Array = PackedVector2Array()
 var _bm_end: PackedVector2Array = PackedVector2Array()
 var _bm_reach: PackedFloat32Array = PackedFloat32Array()
@@ -198,7 +201,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring, _bm_swept, _bm_role, _bm_fan]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring, _bm_swept, _bm_role, _bm_fan, _bm_fan_id]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -435,7 +438,7 @@ func hits_per_target(lifetime: float) -> int:
 ## Its `blast` and `on expire` payload happen where it ends when its life is over. Returns false
 ## when it could not start (no direction). `caster` and `caster_seq` are who casts it (`Spells._caster`:
 ## the wizard, a point or a shot), `echoed` whether it is an echo's firing (half damage).
-func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float, caster: int, caster_seq: int, echoed: bool, role: int = ROLE_ALONE, fan: float = 0.0) -> bool:
+func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float, caster: int, caster_seq: int, echoed: bool, role: int = ROLE_ALONE, fan: float = 0.0, fan_id: int = -1) -> bool:
 	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
 		return false
 	# A free row, or new rows when every one is on: no beam ends another.
@@ -468,6 +471,8 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_length[at] = spell.ray_length
 	_bm_role[at] = role
 	_bm_fan[at] = fan
+	# A trunk is its fan's: its own birth names the fan.
+	_bm_fan_id[at] = _bm_born[at] if role == ROLE_TRUNK else fan_id
 	# A fan's trunk is its first BEAM_TRUNK pixels; each beam of its fan the rest, from the trunk's end.
 	var from: Vector2 = origin
 	if role == ROLE_TRUNK:
@@ -979,6 +984,7 @@ func _start_leg(parent: int, gate: int, out: int) -> void:
 	_bm_floor[at] = INF
 	_bm_role[at] = ROLE_ALONE
 	_bm_fan[at] = 0.0
+	_bm_fan_id[at] = -1
 	# Its own homing, or else the portal's: a portal's homing steers what comes out of it.
 	_bm_steer[at] = portal if portal != null and portal.homing_range > 0.0 and _bm_steer[parent] != null and _bm_steer[parent].homing_range <= 0.0 else _bm_steer[parent]
 	var legs: int = maxi(spell.pierce, 0) + 1
@@ -1147,7 +1153,7 @@ func _grow_beams() -> void:
 	_bm_tip.resize(size)
 	_bm_tip_dir.resize(size)
 	_bm_hit_at.resize(size)
-	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_role, _bm_fan]:
+	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_role, _bm_fan, _bm_fan_id]:
 		column.resize(size)
 	_bm_zap_hit.resize(size)
 	_bm_zap_rolls.resize(size)
@@ -1304,6 +1310,12 @@ func beam_role(at: int) -> int:
 	return _bm_role[at]
 
 
+## Which fan live beam `at` is of (its trunk's birth), -1 for a beam of its own: a fan's trunk and
+## beams share it, so its look draws them as one (`FeelBeams`).
+func beam_fan_id(at: int) -> int:
+	return _bm_fan_id[at]
+
+
 func beam_since_hit(at: int) -> float:
 	return kit.clock() - _bm_hit_at[at]
 
@@ -1335,12 +1347,13 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var caster: int = kit.caster()
 	var caster_seq: int = kit.caster_seq()
 	var echoed: bool = kit.is_echo(spell)
+	var fan_id: int = _bm_next_born
 	if not start(spell, tag, actor, origin, DMath.from_angle(angle), chain, prev, source, lifetime, caster, caster_seq, echoed, ROLE_TRUNK):
 		return 0
 	var made: int = 0
 	for n in count:
 		var off: float = kit.fan_angle(n, count, spell)
-		if start(spell, tag, actor, origin, DMath.from_angle(angle + off), chain, prev, source, lifetime, caster, caster_seq, echoed, ROLE_FAN, off):
+		if start(spell, tag, actor, origin, DMath.from_angle(angle + off), chain, prev, source, lifetime, caster, caster_seq, echoed, ROLE_FAN, off, fan_id):
 			made += 1
 	return made
 

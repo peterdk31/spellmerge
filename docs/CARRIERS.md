@@ -347,3 +347,8 @@ is hit once a beam tick), and the fan's beams from its end, each the trunk's len
 turned off it by its place in the fan, each with all the beam's cards from there (it bends, turns at
 walls, waves and fires its payloads). The trunk ends at a wall it meets first, and so does the fan;
 its end is no carrier's end (no blast, no `on expire`, no pour onto the floor there).
+Its look is one beam that splits (the owner, 2026-11-27, on #977): when its trunk and beams all run
+straight, the trunk's node draws the whole fan in one draw, every pixel taking the nearest of its
+segments (`fan_*` in `shot_beam.gdshaderinc` and the beam card's shader, the way pools merge), so
+it has one edge round it and one light; a fan with a bent beam draws beam by beam, its join kept
+clean (no flares there, its beams' light rising from it, `beam_from`).

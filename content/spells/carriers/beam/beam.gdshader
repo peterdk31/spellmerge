@@ -62,6 +62,14 @@ uniform float beam_lead = 0.0;
 // The pixels over which its light rises from nothing at its start (0: lit from its start): a beam of
 // a fan (+2, +3), so the fan joins its trunk as one beam that splits, never a stack of lights.
 uniform float beam_from = 0.0;
+// A fan drawn as one (+2, +3 on a beam, the owner's decision of 2026-11-27, #972): its trunk and its
+// beams, `fan_count` segments (start x, y, end x, y), the trunk first; `fan_base` how far along the
+// trunk's end is. Every pixel takes the nearest of them, so the fan is one merged shape: one edge
+// round it, no inner edges where its beams meet, one light. 0: the beam alone, along its path.
+const int FAN_MOST = 48;
+uniform int fan_count = 0;
+uniform vec4 fan_segs[48];
+uniform float fan_base = 0.0;
 // Every different infusion on it, in slot order (`CompiledSpell.infusion_looks`): rgb its tint,
 // alpha its look kind / 255, and how many (0: a beam shown with its tint and look only, whose
 // infusion is worked out from them). The first is its body; the others are its strands.
@@ -143,6 +151,24 @@ void vertex() {
 	piece_way = vec4(way, max(abs(way.x), abs(way.y)), 0.0);
 	cut_lo = vec4(first ? A.xy - way * beam_lead : A.xy, lo_n);
 	cut_hi = vec4(last ? B.xy + way * beam_lead : B.xy, hi_n);
+	// A fan: one quad over all its segments (its first slot's), each pixel finding its own.
+	if (fan_count > 0) {
+		vec2 box_lo = vec2(1.0e9);
+		vec2 box_hi = vec2(-1.0e9);
+		for (int i = 0; i < FAN_MOST; i++) {
+			if (i < fan_count) {
+				box_lo = min(box_lo, min(fan_segs[i].xy, fan_segs[i].zw));
+				box_hi = max(box_hi, max(fan_segs[i].xy, fan_segs[i].zw));
+			}
+		}
+		vec2 pad = vec2(beam_width + beam_lead);
+		box_lo -= pad;
+		box_hi += pad;
+		VERTEX = slot == 0 ? vec2(mix(box_lo.x, box_hi.x, corner.x), mix(box_lo.y, box_hi.y, corner.y)) : vec2(-1.0e6);
+		world = VERTEX;
+		cut_lo = vec4(-1.0e6, 0.0, 1.0, 0.0);
+		cut_hi = vec4(1.0e6, 0.0, 1.0, 0.0);
+	}
 	// Two pixels inside its quad's edge: room for a pulse's bulge and a sparkle past it.
 	bands = clamp(floor(BANDS * beam_swell + 0.25), 1.0, max(half_width - 3.0, 1.0));
 	// Its first infusion's look kind, handed over, or for a beam shown with its look only the
@@ -244,12 +270,46 @@ vec3 strand_at(float kind, float i, float n, float along, float reach) {
 	return vec3(r * sin(a), cos(a), r * style.x * cos(a));
 }
 
+// The fan's segment nearest `P` (the trunk on a tie): how far along the beam `P` is on it, how far
+// across, its way's longer axis share, its whole length to its end and its end (the trunk's none).
+void fan_nearest(vec2 P, out float along, out float across, out float cheb, out float len, out vec2 end) {
+	float best = 1.0e9;
+	int k = 0;
+	for (int i = 0; i < FAN_MOST; i++) {
+		if (i < fan_count) {
+			vec2 ab = fan_segs[i].zw - fan_segs[i].xy;
+			float t = clamp(dot(P - fan_segs[i].xy, ab) / max(dot(ab, ab), 1.0e-6), 0.0, 1.0);
+			float d = length(P - (fan_segs[i].xy + ab * t));
+			if (d < best) {
+				best = d;
+				k = i;
+			}
+		}
+	}
+	vec4 s = fan_segs[0];
+	for (int i = 1; i < FAN_MOST; i++) {
+		if (i == k) {
+			s = fan_segs[i];
+		}
+	}
+	float base = k == 0 ? 0.0 : fan_base;
+	vec2 ab = s.zw - s.xy;
+	float l = max(length(ab), 0.001);
+	vec2 way = ab / l;
+	vec2 d = P - s.xy;
+	along = base + dot(d, way);
+	across = dot(d, vec2(-way.y, way.x));
+	cheb = max(abs(way.x), abs(way.y));
+	len = base + l;
+	end = k == 0 ? vec2(-100000.0) : s.zw;
+}
+
 // The beam's pixel at `along` pixels from the staff and `across` from its middle, `cheb` the
 // longer axis's share of its way on screen (so a band is one pixel per step of that axis, never
 // two), `P` the pixel in the world, `pulse_e` the infusion of the pulse nearest: its colour, or
 // alpha 0.
-vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
-	float len = max(beam_length, 1.0);
+vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e, float length_at, vec2 end_at) {
+	float len = max(length_at, 1.0);
 	float at = floor(along);
 	float off = off_at(along, len);
 	// Its lane across in art pixels (ART_DETAIL a world pixel; ART2), `x` in world pixels: its bands
@@ -308,7 +368,7 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	// the heart (void's dark), its light round it.
 	float flick = mod(floor(sim_time * 30.0), 2.0);
 	vec2 ds = floor(P) - floor(beam_start);
-	vec2 de = floor(P) - floor(beam_end);
+	vec2 de = floor(P) - floor(end_at);
 	float sr = 1.0 + flick;
 	float er = 2.0 + flick + floor(0.5 * bands - 1.0);
 	vec3 heart = mix(BONE_LIGHT, OUTLINE, rift);
@@ -324,11 +384,11 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 
 // The beam's light at `P` (`along` it, `across` from its middle): a soft band as wide as its bands
 // and more, and both ends, in its glow; the pulses running down it, each in its infusion's light.
-vec3 beam_light(float along, float across, vec2 P, float pulse_e) {
-	float len = max(beam_length, 1.0);
+vec3 beam_light(float along, float across, vec2 P, float pulse_e, float length_at, vec2 end_at) {
+	float len = max(length_at, 1.0);
 	float off = off_at(along, len);
 	float a = abs(across - off);
-	float lit = 0.5 * falloff(a, 3.0 + 1.5 * bands) + 0.6 * falloff(length(floor(P) - floor(beam_end)), 7.0 + bands) + 0.4 * falloff(length(floor(P) - floor(beam_start)), 5.0);
+	float lit = 0.5 * falloff(a, 3.0 + 1.5 * bands) + 0.6 * falloff(length(floor(P) - floor(end_at)), 7.0 + bands) + 0.4 * falloff(length(floor(P) - floor(beam_start)), 5.0);
 	vec3 pulse_glow = pulse_e >= 0.0 ? infusion_shade(int(pulse_e), 2) : glow;
 	vec3 light = glow * lit + pulse_glow * 0.45 * pulse_at(along, len, 6.0) * falloff(a, 3.0 + bands);
 	return beam_from > 0.0 ? light * smoothstep(0.0, beam_from, along) : light;
@@ -355,11 +415,18 @@ void fragment() {
 	vec2 d = P - piece.xy;
 	float along = piece.z + dot(d, piece_way.xy);
 	float across = dot(d, vec2(-piece_way.y, piece_way.x));
-	float pulse_e = pulse_infusion(along, max(beam_length, 1.0));
+	float cheb = piece_way.z;
+	float len = beam_length;
+	vec2 end_at = beam_end;
+	if (fan_count > 0) {
+		// A fan: the nearest of its segments draws the pixel, as one merged beam.
+		fan_nearest(P, along, across, cheb, len, end_at);
+	}
+	float pulse_e = pulse_infusion(along, max(len, 1.0));
 	if (inside && mode < M_PIECE_LIGHT + 0.5) {
-		colour = vec4(beam_light(along, across, P, pulse_e) * light_scale() * glow_strength, 0.0);
+		colour = vec4(beam_light(along, across, P, pulse_e, len, end_at) * light_scale() * glow_strength, 0.0);
 	} else if (inside) {
-		colour = beam_pixel(along, across, piece_way.z, P, pulse_e);
+		colour = beam_pixel(along, across, cheb, P, pulse_e, len, end_at);
 	}
 	COLOR = colour;
 }

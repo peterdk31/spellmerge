@@ -468,3 +468,56 @@ func test_a_fan_is_drawn_as_one_beam_that_splits() -> void:
 		check_equal(start, Vector2.ZERO if role != CarrierBeam.ROLE_FAN else FeelScript.BEAM_NO_FLARE, "role %d: a flare at its start unless it is a fan's beam" % role)
 		check(end.is_finite() and (role == CarrierBeam.ROLE_TRUNK) == (end == FeelScript.BEAM_NO_FLARE), "role %d: a flare at its end unless it is a trunk (%s)" % [role, end])
 		check_equal(from, FeelScript.BEAM_FAN_IN if role == CarrierBeam.ROLE_FAN else 0.0, "role %d: a fan's beam lights up from the join" % role)
+
+
+## A fan's rows (+2 on a beam): its trunk (row 0) and its three beams (rows 1 to 3), one fan, each
+## straight from the trunk's end; with `bent`, its last beam bends (a homing one).
+class FanRows:
+	extends FakeBeams
+	var bent: bool = false
+
+	func beam_slots() -> int:
+		return 4
+
+	func beam_on(_at: int) -> bool:
+		return true
+
+	func beam_role(at: int) -> int:
+		return CarrierBeam.ROLE_TRUNK if at == 0 else CarrierBeam.ROLE_FAN
+
+	func beam_fan_id(_at: int) -> int:
+		return 7
+
+	func beam_point_count(at: int) -> int:
+		return 9 if bent and at == 3 else 2
+
+	func beam_point(at: int, n: int) -> Vector2:
+		if at == 0:
+			return Vector2(24.0 * n, 0.0)
+		var way: Vector2 = Vector2.from_angle(0.25 * float(at - 2))
+		if bent and at == 3:
+			return Vector2(24.0, 0.0) + way * 20.0 * n + Vector2(0.0, 2.0 * n * n)
+		return Vector2(24.0, 0.0) + way * 200.0 * n
+
+	func beam_reach(at: int) -> float:
+		return 24.0 if at == 0 else 200.0
+
+
+## A fan whose trunk and beams all run straight is drawn as one (the owner, 2026-11-27, on #977): its
+## trunk's node draws every segment (the nearest taking each pixel, `fan_*`) and its beams' nodes
+## nothing; a fan with a bent beam is drawn beam by beam.
+func test_a_straight_fan_is_one_draw_and_a_bent_one_beam_by_beam() -> void:
+	var beams := own(FanRows.new()) as FanRows
+	feel.spells = beams
+	feel.step(0.016)
+	check_equal(_live_lines().size(), 1, "one node draws the fan")
+	var material: ShaderMaterial = feel._live_beams[0].material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"fan_count"), 4, "the trunk and its three beams")
+	var segs: PackedVector4Array = material.get_shader_parameter(&"fan_segs")
+	check(segs[0].is_equal_approx(Vector4(0.0, 0.0, 24.0, 0.0)), "the trunk first (%s)" % segs[0])
+	check(Vector2(segs[2].z, segs[2].w).is_equal_approx(Vector2(224.0, 0.0)), "each beam from the trunk's end to where it got (%s)" % segs[2])
+	check(is_equal_approx(float(material.get_shader_parameter(&"fan_base")), 24.0), "the beams start where the trunk ends")
+	beams.bent = true
+	feel.step(0.016)
+	check_equal(_live_lines().size(), 4, "a fan with a bent beam: each beam its own node")
+	check_equal((feel._live_beams[0].material as ShaderMaterial).get_shader_parameter(&"fan_count"), 0, "the trunk alone")

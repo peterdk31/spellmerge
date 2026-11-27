@@ -28,6 +28,8 @@ const BANDS: Array[PackedColorArray] = [
 ## A band's width and the checker's square (layout pixels).
 const BAND: float = 40.0
 const SQUARE: float = 3.0
+## The layout the bands cover (its size, as `PictureGrid` lays the HUD out).
+const LAYOUT := Vector2(640.0, 360.0)
 ## The crops: the builder's column, the inventory's column, the pause menu's top rows (picture
 ## pixels, as `save_crop` takes them), and half of each crop.
 const BUILDER_AT := Vector2(124, 190)
@@ -41,13 +43,13 @@ class Backdrop extends Control:
 	func _draw() -> void:
 		var x: float = 0.0
 		var band: int = 0
-		while x < size.x:
+		while x < LAYOUT.x:
 			var colours: PackedColorArray = BANDS[band % BANDS.size()]
 			var half: float = floorf(BAND * 0.5)
-			draw_rect(Rect2(x, 0.0, half, size.y), colours[0])
+			draw_rect(Rect2(x, 0.0, half, LAYOUT.y), colours[0])
 			var row: int = 0
 			var y: float = 0.0
-			while y < size.y:
+			while y < LAYOUT.y:
 				for column in int(half / SQUARE):
 					draw_rect(Rect2(x + half + float(column) * SQUARE, y, SQUARE, SQUARE), colours[1 + (row + column) % 2])
 				y += SQUARE

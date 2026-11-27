@@ -113,7 +113,6 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const MenuTabsScript := preload("res://hud/widgets/menu_tabs.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
-const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const PLAYER_COUNT: int = 4
 enum Page { MAIN, SETTINGS }
@@ -436,8 +435,7 @@ func open_menu(player: int) -> bool:
 	_ui_focus.close(player)
 	owner_player = player
 	_title.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
-	theme_type_variation = &"MenuPanel"
-	queue_redraw()
+	theme_type_variation = StringName("PlayerPanel%d" % (player + 1))
 	_tabs.show_for(player)
 	_hint_glyph.show_action(player, &"back")
 	_show_page(Page.MAIN)
@@ -765,13 +763,6 @@ func waiting_seat() -> int:
 		if _waiting_seats & (1 << seat) != 0:
 			return seat
 	return -1
-
-
-## Over the theme's quiet MenuPanel (no border, ART4: the owner, 2026-11-27), the owner's small
-## corner L in its ramp at the top left says whose menu it is (and its title, in its colour).
-func _draw() -> void:
-	if owner_player >= 0:
-		HudArt.corner_mark(self, Vector2.ZERO, HudArt.player_ramp(owner_player))
 
 
 func _on_closed(player: int) -> void:

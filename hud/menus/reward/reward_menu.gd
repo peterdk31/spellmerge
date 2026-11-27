@@ -34,7 +34,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const LayoutScript := preload("res://hud/menus/reward/reward_layout.gd")
 const CardScript := preload("res://hud/menus/reward/reward_card.gd")
-const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const TITLE_TEXT: String = "Pick 1 of %d"
 ## Its title after a pick was refused (`reward_refused`: a full bag, a heal while down).
@@ -50,12 +49,11 @@ const MOVE_FRAMES: int = 4
 const SCROLL_FRAMES: int = 4
 
 const OUTLINE: Color = Color("#14121f")
+const BACK: Color = Color("#2b2840")
 const GOLD: Color = Color("#f2c230")
 const ARROW: Color = Color("#d4d0e0")
-## The title's outline, in layout pixels (as the Labels' theme outline).
-const TITLE_OUTLINE: int = 2
-## How far outside the cards' top-left corner the player's corner mark starts.
-const MARK_OUT: float = 3.0
+const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
+const PLAYER_LIGHTS: Array[Color] = [Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0")]
 
 ## The seat it belongs to (0-3), set before it enters the tree.
 var index: int = 0
@@ -444,27 +442,21 @@ func _focus_on(at: int) -> void:
 
 
 func _draw() -> void:
-	# No box and no background (ART4, the owner, 2026-11-27): the cards keep their own outlines, the
-	# title its outline, and the player's small corner L just outside the cards' top left says whose it is.
-	var ramp: PackedColorArray = HudArt.player_ramp(index % HudArt.PLAYERS.size())
-	HudArt.corner_mark(self, _strip.position - Vector2(MARK_OUT, MARK_OUT), ramp)
+	var whole := Rect2(Vector2.ZERO, Vector2(size.x, _full_height))
+	draw_rect(whole, OUTLINE)
+	draw_rect(whole.grow(-1.0), PLAYER_COLORS[index % PLAYER_COLORS.size()])
+	draw_rect(whole.grow(-2.0), BACK)
 	var font: Font = get_theme_default_font()
 	var x: float = floorf((size.x - font.get_string_size(_title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x) * 0.5)
-	var baseline: Vector2 = Vector2(x, LayoutScript.EDGE + 1.0 + font.get_ascent(FONT_SIZE)).round()
-	draw_string_outline(font, baseline, _title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TITLE_OUTLINE, OUTLINE)
-	draw_string(font, baseline, _title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, ramp[HudArt.LIGHT])
+	draw_string(font, Vector2(x, LayoutScript.EDGE + 1.0 + font.get_ascent(FONT_SIZE)).round(), _title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, PLAYER_LIGHTS[index % PLAYER_LIGHTS.size()])
 	if _layout.scrolls:
 		var middle: float = _strip.position.y + floorf(_strip.size.y * 0.5)
 		_draw_arrow(Vector2(LayoutScript.EDGE + 1.0, middle), -1)
 		_draw_arrow(Vector2(size.x - LayoutScript.EDGE - 2.0, middle), 1)
 
 
-## A small arrow, 3 px deep, its point at `tip` toward `way` (-1 left, 1 right), in an outline one
-## art pixel wide, as it sits on the game.
+## A small arrow, 3 px deep, its point at `tip` toward `way` (-1 left, 1 right).
 func _draw_arrow(tip: Vector2, way: int) -> void:
-	for depth in 3:
-		var back: float = tip.x - float(way * depth)
-		draw_rect(Rect2(Vector2(back, tip.y - float(depth)), Vector2(1.0, float(depth * 2 + 1))).grow(HudArt.A), OUTLINE)
 	for depth in 3:
 		var column: float = tip.x - float(way * depth)
 		draw_rect(Rect2(Vector2(column, tip.y - float(depth)), Vector2(1.0, float(depth * 2 + 1))), ARROW)

@@ -20,8 +20,6 @@ extends RefCounted
 ##   the rest the track's colour; `line_fill`: the fill in it under that lip (`under_lip`), its
 ##   bottom art row in its shade; and a hard `drop_shadow` one art pixel under the trough.
 ## - `corner_mark`: a player's small L in its ramp, for a panel with no frame and no background.
-## - `meter`: a whole line, its trough and its fill to a share (the menus' and the boss's lines);
-##   `rule`: a one-art-pixel line under a heading or a note, in place of a box round it.
 ##
 ## Static, display only: each call draws a handful of rects on `target` and allocates nothing.
 ## `target` is the CanvasItem drawn on, or anything with its `draw_rect(rect, color)` (the tests'
@@ -142,23 +140,6 @@ static func corner_mark(target: Object, at: Vector2, ramp: PackedColorArray) -> 
 	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(2.0 * A, MARK_ARM - 2.0 * A)), ramp[BASE])
 	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(MARK_ARM - 2.0 * A, A)), ramp[LIGHT])
 	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(A, MARK_ARM - 2.0 * A)), ramp[LIGHT])
-
-
-## A line over `rect` (layout pixels) filled to `share` (0 to 1) of its width, by whole layout
-## pixels: its `trough` in `track`, and in it the `line_fill` in `color` with its `shade` row.
-static func meter(target: Object, rect: Rect2, share: float, color: Color, shade: Color, track: Color = OUTLINE) -> void:
-	trough(target, rect, track)
-	var fill: Rect2 = under_lip(rect)
-	fill.size.x = roundf(fill.size.x * clampf(share, 0.0, 1.0))
-	line_fill(target, fill, color, shade)
-
-
-## A rule one art pixel tall from `at` (layout pixels), `width` long, in `color`: what marks a
-## heading or a note where a box round it was (the owner, 2026-11-27: "The border is too much").
-static func rule(target: Object, at: Vector2, width: float, color: Color) -> void:
-	if width <= 0.0:
-		return
-	target.draw_rect(Rect2(at, Vector2(width, A)), color)
 
 
 ## The part of a trough's `rect` under its Outline lip, where its fill goes. A line one layout pixel

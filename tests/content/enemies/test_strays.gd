@@ -25,8 +25,16 @@ const GLOWS: Array[Color] = [
 	Color(0.878, 0.541, 0.847, 1),
 	Color(1, 0.953, 0.651, 1),
 ]
-## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"], [&"spray"]]
+## The cards of each stray's staffs, staff by staff, in the same order. Four strays hold a second
+## staff for a role (enemy AI L7, the owner's picks of 2026-11-27).
+const CARDS: Array[Array] = [
+	[[&"fire", &"bolt"]],
+	[[&"dash"], [&"swing"]],
+	[[&"triple", &"lightning", &"bolt"], [&"wall"]],
+	[[&"frost", &"bolt"], [&"pull", &"bolt"]],
+	[[&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"], [&"dash"]],
+	[[&"spray"]],
+]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -86,24 +94,32 @@ func test_each_staff_compiles_and_its_first_cast_is_affordable() -> void:
 		if not data.has_staffs():
 			continue
 		check_equal(data.problems(), PackedStringArray(), "%s: its data is sound" % data.id)
-		check_equal(SpellValidator.check_staff(data.staffs[0].staff).size(), 0, "%s: its staff is valid" % data.id)
 		var body: Actor = _world.enemy(data.scene, data, Vector2(-500.0, 300.0))
-		check(body.caster != null and body.caster.has_staff(0), "%s: its staff compiles and casts" % data.id)
-		if body.caster != null and body.caster.has_staff(0):
-			var cost: float = body.caster.next_cast_mana(0)
-			check(cost >= 0.0 and cost <= data.staffs[0].staff.max_mana, "%s: the first cast (%.1f mana) fits its pool (%.1f)" % [data.id, cost, data.staffs[0].staff.max_mana])
+		check(body.caster != null, "%s has a caster" % data.id)
+		if body.caster == null:
+			continue
+		for index in data.staffs.size():
+			var staff: StaffBase = data.staffs[index].staff
+			check_equal(SpellValidator.check_staff(staff).size(), 0, "%s: staff %d is valid" % [data.id, index])
+			check(body.caster.has_staff(index), "%s: staff %d compiles and casts" % [data.id, index])
+			if body.caster.has_staff(index):
+				var cost: float = body.caster.next_cast_mana(index)
+				check(cost >= 0.0 and cost <= staff.max_mana, "%s: staff %d's first cast (%.1f mana) fits its pool (%.1f)" % [data.id, index, cost, staff.max_mana])
 
 
 func test_each_stray_casts_the_cards_it_was_planned_with() -> void:
 	for i in STRAYS.size():
 		var held: Array = []
-		for card in STRAYS[i].staffs[0].cards:
-			held.append(card)
-		check_equal(held, CARDS[i], "%s: its cards" % STRAYS[i].id)
+		for entry in STRAYS[i].staffs:
+			var cards: Array = []
+			for card in entry.cards:
+				cards.append(card)
+			held.append(cards)
+		check_equal(held, CARDS[i], "%s: its staffs' cards" % STRAYS[i].id)
 
 
 ## Four players in the room: the Rime Crook, the Bone Scepter and the Spitter wind up, cast their
-## spells (frost · hook, a bolt and a void bolt falling where it hit, a spray) at the nearest of them and nobody waits (they are actors on the enemy team).
+## spells (a frost bolt, a bolt and a void bolt falling where it hit, a spray) at the nearest of them and nobody waits (they are actors on the enemy team).
 func test_the_new_strays_attack_four_players() -> void:
 	for data in [STRAYS[3], STRAYS[4], STRAYS[5]]:
 		var world := AiFixture.new(root, 4)
@@ -133,6 +149,36 @@ func test_the_new_strays_attack_four_players() -> void:
 		check(body.is_inside_tree() and not body.is_down(), "%s: stays a live actor" % data.id)
 		world.free_all()
 
+
+
+## The strays with a role (enemy AI L7) play both their staffs against a player: the Splinter dashes
+## in and swings, the Storm Fork raises its wall, the Rime Crook pulls itself in on its pull bolt
+## (under fire) and the Bone Scepter dashes away when it is low and crowded. The AI picks the staff by what it casts
+## (it never names a card), so this is the check that each role's staff gets played at all.
+func test_the_role_strays_cast_their_second_staff() -> void:
+	for data in [STRAYS[1], STRAYS[2], STRAYS[3], STRAYS[4]]:
+		var world := AiFixture.new(root, 1)
+		world.players[0].position = Vector2(90.0, 0.0)
+		var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
+		if data == STRAYS[4]:
+			body.health.health = body.health.max_health * 0.25
+		var cast_at: Array[int] = []
+		body.caster.cast_done.connect(func(at: int, _origin: Vector2, _direction: Vector2) -> void: cast_at.append(at))
+		for step in 1200:
+			# The player fires a shot at it now and then, so the one that guards has something to stop.
+			if step % 30 == 0 and body.is_inside_tree():
+				world.projectiles.spawn(world.players[0].id, body.position + Vector2(120.0, -12.0), Vector2(-200.0, 0.0), 2.0, 4.0, AiFixture.ProjectileManagerScript.ACTOR_LAYERS)
+			world.run_all(1)
+			if cast_at.has(1):
+				break
+		check(cast_at.has(1), "%s: casts its second staff (%s) in a fight (casts by staff: %s)" % [data.id, data.staffs[1].cards, cast_at])
+		if data == STRAYS[4] and cast_at.has(1):
+			# Its dash is a step away: a dash goes the way the body walks, and it walks away.
+			var before: float = body.position.distance_to(world.players[0].position)
+			world.run_all(20)
+			var after: float = body.position.distance_to(world.players[0].position)
+			check(after > before + 20.0, "the Bone Scepter's dash takes it away from the player (%.0f to %.0f px)" % [before, after])
+		world.free_all()
 
 func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:
 	var body: Actor = _world.imp(Vector2(-400.0, 0.0))

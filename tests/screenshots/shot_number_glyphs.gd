@@ -6,6 +6,9 @@ extends SceneTree
 ## them). Prints `NUMBER GLYPHS: N px differ` (by more than the blend's rounding) and saves both
 ## (`user://number_glyphs_sheet.png`, `user://number_glyphs_font.png`); quits 1 when any differ.
 ##
+## Both are drawn at the font's art detail (the views ArtDetail.DETAIL times SIZE, their canvases
+## scaled: the world at zoom 1), so every art pixel of a glyph is a pixel of each.
+##
 ## godot --path . --script res://tests/screenshots/shot_number_glyphs.gd   (it needs a window)
 
 const DrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
@@ -54,7 +57,8 @@ func _initialize() -> void:
 	var views: Array[SubViewport] = []
 	for n in 2:
 		var view := SubViewport.new()
-		view.size = SIZE
+		view.size = SIZE * ArtDetail.DETAIL
+		view.canvas_transform = Transform2D.IDENTITY.scaled(Vector2.ONE * float(ArtDetail.DETAIL))
 		view.disable_3d = true
 		view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		var back := ColorRect.new()

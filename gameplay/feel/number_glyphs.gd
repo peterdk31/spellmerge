@@ -14,11 +14,18 @@ extends SubViewport
 ## (`UPDATE_DISABLED`). The sheet's pixels are the font's own, in white, premultiplied
 ## by their coverage (drawn over nothing), so the drawer draws them with a premultiplied blend
 ## and its colour times its alpha. View only; nothing is allocated after it is made.
+##
+## **At art-pixel detail** (ART4 part 4, 2026-11-27): the game's font draws two art pixels a pixel
+## of its size (`PixelFont`), so the sheet is drawn DETAIL times its size (its page scaled), and each
+## region is that many sheet pixels a world unit: at zoom 1 an art pixel of a number is a pixel of
+## the picture, as the HUD's text is.
 
 const VIEW_ONLY: bool = true
 
 ## The white square's side (pixels).
 const WHITE: int = 4
+## Sheet pixels a pixel of the font's size (the font's art detail).
+const DETAIL: int = ArtDetail.DETAIL
 
 ## The font size this sheet is of, and the room left round a glyph in its cell (its outline's).
 var font_size: int = 8
@@ -57,7 +64,7 @@ func _init(font: Font, size_of_font: int, outline: int, glyphs: PackedStringArra
 		_advance[code] = advance
 		x += _wide[code]
 	_white_at = Vector2(float(x), 0.0)
-	size = Vector2i(x + WHITE, cell_height * 2)
+	size = Vector2i(x + WHITE, cell_height * 2) * DETAIL
 	transparent_bg = true
 	disable_3d = true
 	gui_disable_input = true
@@ -65,6 +72,7 @@ func _init(font: Font, size_of_font: int, outline: int, glyphs: PackedStringArra
 	render_target_update_mode = SubViewport.UPDATE_DISABLED
 	var page := Node2D.new()
 	page.name = "Page"
+	page.scale = Vector2(DETAIL, DETAIL)
 	page.draw.connect(_draw_page.bind(page))
 	add_child(page)
 
@@ -88,12 +96,15 @@ func has(code: int) -> bool:
 	return _left.has(code)
 
 
-## The sheet's region of `code`'s glyph (`outline`: its outline's).
+## The sheet's region of `code`'s glyph (`outline`: its outline's), in sheet pixels: DETAIL a pixel
+## of `place_of`'s.
 func region_of(code: int, outline: bool) -> Rect2:
-	return Rect2(float(_left[code]), float(cell_height) if outline else 0.0, float(_wide[code]), float(cell_height))
+	var top: float = float(cell_height) if outline else 0.0
+	return Rect2(float(_left[code] * DETAIL), top * DETAIL, float(_wide[code] * DETAIL), float(cell_height * DETAIL))
 
 
-## Where `code`'s cell is drawn for a glyph whose baseline starts at `at`: the same pixels as the
+## Where `code`'s cell is drawn for a glyph whose baseline starts at `at`, in the drawer's pixels (a
+## DETAIL-th of its region's size): the same pixels as the
 ## font drawing the character there.
 func place_of(code: int, at: Vector2) -> Rect2:
 	return Rect2(at.x - float(pad), at.y - float(baseline), float(_wide[code]), float(cell_height))
@@ -101,7 +112,7 @@ func place_of(code: int, at: Vector2) -> Rect2:
 
 ## The sheet's white square (a pixel in from its edges).
 func white_region() -> Rect2:
-	return Rect2(_white_at + Vector2.ONE, Vector2.ONE * float(WHITE - 2))
+	return Rect2((_white_at + Vector2.ONE) * float(DETAIL), Vector2.ONE * float((WHITE - 2) * DETAIL))
 
 
 func _draw_page(page: Node2D) -> void:

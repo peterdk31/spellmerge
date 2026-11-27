@@ -272,16 +272,16 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 
 
-func _the_shown_beam() -> MeshInstance2D:
-	var beam: MeshInstance2D = null
-	for node in feel._shown_beams:
-		if node.visible:
-			beam = node
-	return beam
+## The beams Feel draws by the beam card's look now (`BeamUnion`): drawn as a frame draws them, with
+## no time passing, so a beam just shown is in it.
+func _drawn() -> BeamUnion:
+	feel._job_beams._draw_live_beams(0.0)
+	return feel.beam_union(BEAM_CARD_SHADER)
 
 
 func _swell() -> float:
-	return (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_swell") as float
+	var union: BeamUnion = _drawn()
+	return union.swells[union.beams - 1] if union != null and union.beams > 0 else 0.0
 
 
 func test_a_beam_opens_wide_then_thins() -> void:
@@ -291,8 +291,7 @@ func test_a_beam_opens_wide_then_thins() -> void:
 	feel.step(preset.beam_seconds * 0.5)
 	check(_swell() < first, "thinner after")
 	check(_swell() < 1.0, "thinner than at rest at last")
-	check(_the_shown_beam().scale == Vector2.ONE, "its pixels are never stretched")
-	check_equal((_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_width"), FeelScript.BEAM_TEXTURE_HEIGHT, "nor its width: the shader swells its rim")
+	check_equal(_drawn().widths[0], FeelScript.BEAM_TEXTURE_HEIGHT, "never wider: the shader swells its rim, never its pixels")
 
 
 func test_a_beam_flickers_by_the_preset_depth_on_every_other_step() -> void:
@@ -316,20 +315,21 @@ func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 	feel.step(0.07)
 	var t: float = (preset.beam_seconds - 0.07) / preset.beam_seconds
 	check(is_equal_approx(_swell(), t), "only the fade thins it")
-	var fade: float = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_fade") as float
-	check(is_equal_approx(fade, t), "and dissolves it by as much")
+	check(is_equal_approx(_drawn().fades[0], t), "and dissolves it by as much")
 
 
 func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
 	bus.carrier_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
-	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
-	check(material.shader == BEAM_CARD_SHADER, "a beam, by its card's own shader (card-looks phase 2)")
-	check_equal(material.get_shader_parameter(&"beam_points"), 2, "along a path of two points")
-	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
-	check_equal(material.get_shader_parameter(&"beam_player"), 3, "in its caster's hat ramp")
-	check_equal(material.get_shader_parameter(&"beam_look"), 9, "with the cast's cards")
-	check_equal(material.get_shader_parameter(&"beam_infusion_count"), 0, "a shown beam hands no infusions: its look works them out from its tint and cards")
-	check(is_equal_approx(material.get_shader_parameter(&"beam_glow") as float, preset.beam_alpha), "glowing as the preset says")
+	var union: BeamUnion = _drawn()
+	check(union != null and union.material.shader == BEAM_CARD_SHADER, "a beam, by its card's own shader (card-looks phase 2)")
+	if union == null:
+		return
+	check_equal(union.point_counts[0], 2, "along a path of two points")
+	check_equal(union.lengths[0], 100.0, "as long as it got")
+	check_equal(union.players[0], 3, "in its caster's hat ramp")
+	check_equal(union.looks[0], 9, "with the cast's cards")
+	check(union.infusions[0].is_empty(), "a shown beam hands no infusions: its look works them out from its tint and cards")
+	check(is_equal_approx(union.glows[0], preset.beam_alpha), "glowing as the preset says")
 
 
 func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
@@ -401,24 +401,19 @@ func test_an_impact_cue_is_of_the_shots_spell() -> void:
 	check_equal(tags, [77] as Array[int], "a rune's burst leaves its scar by the cards of the shot's spell (`impact_tag`)")
 
 
-## Two beams on screen at once keep their own materials: each sets its own path and length, so a
-## card's shader is set on each beam's own material, never shared (card-looks phase 2).
-func test_two_beams_keep_their_own_materials() -> void:
+## Two beams on screen at once are one merged shape (the owner, 2026-11-27): one node and one
+## material, the beam card's, each beam its own row in it with its own path and length.
+func test_two_beams_are_drawn_as_one_shape() -> void:
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	bus.carrier_shown.emit(1, &"beam", Vector2(0, 50), Vector2.RIGHT, 60.0, Color.BLUE, 0)
-	var shown: Array[MeshInstance2D] = []
-	for node in feel._shown_beams:
-		if node.visible:
-			shown.append(node)
-	check_equal(shown.size(), 2, "two beams")
-	if shown.size() != 2:
+	var union: BeamUnion = _drawn()
+	check_equal(union.beams if union != null else 0, 2, "two beams")
+	if union == null or union.beams != 2:
 		return
-	check(shown[0].material != shown[1].material, "each its own material")
-	var lengths: Array = [(shown[0].material as ShaderMaterial).get_shader_parameter(&"beam_length"), (shown[1].material as ShaderMaterial).get_shader_parameter(&"beam_length")]
+	check(union.node.visible and union.material.shader == BEAM_CARD_SHADER, "drawn by one node, by the beam card's shader")
+	var lengths: Array = [union.lengths[0], union.lengths[1]]
 	lengths.sort()
 	check_equal(lengths, [60.0, 100.0], "each its own length")
-	for node in shown:
-		check((node.material as ShaderMaterial).shader == BEAM_CARD_SHADER, "each by the beam card's shader")
 
 
 ## Only a card its own area draws lends a beam its shader: a ray of another card (a zap of a bolt

@@ -17,175 +17,36 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // 2026-11-08: "it would be cool if it could take colors from each infusion type"). A beam whose
 // first infusion is void turns inside out: a dark rift down the middle, its ramp glowing at the
 // lips.
-// Its vertices, quads and uniforms are the plain beam's (Feel draws each live beam with it on the
-// beam's own material); warmed as a mesh before the first room.
+// Every beam drawn with it is ONE merged shape, in one draw (the owner, 2026-11-27: "Beams should
+// merge into each other (like the pool)"; `core/projectiles/shot_beam_union.gdshaderinc`, whose
+// vertices, quads and data it takes): its bands, rim, light and core come from the union's one
+// distance, so beams close or crossing melt into one body with one rim, and where they meet its
+// pixels take their colours from every beam near by the rule at a junction. Its own look (its
+// strands, its pulses and their colours, void's rift, its sway) is drawn by the piece nearest each
+// pixel, in that beam's own coordinates; another beam's colour there is its ramp at the union's
+// band (`look_neighbour`). Warmed as a mesh before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 // Every infusion shows as a strand of its own (below), so its look keeps the first's ramp unwoven.
 #define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
+#include "res://core/projectiles/shot_beam_data.gdshaderinc"
 
-// The most points a path has (LIVE_BEAM_POINTS in gameplay/feel/feel.gd).
-const int BEAM_POINTS = 80;
-// The quad kinds (BEAM_Q_* in gameplay/feel/feel.gd), in UV.y.
-const float Q_PIECE_LIGHT = 0.0;
-const float Q_PIECE = 1.0;
-// The fragment's modes: a piece's light, a piece's pixels.
-const float M_PIECE_LIGHT = 0.0;
-const float M_PIECE = 1.0;
 // How many pixels each side of its core the beam's bands reach at rest (its swell 1).
 const float BANDS = 4.0;
 // How fast its pulses run down it (px/s) and how many are on it at once.
 const float PULSE_SPEED = 320.0;
 const int PULSES = 4;
-// The most infusions it is handed (Feel's BEAM_INFUSIONS_MOST).
+// The most infusions it is handed (Feel's BEAM_INFUSIONS_MOST, BeamUnion's INFUSIONS_MOST).
 const int INFUSIONS = 8;
 
-uniform vec4 core_override = vec4(1.0);
-// Feel's fade of the beam (kept with the beam; the beam's own fade is `beam_fade`).
-uniform vec4 body_tint = vec4(1.0);
-uniform vec3 beam_path[80];
-uniform int beam_points = 0;
-uniform float beam_length = 0.0;
-uniform float beam_width = 16.0;
-uniform int beam_player = 0;
-uniform int beam_look = 0;
-uniform float beam_fade = 1.0;
-uniform float beam_swell = 1.0;
-uniform float beam_glow = 1.0;
-// Where a beam starts (the staff) and ends in the world: its flares are drawn there, upright on
-// the world's pixels.
-uniform vec2 beam_start = vec2(-100000.0);
-uniform vec2 beam_end = vec2(-100000.0);
-// How far the beam's quads reach past each end, so the flares are whole.
-uniform float beam_lead = 0.0;
-// Every different infusion on it, in slot order (`CompiledSpell.infusion_looks`): rgb its tint,
-// alpha its look kind / 255, and how many (0: a beam shown with its tint and look only, whose
-// infusion is worked out from them). The first is its body; the others are its strands.
-uniform vec4 beam_infusions[8];
-uniform int beam_infusion_count = 0;
-
-// The pixel in the world.
-varying vec2 world;
-varying flat float mode;
-// A piece: its start (x, y, how far along), its way, the longer axis's share of its way (`cheb`),
-// the lines across its ends it keeps between (a point and its normal each).
-varying flat vec4 piece;
-varying flat vec4 piece_way;
-varying flat vec4 cut_lo;
-varying flat vec4 cut_hi;
-// The whole beam's: how many pixels its bands reach each side now (its swell, kept inside its
-// quads), whether it is void's dark rift (1: void came first) or a white-hot core (0); its first
-// infusion's look kind (0 none: it sways, jags or wavers by it), how many infusions it shows.
-varying flat float bands;
+// The beam's own: whether it is void's dark rift (1: void came first) or a white-hot core (0); its
+// first infusion's look kind (0 none: it sways, jags or wavers by it), how many infusions it shows.
 varying flat float rift;
 varying flat float first_kind;
 varying flat float infusion_count;
 
-// ---- Vertices ----
-
-// Infusion `i`'s look kind (its card's `look_layer`).
-float infusion_kind(int i) {
-	return floor(beam_infusions[clamp(i, 0, INFUSIONS - 1)].a * 255.0 + 0.5);
-}
-
-// Infusion `i`'s shade `k` (0 shadow, 1 base, 2 light), from its tint (a palette colour) as a
-// reaction's exact colour is made (`look_of`, EXACT).
-vec3 infusion_shade(int i, int k) {
-	vec3 c = beam_infusions[clamp(i, 0, INFUSIONS - 1)].rgb;
-	return k == 0 ? c * 0.55 : (k == 1 ? c : mix(c, vec3(1.0), 0.35));
-}
-
-// Point `n` of the path (clamped to it).
-vec3 path_point(int n) {
-	return beam_path[clamp(n, 0, max(beam_points - 1, 0))];
-}
-
-// The way piece `n` runs.
-vec2 way_of(int n) {
-	vec2 ab = path_point(n + 1).xy - path_point(n).xy;
-	return length(ab) > 0.001 ? normalize(ab) : vec2(1.0, 0.0);
-}
-
-void vertex() {
-	vec3 b = look_channels(beam_look);
-	Look L = look_of(core_override.rgb, beam_player < 0 ? ENEMY_PLAYER : float(min(beam_player, 3)), 1.0, b, 0.0, true);
-	SET_LOOK(L);
-	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
-	// corner in UV.y (kind + 0.25 or 0.75). Piece `slot`: from its point to the next, a lead past
-	// the beam's ends, as wide as the beam each side and a beam's width more at a bend, cut at the
-	// bend's middle.
-	int slot = int(floor(UV.x));
-	float quad = floor(UV.y);
-	vec2 corner = vec2(fract(UV.x) > 0.5 ? 1.0 : 0.0, fract(UV.y) > 0.5 ? 1.0 : 0.0);
-	bool shown = slot < beam_points - 1;
-	vec3 A = path_point(slot);
-	vec3 B = path_point(slot + 1);
-	vec2 way = way_of(slot);
-	vec2 side = vec2(-way.y, way.x);
-	float half_width = beam_width * 0.5;
-	bool first = slot == 0;
-	bool last = slot >= beam_points - 2;
-	float back = first ? beam_lead : beam_width;
-	float on = last ? beam_lead : beam_width;
-	vec2 lo_n = first ? way : normalize(way_of(slot - 1) + way);
-	vec2 hi_n = last ? way : normalize(way + way_of(slot + 1));
-	vec2 along_corner = mix(A.xy - way * back, B.xy + way * on, corner.x);
-	vec2 at = along_corner + side * mix(-half_width, half_width, corner.y);
-	// Folded away when there is nothing to draw.
-	VERTEX = shown ? at : vec2(-1.0e6);
-	world = VERTEX;
-	mode = quad == Q_PIECE ? M_PIECE : M_PIECE_LIGHT;
-	piece = vec4(A.xy, A.z, 0.0);
-	piece_way = vec4(way, max(abs(way.x), abs(way.y)), 0.0);
-	cut_lo = vec4(first ? A.xy - way * beam_lead : A.xy, lo_n);
-	cut_hi = vec4(last ? B.xy + way * beam_lead : B.xy, hi_n);
-	// Two pixels inside its quad's edge: room for a pulse's bulge and a sparkle past it.
-	bands = clamp(floor(BANDS * beam_swell + 0.25), 1.0, max(half_width - 3.0, 1.0));
-	// Its first infusion's look kind, handed over, or for a beam shown with its look only the
-	// kind its tint's infusion gives off (a plain beam: none).
-	float shown_kind = L.plain > 0.5 ? 0.0 : (bit_set(b, L_PULL) ? L_PULL : (bit_set(b, L_SPARKS) ? L_SPARKS : (bit_set(b, L_GUSTS) ? L_GUSTS : (bit_set(b, L_EMBERS) ? L_EMBERS : 0.0))));
-	float kind = beam_infusion_count > 0 ? infusion_kind(0) : shown_kind;
-	first_kind = kind;
-	infusion_count = float(min(beam_infusion_count, INFUSIONS));
-	rift = kind == L_PULL ? 1.0 : 0.0;
-	// A tint no palette material holds (mend's green) takes a ramp made from the tint itself.
-	float near = 9.0;
-	for (int i = 0; i < MATERIALS * 3; i++) {
-		near = min(near, distance(core_override.rgb, SHADES[i]));
-	}
-	if (L.plain < 0.5 && near > 0.08) {
-		vec3 t = core_override.rgb;
-		lo = t * 0.55;
-		mid = t;
-		hi = mix(t, vec3(1.0), 0.35);
-		hot = mix(t, vec3(1.0), 0.7);
-		glow = mix(mid, hi, 0.35);
-	}
-}
-
-// ---- Fragments ----
-// Small on purpose (core/README.md, "The shot shaders"): a pixel only colours itself from what
-// its quad's vertices worked out. Nothing read from the path.
-
-// Where the middle of the beam runs `along` pixels from the staff, pushed across: jagged for
-// lightning, swaying for storm, wavering for fire (its first infusion; the others wind as strands).
-float off_at(float along, float len) {
-	float jf = floor(sim_time * 30.0);
-	float off = 0.0;
-	if (first_kind == L_SPARKS) {
-		float seg = 6.0;
-		float k = floor(along / seg);
-		float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 41.0) - 0.5) * 6.0;
-		float o1 = (k + 1.0) * seg >= len ? 0.0 : (hash(k + 1.0, jf, 41.0) - 0.5) * 6.0;
-		off = mix(o0, o1, fract(along / seg));
-	} else if (first_kind == L_GUSTS) {
-		off = sin(along * 0.11 - sim_time * 18.0) * 1.6;
-	} else if (first_kind == L_EMBERS) {
-		off = sin(along * 0.55 - sim_time * 36.0) * 0.7;
-	}
-	return off;
-}
+// ---- The union's hooks (shot_beam_union.gdshaderinc) ----
 
 // How close `along` is to the nearest pulse running down a beam `len` long (1 on it, 0 from
 // `reach` pixels off).
@@ -193,6 +54,79 @@ float pulse_at(float along, float len, float reach) {
 	float gap = len / float(PULSES);
 	float d = mod(along - sim_time * PULSE_SPEED, gap);
 	return falloff(min(d, gap - d), reach);
+}
+
+// Its bands each side of its core: BANDS at rest, swelling and thinning with it, at least one, two
+// pixels inside half its width (room for a pulse's bulge and a sparkle past it).
+float look_bands(float swell, float width) {
+	return clamp(floor(BANDS * swell + 0.25), 1.0, max(width * 0.5 - 3.0, 1.0));
+}
+
+// How far past its bands its edge reaches `along` it: a ripple that runs down it, and a pixel more
+// where a pulse passes, on its own side each (so the two edges ripple apart).
+float look_ripple(float along, float len, float side) {
+	float ripple = sin(along * 0.31 + side * 2.1 - sim_time * 23.0) > 0.55 ? 1.0 : 0.0;
+	return ripple + floor(pulse_at(along, len, 6.0) * 1.6);
+}
+
+// Where the middle of a beam of first kind `kind` runs `along` pixels from the staff, pushed
+// across: jagged for lightning, swaying for storm, wavering for fire (its first infusion; the others
+// wind as strands).
+float look_off(float kind, float along, float len) {
+	float jf = floor(sim_time * 30.0);
+	float off = 0.0;
+	if (kind == L_SPARKS) {
+		float seg = 6.0;
+		float k = floor(along / seg);
+		float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 41.0) - 0.5) * 6.0;
+		float o1 = (k + 1.0) * seg >= len ? 0.0 : (hash(k + 1.0, jf, 41.0) - 0.5) * 6.0;
+		off = mix(o0, o1, fract(along / seg));
+	} else if (kind == L_GUSTS) {
+		off = sin(along * 0.11 - sim_time * 18.0) * 1.6;
+	} else if (kind == L_EMBERS) {
+		off = sin(along * 0.55 - sim_time * 36.0) * 0.7;
+	}
+	return off;
+}
+
+// Its own varyings for its beam `b`, set in the union's vertex() (a varying is set there only): its
+// first infusion's kind, how many it shows, whether it is a rift, and for a tint no palette material
+// holds (mend's green) a ramp made from the tint itself.
+#define LOOK_VERTEX(L, b) vec4 kinds = beam_texel(b, B_KIND); first_kind = kinds.z; infusion_count = min(kinds.x, float(INFUSIONS)); rift = first_kind == L_PULL ? 1.0 : 0.0; if (L.plain < 0.5 && int(kinds.y + 0.5) >= RAMP_OWN) { vec3 own_tint = beam_texel(b, B_CORE).rgb; lo = own_tint * 0.55; mid = own_tint; hi = mix(own_tint, vec3(1.0), 0.35); hot = mix(own_tint, vec3(1.0), 0.7); glow = mix(mid, hi, 0.35); }
+
+// Another beam's colour at the union's distance `e`: its band counted in from the edge in its ramp
+// (shadow, base, light, white-hot, then the core's bone), a rift's the other way round.
+vec3 look_neighbour(float ramp, float kind, int b, float e) {
+	float band = floor(-e);
+	vec3 shade = band > 3.5 ? BONE_LIGHT : ramp_shade(ramp, b, int(clamp(band, 0.0, 3.0)));
+	vec3 rift_shade = band < 0.5 ? ramp_shade(ramp, b, 2) : (band < 1.5 ? ramp_shade(ramp, b, 1) : (band < 2.5 ? ramp_shade(ramp, b, 0) : OUTLINE));
+	return kind == L_PULL ? rift_shade : shade;
+}
+
+// Another beam's light.
+vec3 look_neighbour_glow(float ramp, float kind, int b) {
+	return mix(ramp_shade(ramp, b, 1), ramp_shade(ramp, b, 2), 0.35);
+}
+
+#include "res://core/projectiles/shot_beam_union.gdshaderinc"
+
+// ---- Its own look ----
+
+// Infusion `i` of this beam: rgb its tint, alpha its look kind / 255.
+vec4 infusion_of(int i) {
+	return beam_texel(int(own_beam + 0.5), B_INFUSIONS + clamp(i, 0, INFUSIONS - 1));
+}
+
+// Infusion `i`'s look kind (its card's `look_layer`).
+float infusion_kind(int i) {
+	return floor(infusion_of(i).a * 255.0 + 0.5);
+}
+
+// Infusion `i`'s shade `k` (0 shadow, 1 base, 2 light), from its tint (a palette colour) as a
+// reaction's exact colour is made (`look_of`, EXACT).
+vec3 infusion_shade(int i, int k) {
+	vec3 c = infusion_of(i).rgb;
+	return k == 0 ? c * 0.55 : (k == 1 ? c : mix(c, vec3(1.0), 0.35));
 }
 
 // The infusion the pulse nearest `along` carries: the pulses take turns, the first infusion's own
@@ -209,14 +143,14 @@ float pulse_infusion(float along, float len) {
 // wide, a dark heart (void) threads, rising motes (mend) drift; sparks (lightning) jag, worked
 // out apart; any other kind winds its own way, picked from its number.
 vec3 strand_style(float kind) {
-	vec3 own = vec3(0.12 + 0.3 * hash_seeded(kind, 1.0, 57.0, 0.0), 3.0 + 9.0 * hash_seeded(kind, 2.0, 57.0, 0.0), 0.8);
-	own = kind == L_EMBERS ? vec3(0.21, 10.0, 0.9) : own;
-	own = kind == L_FLECKS ? vec3(0.42, 5.0, 0.8) : own;
-	own = kind == L_GUSTS ? vec3(0.085, 14.0, 1.15) : own;
-	own = kind == L_PULL ? vec3(0.26, 7.0, 0.75) : own;
-	own = kind == L_SPARKS ? vec3(0.0, 0.0, 0.85) : own;
-	own = kind == L_MOTES ? vec3(0.12, 3.0, 0.7) : own;
-	return own;
+	vec3 own_style = vec3(0.12 + 0.3 * hash_seeded(kind, 1.0, 57.0, 0.0), 3.0 + 9.0 * hash_seeded(kind, 2.0, 57.0, 0.0), 0.8);
+	own_style = kind == L_EMBERS ? vec3(0.21, 10.0, 0.9) : own_style;
+	own_style = kind == L_FLECKS ? vec3(0.42, 5.0, 0.8) : own_style;
+	own_style = kind == L_GUSTS ? vec3(0.085, 14.0, 1.15) : own_style;
+	own_style = kind == L_PULL ? vec3(0.26, 7.0, 0.75) : own_style;
+	own_style = kind == L_SPARKS ? vec3(0.0, 0.0, 0.85) : own_style;
+	own_style = kind == L_MOTES ? vec3(0.12, 3.0, 0.7) : own_style;
+	return own_style;
 }
 
 // Strand `i` (of `n`, look kind `kind`) at `along`: how far across it is (x), whether it is in
@@ -241,30 +175,37 @@ vec3 strand_at(float kind, float i, float n, float along, float reach) {
 	return vec3(r * sin(a), cos(a), r * style.x * cos(a));
 }
 
-// The beam's pixel at `along` pixels from the staff and `across` from its middle, `cheb` the
-// longer axis's share of its way on screen (so a band is one pixel per step of that axis, never
-// two), `P` the pixel in the world, `pulse_e` the infusion of the pulse nearest: its colour, or
-// alpha 0.
-vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
-	float len = max(beam_length, 1.0);
-	float at = floor(along);
-	float off = off_at(along, len);
-	// Its lane across in art pixels (ART_DETAIL a world pixel; ART2), `x` in world pixels: its bands
-	// keep their world widths (`band`), its core and strands an art pixel fine.
-	float xs = floor((across - off) * ART_DETAIL / max(cheb, 0.5) + 0.5);
-	float x = abs(xs) / ART_DETAIL;
-	// Its edge here: a ripple that runs down it, and a pixel more where a pulse passes, on its own
-	// side each (`x` the pixel's, so the two edges ripple apart).
-	float side = xs < 0.0 ? 1.0 : 0.0;
-	float ripple = sin(along * 0.31 + side * 2.1 - sim_time * 23.0) > 0.55 ? 1.0 : 0.0;
-	float pulse = pulse_at(along, len, 6.0);
-	float edge = bands + ripple + floor(pulse * 1.6);
-	// Its band, counted in from its edge: 0 its edge (shadow), 1 base, 2 light, 3 white-hot, more the
-	// core. A rift counts the other way round: lips bright, the dark at its middle.
-	// Whole bands (ART2): an art lane in a band's half step counts as the band it lies in, so every
-	// band keeps its world width and only the core is an art pixel thin (the beam half an art pixel
-	// narrower on each side of it).
-	float band = floor(edge - x);
+// A flare's heart and arm for a beam: this beam's own colours, another's from its ramp (void's
+// dark heart and its light round it).
+vec3 flare_heart(float kind) {
+	return kind == L_PULL ? OUTLINE : BONE_LIGHT;
+}
+
+vec3 flare_arm(float beam, float ramp, float kind) {
+	bool mine_beam = abs(beam - own_beam) < 0.5;
+	vec3 own_arm = mix(hot, VOID_LIGHT, rift);
+	vec3 other_arm = kind == L_PULL ? VOID_LIGHT : ramp_shade(ramp, int(beam + 0.5), 3);
+	return mine_beam ? own_arm : other_arm;
+}
+
+vec3 flare_rim(float beam, float ramp) {
+	return abs(beam - own_beam) < 0.5 ? hi : ramp_shade(ramp, int(beam + 0.5), 2);
+}
+
+// The pixel at `P` of the merged shape `u`, drawn by this quad's piece `me`, `pulse_e` the infusion
+// of the pulse nearest: its colour, or alpha 0.
+vec4 beam_pixel(Union u, Piece me, vec2 P, float pulse_e) {
+	float len = me.len;
+	float at = floor(me.along);
+	float x = me.x;
+	float xs = me.xs;
+	float side = me.side;
+	float edge = me.edge;
+	float pulse = pulse_at(me.along, len, 6.0);
+	// Its band, counted in from the merged shape's edge: 0 its edge (shadow), 1 base, 2 light, 3
+	// white-hot, more the core. A rift counts the other way round: lips bright, the dark at its
+	// middle. Whole bands (ART2): every band keeps its world width; only the core is an art pixel thin.
+	float band = floor(-u.e);
 	vec3 shade = band < 0.5 ? lo : (band < 1.5 ? mid : (band < 2.5 ? hi : (band < 3.5 ? hot : BONE_LIGHT)));
 	vec3 rift_shade = band < 0.5 ? hi : (band < 1.5 ? mid : (band < 2.5 ? lo : OUTLINE));
 	vec3 inner = mix(shade, rift_shade, rift);
@@ -283,7 +224,7 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 			break;
 		}
 		float kind = infusion_kind(i);
-		vec3 s = strand_at(kind, float(i - 1), strands, along, reach);
+		vec3 s = strand_at(kind, float(i - 1), strands, me.along, reach);
 		bool hit = abs(xs / ART_DETAIL - s.x) <= 0.25 + 0.5 * abs(s.z);
 		bool front = s.y > 0.0;
 		vec3 strand_shade = infusion_shade(i, front ? (band < 2.5 ? 2 : 1) : 0);
@@ -292,47 +233,48 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	}
 	vec4 colour = vec4(0.0);
 	// As it ends it falls apart into pixels, its edge first, its core last.
-	bool kept = hash(at, x + side * 17.0 + 7.0, 42.0) < beam_fade * 1.4 - (x / max(edge, 1.0)) * (1.0 - beam_fade);
-	if (kept && along >= 0.0 && along <= len) {
-		if (x <= edge) {
-			colour = vec4(inner, 1.0);
-		} else if (x == edge + 1.0 / ART_DETAIL && mod(at * 7.0 + side * 5.0 + floor(sim_time * 30.0) * 13.0, 11.0) < 1.5) {
-			// Sparkles a pixel past its edge, re-rolled every other frame, in the pulse's colours.
+	float fade = me.fade;
+	bool kept = hash(at, x + side * 17.0 + 7.0, 42.0) < fade * 1.4 - (x / max(edge, 1.0)) * (1.0 - fade);
+	if (kept) {
+		if (u.e <= 0.0) {
+			// Where beams meet, its colour from every beam near (the rule at a junction).
+			colour = vec4(union_colour(u, inner), 1.0);
+		} else if (u.e <= 1.0 / ART_DETAIL && me.e < OUTSIDE && mod(at * 7.0 + side * 5.0 + floor(sim_time * 30.0) * 13.0, 11.0) < 1.5) {
+			// Sparkles a pixel past the edge, re-rolled every other frame, in the pulse's colours.
 			colour = vec4(pulse_e >= 0.0 ? infusion_shade(pe, 2) : mix(hi, VOID_LIGHT, rift), 1.0);
 		}
 	}
-	// Flares at the staff and where it lands, upright crosses that flicker a pixel: white-hot at
-	// the heart (void's dark), its light round it.
+	// Flares at each beam's staff and where it lands, upright crosses that flicker a pixel:
+	// white-hot at the heart (void's dark), its light round it.
 	float flick = mod(floor(sim_time * 30.0), 2.0);
-	vec2 ds = floor(P) - floor(beam_start);
-	vec2 de = floor(P) - floor(beam_end);
+	vec2 ds = u.start_d;
+	vec2 de = u.end_d;
 	float sr = 1.0 + flick;
-	float er = 2.0 + flick + floor(0.5 * bands - 1.0);
-	vec3 heart = mix(BONE_LIGHT, OUTLINE, rift);
-	vec3 arm = mix(hot, VOID_LIGHT, rift);
-	if ((ds.x == 0.0 && abs(ds.y) <= sr) || (ds.y == 0.0 && abs(ds.x) <= sr)) {
-		colour = vec4(ds == vec2(0.0) ? heart : arm, 1.0);
+	float er = 2.0 + flick + floor(0.5 * u.end_bands - 1.0);
+	if (u.start_beam >= 0.0 && ((ds.x == 0.0 && abs(ds.y) <= sr) || (ds.y == 0.0 && abs(ds.x) <= sr))) {
+		colour = vec4(ds == vec2(0.0) ? flare_heart(u.start_kind) : flare_arm(u.start_beam, u.start_ramp, u.start_kind), 1.0);
 	}
-	if (beam_fade > 0.3 && ((de.x == 0.0 && abs(de.y) <= er) || (de.y == 0.0 && abs(de.x) <= er))) {
-		colour = vec4(abs(de.x) + abs(de.y) < 1.5 ? heart : (abs(de.x) + abs(de.y) < er ? arm : hi), 1.0);
+	if (u.end_beam >= 0.0 && u.end_fade > 0.3 && ((de.x == 0.0 && abs(de.y) <= er) || (de.y == 0.0 && abs(de.x) <= er))) {
+		float m = abs(de.x) + abs(de.y);
+		colour = vec4(m < 1.5 ? flare_heart(u.end_kind) : (m < er ? flare_arm(u.end_beam, u.end_ramp, u.end_kind) : flare_rim(u.end_beam, u.end_ramp)), 1.0);
 	}
 	return colour;
 }
 
-// The beam's light at `P` (`along` it, `across` from its middle): a soft band as wide as its bands
-// and more, and both ends, in its glow; the pulses running down it, each in its infusion's light.
-vec3 beam_light(float along, float across, vec2 P, float pulse_e) {
-	float len = max(beam_length, 1.0);
-	float off = off_at(along, len);
-	float a = abs(across - off);
-	float lit = 0.5 * falloff(a, 3.0 + 1.5 * bands) + 0.6 * falloff(length(floor(P) - floor(beam_end)), 7.0 + bands) + 0.4 * falloff(length(floor(P) - floor(beam_start)), 5.0);
+// The light at `P`: a soft band round the merged shape as wide as its bands and more, and the
+// beams' ends near, in the glow of every beam near; this beam's pulses, each in its infusion's light.
+vec3 beam_light(Union u, Piece me, vec2 P, float pulse_e) {
+	float a = max(u.e + u.bands, 0.0);
+	float lit = 0.5 * falloff(a, 3.0 + 1.5 * u.bands);
+	lit += u.end_beam >= 0.0 ? 0.6 * falloff(length(u.end_d), 7.0 + u.end_bands) : 0.0;
+	lit += u.start_beam >= 0.0 ? 0.4 * falloff(length(u.start_d), 5.0) : 0.0;
 	vec3 pulse_glow = pulse_e >= 0.0 ? infusion_shade(int(pulse_e), 2) : glow;
-	return glow * lit + pulse_glow * 0.45 * pulse_at(along, len, 6.0) * falloff(a, 3.0 + bands);
+	return union_glow(u, glow) * lit + pulse_glow * 0.45 * u.own_w * pulse_at(me.along, me.len, 6.0) * falloff(a, 3.0 + u.bands);
 }
 
 // The light's strength after the beam's fade, glow, flicker and void's dimming.
-float light_scale() {
-	float k = beam_fade * beam_glow;
+float light_scale(Piece me) {
+	float k = me.fade * beam_texel(int(own_beam + 0.5), B_LOOK).w;
 	if (first_kind == L_SPARKS) {
 		k *= 0.55 + 0.9 * hash(floor(sim_time * 20.0), 0.0, 21.0);
 	}
@@ -343,19 +285,18 @@ float light_scale() {
 }
 
 void fragment() {
-	// A piece: only the pixels on its side of each bend (the cuts), along it from its start.
+	// Each art pixel once: the union at its middle, drawn only by the piece nearest it.
 	vec4 colour = vec4(0.0);
-	vec2 P = world;
-	vec2 c = art_centre(P);
-	bool inside = dot(c - cut_lo.xy, cut_lo.zw) >= 0.0 && dot(c - cut_hi.xy, cut_hi.zw) < 0.0;
-	vec2 d = P - piece.xy;
-	float along = piece.z + dot(d, piece_way.xy);
-	float across = dot(d, vec2(-piece_way.y, piece_way.x));
-	float pulse_e = pulse_infusion(along, max(beam_length, 1.0));
-	if (inside && mode < M_PIECE_LIGHT + 0.5) {
-		colour = vec4(beam_light(along, across, P, pulse_e) * light_scale() * glow_strength, 0.0);
-	} else if (inside) {
-		colour = beam_pixel(along, across, piece_way.z, P, pulse_e);
+	vec2 P = art_centre(world);
+	Piece me;
+	Union u = union_at(P, me);
+	if (u.mine) {
+		// Its pixels where it has them, its light (added) elsewhere: light under them is never seen.
+		float pulse_e = pulse_infusion(me.along, me.len);
+		colour = beam_pixel(u, me, P, pulse_e);
+		if (colour.a < 0.5) {
+			colour = vec4(beam_light(u, me, P, pulse_e) * light_scale(me) * glow_strength, 0.0);
+		}
 	}
 	COLOR = colour;
 }

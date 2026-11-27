@@ -72,8 +72,8 @@ func test_the_beam_does_not_reach_past_its_length() -> void:
 
 func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
 	# The beam's look is its own (a white-hot core banded out through its ramp; void a dark rift;
-	# the owner, 2026-11-08), no longer the plain beam's include: Feel sets the plain beam's
-	# uniforms on it (`FeelBeams._on_carrier_shown`), so it keeps declaring every one, or a setting falls
+	# the owner, 2026-11-08), no longer the plain beam's include: Feel's beam union sets the plain
+	# beam's uniforms on it (`BeamUnion.publish`), so it keeps declaring every one, or a setting falls
 	# on nothing and the beam draws stale.
 	var plain: String = ShaderSource.of(load("res://core/projectiles/shot_beam.gdshader") as Shader)
 	var own_look: String = ShaderSource.of(_carrier_card(&"beam").look_shader)
@@ -83,9 +83,10 @@ func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
 		if line.begins_with("uniform "):
 			count += 1
 			check(own_look.contains(line), "the beam's look keeps `%s`" % line)
-	check(count > 10, "the plain beam's uniforms were read (%d)" % count)
-	check(own_look.contains("uniform vec4 beam_infusions[8];") and own_look.contains("uniform int beam_infusion_count"), "it is handed every infusion on the beam")
-	check(own_look.contains("rift = kind == L_PULL ? 1.0 : 0.0;"), "a beam whose first infusion gives off a dark heart (void) is a dark rift")
+	check(count >= 5, "the plain beam's uniforms were read (%d)" % count)
+	check(_carrier_card(&"beam").look_shader.code.contains("#include \"res://core/projectiles/shot_beam_union.gdshaderinc\""), "drawn as one merged shape with every other beam (the owner, 2026-11-27)")
+	check(own_look.contains("B_INFUSIONS"), "it reads every infusion on the beam from its row")
+	check(own_look.contains("rift = first_kind == L_PULL ? 1.0 : 0.0;"), "a beam whose first infusion gives off a dark heart (void) is a dark rift")
 
 
 

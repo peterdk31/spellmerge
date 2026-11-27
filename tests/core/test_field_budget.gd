@@ -7,7 +7,8 @@ extends "res://tests/support/suite.gd"
 ##
 ## - **What held shots cost** (the owner, 2026-11-26: "No limits"): one field holding HELD shots, its
 ##   step (drawing every one in) within HELD_BUDGET_US, and its burst, spread over steps
-##   (BURST_PER_STEP a step), each step within BURST_BUDGET_US, for 500 and 2000.
+##   (BURST_PER_STEP a step), each step within BURST_BUDGET_REFERENCES GDScript references, for 500 and
+##   2000.
 ##
 ## The numbers are printed (`BUDGET:` lines) for the PR. Real time is read here, in a test, never in
 ## the game.
@@ -29,7 +30,11 @@ const FIELD_BUDGET_REFERENCES: float = 0.19
 ## about 1.4 ms a step since, BURST_PER_STEP at a time; generous for a shared machine).
 const HELD: Array[int] = [500, 2000]
 const HELD_BUDGET_US: int = 20000
-const BURST_BUDGET_US: int = 8000
+## The burst's dearest step in GDScript references (tests/support/wall_clock.gd), so it holds beside
+## other tests: its fixed 8000 us flaked on CI at 8874 us (#980). Measured 0.30 to 0.42 (once 0.67)
+## a step for 500 and 2000 held on a 4-core container, 2026-11-27, a reference about 3.9 ms there;
+## 2.0 is about the old 8000 us there, as loose as it on purpose.
+const BURST_BUDGET_REFERENCES: float = 2.0
 
 
 func _manager(native: bool) -> Array:
@@ -116,16 +121,31 @@ func test_held_shots_cost_within_their_budget() -> void:
 		fields.step(DT)
 		var held_us: int = Time.get_ticks_usec() - start
 		arena.projectiles.remove_by_tag(arena.projectiles.get_tag_of(fields.field_slot(0)))
-		# The burst, spread: BURST_PER_STEP a step, its dearest step timed.
+		# The burst, spread: BURST_PER_STEP a step, its dearest step timed, each step followed by the
+		# GDScript reference run for as long as it took (as WallClock.against shares the machine
+		# alike; a step changes what is held, so it cannot be run again), the fastest reference kept.
 		var worst: int = 0
 		var steps: int = 0
+		var reference_best: float = -1.0
 		while fields.held_count() > 0 and steps < 100:
 			start = Time.get_ticks_usec()
 			fields.step(DT)
-			worst = maxi(worst, Time.get_ticks_usec() - start)
+			var took: int = Time.get_ticks_usec() - start
+			worst = maxi(worst, took)
 			steps += 1
+			var runs: int = 0
+			var began: int = Time.get_ticks_usec()
+			var spent: int = 0
+			while runs == 0 or spent < took:
+				WallClock.gdscript_reference()
+				runs += 1
+				spent = Time.get_ticks_usec() - began
+			var one: float = float(spent) / float(runs)
+			reference_best = one if reference_best < 0.0 else minf(reference_best, one)
+		var burst: WallClock.Timed = WallClock.Timed.new(worst, reference_best)
 		check_equal(fields.held_count(), 0, "%d let go" % many)
 		check_equal(steps, ceili(float(many) / float(CarrierField.BURST_PER_STEP)), "%d let go over as many steps as the burst's share a step says" % many)
-		print("BUDGET: a field holding %d shots: a step %d us; its burst over %d steps, its dearest step %d us" % [many, held_us, steps, worst])
-		check(held_us < HELD_BUDGET_US and worst < BURST_BUDGET_US, "%d held within budget (%d, %d)" % [many, held_us, worst])
+		print("BUDGET: a field holding %d shots: a step %d us; its burst over %d steps, its dearest step %d us (%.3f GDScript references)" % [many, held_us, steps, worst, burst.multiple])
+		check(held_us < HELD_BUDGET_US, "%d held within budget (%d us)" % [many, held_us])
+		check(burst.multiple <= BURST_BUDGET_REFERENCES, "%d let go within %.2f GDScript references a step (%.3f: %d us)" % [many, BURST_BUDGET_REFERENCES, burst.multiple, worst])
 		arena.free_all()

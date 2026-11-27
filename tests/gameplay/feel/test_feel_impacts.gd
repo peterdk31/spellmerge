@@ -251,7 +251,7 @@ func test_flashes_draw_above_the_room_and_the_pillar_tops() -> void:
 	bus.projectile_impact.emit(0, null, Vector2.ZERO, Vector2.UP)
 	check_equal(feel.get_child_count(), children, "no nodes for hits: one batch draws them all")
 	for child in feel.get_children():
-		check(not child is CPUParticles2D and not child is Line2D or child in feel._live_beams, "no particle nodes and no lines but the beams: %s" % child)
+		check(not child is CPUParticles2D and not child is Line2D, "no particle nodes and no lines: %s" % child)
 
 
 ## S6 2: a hit's look is the cue `hit` (and `hit_puff` with no way), so it is data: a cue file

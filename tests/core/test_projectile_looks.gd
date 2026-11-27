@@ -171,7 +171,7 @@ func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 	var look_code: ShaderInclude = load("res://core/projectiles/shot_look.gdshaderinc")
 	check(look_code.code.contains("bit_set(b, ENEMY_RAMP) ? ENEMY_PLAYER"), "every shot shader's look takes it")
 	var beam: Shader = load("res://core/projectiles/shot_beam.gdshader")
-	check(ShaderSource.of(beam).contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
+	check(ShaderSource.of(beam).contains("core_row.a < -0.5 ? ENEMY_PLAYER"), "and an enemy's beam uses it too (its player -1 in its row, `BeamUnion`)")
 	check(ManagerScript.ramp_color(ActorsScript.RAMP_ENEMY).is_equal_approx(Color("#a68a2a")), "the enemy ramp's colour is Blight ochre")
 	var enemy: int = ActorSeats.enemy(mgr.actors)
 	check(mgr.tint_of(enemy).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
@@ -656,10 +656,17 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 func test_a_looks_int_is_split_by_its_channels_everywhere() -> void:
 	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
 	check(palette.code.contains("vec3 look_channels(int look)"), "the include splits a look int")
-	for path: String in ["res://core/projectiles/shot_beam.gdshaderinc", "res://core/projectiles/shot_swing.gdshaderinc", "res://content/spells/carriers/beam/beam.gdshader", "res://content/spells/carriers/swing/swing.gdshader"]:
+	for path: String in ["res://core/projectiles/shot_swing.gdshaderinc", "res://content/spells/carriers/swing/swing.gdshader"]:
 		var code: String = FileAccess.get_file_as_string(path)
 		check(code.contains("look_channels("), "%s splits its look by the channels" % path)
 		check(not code.contains("_look & 255)"), "%s keeps no byte split" % path)
+	# The beams' looks come in their rows (a float texel holds a whole number to 2^24 only, a look 30
+	# bits): BeamUnion splits each by the channels, and the union reads the three as `look_of`'s bits.
+	var look: int = ManagerScript.pack_look(PackedInt32Array([1, 11, 21, ManagerScript.LOOK_SLICK])) | ManagerScript.LOOK_ENEMY_RAMP
+	var channels: Vector3 = BeamUnion.look_channels(look)
+	var m: float = float(ManagerScript.LOOK_CHANNEL_MAX)
+	check_equal(ManagerScript.look_of_channels(channels.x / m, channels.y / m, channels.z / m), look, "a beam's look comes back whole from its channels")
+	check(FileAccess.get_file_as_string("res://core/projectiles/shot_beam_union.gdshaderinc").contains("look_of(core_row.rgb, core_row.a < -0.5 ? ENEMY_PLAYER : min(core_row.a, 3.0), 1.0, look_row.xyz"), "and the beams' union takes them as its look's bits")
 
 
 ## Regression (the same review): a birth's look float lost the low bits of a look with a flag (a
@@ -709,6 +716,6 @@ func test_the_carriers_look_shaders_sample_art_pixels() -> void:
 		var code: String = FileAccess.get_file_as_string("res://content/spells/carriers/%s/%s.gdshader" % [id, id])
 		check(code.contains("art_centre("), "the %s card's look samples art pixels" % id)
 	var beam: String = FileAccess.get_file_as_string("res://content/spells/carriers/beam/beam.gdshader")
-	check(beam.contains("float band = floor(edge - x);"), "the beam's bands keep their world widths on the art grid")
+	check(beam.contains("float band = floor(-u.e);"), "the beam's bands keep their world widths on the art grid (counted in from the merged shape's edge)")
 	var familiar: String = FileAccess.get_file_as_string("res://content/spells/carriers/familiar/familiar.gdshader")
 	check(familiar.contains("vec2 dw = floor(d + 0.5);") and familiar.contains("float t = floor(tn.x + 0.5);"), "the familiar's glint, eyes and tail stay on their world pixels")

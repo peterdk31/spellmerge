@@ -23,9 +23,12 @@ extends Node
 ## the folder is asked for (`get_resource`, `get_ids`, `get_all`, `add`, `remove`; `get_folders`
 ## loads every folder, since a folder is listed only when one of its files has an id). What a folder
 ## gives is the same either way, but the menu's start no longer waits for content it does not show,
-## such as the rooms' scenes with their art (#972). Once the game runs (the menu is up), the folders
-## nobody asked for yet are loaded a few milliseconds a frame (`warm_step`), so none is first asked
-## for in play. Nothing the simulation reads depends on when a folder loads.
+## such as the rooms' scenes with their art (#972). Once the menu has been up for `WARM_AFTER_FRAMES`
+## frames, the folders nobody asked for yet are loaded a few milliseconds a frame (`warm_step`; a big
+## file can take longer than that alone), so none is first asked for in play. Nothing the simulation
+## reads depends on when a folder loads, since content resources are never changed in place (a rule:
+## shared, read only). The saving is a release build's (the web's): a debug build's validators, below,
+## ask for most folders at the start.
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
 ## runs' (`validate_runs()`) and the items' (`validate_items()`: each item's use),
@@ -43,6 +46,10 @@ extends Node
 
 const DEFAULT_CONTENT_ROOT: String = "res://content"
 const DEFAULT_AUDIO_ROOT: String = "res://audio"
+## How long a frame may spend loading content nobody asked for yet (`warm_step`), in microseconds,
+## and how many frames after the start it begins, so the menu's first frames are its own.
+const WARM_USEC_PER_FRAME: int = 4000
+const WARM_AFTER_FRAMES: int = 30
 
 ## The content root of the last scan, and the duplicate spell ids it found (one line each,
 ## naming both files), for the validator.
@@ -53,9 +60,15 @@ var _resources: Dictionary = {}
 ## folder -> PackedStringArray of its `.tres` files, in sorted path order, for each folder the last
 ## scan found and nothing has asked for yet
 var _unloaded: Dictionary = {}
-## The files of the first folder of `_unloaded` that `warm_step` has loaded so far, held so they stay
-## in the resource cache until the folder is registered.
+## Every folder of the last scan, in scan order, and the index in it of the folder `warm_step` is
+## loading (every folder before it is loaded).
+var _order: Array[StringName] = []
+var _order_at: int = 0
+## The files of that folder that `warm_step` has loaded so far, held so they stay in the resource
+## cache until the folder is registered.
 var _warmed: Array[Resource] = []
+## Frames to wait before warming (`WARM_AFTER_FRAMES`).
+var _warm_wait: int = WARM_AFTER_FRAMES
 ## folder -> sorted Array[StringName] of every id
 var _ids: Dictionary = {}
 ## sound id -> path
@@ -70,9 +83,6 @@ var _data: Dictionary = {}
 var _plain: RegEx = RegEx.create_from_string("^[a-z0-9_]+$")
 ## The templates' shapes by biome (`piece_shapes`), kept until the content changes.
 var _piece_shapes: Dictionary = {}
-
-## How long a frame may spend loading content nobody asked for yet (`warm_step`), in microseconds.
-const WARM_USEC_PER_FRAME: int = 4000
 
 ## The folder a content item keeps its sounds in, and a sound's folder of baked variants: never ids.
 const SOUNDS_FOLDER: String = "sounds"
@@ -91,6 +101,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _warm_wait > 0:
+		_warm_wait -= 1
+		return
 	if warm_step(WARM_USEC_PER_FRAME):
 		set_process(false)
 
@@ -100,8 +113,12 @@ func _process(_delta: float) -> void:
 ## when every folder is loaded. Only when a folder loads changes: what each gives is the same.
 func warm_step(budget_usec: int) -> bool:
 	var start: int = Time.get_ticks_usec()
-	while not _unloaded.is_empty():
-		var folder: StringName = _unloaded.keys()[0]
+	while _order_at < _order.size():
+		var folder: StringName = _order[_order_at]
+		if not _unloaded.has(folder):
+			_order_at += 1
+			_warmed.clear()
+			continue
 		var paths: PackedStringArray = _unloaded[folder]
 		if _warmed.size() >= paths.size():
 			_load_folder(folder)
@@ -119,6 +136,8 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_duplicates.clear()
 	_resources.clear()
 	_unloaded.clear()
+	_order.clear()
+	_order_at = 0
 	_warmed.clear()
 	_piece_shapes.clear()
 	_ids.clear()
@@ -127,6 +146,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_sound_clashes.clear()
 	_data.clear()
 	for folder_name: String in _list_dir(content_root, true):
+		_order.append(StringName(folder_name))
 		_unloaded[StringName(folder_name)] = _find_files(content_root.path_join(folder_name), PackedStringArray(["tres"]), SOUNDS_FOLDER)
 	var sound_files: PackedStringArray = PackedStringArray()
 	_collect_sounds(audio_root, sound_extensions, true, sound_files)
@@ -194,7 +214,7 @@ static func scan_folder(folder: StringName, content_root: String = DEFAULT_CONTE
 func _load_folder(folder: StringName) -> void:
 	if not _unloaded.has(folder):
 		return
-	var warmed: bool = folder == _unloaded.keys()[0]
+	var warmed: bool = _order_at < _order.size() and _order[_order_at] == folder
 	var paths: PackedStringArray = _unloaded[folder]
 	_unloaded.erase(folder)
 	var duplicates: Array[String] = []

@@ -36,3 +36,11 @@ func test_a_scan_loads_nothing_and_is_quick() -> void:
 	var all: WallClock.Timed = WallClock.against(_scan_and_load_all, WallClock.gdscript_reference, RUNS)
 	print("BENCH: the registry's scan: %.1f GDScript references (%d us; a reference %d us); loading every folder too: %.1f" % [timed.multiple, timed.work_usec, timed.reference_usec, all.multiple])
 	check(timed.multiple <= USUAL * SLACK, "a scan took %.1f GDScript references, within %.1f" % [timed.multiple, USUAL * SLACK])
+	check(all.multiple > USUAL * SLACK, "loading every folder at the scan, as before, would fail the budget (%.1f)" % all.multiple)
+
+
+func test_a_scan_of_the_game_loads_no_folder() -> void:
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan()
+	check(fresh._resources.is_empty(), "a scan registers no folder")
+	check(fresh._unloaded.has(&"rooms") and fresh._unloaded.has(&"spells"), "it lists the game's folders, the rooms and spells among them")

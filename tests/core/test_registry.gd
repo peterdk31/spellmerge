@@ -252,8 +252,10 @@ const LAZY_ROOM: String = LAZY_ROOT + "/content/rooms/hall.tres"
 const LAZY_SPELL: String = LAZY_ROOT + "/content/spells/spark.tres"
 
 
-## A content root under user:// of one room and one spell, files no test has loaded yet.
+## A content root under user:// of one room and one spell, files no test has loaded yet (checked:
+## a file still in the resource cache would make the checks of what a scan loads mean nothing).
 func _lazy_content() -> void:
+	check(not ResourceLoader.has_cached(LAZY_ROOM) and not ResourceLoader.has_cached(LAZY_SPELL), "no test left the fixture's files loaded")
 	DirAccess.make_dir_recursive_absolute(LAZY_ROOT + "/content/rooms")
 	DirAccess.make_dir_recursive_absolute(LAZY_ROOT + "/content/spells")
 	var room := RoomBase.new()
@@ -319,4 +321,18 @@ func test_a_folder_asked_for_while_warming_is_the_same() -> void:
 	check_equal(fresh.get_ids(&"spells"), _names([&"spark"]), "a folder after the one being warmed loads when asked")
 	check_equal(fresh.get_ids(&"rooms"), _names([&"hall"]), "the one being warmed too")
 	check(fresh.warm_step(0), "and nothing is left to warm")
+	_remove_lazy_content()
+
+
+func test_the_folder_being_warmed_asked_for_is_loaded_and_warming_goes_on() -> void:
+	_lazy_content()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(LAZY_ROOT + "/content", LAZY_ROOT + "/audio")
+	fresh.warm_step(0)
+	check_equal(fresh.get_ids(&"rooms"), _names([&"hall"]), "the folder being warmed loads when asked")
+	check(fresh._warmed.is_empty(), "its warmed files are let go once it is registered")
+	check(not ResourceLoader.has_cached(LAZY_SPELL), "the next folder is not loaded yet")
+	fresh.warm_step(0)
+	check(ResourceLoader.has_cached(LAZY_SPELL), "warming goes on with the next folder's first file")
+	check(fresh.warm_step(0), "and then everything is loaded")
 	_remove_lazy_content()

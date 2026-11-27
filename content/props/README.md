@@ -19,7 +19,7 @@ Things in the world that stand, block, take hits, react by casting spell cards a
   - a light (`light_reach` above 0, `light_*`).
   - `cue`: played as the state is entered (not the start state).
 - **Changes of state play their frames** (docs/STYLE.md, "Smooth").
-- **Art from a grid:** `<name>.grid.json` -> `tools/pixel_grid.py` -> `<name>.svg` (and `<name>_motes.svg` when the grid marks `*`). Commit the grid and both SVGs; `tools/test_pixel_grid.py` fails when they differ.
+- **Art at 2x detail, from parts:** a prop's looks are drawn by `tools/prop_art.py` (on `tools/sprite_rules.py`: each prop its own shapes and light rules) as `<name>@2x.svg` (a strip: `<name>@2x.png`), 64 art pixels a 32-unit cell, drawn at half size (`ArtDetail`; `PropLayer.frame_size` is in world units, `frame_px` in the picture's pixels). Change a prop's art in its rules and run the tool; `tools/test_prop_art.py` fails when a file differs. A mote mask (`<name>_motes.svg`) stays at 1x, a lit pixel a world pixel, written by the same tool from the prop's glowing points. A prop not yet redrawn (the hub's stone and altar) is 1x, from a grid (`tools/pixel_grid.py`).
 - **`PropStates`:** `list` of `PropState`, the first the start state. **`PropState`:** `state_id`, `triggers` (in order), `blocks`, `hittable`, `gone` (entering it frees the prop).
 - **`PropTrigger`:** `when` and its numbers, then `cast` (staff 1–4; 0 none) and `then` (a state id; empty stays).
 
@@ -62,18 +62,18 @@ Other worked props to copy: `arc_lodestone` (runs dry: `refused 1, dry`), `fount
 
 ## Allowed files
 
-`.tres`, `.tscn` (text), sprites (`.png` or `.svg`) and their `.grid.json` grids, `assets.json`, the prop's `test_<id>.gd`, plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB otherwise. Typed GDScript only; no banned APIs; load only with literal `res://` paths.
+`.tres`, `.tscn` (text), sprites (`.png` or `.svg`) and, for 1x art, their `.grid.json` grids, `assets.json`, the prop's `test_<id>.gd`, plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB otherwise. Typed GDScript only; no banned APIs; load only with literal `res://` paths.
 
 ## Steps
 
 1. Make `content/props/<id>/`, its `<id>.tres` (`scene` = `base/prop.tscn`) and `<id>_states.tres` (start from the barrel).
 2. Give it staffs of player cards for what it casts.
-3. Draw grids, write SVGs (`tools/pixel_grid.py`), give each state a look, list the art in `assets.json`, commit the `.uid` files.
+3. Draw its looks in `tools/prop_art.py` (copy the crate), run it, give each state a look, list the art in `assets.json`, commit the `.uid` files.
 4. Write `test_<id>.gd` for its paths; run the checks; open a PR.
 
 ## Tests
 
-`content/props/<id>/test_<id>.gd`, `tests/content/props/test_prop_data.gd` (roles, pools), `tests/gameplay/actor/test_prop_state_triggers.gd`, `tools/test_pixel_grid.py`.
+`content/props/<id>/test_<id>.gd`, `tests/content/props/test_prop_data.gd` (roles, pools), `tests/gameplay/actor/test_prop_state_triggers.gd`, `tools/test_prop_art.py`, `tools/test_pixel_grid.py`.
 
 ```sh
 tools/check.sh

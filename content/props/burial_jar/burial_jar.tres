@@ -4,11 +4,11 @@
 [ext_resource type="Resource" path="res://content/props/burial_jar/burial_jar_states.tres" id="2"]
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="3"]
 [ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4"]
-[ext_resource type="Texture2D" path="res://content/props/burial_jar/idle.svg" id="5"]
+[ext_resource type="Texture2D" path="res://content/props/burial_jar/idle@2x.svg" id="5"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="6"]
 [ext_resource type="Script" path="res://core/base/prop_layer.gd" id="7"]
 [ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="8"]
-[ext_resource type="Texture2D" path="res://content/props/burial_jar/shattered.svg" id="9"]
+[ext_resource type="Texture2D" path="res://content/props/burial_jar/shattered@2x.svg" id="9"]
 [ext_resource type="Script" path="res://core/base/prop_base.gd" id="10"]
 
 [sub_resource type="Resource" id="staff_1"]

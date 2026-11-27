@@ -11,7 +11,7 @@ extends "res://tests/support/suite.gd"
 ## the round holds BUDGET_REFERENCES (the web build runs the module too). Every multiple is printed
 ## (`BUDGET:` lines), the GDScript fallback's too. Real time is read here, in a test, never in the
 ## game. The beams between their hits walk together (`CarrierBeam.walk_together`, natively
-## `ShotKernel.ray_walks`); before that each walked alone in GDScript, at about twice the cost a beam.
+## `ShotKernel.ray_walks`); before, each walked alone in GDScript, at about twice the cost.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const WallClock := preload("res://tests/support/wall_clock.gd")

@@ -29,6 +29,10 @@ const CASTS: Array = [
 	[[&"hold", &"frost", &"beam"], Vector2(430.0, 240.0), Vector2(520.0, 300.0), 3],
 	[[&"hold", &"lightning", &"beam"], Vector2(610.0, 245.0), Vector2(520.0, 300.0), 3],
 ]
+## Where the check's fan of six beams starts, and the most of its pixels by the hand that may be
+## white-hot, in percent.
+const FAN_HAND := Vector2(100.0, 320.0)
+const WHITE_MOST: int = 50
 ## The crops: name, the world point they are round, and their half size.
 const CROPS: Array = [
 	["plus_two", Vector2(90.0, 60.0), Vector2i(50, 30)],
@@ -99,7 +103,8 @@ func take() -> void:
 ## one body with one rim (no pixel of the rim's two shades between their white-hot cores, which two
 ## beams drawn apart have: the one on top's rim over the other); where fire crosses frost, the dither
 ## interleaves their colours pixel by pixel far more often than the nearest beam's colour alone (one
-## seam between them).
+## seam between them); six beams from one hand are white-hot only along their own cores, their stack
+## the ramp's light.
 func _check_union(spells: Node, wizards: PackedInt32Array, feel: Node) -> void:
 	spells.call("clear")
 	var plain: Array[StringName] = [&"hold", &"beam"]
@@ -109,13 +114,33 @@ func _check_union(spells: Node, wizards: PackedInt32Array, feel: Node) -> void:
 	spells.call("install_staff", wizards[0], 1, spells.call("compile_staff", plain, STARTER))
 	spells.call("install_staff", wizards[1], 0, spells.call("compile_staff", fire, STARTER))
 	spells.call("install_staff", wizards[2], 0, spells.call("compile_staff", frost, STARTER))
+	var fan: Array[StringName] = [&"hold", &"plus_two", &"plus_three", &"beam"]
+	spells.call("install_staff", wizards[3], 0, spells.call("compile_staff", fan, STARTER))
 	spells.call("cast_staff", wizards[0], 0, Vector2(100.0, 100.0), Vector2.RIGHT, 100.0)
 	spells.call("cast_staff", wizards[0], 1, Vector2(100.0, 105.0), Vector2.RIGHT, 100.0)
 	spells.call("cast_staff", wizards[1], 0, Vector2(100.0, 250.0), Vector2.RIGHT, 100.0)
 	spells.call("cast_staff", wizards[2], 0, Vector2(200.0, 200.0), Vector2.DOWN, 100.0)
+	spells.call("cast_staff", wizards[3], 0, FAN_HAND, Vector2.RIGHT, 100.0)
 	await settle()
 	var image: Image = await grab()
 	save_crop(image, on_screen(Vector2(170.0, 102.0)), "beam_union_side_by_side_4x", Vector2i(50, 20), 4)
+	save_crop(image, on_screen(FAN_HAND + Vector2(45.0, 0.0)), "beam_union_fan_hand_4x", Vector2i(50, 30), 4)
+	# Six beams from one hand: their stack is the ramp's light, never white-hot of itself (the owner,
+	# 2026-11-27: the colour reads near the hand), so only their own cores are white there.
+	var white: int = 0
+	var drawn: int = 0
+	var from: Vector2 = on_screen(FAN_HAND + Vector2(8.0, -10.0))
+	var to: Vector2 = on_screen(FAN_HAND + Vector2(28.0, 10.0))
+	for y in range(int(from.y), int(to.y)):
+		for x in range(int(from.x), int(to.x)):
+			var c: Color = image.get_pixel(x, y)
+			if c.get_luminance() > 0.6:
+				drawn += 1
+				white += 1 if c.get_luminance() > 0.88 else 0
+	print("BEAM UNION: white-hot share of the fan by the hand: %d of %d" % [white, drawn])
+	if drawn == 0 or white * 100 > drawn * WHITE_MOST:
+		fail("six beams by the hand are white-hot more than %d%% (%d of %d): their stack must stop at the ramp's light" % [WHITE_MOST, white, drawn])
+		return
 	# Where the two are at most 6 px apart (the aim spreads them a little as they go).
 	var union: BeamUnion = feel.call(&"beam_union", BEAM_CARD_SHADER) as BeamUnion
 	var columns: Array[float] = []

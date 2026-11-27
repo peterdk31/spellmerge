@@ -63,6 +63,10 @@ const float SOFT_COLOUR = 1.5;
 const float UNION_ROOM = 1.0;
 // A pixel past a beam's end (its flat cut) is this far outside it, and more as it is further.
 const float OUTSIDE = 500.0;
+// How deep beams stacked make the shape at most, past what the deepest of them is on its own: just
+// short of a third band in (bands from the edge: shadow, base, light, white-hot), so their stack is
+// at most the ramp's light.
+const float STACK_DEEPEST = 2.999;
 // A beam's colour counts at a pixel only this near its edge (pixels outside it).
 const float COLOUR_REACH = 2.0;
 // A beam this much further in than the nearest adds nothing to the union worth a look (exp(-6) of it).
@@ -317,7 +321,8 @@ Piece piece_at(int s, vec2 P, bool own_piece) {
 	return p;
 }
 
-// The merged shape at a pixel: its distance (`e`, below 0 inside), whether this quad's piece draws
+// The merged shape at a pixel: its distance (`e`, below 0 inside; no deeper than STACK_DEEPEST past
+// the deepest beam's own depth there, `deepest`), whether this quad's piece draws
 // the pixel (`mine`), how wide its bands are there (weighed by nearness), this beam's share of the
 // colour (`own_w`), the two other beams nearest (`o1_*`, `o2_*`: the beam, -1 for none, its ramp,
 // kind and share) and the dither's pick among them and this beam (`pick`: 0 this beam, 1 or 2); the
@@ -325,6 +330,7 @@ Piece piece_at(int s, vec2 P, bool own_piece) {
 // is near), its ramp, bands, kind and (an end's) fade.
 struct Union {
 	float e;
+	float deepest;
 	bool mine;
 	float bands;
 	float own_w;
@@ -387,6 +393,7 @@ Near near_of(Piece q) {
 // to `u.own_w`, another's kept when it is one of the two heaviest.
 void count_beam(Near g, float own_beam_id, inout Sums sums, inout Union u) {
 	sums.soft += exp(-g.ord / SOFT);
+	u.deepest = max(u.deepest, g.ripple - g.e);
 	if (g.e < COLOUR_REACH + g.ripple) {
 		float w = exp(-g.ord / SOFT_COLOUR);
 		sums.w += w;
@@ -441,6 +448,7 @@ Union union_at(vec2 P, out Piece me) {
 	u.start_kind = 0.0;
 	u.end_kind = 0.0;
 	u.end_fade = 0.0;
+	u.deepest = 0.0;
 	if (!u.mine) {
 		return u;
 	}
@@ -541,6 +549,9 @@ Union union_at(vec2 P, out Piece me) {
 	float union_e = sums.soft > 0.0 ? -SOFT * log(sums.soft) : OUTSIDE;
 	u.bands = sums.w > 0.0 ? sums.bands / sums.w : me.bands;
 	u.e = union_e - (sums.w > 0.0 ? sums.ripple / sums.w : me.ripple);
+	// Beams stacked deepen the shape only to the ramp's brightest colour (the light), so the colour
+	// reads where they meet (the owner, 2026-11-27); only a beam's own depth there makes it white-hot.
+	u.e = max(u.e, -max(u.deepest, STACK_DEEPEST));
 	// The shares of this beam and the two others nearest, and the dither's pick among them: a
 	// threshold an art pixel, their shares stacked in the beams' order.
 	float total = u.own_w + u.o1_w + u.o2_w;

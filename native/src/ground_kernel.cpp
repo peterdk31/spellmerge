@@ -1779,7 +1779,7 @@ struct Drawing {
 	bool seam_colour(int64_t p, const int32_t *&ramp) const {
 		const int32_t b = band[p];
 		const std::vector<int32_t> &ramps = seam_ramps[side[p]];
-		if (b < 0 || ramps.empty()) {
+		if (b < 0 || (size_t)b * 3 + 3 > ramps.size()) {
 			return false;
 		}
 		ramp = ramps.data() + b * 3;

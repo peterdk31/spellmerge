@@ -133,10 +133,13 @@ func test_the_loading_screen_is_under_only_the_pause_menu_the_pad_line_and_the_f
 # --- One panel ---------------------------------------------------------------------------------
 
 
-func test_each_panel_uses_its_players_theme_variation() -> void:
+## The corner panel has no frame and no background (the owner, 2026-11-27): its margins are the
+## theme's `OpenPanel`, its player told by a corner mark in its ramp (ART4, `hud/widgets/hud_art.gd`;
+## tests/hud/test_hud_art.gd).
+func test_each_panel_uses_the_open_panel_variation() -> void:
 	for player in 4:
 		var panel: PlayerPanelScript = _panel(player)
-		check_equal(panel.theme_type_variation, StringName("PlayerPanel%d" % (player + 1)), "panel %d uses its theme variation" % player)
+		check_equal(panel.theme_type_variation, PlayerPanelScript.OPEN_PANEL, "panel %d uses the open panel's margins" % player)
 
 
 func test_the_health_line_shows_the_health() -> void:

@@ -1,6 +1,6 @@
 extends Control
 ## One staff's row of the corner panel (owner, 2026-10-27): the staff's button glyph, then its
-## cast sequence as small card icons in read order, one framed group per cast of the cycle, so a
+## cast sequence as small card icons in read order, one group per cast of the cycle, so a
 ## player sees which cards fire together and finds a card that does nothing, and under the cards
 ## a thin blue line of the staff's own mana (owner, 2026-11-19; `set_mana`, `meter_line.gd`).
 ##
@@ -43,6 +43,7 @@ extends Control
 const GlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
 const IconAtlasScript := preload("res://hud/widgets/icon_atlas.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const ICON: float = 8.0
 ## One icon plus the 1 px between two icons.
@@ -59,6 +60,8 @@ const CAST_GAP: float = 2.0
 const GLYPH_CELL: float = 14.0
 ## The arrow at an end of a strip with cards hidden that way: its width with its dark backing.
 const ARROW_WIDTH: float = 4.0
+## The arrow's columns, an art pixel each (`_draw_arrow`).
+const ARROW_COLUMNS: int = 6
 ## Frames an arrow takes to slide in from its end of the strip, or back out (docs/STYLE.md, "Smooth").
 const ARROW_FRAMES: int = 3
 ## How much of the cards before the next cast stays in view: one card, and the arrow over it.
@@ -76,9 +79,7 @@ enum Style { BUTTON, NEXT_CAST }
 ## `set_timing`'s `firing` when the row is not told what the mana pays.
 const FIRING_UNKNOWN: int = -2
 
-const FRAME: Color = Color("#4a4663")
 const FILL: Color = Color(0.11, 0.1, 0.16, 0.85)
-const NEXT_FILL: Color = Color(0.24, 0.21, 0.12, 0.95)
 const GOLD: Color = Color("#f2c230")
 const MUTED: Color = Color("#a39fb8")
 const WASTE_TINT: Color = Color(0.45, 0.45, 0.5, 0.55)
@@ -89,7 +90,8 @@ const EDGE_DELAY: Color = Color("#7fd6f5")
 const EDGE_RECHARGE: Color = Color("#f08a3c")
 ## The edge of a wind-up's charge, a frame the mana does not pay, and a fizzle's rim.
 const EDGE_WIND: Color = Color("#f2c230")
-const SHORT: Color = Color("#d8443a")
+## Short of mana: the palette's Fire base (the owner's decision of 2026-11-27, ART4).
+const SHORT: Color = HudArt.FIRE[HudArt.BASE]
 const SHORT_TINT: Color = Color(0.6, 0.5, 0.55, 0.8)
 const RIM: Color = Color.WHITE
 const GLYPH_DIM: Color = Color(0.5, 0.5, 0.58, 1.0)
@@ -202,6 +204,7 @@ func _ready() -> void:
 	_mana = MeterScript.new()
 	_mana.name = "Mana"
 	_mana.fill_color = MeterScript.MANA_COLOR
+	_mana.fill_shade = MeterScript.MANA_SHADE
 	_mana.visible = false
 	_mana.live = live
 	_mana.looks_changed.connect(live_changed.emit)
@@ -543,17 +546,10 @@ func _draw_cards() -> void:
 	var view: float = _strip.size.x
 	_drawn_outline = -1
 	_drawn_dashed = -1
-	# Three passes, each a run of one kind (the frames' fills, the icons, all one page of
-	# `IconAtlas`, then the strikes and the frames' edges), so the strip is three draw calls
-	# however many cards it shows; nothing of one pass overlaps another's in a way the order shows
-	# (an icon lies inside its fill, a strike over its icon, an edge round its own frame).
-	for c in _cast_size.size():
-		var box: Rect2 = _cast_box(c, view)
-		if box.size.x <= 0.0:
-			continue
-		var is_next: bool = c == next and _firing != -1
-		var marked: bool = is_next and (on_button or not recharging)
-		_strip.draw_rect(box, NEXT_FILL if marked else FILL)
+	# No fill under the casts (the owner, 2026-11-27: no HUD background): the cards sit straight on
+	# the game, each icon in its own outline, a cast told from the next by its wider gap (CAST_GAP). Two
+	# passes, each a run of one kind (the icons, all one page of `IconAtlas`, then the strikes and
+	# the marked frames' edges), so the strip is two draw calls however many cards it shows.
 	for c in _cast_size.size():
 		var box: Rect2 = _cast_box(c, view)
 		if box.size.x <= 0.0:
@@ -590,10 +586,10 @@ func _draw_cards() -> void:
 				var at := Vector2(box.position.x + 1.0 + i * ICON_STEP, 1.0)
 				_strip.draw_line(at + Vector2(0.0, ICON), at + Vector2(ICON, 0.0), STRIKE, 1.0)
 		if marked and recharging:
-			_draw_dashed(box, GOLD)
+			HudArt.dashed_tile(_strip, box, HudArt.SPARK[HudArt.LIGHT], GOLD)
 			_drawn_dashed = c
 		else:
-			_strip.draw_rect(box, GOLD if marked else (SHORT if short else FRAME), false, 1.0)
+			_draw_tile(box, marked, short)
 			if marked:
 				_drawn_outline = c
 	# The `NEXT_CAST` shade and the arrows over it: here, or while `live` by the panel's live layer
@@ -683,14 +679,17 @@ func _arrow_out(slid: int) -> float:
 
 
 ## A small arrow at `x` of the strip pointing `way` (-1 left, 1 right), on a dark backing over the
-## cards it hides: 3 px wide, its columns 2, 4 and 6 px tall from the tip.
+## cards it hides, drawn in art pixels (`HudArt.A`): six columns stepping out from the tip one art
+## pixel up and down at a time, 2 to 12 art pixels tall (the 2, 4 and 6 layout pixels of before,
+## its slope now whole art pixels), the tip's column one art pixel in from the backing's end.
 func _draw_arrow(target: CanvasItem, at: Vector2, clip: bool, x: float, way: int, color: Color) -> void:
 	_rect_onto(target, Rect2(x, 0.0, ARROW_WIDTH, BOX_HEIGHT), FILL, at, clip)
-	for step in 3:
-		# The tip is the column furthest out; each column inward is 2 px taller.
-		var column: float = x + (float(step) if way < 0 else ARROW_WIDTH - 1.0 - float(step))
-		var half: float = float(step)
-		_rect_onto(target, Rect2(column, BOX_HEIGHT * 0.5 - 1.0 - half, 1.0, 2.0 + half * 2.0), color, at, clip)
+	var a: float = HudArt.A
+	for step in ARROW_COLUMNS:
+		# The tip is the column furthest out; each column inward is an art pixel taller each way.
+		var column: float = x + a + (float(step) * a if way < 0 else ARROW_WIDTH - 2.0 * a - float(step) * a)
+		var half: float = float(step + 1) * a
+		_rect_onto(target, Rect2(column, BOX_HEIGHT * 0.5 - half, a, half * 2.0), color, at, clip)
 
 
 ## Over the glyph: the `BUTTON` shade, which pulls back up as the delay runs (what is still to
@@ -747,7 +746,6 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 	var box := Rect2(Vector2(x - 1.0, at.y), Vector2(_sigil_icons.size() * ICON_STEP + 1.0, BOX_HEIGHT))
 	for icon: Texture2D in _sigil_icons:
 		var tile := Rect2(Vector2(x, at.y + 1.0), Vector2(ICON, ICON))
-		target.draw_rect(tile, FILL)
 		if icon != null:
 			target.draw_texture_rect(icon, tile, false)
 		x += ICON_STEP
@@ -760,17 +758,15 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 		target.draw_rect(box.grow(1.0), SIGIL_GLOW, false, 1.0)
 
 
-func _draw_dashed(box: Rect2, color: Color) -> void:
-	var x: float = box.position.x
-	while x < box.end.x:
-		_strip.draw_rect(Rect2(x, box.position.y, 1.0, 1.0), color)
-		_strip.draw_rect(Rect2(x, box.end.y - 1.0, 1.0, 1.0), color)
-		x += 2.0
-	var y: float = box.position.y
-	while y < box.end.y:
-		_strip.draw_rect(Rect2(box.position.x, y, 1.0, 1.0), color)
-		_strip.draw_rect(Rect2(box.end.x - 1.0, y, 1.0, 1.0), color)
-		y += 2.0
+## Cast `box`'s frame at the art's detail (`HudArt.tile`): gold for the cast a press fires, red for
+## one the mana does not pay, each lit on its top and left edge. Any other cast has no frame (the
+## owner, 2026-11-27: a cleaner HUD, no boxes, no background): the gap between two casts (CAST_GAP,
+## wider than between two cards) parts them, and a frame marks only what needs the eye.
+func _draw_tile(box: Rect2, marked: bool, short: bool) -> void:
+	if marked:
+		HudArt.tile(_strip, box, HudArt.SPARK[HudArt.LIGHT], GOLD)
+	elif short:
+		HudArt.tile(_strip, box, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
 
 
 ## The `BUTTON` shade's height over a glyph inside `tall` px high: the wind-up's risen part, or the

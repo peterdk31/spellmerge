@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # the merge base, for the PR's diff below
       - id: read-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -101,7 +101,7 @@ jobs:
           disallowed-tools: "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
       - id: account-token
         if: always()
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}

@@ -71,6 +71,10 @@ var _glyph: Dictionary = GlyphsScript.NO_GLYPH
 var _body: PixelShape = null
 var _symbol: PixelShape = null
 var _tones: PackedColorArray = PackedColorArray(STONE_TONES)
+## Every body and symbol baked so far, by its shape, size and label (`_baked_shape`): a shape is
+## never changed once baked, so glyphs alike share one, and a menu's glyphs are made in no time (#972:
+## a bake took about 0.75 ms, and the HUD's start baked some hundred of them, twice each).
+static var _baked: Dictionary = {}
 
 
 func _init() -> void:
@@ -138,31 +142,50 @@ func _bake() -> void:
 	_symbol = null
 	var color: Color = _glyph["color"]
 	_tones = PackedColorArray(STONE_TONES)
-	match int(_glyph["shape"]):
-		GlyphsScript.Shape.KEY:
-			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_KEY, CUT_KEY), true)
-		GlyphsScript.Shape.SHOULDER:
-			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_SHOULDER, CUT_KEY), true)
+	var shape: int = int(_glyph["shape"])
+	_body = _baked_shape(shape, wide, tall)
+	match shape:
+		GlyphsScript.Shape.SHOULDER, GlyphsScript.Shape.TRIGGER:
 			_tones = PackedColorArray(DARK_TONES)
-		GlyphsScript.Shape.TRIGGER:
-			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_TRIGGER, CUT_KEY), true)
-			_tones = PackedColorArray(DARK_TONES)
-		GlyphsScript.Shape.MOUSE:
-			_body = PixelShape.from_rows(cap_rows(wide, tall, CUT_MOUSE, CUT_MOUSE), true)
-		GlyphsScript.Shape.DPAD:
-			_body = PixelShape.from_rows(dpad_rows(tall), true)
 		GlyphsScript.Shape.FACE:
-			_body = PixelShape.disc(tall)
 			_tones[PixelShape.LIGHT] = color.lightened(0.35)
 			_tones[PixelShape.BASE] = color
 			_tones[PixelShape.SHADOW] = color.darkened(0.4)
 		GlyphsScript.Shape.SYMBOL:
-			_body = PixelShape.disc(tall)
-			var symbol: String = String(_glyph["label"])
-			if SYMBOL_ROWS.has(symbol):
-				_symbol = PixelShape.from_rows(PackedStringArray(SYMBOL_ROWS[symbol]), false, false)
-			else:
-				_symbol = PixelShape.ring(SYMBOL_SIDE, 2, false, false)
+			_symbol = _baked_symbol(String(_glyph["label"]))
+
+
+## The body of a glyph of `shape` (`GlyphsScript.Shape`), `wide` × `tall` art pixels inside its
+## Outline, baked once (`_baked`).
+static func _baked_shape(shape: int, wide: int, tall: int) -> PixelShape:
+	var key := Vector3i(shape, wide, tall)
+	if _baked.has(key):
+		return _baked[key]
+	var body: PixelShape = null
+	match shape:
+		GlyphsScript.Shape.KEY:
+			body = PixelShape.from_rows(cap_rows(wide, tall, CUT_KEY, CUT_KEY), true)
+		GlyphsScript.Shape.SHOULDER:
+			body = PixelShape.from_rows(cap_rows(wide, tall, CUT_SHOULDER, CUT_KEY), true)
+		GlyphsScript.Shape.TRIGGER:
+			body = PixelShape.from_rows(cap_rows(wide, tall, CUT_TRIGGER, CUT_KEY), true)
+		GlyphsScript.Shape.MOUSE:
+			body = PixelShape.from_rows(cap_rows(wide, tall, CUT_MOUSE, CUT_MOUSE), true)
+		GlyphsScript.Shape.DPAD:
+			body = PixelShape.from_rows(dpad_rows(tall), true)
+		GlyphsScript.Shape.FACE, GlyphsScript.Shape.SYMBOL:
+			body = PixelShape.disc(tall)
+	_baked[key] = body
+	return body
+
+
+## A PlayStation glyph's symbol (`label`: cross, square, triangle, else the circle), baked once.
+static func _baked_symbol(label: String) -> PixelShape:
+	if _baked.has(label):
+		return _baked[label]
+	var symbol: PixelShape = PixelShape.from_rows(PackedStringArray(SYMBOL_ROWS[label]), false, false) if SYMBOL_ROWS.has(label) else PixelShape.ring(SYMBOL_SIDE, 2, false, false)
+	_baked[label] = symbol
+	return symbol
 
 
 ## A cap's rows, `wide` × `tall` art pixels (`#` filled), its top corners cut by `top` stepping in a

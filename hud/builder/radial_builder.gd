@@ -90,6 +90,7 @@ const TreeViewScript := preload("res://hud/builder/tree_view.gd")
 const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
 const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
 const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 ## How the ring shows the bag: every card at once, or one kind at a time.
 enum Layout { ALL, KIND }
@@ -129,16 +130,19 @@ const GROUP_COLORS: Array[Color] = [Color("#f4f1ea"), Color("#a39fb8")]
 ## The layout, in the view's pixels from the quarter's top left, the same in every quarter.
 const EDGE: float = 4.0
 const COLUMN_WIDTH: float = 112.0
-## The HP and MP bars on top of the column: a 1 px frame in the player's colour round two 2 px
-## bars (HP over MP) with a 1 px line between, 7 px in all.
+## The HP and MP lines on top of the column: two lines 3 px tall in their troughs (HP over MP),
+## 1 px apart, 7 px in all; no frame round them (ART4).
 const BARS_HEIGHT: float = 7.0
+## How tall each of the two lines is, and how far outside their top-left corner the player's corner
+## mark starts.
+const LINE_HEIGHT: float = 3.0
+const MARK_OUT: Vector2 = Vector2(3.0, 2.0)
 const TABS_FROM_TOP: float = 11.0
 const SLOTS_FROM_TOP: float = 26.0
-## The bars' colours, the corner panel's lines' (`meter_line.gd`), and each player's colour (the
-## theme's PlayerPanel1-4 borders).
+## The bars' colours, the corner panel's lines' (`meter_line.gd`); each player's colour is
+## `HudArt.player_ramp`.
 const HEALTH_COLOR: Color = MeterLineScript.HEALTH_COLOR
 const MANA_COLOR: Color = MeterLineScript.MANA_COLOR
-const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 const SLOT_SIZE: float = 16.0
 const SLOT_STEP: float = 18.0
 const SLOT_COLUMNS: int = 5
@@ -1349,6 +1353,11 @@ func _frame(rect: Rect2, color: Color) -> void:
 	draw_rect(rect, color, false, 1.0)
 
 
+## A frame one art pixel thin (ART4): what parts a slot from the game, never a border.
+func _thin(rect: Rect2, color: Color) -> void:
+	HudArt.ring(self, rect, color)
+
+
 func _draw() -> void:
 	if not _open:
 		return
@@ -1458,12 +1467,14 @@ func _draw_tabs() -> void:
 			continue
 		var staff: int = _tab_numbers[at]
 		if staff == NONE:
-			# An empty hand: an outline under its dim glyph, never shown.
-			_frame(rect, LINE)
+			# An empty hand: a thin outline under its dim glyph, never shown.
+			_thin(rect, LINE)
 			continue
 		var on: bool = staff == _viewed
-		draw_rect(rect, LINE if not on else GOLD.darkened(0.35))
-		_frame(rect, GOLD if on else DIM)
+		# A quiet tab with no frame; the one shown a gold slot (ART4).
+		draw_rect(HudArt.inside_cut(rect), LINE if not on else GOLD.darkened(0.35))
+		if on:
+			HudArt.tile(self, rect, HudArt.SPARK[HudArt.LIGHT], HudArt.SPARK[HudArt.BASE])
 		if _tab_hands[at] == NONE:
 			# A staff in the bag: its head.
 			var base: StaffBase = _plan(staff).get("staff") as StaffBase
@@ -1503,7 +1514,7 @@ func _draw_slots() -> void:
 		var id: StringName = cards[slot]
 		if id == NO_CARD or landing.has(slot):
 			draw_rect(rect, EMPTY)
-			_frame(rect, TILE)
+			_thin(rect, LINE)
 		elif previewing and slot == _slot:
 			draw_rect(rect, EMPTY)
 			_draw_icon(id, rect, 0.55)
@@ -1537,7 +1548,7 @@ func _draw_slots() -> void:
 		var share: float = clampf(_clear_held / CLEAR_HOLD, 0.0, 1.0)
 		var shown: int = mini(cards.size() - _first_row * SLOT_COLUMNS, SLOT_ROWS * SLOT_COLUMNS)
 		var box := Rect2(_slots_at - Vector2(3.0, 3.0), Vector2(SLOT_STEP * SLOT_COLUMNS + 4.0, SLOT_STEP * ceili(float(shown) / float(SLOT_COLUMNS)) + 4.0))
-		_frame(box, Color(WARN, 0.3 + 0.6 * share))
+		_thin(box, Color(WARN, 0.3 + 0.6 * share))
 		draw_rect(Rect2(box.position.x, box.end.y, box.size.x * share, 2.0), WARN)
 
 
@@ -1554,12 +1565,14 @@ func _draw_groups(groups: PackedInt32Array) -> void:
 		var box: Rect2 = _slot_rect(slot).grow(1.0)
 		var joined_left: bool = slot % SLOT_COLUMNS > 0 and groups[slot - 1] == group
 		var joined_right: bool = slot % SLOT_COLUMNS < SLOT_COLUMNS - 1 and slot + 1 < groups.size() and groups[slot + 1] == group
-		draw_rect(Rect2(box.position.x, box.position.y, box.size.x, 1.0), color)
-		draw_rect(Rect2(box.position.x, box.end.y - 1.0, box.size.x, 1.0), color)
+		# One art pixel thin (ART4).
+		var thin: float = HudArt.A
+		draw_rect(Rect2(box.position.x, box.position.y, box.size.x, thin), color)
+		draw_rect(Rect2(box.position.x, box.end.y - thin, box.size.x, thin), color)
 		if not joined_left:
-			draw_rect(Rect2(box.position.x, box.position.y, 1.0, box.size.y), color)
+			draw_rect(Rect2(box.position.x, box.position.y, thin, box.size.y), color)
 		if not joined_right:
-			draw_rect(Rect2(box.end.x - 1.0, box.position.y, 1.0, box.size.y), color)
+			draw_rect(Rect2(box.end.x - thin, box.position.y, thin, box.size.y), color)
 
 
 ## Per slot of the shown staff, the cast of its cycle that first reads it (0 first), or -1 for a
@@ -1604,31 +1617,29 @@ func _draw_icon(id: StringName, rect: Rect2, alpha: float) -> void:
 	draw_texture_rect(icon, Rect2(at, Vector2(size, size)), false, Color(1.0, 1.0, 1.0, alpha))
 
 
-## The HP and MP bars on top of the column, framed in the player's colour (owner, 2026-10-31).
+## The HP and MP lines on top of the column (owner, 2026-10-31), each in its trough with no frame
+## round them (ART4, the owner, 2026-11-27: no HUD boxes); the player's small corner L just outside
+## their top-left corner says whose builder it is.
 func _draw_bars() -> void:
-	var frame := Rect2(_bars_at, Vector2(COLUMN_WIDTH, BARS_HEIGHT))
-	draw_rect(frame, PLAYER_COLORS[clampi(index, 0, PLAYER_COUNT - 1)])
-	var inner := Rect2(frame.position + Vector2(1.0, 1.0), Vector2(frame.size.x - 2.0, 2.0))
 	var shares: Vector2 = bar_shares()
-	draw_rect(inner, OUTLINE)
-	draw_rect(Rect2(inner.position, Vector2(roundf(inner.size.x * shares.x), 2.0)), HEALTH_COLOR)
-	var lower := Rect2(inner.position + Vector2(0.0, 3.0), inner.size)
-	draw_rect(lower, OUTLINE)
-	draw_rect(Rect2(lower.position, Vector2(roundf(lower.size.x * shares.y), 2.0)), MANA_COLOR)
+	HudArt.meter(self, Rect2(_bars_at, Vector2(COLUMN_WIDTH, LINE_HEIGHT)), shares.x, HEALTH_COLOR, MeterLineScript.HEALTH_SHADE)
+	HudArt.meter(self, Rect2(_bars_at + Vector2(0.0, BARS_HEIGHT - LINE_HEIGHT), Vector2(COLUMN_WIDTH, LINE_HEIGHT)), shares.y, MANA_COLOR, MeterLineScript.MANA_SHADE)
+	HudArt.corner_mark(self, _bars_at - MARK_OUT, HudArt.player_ramp(index))
 
 
 ## The card info panel: the card under the slot marker (`card_info`), and a refusal's note over its top.
 func _draw_info() -> void:
 	var box: Rect2 = _info
 	var info: Dictionary = card_info()
-	draw_rect(box, OUTLINE)
+	# No box round it (ART4): a rule along its top, in the card's kind colour.
+	var rule_at: Vector2 = box.position
 	if info["id"] == NO_CARD:
-		_frame(box, LINE)
+		HudArt.rule(self, rule_at, box.size.x, LINE)
 		_text(info["name"], box.position + Vector2(3.0, 2.0), DIM)
 	else:
 		var kind: StringName = _spells.component_kind(info["id"]) if _spells != null else &""
 		var color: Color = KIND_COLORS.get(kind, DIM)
-		_frame(box, color)
+		HudArt.rule(self, rule_at, box.size.x, color)
 		var kind_word: String = info["kind"]
 		var kind_x: float = box.end.x - 3.0 - _text_width(kind_word)
 		_text(_fit(info["name"], kind_x - box.position.x - 6.0), box.position + Vector2(3.0, 2.0), TEXT)
@@ -1645,13 +1656,13 @@ func _draw_info() -> void:
 				line = _fit(line + "..", box.size.x - 6.0)
 			_text(line, Vector2(box.position.x + 3.0, first_y + at * LINE_STEP), MUTED)
 		if not stats.is_empty():
-			draw_rect(Rect2(box.position.x + 2.0, stats_y - 2.0, box.size.x - 4.0, 1.0), LINE)
+			HudArt.rule(self, Vector2(box.position.x + 2.0, stats_y - 2.0), box.size.x - 4.0, LINE)
 			for at in stats.size():
 				_text(stats[at], Vector2(box.position.x + 3.0, stats_y + at * LINE_STEP), TEXT)
 	if note_text() != "":
 		var note := Rect2(box.position, Vector2(box.size.x, LINE_STEP + 3.0))
 		draw_rect(note, OUTLINE)
-		_frame(note, WARN)
+		HudArt.rule(self, Vector2(note.position.x, note.end.y - HudArt.A), note.size.x, WARN)
 		_text(_fit(_note, box.size.x - 6.0), note.position + Vector2(3.0, 1.0), WARN)
 
 

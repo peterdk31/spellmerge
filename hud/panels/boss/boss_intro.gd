@@ -38,6 +38,7 @@ extends Control
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SHADER: Shader = preload("res://hud/panels/boss/silhouette.gdshader")
 ## The title type's look (`TitleLabel`), a theme of its own: the project theme is loaded before the
@@ -499,14 +500,16 @@ func _draw_stage() -> void:
 		_slash_points[2] = Vector2(view.x + margin, top + SLASH_HEIGHT)
 		_slash_points[3] = Vector2(left - SLASH_SLANT, top + SLASH_HEIGHT)
 		_stage.draw_colored_polygon(_slash_points, colour)
-	# The dialog box, over the bottom bar's top edge.
+	# The dialog box, over the bottom bar's top edge: a quiet dark field, its corners cut, with no
+	# frame round it, only a rule one art pixel tall along its top in the boss's accent (ART4, the
+	# owner, 2026-11-27: "The border is too much").
 	if _line.visible:
 		var box: Rect2 = _box()
 		var fade: float = 1.0 - _closing_share()
-		_stage.draw_rect(box, Color(Palette.OUTLINE, 0.92 * fade))
+		_stage.draw_rect(HudArt.inside_cut(box), Color(Palette.OUTLINE, 0.92 * fade))
 		var edge: Color = _accent[2]
 		edge.a = fade
-		_stage.draw_rect(box, edge, false, 1.0)
+		HudArt.rule(_stage, box.position + Vector2(HudArt.A, 0.0), box.size.x - 2.0 * HudArt.A, edge)
 
 
 ## The portrait: its rest frame (the silhouette's shape) until the reveal, then its mean pose.

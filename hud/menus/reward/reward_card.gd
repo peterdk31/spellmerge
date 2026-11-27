@@ -18,9 +18,10 @@ const SPACE: float = 3.0
 ## How far the focused card stands up (whole pixels; the menu raises it one a frame).
 const LIFT: int = 3
 
-const OUTLINE: Color = Color("#14121f")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 const BODY: Color = Color("#2b2840")
 const RIM: Color = Color("#4a4663")
+const RIM_LIGHT: Color = Color("#7a7694")
 const TEXT: Color = Color("#f4f1ea")
 const MUTED: Color = Color("#a39fb8")
 
@@ -105,9 +106,9 @@ func wrap_words(text: String, width: float) -> PackedStringArray:
 func _draw() -> void:
 	var top: float = float(LIFT - lift)
 	var body := Rect2(Vector2(0.0, top), Vector2(size.x, size.y - float(LIFT)))
-	draw_rect(body, OUTLINE)
-	draw_rect(body.grow(-1.0), RIM)
-	draw_rect(body.grow(-2.0), BODY)
+	# Its outline cut at the corners and lit top-left, at the art's detail (ART4).
+	draw_rect(HudArt.inside_cut(body), BODY)
+	HudArt.tile(self, body, RIM_LIGHT, RIM)
 	var y: float = top + PAD
 	var icon_at := Vector2(floorf((size.x - ICON) * 0.5), y)
 	var icon: Texture2D = choice.get("icon") as Texture2D

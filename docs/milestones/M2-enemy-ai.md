@@ -250,13 +250,13 @@ Waits for gameplay/difficulty to send `difficulty_changed`. **Do:** `Entities` h
 
 The strays still hold one staff each. The design meant them to show the system off: e.g. the Splinter a dash and a swing, the Rime Crook its frost bolt and a pull bolt on its own staff, the Bone Scepter a rain and a dash away, the Storm Fork a triple bolt and a wall. Content, one PR, tried in the enemy arena with the AI view; the owner picks the staffs.
 
-**Built (2026-11-27, the owner's picks: the plan's four).** Each keeps its staff and gains a second, played by the behaviour its cast fits; no AI code changed:
-- **Splinter:** its dash, and a swing (1 slot, 0.5 s wind-up, 1.25 s delay) for when the dash has carried it in.
-- **Rime Crook:** its frost bolt (keeping Cast when Close), and a pull bolt on its own staff (2 slots, 0.8 s wind-up, 3 s delay) that pulls it to what it hits.
-- **Bone Scepter:** its on-hit void rain, and a dash (0.3 s wind-up, 4 s delay) that the evade behaviour plays when it is low or crowded: a step away.
-- **Storm Fork:** its triple lightning bolt, and a wall (0.9 s wind-up, 5 s delay) that the guard behaviour stands when shots are coming.
+**Built (2026-11-27, the owner's picks: the plan's four).** Each keeps its staff and gains a second; no AI code changed. The AI plays a staff by what it casts, so a second staff that hits is also cast by `fight` when it is the one ready:
+- **Splinter:** its dash, and a swing (1 slot, 0.5 s wind-up, 1.25 s delay). The swing's reach gives it a range band it had none of (a dash is skipped there), so it now closes in through `position` and spreads round its target as other strays do, and still touches for its contact damage.
+- **Rime Crook:** a frost bolt (2 slots, 20 mana at 2 a second), cast by its AI at range, and its frost pull on its own staff (`frost · pull · bolt`, 0.7 s wind-up, 3 s delay, 12 mana at 2 a second) with Cast when Close, so a foe that comes close is still hooked in with frost, telegraphed (staff-language.md, "Enemies too"). Its two pools together cast a little more than its one staff did (4 a second of regen against 3).
+- **Bone Scepter:** its on-hit void rain, and a dash (0.4 s wind-up, 4 s delay): `evade` plays it as a step away when it is low or crowded; `dodge` may also spend it sideways from a shot, and `fight` on a foe in its 80 px when the rain is not ready.
+- **Storm Fork:** its triple lightning bolt, and a wall (0.9 s wind-up, 5 s delay) that `guard` stands when shots are coming; `fight` may also cast it on a foe within its 28 px.
 
-Tests: `tests/content/enemies/test_strays.gd` (every staff valid and affordable, the cards staff by staff, each second staff cast in a fight, the Bone Scepter's dash taking it away).
+Tests: `tests/content/enemies/test_strays.gd` (every staff valid and affordable; the cards staff by staff; each second staff cast in a fight by its role, with no shots but at the Storm Fork; the Rime Crook pulled in by its frost pull; the Bone Scepter's dash taking it away).
 
 ## Self-critique against docs/DESIGN.md
 

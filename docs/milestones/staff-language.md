@@ -142,7 +142,7 @@ A new item kind, **sigil** (`content/sigils/<id>/`, a `SigilBase` on `ItemConten
 
 | Enemy | Staff | Sigil | Why |
 | --- | --- | --- | --- |
-| Rime Crook | its frost pull (wind-up 0.7 s) | Cast when Close | come close and it hooks you in with frost, telegraphed |
+| Rime Crook | its frost pull, on a staff of its own since enemy AI L7 (wind-up 0.7 s) | Cast when Close | come close and it hooks you in with frost, telegraphed |
 | Storm Fork | its triple lightning (wind-up 0.75 s) | Cast when Hurt | wounded, it lashes out on its own |
 
   Every other foe, and the Old Broom, has none for now.

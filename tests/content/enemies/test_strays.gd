@@ -31,7 +31,7 @@ const CARDS: Array[Array] = [
 	[[&"fire", &"bolt"]],
 	[[&"dash"], [&"swing"]],
 	[[&"triple", &"lightning", &"bolt"], [&"wall"]],
-	[[&"frost", &"bolt"], [&"pull", &"bolt"]],
+	[[&"frost", &"bolt"], [&"frost", &"pull", &"bolt"]],
 	[[&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"], [&"dash"]],
 	[[&"spray"]],
 ]
@@ -151,33 +151,39 @@ func test_the_new_strays_attack_four_players() -> void:
 
 
 
-## The strays with a role (enemy AI L7) play both their staffs against a player: the Splinter dashes
-## in and swings, the Storm Fork raises its wall, the Rime Crook pulls itself in on its pull bolt
-## (under fire) and the Bone Scepter dashes away when it is low and crowded. The AI picks the staff by what it casts
-## (it never names a card), so this is the check that each role's staff gets played at all.
+## The strays with a role (enemy AI L7) play both their staffs against a player, each the way its role
+## means: the Splinter dashes in and swings; the Storm Fork, under fire, raises its wall; the Rime
+## Crook, with a foe close, casts its frost pull by itself (Cast when Close) and is pulled in on its
+## hit; the Bone Scepter, low and crowded, steps away with its dash. The AI picks the staff by what it
+## casts (it never names a card), so this is the check that each role's staff gets played at all.
 func test_the_role_strays_cast_their_second_staff() -> void:
 	for data in [STRAYS[1], STRAYS[2], STRAYS[3], STRAYS[4]]:
 		var world := AiFixture.new(root, 1)
 		world.players[0].position = Vector2(90.0, 0.0)
 		var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
+		# Only the Storm Fork is shot at: its wall is a guard. The others see no shot, so nothing
+		# but their role (the Bone Scepter's: low on health, a foe near) makes them cast.
+		var shot_at: bool = data == STRAYS[2]
 		if data == STRAYS[4]:
 			body.health.health = body.health.max_health * 0.25
 		var cast_at: Array[int] = []
 		body.caster.cast_done.connect(func(at: int, _origin: Vector2, _direction: Vector2) -> void: cast_at.append(at))
+		var before: float = 0.0
 		for step in 1200:
-			# The player fires a shot at it now and then, so the one that guards has something to stop.
-			if step % 30 == 0 and body.is_inside_tree():
+			if shot_at and step % 30 == 0:
 				world.projectiles.spawn(world.players[0].id, body.position + Vector2(120.0, -12.0), Vector2(-200.0, 0.0), 2.0, 4.0, AiFixture.ProjectileManagerScript.ACTOR_LAYERS)
+			before = body.position.distance_to(world.players[0].position)
 			world.run_all(1)
 			if cast_at.has(1):
 				break
 		check(cast_at.has(1), "%s: casts its second staff (%s) in a fight (casts by staff: %s)" % [data.id, data.staffs[1].cards, cast_at])
-		if data == STRAYS[4] and cast_at.has(1):
-			# Its dash is a step away: a dash goes the way the body walks, and it walks away.
-			var before: float = body.position.distance_to(world.players[0].position)
-			world.run_all(20)
+		if cast_at.has(1) and (data == STRAYS[3] or data == STRAYS[4]):
+			world.run_all(40)
 			var after: float = body.position.distance_to(world.players[0].position)
-			check(after > before + 20.0, "the Bone Scepter's dash takes it away from the player (%.0f to %.0f px)" % [before, after])
+			if data == STRAYS[3]:
+				check(after < before - 10.0, "the Rime Crook's frost pull pulls it in (%.0f to %.0f px)" % [before, after])
+			else:
+				check(after > before + 20.0, "the Bone Scepter's dash takes it away (%.0f to %.0f px)" % [before, after])
 		world.free_all()
 
 func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:

@@ -43,7 +43,7 @@ var _shown_beam_tint: PackedColorArray
 var _shown_beam_tag: PackedInt64Array
 var _next_shown_beam: PackedInt32Array
 ## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
-## change, in LIVE_SET's order: `_draw_live_beams` sets one only when its value changes (a fan of
+## change, in `LiveSet`'s order: `_draw_live_beams` sets one only when its value changes (a fan of
 ## split beams is dozens of nodes, #972), and every one again when the node's shader changes. Feel's
 ## own; an entry is made with its node.
 var _live_set: Array[Array] = []

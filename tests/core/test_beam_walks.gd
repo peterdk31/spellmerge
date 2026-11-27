@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## split four times is 81 beams): a run plays the same, tick for tick, as each beam walking alone, in
 ## GDScript and with the native kernel. Real cards in the combo arena (Spells, the projectile
 ## manager, Combat), a staff cast again and again as its aim swings: split beams plain and with
-## homing, pierce, bounce, spiral, growth, storm's zaps, fire on the floor's cover, hold, two players'
+## homing, pierce, bounce, spiral, growth, shield, storm's zaps, through a portal, fire on the floor's cover, hold, two players'
 ## beams side by side, blasts where they end, among imps that soon die (their rows leave the targets'
 ## grid mid-step), with walls and without; casts overlap, so beams of other ages hit and end between
 ## them. The state of Spells, the manager and Combat is hashed every tick (`SimHash.of`).
@@ -26,6 +26,8 @@ const BUILDS: Array[Dictionary] = [
 	{"cards": [["split", "split", "beam"], ["fire", "split", "beam"]], "floor": true, "walls": true},
 	{"cards": [["blast", "split", "split", "beam"]]},
 	{"cards": [["blast", "split", "beam"], ["split", "split", "beam"]], "walls": true},
+	{"cards": [["shield", "split", "split", "beam"], ["split", "beam"]]},
+	{"cards": [["split", "split", "beam"], ["portal"]], "walls": true},
 ]
 
 

@@ -103,15 +103,21 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 func ray_walks(rays: int, actors: PackedInt32Array, points: PackedVector2Array, offsets: PackedInt32Array, counts: PackedInt32Array, lengths: PackedFloat64Array, pierces: PackedInt32Array, widths: PackedFloat64Array, ghosts: PackedByteArray, sources: Array[Node], layers: int, got: PackedFloat64Array, ends: PackedVector2Array, headings: PackedVector2Array) -> void:
 	var kernel: Object = pm._kernel if pm._kernel_rays and walks_batch() else null
 	var at: int = 0
+	# The rows below are read again only after a ray here may have filled a stale grid.
+	var skips_read: bool = false
 	while at < rays:
 		if kernel != null:
-			if _walk_skips.size() < rays:
-				_walk_skips.resize(rays)
-			# The bodies they are cast from, as rows of the targets' grid (`_ray_path`'s `skip_at`): a stale
-			# grid is filled by the ray that needs it, handed back, and these are read again after.
-			for n in range(at, rays):
-				_walk_skips[n] = pm._target_row(sources[n])
+			if not skips_read:
+				if _walk_skips.size() < rays:
+					_walk_skips.resize(rays)
+				# The bodies they are cast from, as rows of the targets' grid (`_ray_path`'s `skip_at`): a
+				# stale grid is filled by the ray that needs it, handed back, and these are read again after.
+				for n in range(at, rays):
+					_walk_skips[n] = pm._target_row(sources[n])
+				skips_read = true
 			var stale: bool = pm._grid_stale and not pm._stepping
+			if stale:
+				skips_read = false
 			var stop: int = kernel.call(&"ray_walks", pm, at, rays, actors, points, offsets, counts, lengths, pierces, widths, ghosts, _walk_skips, layers | Manager.ACTOR_LAYERS, _targets.size(), stale, got, ends, headings)
 			if stop < 0:
 				# Bad sizes (logged): the rest here.

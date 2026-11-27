@@ -76,31 +76,34 @@ func _label(panel: Control, label: String) -> String:
 # --- The theme ---------------------------------------------------------------------------------
 
 
-func test_the_theme_has_a_panel_and_a_label_variation_per_player() -> void:
+func test_the_theme_has_a_label_variation_per_player_and_one_menu_panel() -> void:
+	# A menu's player is told by its corner mark (HudArt.corner_mark) and its words, not its box (ART4).
 	for n in range(1, 5):
-		check(SpellmergeTheme.has_stylebox("panel", "PlayerPanel%d" % n), "theme has PlayerPanel%d" % n)
 		check(SpellmergeTheme.has_color("font_color", "PlayerLabel%d" % n), "theme has PlayerLabel%d" % n)
+		check(not SpellmergeTheme.has_stylebox("panel", "PlayerPanel%d" % n), "theme has no PlayerPanel%d border any more" % n)
+	check(SpellmergeTheme.has_stylebox("panel", "MenuPanel"), "theme has MenuPanel")
 
 
-func test_the_theme_has_the_health_bar_fill() -> void:
-	# The boss bar's; the corner panel draws thin lines of its own (`meter_line.gd`).
-	check(SpellmergeTheme.has_stylebox("fill", "HealthBar"), "theme has HealthBar")
+func test_the_theme_has_the_health_bar_drawn_by_the_boss_bar() -> void:
+	# The boss bar draws its own trough and fill (HudArt.meter); the theme's HealthBar draws nothing.
+	check(SpellmergeTheme.get_stylebox("fill", "HealthBar") is StyleBoxEmpty, "HealthBar's fill is empty")
+	check(SpellmergeTheme.get_stylebox("background", "HealthBar") is StyleBoxEmpty, "HealthBar's background is empty")
 
 
-func test_every_player_panel_has_its_own_border_colour() -> void:
-	# The four panel borders differ, so no two players look alike.
-	var borders: Array[Color] = []
-	for n in range(1, 5):
-		var box := SpellmergeTheme.get_stylebox("panel", "PlayerPanel%d" % n) as StyleBoxFlat
-		check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
-		if box != null:
-			borders.append(box.border_color)
-
-
-func test_every_player_panel_background_is_translucent_but_readable() -> void:
-	for n in range(1, 5):
-		var box := SpellmergeTheme.get_stylebox("panel", "PlayerPanel%d" % n) as StyleBoxFlat
-		check(box != null and box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a if box != null else -1.0])
+func test_the_menu_panels_and_buttons_have_no_borders_and_a_quiet_readable_fill() -> void:
+	# ART4 (the owner, 2026-11-27: "The border is too much"): no frame round a menu, a panel or a
+	# button; a fill quiet enough to see the game through, dark enough to read on. Focus is a thin
+	# gold line, one layout pixel.
+	for pair: Array in [["panel", "MenuPanel"], ["panel", "PanelContainer"], ["normal", "Button"], ["hover", "Button"], ["pressed", "Button"]]:
+		var box := SpellmergeTheme.get_stylebox(pair[0], pair[1]) as StyleBoxFlat
+		check(box != null, "%s %s is a flat box" % [pair[1], pair[0]])
+		if box == null:
+			continue
+		for side: int in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+			check_equal(box.get_border_width(side), 0, "%s %s has no border" % [pair[1], pair[0]])
+		check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "%s %s is translucent but readable, alpha %s" % [pair[1], pair[0], box.bg_color.a])
+	var focus := SpellmergeTheme.get_stylebox("focus", "Button") as StyleBoxFlat
+	check(focus != null and not focus.draw_center and focus.border_width_top == 1, "a button's focus is a thin gold line")
 
 
 func test_the_theme_fonts_are_no_smaller_than_designed() -> void:

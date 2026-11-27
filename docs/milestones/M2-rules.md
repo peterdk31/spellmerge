@@ -150,7 +150,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 
 ### R4: decide with the owner, then implement (rules 1, 4, 5)
 
-**Done** (checked 2026-11-27): every cell below is decided and built (R4a-R4i, F1-F8). The two items once left for the owner are settled: a rune, decoy or familiar is placed a step ahead, so its mirror lands behind it (F3), and two pulls on the wizard add up (F1). The rule 2 checks deferred from R3 stay in docs/BACKLOG.md.
+**Done** (checked 2026-11-27): every cell below is decided and built (R4a-R4i, F1-F8). F1's last open question is answered: a blast's hits do not pull (the owner, 2026-11-27). The two items once left for the owner are settled: a rune, decoy or familiar is placed a step ahead, so its mirror lands behind it (F3), and two pulls on the wizard add up (F1). The rule 2 checks deferred from R3 stay in docs/BACKLOG.md.
 
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 

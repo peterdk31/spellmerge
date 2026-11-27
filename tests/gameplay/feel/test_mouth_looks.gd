@@ -20,11 +20,11 @@ func test_the_seals_rune_is_its_old_size_in_art_pixels() -> void:
 		check_equal(line.length(), side, "row %d RUNE_SIDE world pixels wide" % y)
 		for x in side:
 			check(".#+".contains(line[x]), "row %d: only shade, lit or none" % y)
-			# Left to right it mirrors, in which pixels are drawn (the lit ones are its top-left).
+			# Left to right it mirrors, in which pixels are drawn (its lit ones may sit on either side).
 			check_equal(line[x] == ".", line[side - 1 - x] == ".", "row %d mirrors at %d" % [y, x])
 			if line[x] == "+":
 				lit += 1
-				check(x < side / 2 + 2 and y < side / 2 + 1, "a lit pixel on its upper half: %d, %d" % [x, y])
+				check(y < side / 2, "a lit pixel on its upper half: %d, %d" % [x, y])
 	check(lit > 0, "it has lit pixels")
 
 

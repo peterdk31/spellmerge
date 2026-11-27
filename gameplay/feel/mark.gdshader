@@ -13,9 +13,11 @@ render_mode blend_mix, world_vertex_coords;
 //
 // **At the art's detail** (ART3; ArtDetail, art_detail.gdshaderinc): the layer has ART_DETAIL texels
 // a world pixel each way and every shape is worked out at the middle of each art pixel, in world
-// units, so a mark keeps its size and steps by the finer pixel: a crack's line is two art pixels
-// over most of it and one out at its tips, with a rim beside it near its middle; a rune's outer circle
-// two and its inner circle and strokes one; a rime's crosses and a blot's speckle are art pixels; a
+// units, so a mark keeps its size and steps by the finer pixel: a crack's line is as wide as
+// at 1x (two world pixels near its middle, one out along it) and one art pixel at its tips, with a
+// ragged rim near its middle; a rune's outer circle
+// two and its inner circle and strokes one; a rime's crosses are an art pixel thick (5 art pixels across, half
+// a world pixel less than at 1x) and a blot's speckle is art pixels; a
 // speck is its world pixel less its lower right art pixel (a chip lit from the top-left).
 //
 // Nothing here is a kind or a colour of its own:
@@ -176,14 +178,13 @@ int mark_crack(vec2 q, float r, float h) {
 		float fi = float(i);
 		float angle = (fi + mark_hash(fi, 1.0, 5.0) * 0.7) * TAU / float(n);
 		float len = k_radius * (0.55 + 0.45 * mark_hash(fi, 2.0, 5.0));
-		// Two art pixels wide over most of it, with a rim an art pixel past it near the middle; one
-		// out at the tips.
-		bool thick = r < k_radius * 0.7;
-		bool rimmed = r < k_radius * 0.45;
-		if (mark_on_line(q, vec2(0.0), angle, len, fi, thick ? ART_PX : 0.5 * ART_PX)) {
+		// As wide as at 1x near the middle (two world pixels, with a ragged rim an art pixel past it)
+		// and out along it (one), and one art pixel at the tips: the finer pixel tapers it.
+		float width = r < k_radius * 0.45 ? 1.0 : (r < k_radius * 0.7 ? ART_PX : 0.5 * ART_PX);
+		if (mark_on_line(q, vec2(0.0), angle, len, fi, width)) {
 			return 1;
 		}
-		if (rimmed && mark_on_line(q, vec2(0.0), angle, len, fi, 1.5 * ART_PX) && h < 0.6) {
+		if (r < k_radius * 0.45 && mark_on_line(q, vec2(0.0), angle, len, fi, 1.0 + ART_PX) && h < 0.4) {
 			return 2;
 		}
 		float fork_at = len * (0.4 + 0.25 * mark_hash(fi, 3.0, 5.0));

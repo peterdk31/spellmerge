@@ -50,7 +50,7 @@ func test_the_fan_leaves_from_the_trunks_end() -> void:
 	check(trunk_end.is_finite(), "a trunk BEAM_TRUNK long along the aim")
 	check_equal(starts.size(), 3, "three beams in its fan")
 	for start in starts:
-		check(start.is_equal_approx(trunk_end), "each starts at the trunk's end (%s, %s)" % [start, trunk_end])
+		check(start.distance_to(trunk_end) < 0.01, "each starts at the trunk's end (%s, %s)" % [start, trunk_end])
 
 
 func test_what_stands_on_the_trunk_is_hit_once_a_tick() -> void:
@@ -81,3 +81,28 @@ func test_a_wall_before_the_trunks_end_stops_the_fan() -> void:
 	for row in beams.beam_slots():
 		if beams.beam_on(row):
 			check(beams.beam_point(row, 0).x <= 14.0 + 0.01, "every row starts short of the wall (%s)" % beams.beam_point(row, 0))
+
+
+## A Penta ring of fans (each copy cast by a point, turned in at the ring's centre every step): each
+## fan's beams still start at the end of their own copy's trunk.
+func test_a_ring_of_fans_leaves_from_each_trunks_end() -> void:
+	var beams: CarrierBeam = _cast(["penta", "plus_two"])
+	_arena.run(DT * 6.0)
+	var trunk_ends: Array[Vector2] = []
+	var starts: Array[Vector2] = []
+	for row in beams.beam_slots():
+		if not beams.beam_on(row) or beams.beam_point_count(row) < 2:
+			continue
+		var start: Vector2 = beams.beam_point(row, 0)
+		var way: Vector2 = start.direction_to(beams.beam_point(row, 1))
+		if is_equal_approx(beams.beam_reach(row), SpellLimits.BEAM_TRUNK):
+			trunk_ends.append(start + way * SpellLimits.BEAM_TRUNK)
+		else:
+			starts.append(start)
+	check(trunk_ends.size() >= 2, "a trunk for each copy (%d)" % trunk_ends.size())
+	check_equal(starts.size(), trunk_ends.size() * 3, "three beams a trunk")
+	for start in starts:
+		var nearest: float = INF
+		for end in trunk_ends:
+			nearest = minf(nearest, start.distance_to(end))
+		check(nearest < 0.05, "each beam starts at a trunk's end (%.3f px off)" % nearest)

@@ -498,7 +498,9 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		spell.radius_scale *= modifier.radius_mult
 		shots *= modifier.shot_mult
 		shots += modifier.shot_add
-		added += modifier.shot_add
+		# Paid for only where they are shots (a carrier that fans: `SHOTS`).
+		if carrier.has(Carrier.SHOTS):
+			added += modifier.shot_add
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
 		spell.speed_start *= modifier.speed_start

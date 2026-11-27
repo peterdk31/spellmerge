@@ -478,7 +478,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	# Skyfall: a beam cast down from its hole reaches its floor line and no further.
 	_bm_floor[at] = kit.floor_now()
 	if is_finite(_bm_floor[at]) and _bm_dir[at].y > 0.0:
-		_bm_length[at] = minf(_bm_length[at], (_bm_floor[at] - from.y) / _bm_dir[at].y)
+		_bm_length[at] = maxf(minf(_bm_length[at], (_bm_floor[at] - from.y) / _bm_dir[at].y), 0.0)
 	_bm_gate[at] = -1
 	_bm_parent[at] = -1
 	_bm_steer[at] = spell
@@ -495,9 +495,12 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
 	_bm_count[at] = 0
 	var holder: int = SpellRuntime.body_of(caster, actor)
+	# Whether its turn was taken off its caster's way (an aim, a flight) now.
+	var turned: bool = false
 	if holder >= 0:
 		if kit.aim_dir(holder).is_finite():
 			_bm_turn[at] = DMath.angle_to(kit.aim_dir(holder), heading)
+			turned = true
 	else:
 		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = kit.live_caster_shot(caster, caster_seq)
@@ -506,6 +509,11 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 		elif not way.is_zero_approx():
 			_bm_turn[at] = DMath.angle_to(way, heading)
+			turned = true
+	if role == ROLE_FAN and not turned:
+		# A fan's beam keeps its place in the fan off whatever way it later follows (a Penta ring's
+		# centre, a shot that starts to fly), as its trunk does.
+		_bm_turn[at] = fan
 	kit.shot_started(tag)
 	_beam_step(at, 0.0)
 	# A trunk is no carrier of its own: its fan's beams are (a timer fires from each of their ends).
@@ -544,7 +552,8 @@ func _beam_step(at: int, delta: float) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	_beam_cast(at, hit)
-	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+	# A trunk's end is its fan's start: it opens no leg through a portal (its fan's beams do).
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag and _bm_role[at] != ROLE_TRUNK:
 		_open_legs(at)
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
@@ -1306,7 +1315,6 @@ func beam_count() -> int:
 	return _bm_on.count(1)
 
 
-## A beam of its own along `heading`, cast by whoever casts this launch (`Spells._caster`).
 ## A launch (`Carrier.launch`). A beam split into a fan (Split's shots, a spread short of a ring,
 ## longer than its trunk; the owner's decision of 2026-11-27, #972) is one trunk from the staff along
 ## the aim and the fan's beams from its end, each turned off the trunk by its place in the fan as
@@ -1331,6 +1339,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	return made
 
 
+## A beam of its own along `heading`, cast by whoever casts this launch (`Spells._caster`).
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
 	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, lifetime, kit.caster(), kit.caster_seq(), kit.is_echo(spell)) else 0
 

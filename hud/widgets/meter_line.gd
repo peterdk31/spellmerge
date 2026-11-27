@@ -26,7 +26,8 @@ const TRACK_COLOR: Color = Color(0.07, 0.06, 0.1, 0.9)
 const HEALTH_SHADE: Color = Color("#8f2d2a")
 const MANA_SHADE: Color = Color("#2c3aa8")
 
-## The fill's colour, the shade along its bottom art row, and the track's behind it.
+## The fill's colour, the shade along its bottom art row (set it with `fill_color`: a line given
+## only a colour keeps health's shade), and the track's behind it. Set before the line first draws.
 @export var fill_color: Color = HEALTH_COLOR
 @export var fill_shade: Color = HEALTH_SHADE
 @export var track_color: Color = TRACK_COLOR

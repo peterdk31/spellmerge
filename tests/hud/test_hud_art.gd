@@ -55,30 +55,27 @@ func _strays(image: Image, allowed: Array[Color]) -> int:
 	return strays
 
 
-func test_a_frame_is_cut_at_its_corners_lit_top_left_and_shaded_bottom_right() -> void:
+## A thin frame (the owner, 2026-11-27: "The border is too much"): one art pixel of the ramp.
+func test_a_frame_is_one_art_pixel_cut_at_its_corners_and_lit_top_left() -> void:
 	var pen := Recorder.new(Vector2i(10, 8))
 	var ramp: PackedColorArray = HudArt.player_ramp(0)
 	HudArt.frame(pen, Rect2(0.0, 0.0, 10.0, 8.0), ramp)
 	var w: int = 20
 	var h: int = 16
 	check_equal(pen.off_grid, 0, "every rect of the frame on whole art pixels")
-	# The outer corners are cut, and the art pixel inside each closes the outline.
+	# The outer corners are cut, and the art pixel inside each closes the line.
 	for corner: Vector2i in [Vector2i(0, 0), Vector2i(w - 1, 0), Vector2i(0, h - 1), Vector2i(w - 1, h - 1)]:
 		check(_same(pen.at(corner.x, corner.y), CLEAR), "corner %s cut" % corner)
-	for corner: Vector2i in [Vector2i(1, 1), Vector2i(w - 2, 1), Vector2i(1, h - 2), Vector2i(w - 2, h - 2)]:
-		check(_same(pen.at(corner.x, corner.y), HudArt.OUTLINE), "corner %s closed by the outline" % corner)
-	# The outline along each side, then the light top and left, the shade bottom and right, the
-	# base, and the inner outline; the inside left alone.
-	check(_same(pen.at(w / 2, 0), HudArt.OUTLINE), "outline on top")
-	check(_same(pen.at(w - 1, h / 2), HudArt.OUTLINE), "outline on the right")
-	check(_same(pen.at(w / 2, 1), ramp[HudArt.LIGHT]), "the top edge lit")
-	check(_same(pen.at(1, h / 2), ramp[HudArt.LIGHT]), "the left edge lit")
-	check(_same(pen.at(w / 2, h - 2), ramp[HudArt.SHADOW]), "the bottom edge shaded")
-	check(_same(pen.at(w - 2, h / 2), ramp[HudArt.SHADOW]), "the right edge shaded")
-	check(_same(pen.at(w / 2, 2), ramp[HudArt.BASE]), "the base inside the lit edge")
-	check(_same(pen.at(w - 3, h / 2), ramp[HudArt.BASE]), "the base inside the shaded edge")
-	check(_same(pen.at(w / 2, 3), HudArt.OUTLINE), "the inner outline")
-	check(_same(pen.at(w / 2, h / 2), CLEAR), "the inside left to the fill")
+	check(_same(pen.at(1, 1), ramp[HudArt.LIGHT]), "the top-left corner closed in the light")
+	for corner: Vector2i in [Vector2i(w - 2, 1), Vector2i(1, h - 2), Vector2i(w - 2, h - 2)]:
+		check(_same(pen.at(corner.x, corner.y), ramp[HudArt.BASE]), "corner %s closed in the base" % corner)
+	check(_same(pen.at(w / 2, 0), ramp[HudArt.LIGHT]), "the top edge lit")
+	check(_same(pen.at(0, h / 2), ramp[HudArt.LIGHT]), "the left edge lit")
+	check(_same(pen.at(w / 2, h - 1), ramp[HudArt.BASE]), "the bottom edge in the base")
+	check(_same(pen.at(w - 1, h / 2), ramp[HudArt.BASE]), "the right edge in the base")
+	# One art pixel deep: everything inside the line is left to the fill.
+	check(pen.image.get_region(Rect2i(2, 1, w - 4, h - 2)).is_invisible(), "nothing inside the line")
+	check(pen.image.get_region(Rect2i(1, 2, w - 2, h - 4)).is_invisible(), "nothing inside the line's sides")
 	check_equal(_strays(pen.image, _palette()), 0, "only palette colours")
 
 
@@ -113,6 +110,15 @@ func test_a_dashed_tile_keeps_its_outline_whole_and_breaks_its_edge() -> void:
 	for x in range(2, 10):
 		drawn.append(_same(pen.at(x, 1), lit))
 	check_equal(drawn, [true, true, false, false, true, true, false, false] as Array[bool], "the top edge dashed two on, two off")
+	var down: Array[bool] = []
+	for y in range(2, 10):
+		down.append(_same(pen.at(1, y), lit))
+	check_equal(down, [true, true, false, false, true, true, false, false] as Array[bool], "the left edge dashed the same")
+	check(_same(pen.at(1, 1), HudArt.OUTLINE) and _same(pen.at(18, 18), HudArt.OUTLINE), "the corners closed, never dashed")
+	var odd := Recorder.new(Vector2i(5, 5))
+	HudArt.dashed_tile(odd, Rect2(0.0, 0.0, 5.0, 5.0), lit, HudArt.SPARK[HudArt.BASE])
+	check_equal(odd.off_grid, 0, "a width not a whole number of dashes: still whole art pixels")
+	check(_same(odd.at(8, 1), HudArt.OUTLINE), "its last dash stops short of the closed corner")
 
 
 func test_a_trough_is_sunk_under_an_outline_lip_and_its_fill_shaded_below() -> void:
@@ -130,7 +136,7 @@ func test_a_trough_is_sunk_under_an_outline_lip_and_its_fill_shaded_below() -> v
 
 func test_a_part_too_small_for_its_depth_draws_nothing() -> void:
 	var pen := Recorder.new(Vector2i(4, 4))
-	HudArt.frame(pen, Rect2(0.0, 0.0, 4.0, 4.0), HudArt.STONE)
+	HudArt.frame(pen, Rect2(0.0, 0.0, 1.0, 1.0), HudArt.STONE)
 	HudArt.tile(pen, Rect2(0.0, 0.0, 1.5, 1.5), HudArt.STONE[HudArt.LIGHT], HudArt.STONE[HudArt.BASE])
 	check_equal(_strays(pen.image, []), 0, "nothing drawn")
 

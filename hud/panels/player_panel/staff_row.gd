@@ -79,7 +79,6 @@ enum Style { BUTTON, NEXT_CAST }
 ## `set_timing`'s `firing` when the row is not told what the mana pays.
 const FIRING_UNKNOWN: int = -2
 
-const FRAME: Color = Color("#4a4663")
 const FILL: Color = Color(0.11, 0.1, 0.16, 0.85)
 const NEXT_FILL: Color = Color(0.24, 0.21, 0.12, 0.95)
 const GOLD: Color = Color("#f2c230")
@@ -768,14 +767,14 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 
 
 ## Cast `box`'s frame at the art's detail (`HudArt.tile`): gold for the cast a press fires, red for
-## one the mana does not pay, else stone; each lit on its top and left edge.
+## one the mana does not pay, each lit on its top and left edge. Any other cast has no frame, only
+## its quiet fill with its corners cut (the owner, 2026-11-27: a cleaner HUD, fewer boxes): the gap
+## between two fills parts the casts, and a frame marks only what needs the eye.
 func _draw_tile(box: Rect2, marked: bool, short: bool) -> void:
 	if marked:
 		HudArt.tile(_strip, box, HudArt.SPARK[HudArt.LIGHT], GOLD)
 	elif short:
 		HudArt.tile(_strip, box, SHORT, HudArt.FIRE[HudArt.SHADOW])
-	else:
-		HudArt.tile(_strip, box, HudArt.STONE[HudArt.LIGHT], FRAME)
 
 
 ## The `BUTTON` shade's height over a glyph inside `tall` px high: the wind-up's risen part, or the

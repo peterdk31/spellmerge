@@ -8,12 +8,11 @@ extends RefCounted
 ## hit boxes and the steps of a shade or a fill keep their numbers, and only the drawing inside them
 ## is finer.
 ##
-## The shape and light rules of each part are here, once (docs/STYLE.md: a 1 px Outline, corners cut
-## by one pixel, light from the top-left, at most three shades a material, palette colours only):
+## The shape and light rules of each part are here, once (docs/STYLE.md: a 1 px Outline, its outer
+## corners cut by one pixel, light from the top-left, at most three shades a material, palette colours only):
 ##
-## - `frame`: a raised frame four art pixels deep (a player's corner panel): the Outline, cut at the
-##   corners; a lit top and left edge and a shaded bottom and right one; the ramp's base; and an
-##   inner Outline that parts the frame from what it holds.
+## - `frame`: a panel's thin frame (a player's corner panel): one art pixel of the player's ramp,
+##   cut at the corners, lit on the top and left.
 ## - `tile`: a slot's edge two art pixels deep (a cast's frame round its cards, a quick-use cell):
 ##   the Outline, cut at the corners, then a lit top and left edge and a base bottom and right one.
 ##   `dashed_tile` is the same with its lit edge broken every other art pixel pair (a recharge).
@@ -46,7 +45,7 @@ const PLAYER_3: PackedColorArray = [Color("#8fd46a"), Color("#3f8f4f"), Color("#
 const PLAYER_4: PackedColorArray = [Color("#c99af0"), Color("#8a4fc4"), Color("#4a2a6b")]
 const PLAYERS: Array[PackedColorArray] = [PLAYER_1, PLAYER_2, PLAYER_3, PLAYER_4]
 ## How deep `frame` and `tile` are, in layout pixels.
-const FRAME_DEPTH: float = 4.0 * A
+const FRAME_DEPTH: float = A
 const TILE_DEPTH: float = 2.0 * A
 
 
@@ -55,16 +54,17 @@ static func player_ramp(seat: int) -> PackedColorArray:
 	return PLAYERS[clampi(seat, 0, PLAYERS.size() - 1)]
 
 
-## A raised frame round `rect` (layout pixels), `FRAME_DEPTH` deep, in `ramp`: the Outline cut at
-## the corners, the lit top-left and shaded bottom-right edge, the base, and an inner Outline.
+## A panel's frame round `rect` (layout pixels): one art pixel of `ramp`, its corners cut, lit on
+## the top and left (the ramp's light) and its base on the bottom and right. A thin line, not a
+## border (the owner, 2026-11-27: "The border is too much"): the corner and the colour say whose
+## panel it is, the quiet fill inside holds it together over a busy floor.
 static func frame(target: Object, rect: Rect2, ramp: PackedColorArray) -> void:
 	if rect.size.x < FRAME_DEPTH * 2.0 + A or rect.size.y < FRAME_DEPTH * 2.0 + A:
 		return
-	var lit: Rect2 = rect.grow(-A)
-	bevel(target, lit, ramp[LIGHT], ramp[SHADOW], ramp[BASE])
-	ring(target, lit.grow(-A), ramp[BASE])
-	ring(target, lit.grow(-2.0 * A), OUTLINE)
-	cut_ring(target, rect, OUTLINE)
+	cut_ring(target, rect, ramp[BASE])
+	target.draw_rect(Rect2(rect.position.x + A, rect.position.y, rect.size.x - 2.0 * A, A), ramp[LIGHT])
+	target.draw_rect(Rect2(rect.position.x, rect.position.y + A, A, rect.size.y - 2.0 * A), ramp[LIGHT])
+	target.draw_rect(Rect2(rect.position + Vector2(A, A), Vector2(A, A)), ramp[LIGHT])
 
 
 ## A slot's edge round `rect` (layout pixels), `TILE_DEPTH` deep: the Outline cut at the corners,
@@ -100,8 +100,9 @@ static func dashed_tile(target: Object, rect: Rect2, lit: Color, base: Color) ->
 	cut_ring(target, rect, OUTLINE)
 
 
-## The part of `rect` a fill under a `tile` or `frame` covers: all but its outer art pixel, so the
-## cut corners show what is under the tile, as a sprite's do.
+## The part of `rect` a fill under a `tile` covers: all but its outer art pixel, so the cut corners
+## show what is under the tile, as a sprite's do (a panel's `frame` takes the same from its theme
+## fill's expand margin of minus one art pixel, `FramedPanel`).
 static func inside_cut(rect: Rect2) -> Rect2:
 	return rect.grow(-A)
 
@@ -115,8 +116,9 @@ static func trough(target: Object, rect: Rect2, track: Color) -> void:
 	target.draw_rect(Rect2(rect.position, Vector2(rect.size.x, A)), OUTLINE)
 
 
-## The part of a trough's `rect` under its Outline lip, where its fill goes (all of a trough one art
-## pixel tall, which has no lip to spare).
+## The part of a trough's `rect` under its Outline lip, where its fill goes. A line one layout pixel
+## tall shows its lip and one fill row, no shade (`line_fill`); a rect no taller than the lip (never
+## a HUD line, which is whole layout pixels) is returned whole rather than emptied.
 static func under_lip(rect: Rect2) -> Rect2:
 	if rect.size.y <= A:
 		return rect

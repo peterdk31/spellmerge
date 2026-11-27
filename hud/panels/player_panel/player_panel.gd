@@ -177,13 +177,14 @@ func _ready() -> void:
 	_refresh_status()
 
 
-## The live layer over the picture: each shown row's glyph shade and rim and its mana line, at the
-## row's place in the content (the same place in the picture and drawn live).
 ## The frame round the panel, in the player's ramp at the art's detail (over the theme's fill).
+## `index` is fixed by `_ready`, so the ramp never changes after.
 func _draw() -> void:
 	HudArt.frame(self, Rect2(Vector2.ZERO, size), HudArt.player_ramp(index))
 
 
+## The live layer over the picture: each shown row's glyph shade and rim and its mana line, at the
+## row's place in the content (the same place in the picture and drawn live).
 func _draw_live() -> void:
 	var origin: Vector2 = _cache.content().get_global_transform().origin
 	for row in _rows:

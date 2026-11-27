@@ -10,6 +10,7 @@ Scripts that contributors and Claude run on their own checkout. **Not an area fo
 - `tools/ptest.sh [jobs] [path-regex]`: the Godot unit tests in parallel (needs the pinned Godot from `ci/build/build.sh --quick`); failures explained by `ptest_failures.py`.
 - `tools/atlas.py <out>`: the Spell atlas data (`atlas.json`; format in `ci/smbot/clips.py`). Standard library only.
 - **Art from rules** (each with `--check`: writes nothing, fails when a file differs from what the rules draw): `staff_art.py` (the curl staff and `art/kit/golden_staff@2x.svg`), `face_art.py` (`art/faces/eyes@2x.svg`, `brows@2x.svg`), `head_art.py` (other staff heads), `enemy_art.py` (enemies and the Old Broom, on `sprite_rules.py`), and `redraw_2x.py IN.svg OUT@2x.(svg|png)` (a one-off 2x redraw; `--blocky`, `--detail`). Palette colours are read from docs/STYLE.md. See art/README.md, "Redrawing a sprite at 64x64".
+- `tools/font_art.py`: the game's text font from glyph parts to `art/ui/fonts/text.png` (the glyph sheet: every face, its outline and its outline with a shadow) and `text.json` (its metrics), read by `core/display/pixel_font.gd`; `--check`, `--preview out.png`.
 - `tools/pixel_grid.py <name>.grid.json...`: a grid of characters to `<name>.svg` (rects, one per run of a colour along a row) and `<name>_motes.svg` (mote points, `*`); `--check`.
 - `tools/ground_shape.py <shape file>...`: a room's `<room>_ground.tscn` and its art in `art/grounds/<room>/` from its shape file (with `ground_materials.py`, `ground_walls.py`); `--check`. **The game draws the same ground:** `gameplay/feel/ground/` (GDScript) and `native/src/ground_kernel.cpp` mirror it, so a change to the drawing is made in all three in the same PR (`tests/gameplay/feel/test_ground_drawing.gd`). A length is `length_of`, never `math.hypot` or `math.dist`. Keep its hot loops cheap (the CI job has 5 minutes).
 - `tools/platform_hashes.py run | play NAME --build DIR | compare LOG...`: exports and plays recorded runs on Linux, Windows (WSL) and web, naming the first tick, area and members where a platform parts from Linux (`tests/platforms/replay_hashes_runner.gd`). Writes only under `build/`.
@@ -20,7 +21,7 @@ Scripts that contributors and Claude run on their own checkout. **Not an area fo
 
 ## Contract
 
-- Tools only read the repository and report, or write the files they are asked for (`atlas.py` its out file, `pixel_grid.py` a grid's SVGs, `ground_shape.py` the named shapes' ground, `sound.py bake` each recipe's own folder then Godot's import, `sheet` only outside the repository). They never change anything else, push or open PRs.
+- Tools only read the repository and report, or write the files they are asked for (`atlas.py` its out file, `pixel_grid.py` a grid's SVGs, `font_art.py` the font's sheet and metrics, `ground_shape.py` the named shapes' ground, `sound.py bake` each recipe's own folder then Godot's import, `sheet` only outside the repository). They never change anything else, push or open PRs.
 - They depend on git and Python 3.10 or newer, standard library only, nothing else (`ptest.sh` also needs bash and the pinned Godot). Only `sound.py bake` and `sheet` need ffmpeg (libvorbis; the video libx264 and aac); a bake without it stops and says what to install; `sound.py check` and every test need only Python.
 - Pipeline Python lives in `ci/smbot/` (owner-only); `check.sh` is a thin wrapper around it.
 - They work in any clone with an `origin` remote, and still run on the local copy when they can't fetch.
@@ -51,7 +52,7 @@ Each problem is printed as rule, file and line, what is wrong and how to fix it.
 
 ## Tests
 
-`python3 -m unittest discover -s tools`: `test_atlas.py`, `test_staff_art.py`, `test_face_art.py`, `test_head_art.py`, `test_enemy_art.py`, `test_redraw_2x.py`, `test_pixel_grid.py` (every grid in the repository), `test_ground_shape.py` (every shape file up to date), `test_ptest_failures.py`, `test_platform_hashes.py`, `test_sound_synth.py`, `test_sound_meter.py`, `test_sound_bake.py`, `test_sound_golden.py`, `test_sound_hashes.py`, `test_sound_score.py`, `test_sound_fixtures.py`.
+`python3 -m unittest discover -s tools`: `test_atlas.py`, `test_staff_art.py`, `test_face_art.py`, `test_head_art.py`, `test_enemy_art.py`, `test_redraw_2x.py`, `test_pixel_grid.py` (every grid in the repository), `test_font_art.py` (the font's sheet up to date), `test_ground_shape.py` (every shape file up to date), `test_ptest_failures.py`, `test_platform_hashes.py`, `test_sound_synth.py`, `test_sound_meter.py`, `test_sound_bake.py`, `test_sound_golden.py`, `test_sound_hashes.py`, `test_sound_score.py`, `test_sound_fixtures.py`.
 
 ```sh
 tools/check.sh                              # your change, as an outside contributor

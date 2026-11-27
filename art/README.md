@@ -47,7 +47,7 @@ Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`u
 
 ## Example to copy
 
-`art/vfx/hit_spark.svg` with its `.import` and its manifest entry (a placeholder SVG of rects: docs/STYLE.md, "Placeholder SVGs"). More: `art/tilesets/crypt/floor@2x.svg` (flat) and `wall@2x.svg` (lit and shaded), both drawn by `tools/room_art.py`. The title type `art/ui/fonts/title.svg` is drawn from `title.grid.json` by `tools/pixel_grid.py` and imported as an image font (`importer="font_data_image"`, ranges `32-126`, 16 columns); redraw a glyph in the grid and run the tool; a character past ASCII is a cell after the last and its own entry in `character_ranges`.
+`art/vfx/hit_spark.svg` with its `.import` and its manifest entry (a placeholder SVG of rects: docs/STYLE.md, "Placeholder SVGs"). More: `art/tilesets/crypt/floor@2x.svg` (flat) and `wall@2x.svg` (lit and shaded), both drawn by `tools/room_art.py`. The title type `art/ui/fonts/title.svg` is drawn from `title.grid.json` by `tools/pixel_grid.py` and imported as an image font (`importer="font_data_image"`, ranges `32-126`, 16 columns); redraw a glyph in the grid and run the tool; a character past ASCII is a cell after the last and its own entry in `character_ranges`. Every other text is drawn in the game's pixel font: `art/ui/fonts/text.png` and `text.json`, drawn from glyph parts by `tools/font_art.py` (change a glyph's parts there and run it) and made into the FontFile by `core/display/pixel_font.gd`.
 
 ## Validate
 

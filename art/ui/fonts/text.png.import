@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cllodp4apxbw7"
+path="res://.godot/imported/text.png-631175747382f652b3436102889d4f3a.image"
+
+[deps]
+
+source_file="res://art/ui/fonts/text.png"
+dest_files=["res://.godot/imported/text.png-631175747382f652b3436102889d4f3a.image"]
+
+[params]
+

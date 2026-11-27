@@ -97,6 +97,10 @@ Every 2D MultiMesh is made by `Batches.multimesh()` (box `Batches.WORLD`), never
 
 Desktop builds draw on a separate render thread (`tests/core/test_render_thread.gd`). So: a picture the game keeps writing goes through `TextureUpload.hand(image)`, never `ImageTexture.update`/`set_image` (`tests/core/test_texture_upload.gd`); RenderingServer calls only from the main thread; no `get_image()` or viewport read back during play; every font size and outline the HUD or Feel draws is in `GlyphWarmup`'s list (`tests/core/test_glyph_warmup.gd`).
 
+## The game's font
+
+Every text but the boss names' title type is drawn in one original pixel font at art-pixel detail (two art pixels a layout pixel), `PixelFont` (`display/pixel_font.gd`): a bitmap FontFile made at boot from the glyph sheet `art/ui/fonts/text.png` and its metrics `text.json` (drawn by `tools/font_art.py`), with a cache for every size from `FIRST_SIZE` to `LAST_SIZE` and outline up to `MAX_OUTLINE`, and made every theme's default by `Display` as it enters the tree. A size is drawn by the largest face at or under it; its line (ascent, descent) is the old default font's, so layouts are unchanged; advances are whole layout pixels. An outline of any size is the glyph's one-art-pixel outline, from `HEAVY` (3) up with a pixel's hard shadow down-right. Nothing is rasterized in play, so nothing races the render thread. A size or outline outside the lists draws nothing, and `GlyphWarmup.drawn_since_warm` names it. Text drawn into a texture of its own draws it `ArtDetail.DETAIL` times (the damage numbers' sheet, `gameplay/feel/number_glyphs.gd`). `tests/core/test_pixel_font.gd`.
+
 ## Compute effects
 
 `GpuCompute` (`base/gpu_compute.gd`) alone says whether an effect may run as a compute shader (`available()`), reaches the device (`device()`, render thread only) and compiles (`compile`). A `.glsl` lives in `core/` or `gameplay/feel/`, is loaded with a literal `load()` only behind `available()`, never preloaded, compiled when the effect is made, never in play. It keeps its CPU path as the reference and fallback.

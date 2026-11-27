@@ -82,3 +82,15 @@ func test_arrows_turn_by_whole_steps_and_point_their_way() -> void:
 		if right.tone_at(4, y) > PixelShape.OUTLINE:
 			near_back += 1
 	check(near_tip < near_back, "narrow at its tip (%d), wide at its barbs (%d)" % [near_tip, near_back])
+
+
+func test_an_arrow_is_symmetric_about_its_way() -> void:
+	for head: PixelShape in [PixelShape.arrows(30.0, 9.0, 6.0, 16)[0], PixelShape.arrows(16.0, 8.0, 0.0, 16)[4]]:
+		var across: bool = head.width > head.height
+		var mirrored: bool = true
+		for y in head.height:
+			for x in head.width:
+				var other: int = head.tone_at(x, head.height - 1 - y) if across else head.tone_at(head.width - 1 - x, y)
+				# Light and shadow swap sides in a mirror; only what is drawn must match.
+				mirrored = mirrored and ((head.tone_at(x, y) >= 0) == (other >= 0))
+		check(mirrored, "a head %dx%d is the same either side of its way" % [head.width, head.height])

@@ -615,11 +615,16 @@ func _draw() -> void:
 ## shot, in the ramp's light over its base, the Outline round it.
 func _draw_reticle() -> void:
 	var aim: Vector2 = actor.aim
-	var middle: Vector2 = reticle_position() - actor.global_position - aim * (RETICLE_SIZE * 0.5)
+	var shape: PixelShape = reticle_shape(aim)
+	var pixel: float = 1.0 / ArtDetail.DETAIL
 	_reticle_tones[PixelShape.LIGHT] = light_color()
 	_reticle_tones[PixelShape.BASE] = ProjectilesScript.ramp_color(actor.ramp)
 	_reticle_tones[PixelShape.SHADOW] = Palette.shade_beside(_reticle_tones[PixelShape.BASE], Palette.SHADOW)
-	reticle_shape(aim).draw(self, middle, _reticle_tones, 1.0 / ArtDetail.DETAIL)
+	# Its corner snapped to the art pixel in the world, not under the body, so it never stands
+	# between two.
+	var middle: Vector2 = reticle_position() - aim * (RETICLE_SIZE * 0.5)
+	var corner: Vector2 = middle - Vector2(shape.width, shape.height) * (pixel * 0.5)
+	shape.draw_at(self, (corner / pixel).round() * pixel - actor.global_position, _reticle_tones, pixel)
 
 
 ## The reticle's chevron pointing nearest `aim` (baked the first time).

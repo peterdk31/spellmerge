@@ -744,11 +744,13 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 ## art pixels and shaded along its bottom and right, the Outline an art pixel round it with its
 ## corners cut.
 static func _draw_pip(canvas: Control, rect: Rect2, colour: Color) -> void:
+	# As `PixelShape` shades: an art pixel with nothing above or left of it lit (so the top-right and
+	# bottom-left corners are lit too), the rest of the bottom and right edges in shadow.
 	_outline_round(canvas, rect)
 	canvas.draw_rect(rect, Palette.shade_beside(colour, Palette.SHADOW))
 	canvas.draw_rect(Rect2(rect.position, rect.size - Vector2(ART, ART)), colour)
-	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x - ART, ART)), Palette.shade_beside(colour, Palette.LIGHT))
-	canvas.draw_rect(Rect2(rect.position, Vector2(ART, rect.size.y - ART)), Palette.shade_beside(colour, Palette.LIGHT))
+	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, ART)), Palette.shade_beside(colour, Palette.LIGHT))
+	canvas.draw_rect(Rect2(rect.position, Vector2(ART, rect.size.y)), Palette.shade_beside(colour, Palette.LIGHT))
 
 
 ## Seat `seat`'s picked room's outline on `canvas` at its stage (the class doc's PICK_STAGES): a band a
@@ -766,8 +768,10 @@ func _draw_pick(canvas: SeatMap, seat: int, origin: Vector2, scale: int) -> void
 	var light: Color = Palette.shade_beside(colour, Palette.LIGHT)
 	var arm: float = size.x if stage >= PICK_STAGES else (1.0 if stage == 1 else float(mini(BRACKET * scale, int(minf(size.x, size.y) * 0.5))))
 	var tall: float = size.y if stage >= PICK_STAGES else arm
-	# Its Outline first, all round, then its band over it: one corner's Outline never covers another's band.
-	for band in 2:
+	# Its Outline first, all round, then its band's base, then its light over it: one corner's Outline
+	# never covers another's band, and where a lit side meets a base one the light wins, as
+	# `PixelShape` shades.
+	for band in 3:
 		for x in 2:
 			for y in 2:
 				var at: Vector2 = corner + Vector2(size.x - arm if x == 1 else 0.0, size.y - 1.0 if y == 1 else 0.0)
@@ -777,9 +781,16 @@ func _draw_pick(canvas: SeatMap, seat: int, origin: Vector2, scale: int) -> void
 				if band == 0:
 					_outline_round(canvas, across)
 					_outline_round(canvas, upright)
+				elif band == 1:
+					if y == 1:
+						canvas.draw_rect(across, colour)
+					if x == 1:
+						canvas.draw_rect(upright, colour)
 				else:
-					canvas.draw_rect(across, light if y == 0 else colour)
-					canvas.draw_rect(upright, light if x == 0 else colour)
+					if y == 0:
+						canvas.draw_rect(across, light)
+					if x == 0:
+						canvas.draw_rect(upright, light)
 
 
 ## The Outline an art pixel round `rect`, its corners cut (the two rects of its four-way edge).

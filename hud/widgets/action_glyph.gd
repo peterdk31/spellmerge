@@ -46,10 +46,12 @@ const CUT_KEY: int = 1
 const CUT_SHOULDER: int = 2
 const CUT_TRIGGER: int = 7
 const CUT_MOUSE: int = 4
-## The d-pad: its arms' width in art pixels, and the lit arrow at an arm's tip (runs of art pixels
-## pointing up: x, y, length, from the cross's top left; turned for the other arms).
+## The d-pad: its arms' width in art pixels, and the lit arrow at an arm's tip: DPAD_ARROW_ROWS rows,
+## two art pixels wide at its point and two wider a row, its point DPAD_ARROW_IN art pixels in from
+## the arm's end (worked out from the cross's size, so it stays centred in the arm).
 const DPAD_ARM: int = 6
-const DPAD_ARROW: PackedInt32Array = [8, 2, 2, 7, 3, 4, 6, 4, 6]
+const DPAD_ARROW_ROWS: int = 3
+const DPAD_ARROW_IN: int = 2
 const DPAD_TURNS: Array[String] = ["up", "right", "down", "left"]
 ## The PlayStation symbols, 8 × 8 art pixels, strokes two art pixels thick (`#` lit); the circle is a
 ## ring of the same band.
@@ -260,25 +262,30 @@ func _draw_label(area: Rect2, text: String, text_color: Color) -> void:
 ## The d-pad's lit arm (its label: `up`, `right`, `down`, `left`), or every arm (`all`): an arrow at
 ## its tip in Bone's white heat, pointing out.
 func _draw_dpad() -> void:
-	var label: String = String(_glyph["label"])
-	var side: int = roundi(GLYPH_HEIGHT / ART) - 2
+	draw_dpad_arrows(self, String(_glyph["label"]), roundi(GLYPH_HEIGHT / ART) - 2)
+
+
+## The d-pad's arrows for `label` on `target` (anything with `draw_rect`), the cross `side` art pixels
+## square inside its Outline: each arrow's rows mirrored about the cross's middle for each arm, so
+## every arm's is the up arm's turned.
+static func draw_dpad_arrows(target: Object, label: String, side: int) -> void:
 	for turn in DPAD_TURNS.size():
 		if label != DPAD_TURNS[turn] and label != "all":
 			continue
-		for at in range(0, DPAD_ARROW.size(), 3):
-			var x: int = DPAD_ARROW[at]
-			var y: int = DPAD_ARROW[at + 1]
-			var length: int = DPAD_ARROW[at + 2]
+		for row in DPAD_ARROW_ROWS:
+			var length: int = 2 + 2 * row
+			var x: int = side / 2 - 1 - row
+			var y: int = DPAD_ARROW_IN + row
 			var run := Rect2(x, y, length, 1)
 			match turn:
 				1:
 					run = Rect2(side - 1 - y, x, 1, length)
 				2:
-					run = Rect2(x, side - 1 - y, length, 1)
+					run = Rect2(side - x - length, side - 1 - y, length, 1)
 				3:
-					run = Rect2(y, x, 1, length)
+					run = Rect2(y, side - x - length, 1, length)
 			# The cross sits inside its Outline, an art pixel in.
-			draw_rect(Rect2((run.position + Vector2.ONE) * ART, run.size * ART), TEXT_ON_PLAIN)
+			target.draw_rect(Rect2((run.position + Vector2.ONE) * ART, run.size * ART), TEXT_ON_PLAIN)
 
 
 ## The mouse: its body with the button of its label lit (LMB the left, RMB the right), split down

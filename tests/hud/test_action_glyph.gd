@@ -107,3 +107,46 @@ func test_a_cap_is_cut_by_steps_at_its_corners() -> void:
 	check_equal(rows[2], ".########.", "a step a row")
 	check_equal(rows[3], "##########", "then whole")
 	check_equal(rows[7], ".########.", "the bottom cut one in")
+
+
+## Notes the art pixels a drawing sets (two a layout pixel).
+class GlyphPixels extends RefCounted:
+	var lit: Dictionary = {}
+
+	func draw_rect(rect: Rect2, _color: Color) -> void:
+		var art := Rect2i(Vector2i((rect.position * 2.0).round()), Vector2i((rect.size * 2.0).round()))
+		for y in range(art.position.y, art.end.y):
+			for x in range(art.position.x, art.end.x):
+				lit[Vector2i(x, y)] = true
+
+
+func _arrow(label: String, side: int) -> Dictionary:
+	var pixels := GlyphPixels.new()
+	ActionGlyphScript.draw_dpad_arrows(pixels, label, side)
+	return pixels.lit
+
+
+## The d-pad's arrows: each arm's is the up arm's turned about the cross's middle, inside its arm.
+func test_each_dpad_arm_lights_the_up_arms_arrow_turned() -> void:
+	var side: int = roundi(ActionGlyphScript.GLYPH_HEIGHT * 2.0) - 2
+	var up: Dictionary = _arrow("up", side)
+	check(up.size() >= 6, "the up arrow is drawn (%d art pixels)" % up.size())
+	var from: int = (side - ActionGlyphScript.DPAD_ARM) / 2
+	for pixel: Vector2i in up:
+		check(pixel.x - 1 >= from and pixel.x - 1 < from + ActionGlyphScript.DPAD_ARM and pixel.y - 1 < from, "up's arrow inside the up arm (%s)" % pixel)
+	# Turning a pixel of the cross (inside its Outline) a quarter clockwise about its middle.
+	var turned: Dictionary = up
+	for label: String in ["right", "down", "left"]:
+		var next: Dictionary = {}
+		for pixel: Vector2i in turned:
+			var x: int = pixel.x - 1
+			var y: int = pixel.y - 1
+			next[Vector2i(side - 1 - y + 1, x + 1)] = true
+		turned = next
+		var drawn: Dictionary = _arrow(label, side)
+		check_equal(drawn.keys().size(), turned.keys().size(), "%s: as many pixels as up's" % label)
+		var same: bool = true
+		for pixel: Vector2i in turned:
+			same = same and drawn.has(pixel)
+		check(same, "%s's arrow is up's turned" % label)
+	check_equal(_arrow("all", side).size(), up.size() * 4, "all four for the whole d-pad")

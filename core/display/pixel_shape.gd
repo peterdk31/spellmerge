@@ -21,7 +21,8 @@ extends RefCounted
 
 ## One art pixel, in layout pixels.
 const ART_PIXEL: float = 0.5
-## The tones a run is drawn in: the index into the colours `draw` is handed.
+## The tones a run is drawn in: the index into the colours `draw` is handed (not `Palette`'s shade
+## indices, which run shadow, base, light: `Palette.shade_beside` takes those).
 const OUTLINE: int = 0
 const LIGHT: int = 1
 const BASE: int = 2

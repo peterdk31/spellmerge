@@ -77,9 +77,6 @@ const BOSS_HALF_WIDTH_STEP: float = 2.0
 ## a step brighter, Fire light its base, lit in Spark light over a Fire base shade.
 const TONES: PackedColorArray = [Color("#14121f"), Color("#ffa23c"), Color("#e0592f"), Color("#8f2d2a")]
 const BOSS_TONES: PackedColorArray = [Color("#14121f"), Color("#fff3a6"), Color("#ffa23c"), Color("#e0592f")]
-## The base colours, as the look's doc names them.
-const COLOR: Color = Color("#e0592f")
-const BOSS_COLOR: Color = Color("#ffa23c")
 ## The ways a head is drawn pointing: the nearest of WAYS (pixel art turns by whole steps).
 const WAYS: int = 16
 
@@ -130,7 +127,7 @@ func _init() -> void:
 	_place_counts.resize(ScreenViewsScript.VIEWS_MOST)
 	_ids.resize(ActorsScript.ACTORS)
 	var art: float = 1.0 / PixelShape.ART_PIXEL
-	for boss in [false, true]:
+	for boss: bool in [false, true]:
 		for stage in range(1, STAGES + 1):
 			var size: Vector2 = size_at(stage, boss) * art
 			_heads.append(PixelShape.arrows(size.x, size.y, 0.0, WAYS))

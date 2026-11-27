@@ -34,6 +34,9 @@ uniform vec2 beam_start = vec2(-100000.0);
 uniform vec2 beam_end = vec2(-100000.0);
 // How far the beam's quads reach past each end, so the flares are whole.
 uniform float beam_lead = 0.0;
+// The pixels over which its light rises from nothing at its start (0: lit from its start): a beam of
+// a fan (+2, +3), so the fan joins its trunk as one beam that splits, never a stack of lights.
+uniform float beam_from = 0.0;
 
 // The pixel in the world.
 varying vec2 world;
@@ -166,7 +169,7 @@ float beam_light(float along, float across, vec2 P) {
 		float pos = mod(sim_time * 320.0 + float(n) * len / 4.0, len);
 		lit += 0.35 * falloff(abs(along - pos), 5.0) * falloff(abs(across - off), 4.0);
 	}
-	return lit;
+	return beam_from > 0.0 ? lit * smoothstep(0.0, beam_from, along) : lit;
 }
 
 // The light's strength after the beam's fade, glow, flicker and void's dimming.

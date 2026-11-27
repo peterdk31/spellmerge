@@ -438,3 +438,33 @@ func test_live_and_shown_beams_give_their_motes_to_the_pool() -> void:
 func test_the_beam_shader_draws_no_particles() -> void:
 	var code: String = ShaderSource.of(FeelScript.BEAM_SHADER)
 	check(not code.contains("shot_particle") and not code.contains("Q_SPLASH") and not code.contains("Q_PARTICLE"), "its splash and card particles are motes (S6 item 10)")
+
+
+## Live beams of a fan (+2, +3 on a beam, #972): the beam stand-in, its one row a fan's trunk or a
+## beam of its fan (`beam_role`).
+class FanBeams:
+	extends FakeBeams
+	var role: int = CarrierBeam.ROLE_ALONE
+
+	func beam_role(_at: int) -> int:
+		return role
+
+
+## A fan is drawn as one beam that splits (the owner, 2026-11-27, on #977): its trunk draws no flare
+## where the fan's beams leave it, and each of them none where it leaves, its light rising from there
+## over BEAM_FAN_IN pixels, so nothing is stacked at the join; a beam of its own keeps both flares.
+func test_a_fan_is_drawn_as_one_beam_that_splits() -> void:
+	var beams := own(FanBeams.new()) as FanBeams
+	feel.spells = beams
+	for role: int in [CarrierBeam.ROLE_ALONE, CarrierBeam.ROLE_TRUNK, CarrierBeam.ROLE_FAN]:
+		beams.role = role
+		feel.step(0.016)
+		var lines: Array[MeshInstance2D] = _live_lines()
+		check_equal(lines.size(), 1, "role %d: one live beam on screen" % role)
+		var material: ShaderMaterial = lines[0].material as ShaderMaterial
+		var start: Vector2 = material.get_shader_parameter(&"beam_start")
+		var end: Vector2 = material.get_shader_parameter(&"beam_end")
+		var from: float = material.get_shader_parameter(&"beam_from")
+		check_equal(start, Vector2.ZERO if role != CarrierBeam.ROLE_FAN else FeelScript.BEAM_NO_FLARE, "role %d: a flare at its start unless it is a fan's beam" % role)
+		check(end.is_finite() and (role == CarrierBeam.ROLE_TRUNK) == (end == FeelScript.BEAM_NO_FLARE), "role %d: a flare at its end unless it is a trunk (%s)" % [role, end])
+		check_equal(from, FeelScript.BEAM_FAN_IN if role == CarrierBeam.ROLE_FAN else 0.0, "role %d: a fan's beam lights up from the join" % role)

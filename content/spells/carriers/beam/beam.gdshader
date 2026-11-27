@@ -59,6 +59,9 @@ uniform vec2 beam_start = vec2(-100000.0);
 uniform vec2 beam_end = vec2(-100000.0);
 // How far the beam's quads reach past each end, so the flares are whole.
 uniform float beam_lead = 0.0;
+// The pixels over which its light rises from nothing at its start (0: lit from its start): a beam of
+// a fan (+2, +3), so the fan joins its trunk as one beam that splits, never a stack of lights.
+uniform float beam_from = 0.0;
 // Every different infusion on it, in slot order (`CompiledSpell.infusion_looks`): rgb its tint,
 // alpha its look kind / 255, and how many (0: a beam shown with its tint and look only, whose
 // infusion is worked out from them). The first is its body; the others are its strands.
@@ -327,7 +330,8 @@ vec3 beam_light(float along, float across, vec2 P, float pulse_e) {
 	float a = abs(across - off);
 	float lit = 0.5 * falloff(a, 3.0 + 1.5 * bands) + 0.6 * falloff(length(floor(P) - floor(beam_end)), 7.0 + bands) + 0.4 * falloff(length(floor(P) - floor(beam_start)), 5.0);
 	vec3 pulse_glow = pulse_e >= 0.0 ? infusion_shade(int(pulse_e), 2) : glow;
-	return glow * lit + pulse_glow * 0.45 * pulse_at(along, len, 6.0) * falloff(a, 3.0 + bands);
+	vec3 light = glow * lit + pulse_glow * 0.45 * pulse_at(along, len, 6.0) * falloff(a, 3.0 + bands);
+	return beam_from > 0.0 ? light * smoothstep(0.0, beam_from, along) : light;
 }
 
 // The light's strength after the beam's fade, glow, flicker and void's dimming.

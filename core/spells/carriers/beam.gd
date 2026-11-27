@@ -1298,6 +1298,12 @@ func beam_tag(at: int) -> int:
 	return _bm_tag[at]
 
 
+## What live beam `at` is of a fan (ROLE_*: its own, a fan's trunk, a beam of a fan), for its look:
+## a fan is drawn as one beam that splits at its trunk's end.
+func beam_role(at: int) -> int:
+	return _bm_role[at]
+
+
 func beam_since_hit(at: int) -> float:
 	return kit.clock() - _bm_hit_at[at]
 

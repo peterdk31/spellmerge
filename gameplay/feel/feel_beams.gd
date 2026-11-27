@@ -48,7 +48,7 @@ var _next_shown_beam: PackedInt32Array
 ## own; an entry is made with its node.
 var _live_set: Array[Array] = []
 ## The order of `_live_set`'s entries.
-enum LiveSet { SHADER, CORE, BODY, LEAD, WIDTH, PLAYER, LOOK, INFUSIONS, INFUSION_COUNT, FADE, SWELL, GLOW, SIZE }
+enum LiveSet { SHADER, CORE, BODY, LEAD, WIDTH, PLAYER, LOOK, INFUSIONS, INFUSION_COUNT, FADE, SWELL, GLOW, FROM, SIZE }
 
 
 ## Takes Feel and its containers and jobs, by the names in LINKED (`Feel._link_jobs`).
@@ -314,6 +314,7 @@ func _draw_live_beams(real_delta: float) -> void:
 	var has_growth: bool = beams != null and beams.has_method(&"beam_growth")
 	var has_infusions: bool = beams != null and beams.has_method(&"beam_infusions")
 	var has_tag: bool = beams != null and beams.has_method(&"beam_tag")
+	var has_role: bool = beams != null and beams.has_method(&"beam_role")
 	for i in _live_beams.size():
 		var node: MeshInstance2D = _live_beams[i]
 		if i >= count or not bool(beams.call(&"beam_on", i)):
@@ -374,6 +375,9 @@ func _draw_live_beams(real_delta: float) -> void:
 		var tint: Color = beams.call(&"beam_tint", i)
 		var ramp: int = _beam_ramp(feel._ramp_of(caster))
 		var look_id: int = int(beams.call(&"beam_look", i)) if has_look else 0
+		# A fan (+2, +3 on a beam) is drawn as one beam that splits: its trunk has no flare where its
+		# beams leave, and they none where they leave it, lighting up from there.
+		var role: int = int(beams.call(&"beam_role", i)) if has_role else CarrierBeam.ROLE_ALONE
 		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
 		var look: CardLook = _carrier_card_look_of(beams.call(&"beam_carrier_card", i) as StringName if has_card else &"", Carrier.LOOK_BEAM)
@@ -399,8 +403,12 @@ func _draw_live_beams(real_delta: float) -> void:
 		if last[LiveSet.LEAD] != FeelScript.BEAM_LEAD:
 			material.set_shader_parameter(&"beam_lead", FeelScript.BEAM_LEAD)
 			last[LiveSet.LEAD] = FeelScript.BEAM_LEAD
-		material.set_shader_parameter(&"beam_start", origin)
-		material.set_shader_parameter(&"beam_end", end_at)
+		material.set_shader_parameter(&"beam_start", origin if role != CarrierBeam.ROLE_FAN else FeelScript.BEAM_NO_FLARE)
+		material.set_shader_parameter(&"beam_end", end_at if role != CarrierBeam.ROLE_TRUNK else FeelScript.BEAM_NO_FLARE)
+		var from: float = FeelScript.BEAM_FAN_IN if role == CarrierBeam.ROLE_FAN else 0.0
+		if last[LiveSet.FROM] != from:
+			material.set_shader_parameter(&"beam_from", from)
+			last[LiveSet.FROM] = from
 		material.set_shader_parameter(&"sim_time", feel._clock)
 		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
 		var grown: float = float(beams.call(&"beam_growth", i)) if has_growth else 1.0
@@ -435,7 +443,7 @@ func _draw_live_beams(real_delta: float) -> void:
 			last[LiveSet.GLOW] = preset.beam_alpha
 		node.visible = true
 		_sound_beam(beams, i, caster, origin, fade)
-		_beam_motes(path, used, walked, end_at, end_dir, fade, ramp, look_id, tint, int(beams.call(&"beam_tag", i)) if has_tag else 0, real_delta)
+		_beam_motes(path, used, walked, end_at, end_dir, fade, ramp, look_id, tint, int(beams.call(&"beam_tag", i)) if has_tag else 0, real_delta, role != CarrierBeam.ROLE_TRUNK)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if spectacle != null:
 			spectacle.light_beam(i, path, used, ramp, look_id, tint, fade, look.light_intensity, look.light_reach)
@@ -467,12 +475,13 @@ func _sound_beam(beams: Object, i: int, caster: int, origin: Vector2, fade: floa
 ## while motes are on: its path is the first `points` of `path` (x, y and how far along), `length`
 ## pixels long, landing at `end_at` going `end_dir`, `fade` whole (1 to 0), of the shader ramp
 ## `ramp` (0-3 a hat ramp, -1 the enemies'), the look `look`, the tint `tint`, the spell of `tag`.
-func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: Vector2, end_dir: Vector2, fade: float, ramp: int, look: int, tint: Color, tag: int, seconds: float) -> void:
+func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: Vector2, end_dir: Vector2, fade: float, ramp: int, look: int, tint: Color, tag: int, seconds: float, splash: bool = true) -> void:
 	if seconds <= 0.0 or points < 2 or not feel._spectacle.motes_on():
 		return
 	var births: BirthsScript = feel._spectacle.births
 	var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
-	if fade > FeelScript.BEAM_SPLASH_FADE:
+	# A fan's trunk splashes nothing where its beams leave it (`splash` false).
+	if splash and fade > FeelScript.BEAM_SPLASH_FADE:
 		for n in births.roll(FeelScript.BEAM_SPLASH_RATE * seconds):
 			if not births.add(end_at, -end_dir, 0, ramp, look, core, tag):
 				return

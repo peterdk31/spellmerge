@@ -8,4 +8,4 @@ script = ExtResource("1_item")
 id = &"frostfire_cascade"
 display_name = "Frostfire Cascade"
 staff = ExtResource("2_dev")
-cards = Array[StringName]([&"on_expire", &"fire", &"plus_two", &"plus_two", &"plus_two", &"nova", &"bolt", &"frost", &"plus_two", &"plus_two", &"plus_two", &"nova", &"bolt"])
+cards = Array[StringName]([&"on_expire", &"fire", &"plus_three", &"plus_three", &"plus_three", &"nova", &"bolt", &"frost", &"plus_three", &"plus_three", &"plus_three", &"nova", &"bolt"])

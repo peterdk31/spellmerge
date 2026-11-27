@@ -17,8 +17,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const Beam := preload("res://content/rooms/decor/beam.tscn")
 const Candles := preload("res://content/rooms/crypt/decals/candles.tscn")
 const Torch := preload("res://content/rooms/crypt/decals/torch.tscn")
-const Rubble := preload("res://art/tilesets/crypt/rubble.svg")
-const Skull := preload("res://art/tilesets/crypt/skull.svg")
+const Rubble := preload("res://art/tilesets/crypt/rubble@2x.svg")
+const Skull := preload("res://art/tilesets/crypt/skull@2x.svg")
 
 ## How near the room's middle the ring's centre stands.
 const MIDDLE: float = 24.0

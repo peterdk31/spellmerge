@@ -41,7 +41,7 @@ const SHOTS_DIR := "user://screenshots"
 ## The game's screen, which every sheet is laid out on: its layout pixels (PictureGrid.SIZE), drawn
 ## at the picture's scale (`sheet_scale`: 2 in the 1280 x 720 picture).
 const SCREEN := Vector2(640.0, 360.0)
-const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
+const FLOOR := preload("res://art/tilesets/crypt/floor@2x.svg")
 const PinnedRun := preload("res://bench/pinned_run.gd")
 const DrawnFramesScript := preload("res://tests/support/drawn_frames.gd")
 const _SHOT_TICK := preload("res://core/sim/tick.gd")
@@ -213,8 +213,8 @@ func lay_floor() -> void:
 	floor_sprite.centered = false
 	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	floor_sprite.region_enabled = true
-	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN)
-	floor_sprite.scale = Vector2.ONE * float(sheet_scale())
+	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN * float(ArtDetail.of(FLOOR)))
+	floor_sprite.scale = ArtDetail.draw_scale(FLOOR) * float(sheet_scale())
 	floor_sprite.z_index = -10
 	root.add_child(floor_sprite)
 

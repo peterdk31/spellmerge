@@ -3,9 +3,9 @@
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_11/arena_11_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
 [ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/sarcophagus.svg" id="5_sarcophagus"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/sarcophagus@2x.svg" id="5_sarcophagus"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble@2x.svg" id="7_rubble"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull@2x.svg" id="8_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar.tres" id="12_pillar"]
 [ext_resource type="Resource" path="res://content/props/cracked_pillar/cracked_pillar.tres" id="13_cracked"]
@@ -33,6 +33,7 @@ shape = SubResource("RectangleShape2D_64x32")
 [node name="Sarcophagus1" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(224, 96)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_sarcophagus")
 centered = false
 
@@ -43,6 +44,7 @@ shape = SubResource("RectangleShape2D_64x32")
 [node name="Sarcophagus2" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(608, 96)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_sarcophagus")
 centered = false
 
@@ -53,6 +55,7 @@ shape = SubResource("RectangleShape2D_64x32")
 [node name="Sarcophagus3" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(224, 256)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_sarcophagus")
 centered = false
 
@@ -63,6 +66,7 @@ shape = SubResource("RectangleShape2D_64x32")
 [node name="Sarcophagus4" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(608, 256)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_sarcophagus")
 centered = false
 
@@ -104,24 +108,28 @@ position = Vector2(448, 200)
 [node name="Rubble1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(480, 120)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Rubble2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(360, 288)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Skull1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(300, 144)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("8_skull")
 centered = false
 
 [node name="Skull2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(600, 216)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("8_skull")
 centered = false
 

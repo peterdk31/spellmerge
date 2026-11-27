@@ -75,10 +75,11 @@ static func wall_bounds(root: Node) -> Rect2:
 	return box
 
 
-## The area a Sprite2D covers: its region, or the whole texture.
+## The area a Sprite2D covers in the world: its region, or the whole texture, at its scale (a 2x
+## texture is drawn at half: ArtDetail).
 static func sprite_rect(sprite: Sprite2D) -> Rect2:
 	var size: Vector2 = sprite.region_rect.size if sprite.region_enabled else sprite.texture.get_size()
-	return Rect2(sprite.position, size)
+	return Rect2(sprite.position, size * sprite.scale.abs())
 
 
 ## The names of what `root` (a room's, a bridge's or a seam's layout) draws under its `Floor`: its

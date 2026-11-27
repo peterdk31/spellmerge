@@ -23,7 +23,7 @@ extends SceneTree
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
+const FLOOR := preload("res://art/tilesets/crypt/floor@2x.svg")
 
 const SCREEN := Vector2(640.0, 360.0)
 const WALL: float = 8.0
@@ -128,7 +128,8 @@ func _initialize() -> void:
 	floor_sprite.centered = false
 	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	floor_sprite.region_enabled = true
-	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN)
+	floor_sprite.region_rect = Rect2(Vector2.ZERO, SCREEN * float(ArtDetail.of(FLOOR)))
+	floor_sprite.scale = ArtDetail.draw_scale(FLOOR)
 	floor_sprite.z_index = -10
 	root.add_child(floor_sprite)
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))

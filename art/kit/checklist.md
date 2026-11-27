@@ -64,7 +64,7 @@ Copy their approach, not their pixels. The list is `art/kit/golden.json`.
 
 - Player character (a living staff, at 2x detail): `art/kit/golden_staff@2x.svg`
 - Enemy (a stray): `art/kit/golden_stray.svg`
-- Raised tile: `art/tilesets/crypt/wall.svg`; flat tile: `art/tilesets/crypt/floor.svg`
+- Raised tile: `art/tilesets/crypt/wall@2x.svg`; flat tile: `art/tilesets/crypt/floor@2x.svg`
 - Projectile: `art/vfx/bolt.svg`; impact: `art/vfx/hit_spark.svg`
 
 Art is CC-BY-SA-4.0 by default. Only original work: no ripped assets, no fan art, no names from other works.

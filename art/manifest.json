@@ -37,22 +37,22 @@
       "prompt": "Redrawn at 2x detail (two art pixels a world pixel, drawn at half size in the game) from its 1x art with the same layout, frames and silhouette, its diagonals smoothed to one-pixel steps and its outside outline one art pixel thick, then given new detail at the finer pixels: a one-pixel lit edge on each part's top-left and a shaded one on its bottom-right,; palette colours only. The 1x art's prompt: The style N wizard's pointed hat (content/wizard/base/wizard_hat_p1.svg) in the Blight ramp, the enemies' colour, for the wizard, the villain of the intro, who wears no player colour. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/tilesets/crypt/floor.svg",
+      "path": "art/tilesets/crypt/floor@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A flat 32x32 crypt floor tile in the Spellmerge palette: Stone base fill with a few small cracks in Stone shadow and a few specks in Stone light, nothing on the outer edge pixels so it repeats without a seam. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "Worn flagstones: joints in Stone's shadow, the lip past each joint caught by the light in short broken lengths, a crack, a little grit. Flat and quiet (shots read over it), nothing on its outer edge pixels, so it repeats with no seam. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/wall.svg",
+      "path": "art/tilesets/crypt/wall@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 crypt wall tile in the Spellmerge palette: stone bricks in four staggered courses, each brick lit on its top and shaded by a Stone shadow joint below, a Stone light edge on the top and left and a Stone shadow edge on the bottom and right (light from the top-left). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "Four courses of dressed blocks in dark mortar, every other one set half a block over. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
       "path": "art/vfx/bolt.svg",
@@ -91,103 +91,103 @@
       "prompt": "An 8x8 tile for the enemy telegraph line, repeated along the line: a 5 px wide dash (a Fire light band with a Spark light core and Fire shadow edges) followed by a 3 px gap, so the line reads as a dashed danger lane. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/tilesets/crypt/wall_top.svg",
+      "path": "art/tilesets/crypt/wall_top@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 crypt wall tile for the top and bottom walls: a Stone light top face on the upper 10 px (one joint, two Stone base specks), a Stone shadow edge, then two courses of Stone base bricks with Stone light top edges and Stone shadow joints, ending in a 4 px Stone shadow foot so the wall reads as a raised block. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The wall's top seen from above: two worn capstones, lit, a shadow under their lip, then the courses of its face going down into the dark. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/pillar.svg",
+      "path": "art/tilesets/crypt/pillar@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The lower half of a 2.5D crypt pillar, 32x32, drawn over its 32x32 footprint: a round shaft 22 px wide (Stone light on the left, base in the middle, Stone shadow on the right, one drum joint) standing on a 30 px wide plinth with a Stone light top edge and a Stone shadow foot, dark Outline. Its upper half is pillar_top.svg. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A square pillar's shaft (going on up into its top tile) on a plinth: lit down its left face, shaded down its right, a joint between its blocks, the plinth's top caught by the light. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/pillar_top.svg",
+      "path": "art/tilesets/crypt/pillar_top@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The upper half of a 2.5D crypt pillar, 32x32, drawn directly above pillar.svg and in front of characters: a lit Stone light capital top face with a few Stone base cracks, a Stone base lip with a Stone light top edge and a Stone shadow underside, a Stone shadow cast under the lip and the top of the shaft (light left, base middle, shadow right) that continues into pillar.svg. Dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The pillar's capital seen from above and the front: a lit capstone with a moulding under its front edge, its neck in shadow, the shaft going on down into the pillar tile. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/torch.svg",
+      "path": "art/tilesets/crypt/torch@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 wall torch bracket drawn over a wall tile (transparent background): a Wood cup and handle with a dark Outline and no flame (the flame is torch_flame.svg, drawn on top). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The wall torch's bracket: a wooden cup bound with an iron band, on a turned handle with an iron collar. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/torch_flame.svg",
+      "path": "art/tilesets/crypt/torch_flame@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 4-frame strip (128x32) of a torch flame above a torch cup, looping: a Fire flame with a Spark light core whose tip is tall, tilted left, short and tilted right in the four frames, with an ember base in Fire shadow and two Spark sparks that drift upward. Dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "One look of the torch's flame: an outer tongue of fire round a gold heart and a white core, sparks lifting off it. Its foot sits in the cup. (32x32 units, 4 frames side by side). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/torch_glow.svg",
+      "path": "art/tilesets/crypt/torch_glow@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A flat 64x64 round light glow for a torch: one stepped disc in Fire base, no outline, no gradient. The game draws it additively at low opacity. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The warm pool a torch or a candle casts (added over the room, faint): a flat disc of fire, a brighter ring of its light shade inside it. (64x64 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/torch_glow_core.svg",
+      "path": "art/tilesets/crypt/torch_glow_core@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 3-frame strip (96x32) of the bright core of a torch glow: one stepped disc in Fire light per frame, 26, 20 and 12 px wide, no outline, no gradient. The game plays the frames in an uneven order, additively at low opacity, over torch_glow.svg so the light flickers. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The flame's own glow breathing in its three sizes: a disc of fire's light, its heart a ring of spark's. (32x32 units, 3 frames side by side). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/door.svg",
+      "path": "art/tilesets/crypt/door@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 crypt door tile for the entry and exit of a room: a Stone frame with a light lintel, a dark Outline, Wood planks with Wood shadow joints, two Stone shadow iron bands and a Spark ring handle. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A plank door in a stone frame: three boards of grained oak, two iron straps riveted across them, a brass ring to pull, the lintel's underside dark over its top. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/rubble.svg",
+      "path": "art/tilesets/crypt/rubble@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 floor decal (transparent background) of three small broken stones, each with a dark Outline, a Stone light top and a Stone base face, plus two Stone shadow chips. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "Broken stone on the floor: three knocked-off lumps and a few chips. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/skull.svg",
+      "path": "art/tilesets/crypt/skull@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 floor decal (transparent background) of a small skull seen from above: Bone light top, Bone base and shadow sides, two dark eye sockets and a row of teeth, a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A skull lying on the floor. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/hub/void.svg",
+      "path": "art/tilesets/hub/void@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (SVG rects written by a small generator from a character grid)",
-      "prompt": "A 32x32 tile of the empty void round the hub's floating island, repeating in both directions: a flat Outline fill with a few sparse faint specks of magic (single Stone shadow pixels, one Void shadow pixel, one tiny four-point glint of Stone shadow round a Stone base centre), none on the outer edge pixels so it repeats without a seam. It reads as nothing behind the bright island. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The dark past the hub's edge: the outline's black, with far motes of stone-dust in it, two faint crosses of a star and a fleck of void's violet. Sparse and quiet; repeats with no seam. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
       "path": "content/wizard/base/wizard_idle@2x.svg",
@@ -604,49 +604,49 @@
       "prompt": "The title type (docs/milestones/boss-intro.md, rule 7): an original bitmap face for boss names, every printable ASCII character on a 12x16 cell, 16 a row in six rows, heavy and a little worn, in Bone light, drawn at 2x. Imported as an image font (font_data_image)."
     },
     {
-      "path": "art/tilesets/crypt/candles.svg",
+      "path": "art/tilesets/crypt/candles@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from candles.grid.json, 2026-11-16)",
-      "prompt": "A 32x32 cluster of three wax candles of falling heights on a broken flagstone ledge (crypt rework CR3, docs/milestones/crypt-rework.md): Bone wax with a shadowed right side and a drip, Wood shadow wicks, a dark Outline. The flames are candle_flame.svg, drawn on top. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "Three tallow candles on a pewter dish, burnt down to different heights: round and pale, wax run down their sides and pooled at their feet, a black wick in each cupped top. (32x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/candle_flame.svg",
+      "path": "art/tilesets/crypt/candle_flame@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from candle_flame.grid.json, 2026-11-16)",
-      "prompt": "A 4-frame strip (128x32) of three small candle flames over candles.svg's wicks, looping: each flame one pixel wide, two to four tall, Fire light at its foot, Spark light inside and Spark base at its tip, leaning by a pixel now and then, the three out of step. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "One look of the three candles' flames: small tongues of fire over their wicks, gold at the foot, white at the heart, each flickering on its own. (32x32 units, 4 frames side by side). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside (none on a tile, which fills its cell and repeats with no seam, nor on a light, which is flat colours). Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/fallen_column.svg",
+      "path": "art/tilesets/crypt/fallen_column@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from fallen_column.grid.json, 2026-11-16)",
-      "prompt": "A 64x32 decal of a fallen crypt column (crypt rework CR3, the antechamber's landmark): a jagged stump of a fluted Stone column on its plinth, two of its drums lying on their sides beside it with their end faces turned to the camera, chips of stone round them; dark Outline, lit from the upper left. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A broken column: its stump on its plinth, its top snapped off in jagged teeth, and two of its drums rolled away on the floor, dust and chips round them. (64x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/decor/beam.png",
+      "path": "art/tilesets/decor/beam@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (a Python script)",
-      "prompt": "A shaft of pale light falling from a crack in the vault (crypt rework, docs/milestones/crypt-rework.md; the hub rework's HR4 beam): a 64x224 column, narrow at the top and wider at the floor, its light in whole steps of transparency (no smooth ramp), fading out over its last rows. Drawn additively over the room. Generated by a short script in the session that made it."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "The shaft of light falling from a crack in the roof (64 x 224 world units): pale, widening as it falls, brighter down its middle, a few fine streaks of brighter light along it, its foot rounding off where it meets the floor. Four steps of alpha, whole pixels. (64x224 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game: one pale blue-white colour in a few flat steps of alpha, whole pixels, no blur, about its 1x shape and size (a room's soft light, docs/STYLE.md, \"Rooms\").",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/decor/beam_pool.png",
+      "path": "art/tilesets/decor/beam_pool@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (a Python script)",
-      "prompt": "The pool of light where the shaft meets the floor: an 80x32 oval in pale blue-white, its transparency in whole steps. Painted light (hidden while spell light draws the spot's own light). Generated by a short script in the session that made it."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "Where the shaft meets the floor (80 x 32 world units): rings of pale light, brighter inward, a bright fleck at its heart. (80x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game: one pale blue-white colour in a few flat steps of alpha, whole pixels, no blur, about its 1x shape and size (a room's soft light, docs/STYLE.md, \"Rooms\").",
+      "tier": "good"
     },
     {
       "path": "art/grounds/arena_01/arena_01_ground_floor.png",
@@ -676,31 +676,31 @@
       "prompt": "The antechamber's glow layer, drawn by tools/ground_shape.py: empty, since crypt_edge has no glow (the file is written for every ground)."
     },
     {
-      "path": "art/tilesets/crypt/sarcophagus.svg",
+      "path": "art/tilesets/crypt/sarcophagus@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from sarcophagus.grid.json, 2026-11-17)",
-      "prompt": "A 64x32 sarcophagus seen from above with its front face to the camera (crypt rework CR4, the nave's landmark): a Stone lid lit from the upper left with a carved figure lying on it, head to the west, a hooded head with closed eyes, hands folded on the hilt of a sword laid along its robe, its feet at the east end; the chest's front face below the lid's dark lip in panels; its corners chipped inside its box, a chip broken off the lid; dark Outline. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A stone coffin: its heavy lid carved with a sleeper (a round head, a long robed body studded down its sides, a sword laid along it), a corner of the lid broken off, the panelled front of the chest under the lid's lip. (64x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/ossuary_wall.svg",
+      "path": "art/tilesets/crypt/ossuary_wall@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from ossuary_wall.grid.json, 2026-11-17)",
-      "prompt": "A 128x32 low wall built of bones seen from above with its front face to the camera (crypt rework CR5, the ossuary court's landmark): its top long bones laid along it in three staggered courses on a dark bed, two skulls lying on them; below a dark lip, its face the ends of stacked bones in courses with three arched skull niches, a skull looking out of each; a dark foot, its corners chipped inside its box, a chip broken off the lip; dark Outline. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A low wall built of the dead: long bones stacked along its top in three courses, two skulls set in them, then a face of bone ends packed in rows round three arched niches, a skull in each, on a stone sill. The bones are dusty and dim (Stone), the skulls their own bone a shade down (`DIM_BONE`), so the wall stays calm behind a fight. (128x32 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
-      "path": "art/tilesets/crypt/bone_pile.svg",
+      "path": "art/tilesets/crypt/bone_pile@2x.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from bone_pile.grid.json, 2026-11-17)",
-      "prompt": "A 32x16 floor decal of bones piled at the foot of an ossuary's wall (crypt rework CR5): a skull on two long bones lying across each other and the ends of two more, mostly Bone shadow and Stone light, the skull in Bone base as the crypt's skull decal, so they stay quieter than the fight; dark Outline, lit from the upper left. Palette colours from docs/STYLE.md."
+      "tool": "Claude (drawn by tools/room_art.py from shape and light rules of its own, on tools/sprite_rules.py; ART3's redraw at 2x detail, 2026-11-27)",
+      "prompt": "A heap of bones: a thigh bone laid across, a rib and a shin under it, a skull on top. (32x16 units). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) for a top-down pixel game, about its 1x silhouette, size and frames, part by part, each a rod, a ball, a bevelled box or polygon, a column or a ring: lit from the top-left in three shades of its material, the base the most, with its material's surface where it has one (wood grain and boards, bone pores, worn stone, a flame's bright core, rivets, a glint in the material's own light shade), a dark seam where a part lies over another and a one-pixel dark outline round the outside. Palette colours from docs/STYLE.md only; no player colours; every pixel fully clear or fully opaque.",
+      "tier": "good"
     },
     {
       "path": "art/grounds/arena_02/arena_02_ground_floor.png",

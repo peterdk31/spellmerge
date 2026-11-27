@@ -13,7 +13,7 @@ unit: each art pixel's middle is tested against the parts, the topmost that hold
   turns, the shadow on the bottom-right ones (docs/STYLE.md, "Light and shading").
 - **Material:** a part's surface marks its inside in its own shades: wood grain along a rod or a
   board, bone pores and cracks, a leaf's vein, a flame's bright core, ice and glass streaks, a
-  stone speckle, a glint on what shines. Stone never takes its shadow (the floor's).
+  stone speckle or its sparser wear, a glint on what shines. Stone never takes its shadow (the floor's).
 - **Edges:** where a part lies over another, the part below takes a dark seam along it, so the
   parts read apart; the outside gets a one-art-pixel outline, closed eight ways; the silhouette's
   bottom-right edge a shade down, its top-left a shade up.
@@ -294,6 +294,14 @@ def _surface(part: Part, hit: Hit, shade: int, ax: int, ay: int) -> int:
     elif s == "pores":
         if _hash(ax, ay, part.seed) % 19 == 0:
             return shade - 1 if shade > 0 else 1
+    elif s == "worn":
+        # Dressed stone, worn: a pit a shade down now and then, a grain of grit a shade up, far
+        # sparser than pores, so a wall or a slab stays calm behind a fight (ART3, part 2).
+        h = _hash(ax, ay, part.seed)
+        if h % 47 == 0:
+            return shade - 1 if shade > 0 else 1
+        if h % 61 == 1:
+            return min(2, shade + 1)
     elif s == "vein":
         if abs(hit.v) < 0.16:
             return shade - 1 if shade > 0 else 1

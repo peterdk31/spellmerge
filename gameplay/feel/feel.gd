@@ -184,8 +184,8 @@ const LIGHT_Z: int = SpectacleScript.LIGHT_Z
 ## part's `floor`) draw with the floor marks: over the room's floor (`RoomBase.FLOOR_Z`), under
 ## every body (the wizards and enemies at 0 and up; it was SHOWN_BEAM_Z - 1 and drew over them).
 const FLOOR_Z: int = MARK_Z
-## Live beams made at once (more are made when core/spells has more: no beam limit, owner
-## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
+## Live beams' paths made at once (more are made when core/spells has more: no beam limit, owner
+## 2026-10-29), and the most points of each one's drawn path (and its light's, BEAM_POINTS in `spell_light.gd`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
 ## along its path's points; a path with more keeps its ends and its sharpest turns and drops the
 ## points of its gentlest curves for its look (`_thin_beam`; its hits and turns are the runtime's,
@@ -194,16 +194,6 @@ const LIVE_BEAM_POINTS: int = 80
 const LIVE_BEAMS: int = 64
 ## How wide a beam that is shown whole (a short beam) is drawn: its core, rim, flares and glow.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
-## The quad kinds of a beam's mesh (`beam_mesh`; Q_* in `shot_beam.gdshader`): the light round
-## each piece of its path, each piece's pixels.
-const BEAM_Q_PIECE_LIGHT: int = 0
-const BEAM_Q_PIECE: int = 1
-## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the
-## lights first, the beam's own pixels last.
-const BEAM_QUADS: Array[Vector3i] = [
-	Vector3i(BEAM_Q_PIECE_LIGHT, LIVE_BEAM_POINTS - 1, 0),
-	Vector3i(BEAM_Q_PIECE, LIVE_BEAM_POINTS - 1, 0),
-]
 ## A beam's motes (spell spectacle 2, S6 item 10; the beam shader drew them until then), given off
 ## as births (`Spectacle.births`, `_beam_motes`): where it lands, BEAM_SPLASH_RATE sparks a second
 ## (the shader's 6, each about a sixth of a second) thrown back off its end while it is more than
@@ -524,9 +514,10 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _hit_flash_material: ShaderMaterial = null
-## The live beams (`Spells.carrier(&"beam")`), one beam mesh each (`beam_mesh`), made once, and each one's
-## path as the shader takes it (x, y and how far along the beam; `beam_path`).
-var _live_beams: Array[MeshInstance2D] = []
+## Every beam on screen, live and shown whole, drawn as one merged shape a look shader (the owner,
+## 2026-11-27; `beam_union.gd`): {Shader: BeamUnion}, one made the first time a shader draws a beam
+## and kept (nearly always one: the beam card's look).
+var _beam_unions: Dictionary = {}
 ## Each carrier card's own look as an area of Feel draws it, asked of Spells once and kept
 ## (`_carrier_card_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
 ## CardLook}}. Beams' and swing trails' materials take its shader; a beam's light its light. Feel
@@ -672,20 +663,18 @@ var unknown_cue_parts: int = 0
 ## at its spot silences (`_hit_slot`).
 var _cue_flash: int = -1
 var _unknown_part_warned: Dictionary = {}
+## Each live beam's path as it is drawn (x, y and how far along the beam), by its row, made as more
+## rows are seen and kept.
 var _live_paths: Array[PackedVector3Array] = []
-## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
-## change, in `FeelBeams.LiveSet`'s order: the beams job sets one only when its value changes, and
-## every one again when the node's shader changes. An entry is made with its node.
-var _live_set: Array[Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
 var _thin_points: PackedVector2Array = PackedVector2Array()
 var _thin_keep: PackedByteArray = PackedByteArray()
 var _thin_turn: PackedFloat32Array = PackedFloat32Array()
 var _thin_sorted: PackedFloat32Array = PackedFloat32Array()
-## Beams shown whole (beam meshes made once) and their paths of two points: seconds left and in
-## all, the owner's body tint and the beam's length in pixels.
-var _shown_beams: Array[MeshInstance2D] = []
+## Beams shown whole (in slots made once) and their paths of two points: the look shader each is
+## drawn by, seconds left and in all, the owner's body tint and the beam's length in pixels.
+var _shown_beam_shader: Array[Shader] = []
 var _shown_beam_paths: Array[PackedVector3Array] = []
 var _shown_beam_left: PackedFloat32Array = PackedFloat32Array()
 var _shown_beam_total: PackedFloat32Array = PackedFloat32Array()
@@ -910,11 +899,10 @@ func _ready() -> void:
 	_hit_flash_material.shader = HIT_FLASH_SHADER
 	ShaderWarmupScript.want(HIT_FLASH_SHADER, ShaderWarmupScript.RECT)
 	for i in SHOWN_BEAM_SLOTS:
-		_shown_beams.append(_job_beams._make_beam())
 		_shown_beam_paths.append(_job_beams._make_beam_path())
+	_shown_beam_shader.resize(SHOWN_BEAM_SLOTS)
 	_job_flashes._make_flashes()
 	for i in LIVE_BEAMS:
-		_live_beams.append(_job_beams._make_beam())
 		_live_paths.append(_job_beams._make_beam_path())
 	_swing_trails = SwingTrailsScript.new(FeelBeams.swing_mesh())
 	add_child(_swing_trails)
@@ -1449,16 +1437,20 @@ func _warm_card_looks() -> void:
 	_job_beams._warm_card_looks()
 
 
-## The mesh a beam is drawn as (`shot_beam.gdshader`, PARTICLES ARE GEOMETRY there): small quads
-## told in their UV which quad kind (BEAM_Q_*) and slot they are, in BEAM_QUADS' order, as
-## `flash_mesh`. The shader places them along the beam's path in the world, so the mesh says
-## nothing of where: it is never culled (its box is the whole world). Made once.
-static func beam_mesh() -> ArrayMesh:
-	return FeelBeams.beam_mesh()
+## The merged beams drawn by `shader` this frame (`beam_union.gd`), or null when none has been.
+func beam_union(shader: Shader) -> BeamUnion:
+	return _beam_unions.get(shader) as BeamUnion
+
+
+## The colour rule where beams meet (BeamUnion.MIX_*: the screenshots show each).
+func set_beam_mix(rule: int) -> void:
+	_job_beams.set_beam_mix(rule)
 
 
 ## The mesh a swing's trail is drawn as (`SwingTrailsScript.SWING_QUADS`; Q_* in
-## `shot_swing.gdshader`), as `beam_mesh`. Made once.
+## `shot_swing.gdshader`): small quads told in their UV which quad kind and slot they are. The
+## shader places them in the world, so the mesh says nothing of where: it is never culled (its box
+## is the whole world). Made once.
 static func swing_mesh() -> ArrayMesh:
 	return FeelBeams.swing_mesh()
 

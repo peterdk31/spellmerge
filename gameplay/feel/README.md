@@ -27,7 +27,7 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is the game's (`
 | cues | `feel_cues.gd` | `play_cue`, the part players, the cues and plans, the events that only play a cue |
 | hits | `feel_hits.gd` | a hit's look, shake and sound, impacts on bodies and walls, the squash, a death's break and remnant |
 | statuses | `feel_statuses.gd` | a status shown on its body, a reaction's cue and name, a discharge's arc, a downed note |
-| beams | `feel_beams.gd` | live and shown beams, their motes and sounds, the beam and swing meshes, the cards' own looks |
+| beams | `feel_beams.gd` | live and shown beams, their motes and sounds, the swing mesh, the cards' own looks; every beam on screen drawn as one merged shape a look shader, in one draw (`beam_union.gd`, below) |
 | casts | `feel_casts.gd` | a cast's cue, a wind-up's telegraph, a cast's sounds, `lane` and `held` parts, a barrier's shell |
 | view | `feel_view.gd` | shake and kick, the picture and views, the "Effects" row, the HUD's corners, a biome's rooms (`_step_rooms`) |
 
@@ -50,6 +50,10 @@ On a real GPU with compute (`GpuCompute.available`) the grid is worked out by `l
 `ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped; only a mirrored room is drawn at layout: an unmirrored one keeps its baked art, which is that drawing (`test_ground_drawing.gd` holds them the same as shown; #972). `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** **At 2x** (ArtDetail; ART3): the floor, the rock face and the walls' art are drawn again on the same outline at 2 art pixels a world pixel (`GroundDrawing._fine`, the tool's `Drawing._fine`, `GroundKernel`'s `draw_fine`); the floor keeps its 1x texture, which the room's readers measure and sample, under its `Detail` child (the 2x art at half size); the rock face and walls are 2x only. A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
 
 **The room's looks drawn by code or shaders are at 2x too** (ART3 part 4): a shader works its shapes out at the middle of each art pixel (`art_centre`, `core/display/art_detail.gdshaderinc`: the marks, the mist, the light's apply rect and the rooms' tints, the bodies' shadows); a `_draw` draws in art pixels, each a rect 1 / `ArtDetail.DETAIL` a side (the secret runes) or under `draw_set_transform` at 1 / `ArtDetail.DETAIL` (the mouths' shimmer, flares and seals, the key doors' bars; a stone bar is `stone_bars.gd`'s, the caller setting and restoring the transform).
+
+### Beams: one merged shape
+
+Every beam on screen (live and shown whole, every player's and the enemies') is drawn as one merged shape a look shader, in one draw (the owner, 2026-11-27: "Beams should merge into each other (like the pool)", "Everything merges"): `beam_union.gd` (`BeamUnion`) holds one frame's beams in one float texture (a row a beam; its path cut into pieces of at most `PIECE_MOST` pixels) and one mesh (a quad a piece); `core/projectiles/shot_beam_union.gdshaderinc` draws it. Each pixel takes the soft union of the beams near it (one distance: one rim round beams that meet, none inside), is drawn once (by the nearest piece: its pixels, or its light where it has none), and where beams meet takes its colour from every beam near by the rule at a junction (`BeamUnion.MIX_*`; the dither by default). A beam card's look (`CarrierCard.look_shader`, drawer `LOOK_BEAM`) includes the union and defines its hooks (`look_bands`, `look_ripple`, `look_off`, `look_neighbour`, `look_neighbour_glow`, `LOOK_VERTEX`). `tests/screenshots/shot_beam_union.gd` checks the union on the pixels drawn; `tests/benchmark/beam_cost.gd` measures it.
 
 ### Damage numbers
 

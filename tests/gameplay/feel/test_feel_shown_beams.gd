@@ -45,42 +45,41 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-func _shown() -> Array[MeshInstance2D]:
-	var found: Array[MeshInstance2D] = []
-	for node in feel._shown_beams:
-		if node.visible:
-			found.append(node)
-	return found
+## The beams Feel draws now, as one merged shape (`BeamUnion`; the beam card's look, or the plain
+## beam's where no card is found): drawn as a frame draws them, with no time passing, so a beam just
+## shown is in it.
+func _union() -> BeamUnion:
+	feel._job_beams._draw_live_beams(0.0)
+	for shader: Shader in feel._beam_unions:
+		return feel._beam_unions[shader] as BeamUnion
+	return null
 
 
-func _param(node: MeshInstance2D, name: StringName) -> Variant:
-	return (node.material as ShaderMaterial).get_shader_parameter(name)
-
-
-func _path(node: MeshInstance2D) -> PackedVector3Array:
-	return _param(node, &"beam_path") as PackedVector3Array
+## How many beams are drawn now.
+func _shown() -> int:
+	var union: BeamUnion = _union()
+	return union.beams if union != null else 0
 
 
 func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
 	bus.carrier_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
-	var shown: Array[MeshInstance2D] = _shown()
-	check_equal(shown.size(), 1, "one beam on screen")
-	var beam: MeshInstance2D = shown[0]
-	check(beam.mesh == FeelScript.beam_mesh(), "drawn as the beam mesh")
-	check_equal(_param(beam, &"beam_points"), 2, "a path of two points")
-	check(_path(beam)[0].is_equal_approx(Vector3(10, 20, 0)), "from the staff")
-	check(_path(beam)[1].is_equal_approx(Vector3(10, 170, 150)), "along the aim, 150 px along")
-	check_equal(_param(beam, &"beam_length"), 150.0, "as long as it got")
-	check_equal(_param(beam, &"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
-	check((_param(beam, &"beam_end") as Vector2).is_equal_approx(Vector2(10, 170)), "which ends where it landed, upright on the world's pixels")
+	check_equal(_shown(), 1, "one beam on screen")
+	var union: BeamUnion = _union()
+	check(union.node.mesh != null and union.node.visible, "drawn by the union's mesh")
+	var path: PackedVector3Array = union.path_of(0)
+	check_equal(path.size(), 2, "a path of two points")
+	check(path[0].is_equal_approx(Vector3(10, 20, 0)), "from the staff")
+	check(path[1].is_equal_approx(Vector3(10, 170, 150)), "along the aim, 150 px along")
+	check_equal(union.lengths[0], 150.0, "as long as it got")
+	check_equal(union.material.get_shader_parameter(&"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
+	check(union.ends[0].is_equal_approx(Vector2(10, 170)), "which ends where it landed, upright on the world's pixels")
 
 
 func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 	bus.carrier_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	var beam: MeshInstance2D = _shown()[0]
-	var core: Color = _param(beam, &"core_override")
+	var core: Color = _union().cores[0]
 	check(core.is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is frost")
-	var body: Color = _param(beam, &"body_tint")
+	var body: Color = feel._shown_beam_body[2 * FeelScript.SHOWN_BEAMS_PER_PLAYER]
 	var owner_tint: Color = projectiles.tint_of(2)
 	check(is_equal_approx(body.r, owner_tint.r) and is_equal_approx(body.g, owner_tint.g) and is_equal_approx(body.b, owner_tint.b), "the body has the owner's tint")
 	check(not core.is_equal_approx(body), "the two are not the same colour")
@@ -89,7 +88,7 @@ func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 ## A nova's ring is its card's cue (`nova`), which the spell runtime shows once per nova (`cue_shown`).
 func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
 	bus.cue_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST, 7)
-	check_equal(_shown().size(), 0, "no sprite: the ring is a flash")
+	check_equal(_shown(), 0, "no beam: the ring is a flash")
 	check_equal(feel.flashes_of(&"ring_out", 0), 1, "a ring flashes out")
 	check_equal(feel.flash_dress(&"ring_out"), [FROST, 7], "in the element's colours, with the cast's cards")
 	feel.step(0.01)
@@ -117,7 +116,9 @@ func test_shown_beams_and_rings_end() -> void:
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	bus.cue_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	feel.step(1.0)
-	check_equal(_shown().size(), 0, "after its seconds the beam is gone")
+	check_equal(_shown(), 0, "after its seconds the beam is gone")
+	var union: BeamUnion = _union()
+	check(union == null or not union.node.visible, "and nothing is drawn")
 	check_equal(feel.live_flashes(), 0, "and the ring")
 
 
@@ -125,15 +126,16 @@ func test_other_carrier_cards_and_empty_beams_show_nothing() -> void:
 	bus.carrier_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST, 0)
-	check_equal(_shown().size(), 0, "none of them is drawn")
+	check_equal(_shown(), 0, "none of them is drawn")
 
 
 func test_four_players_firing_at_once_stay_inside_the_pool() -> void:
 	for round in 4:
 		for player in 4:
 			bus.carrier_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
-	check(_shown().size() <= FeelScript.SHOWN_BEAM_SLOTS, "never more sprites than the pool holds")
-	check_equal(feel._shown_beams.size(), FeelScript.SHOWN_BEAM_SLOTS, "and no sprite is made on the way")
+	check(_shown() <= FeelScript.SHOWN_BEAM_SLOTS, "never more beams than the slots hold")
+	check_equal(feel._shown_beam_paths.size(), FeelScript.SHOWN_BEAM_SLOTS, "and no slot is made on the way")
+	check_equal(feel._beam_unions.size(), 1, "all drawn by one union")
 
 
 func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
@@ -144,27 +146,26 @@ func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 	for player in 4:
 		var seen: int = 0
 		for slot in range(player * FeelScript.SHOWN_BEAMS_PER_PLAYER, (player + 1) * FeelScript.SHOWN_BEAMS_PER_PLAYER):
-			if feel._shown_beams[slot].visible:
+			if feel._shown_beam_left[slot] > 0.0:
 				seen += 1
-		check(seen >= 1, "player %d still has a visible beam" % player)
-	check(_path(feel._shown_beams[FeelScript.SHOWN_BEAMS_PER_PLAYER])[0].is_equal_approx(Vector3(10, 0, 0)), "player 1's beam is untouched")
+		check(seen >= 1, "player %d still has a beam shown" % player)
+	check(feel._shown_beam_paths[FeelScript.SHOWN_BEAMS_PER_PLAYER][0].is_equal_approx(Vector3(10, 0, 0)), "player 1's beam is untouched")
 
 
 func test_one_cast_with_many_rays_shows_every_ray() -> void:
 	for ray in 24:
 		bus.carrier_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST, 0)
-	check_equal(_shown().size(), 24, "a fan of 24 rays is drawn whole")
+	check_equal(_shown(), 24, "a fan of 24 rays is drawn whole")
 
 
 func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 	var enemy: int = ActorSeats.enemy(actors)
 	for i in FeelScript.SHOWN_BEAMS_PER_PLAYER + 6:
 		bus.carrier_shown.emit(enemy, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
-	check_equal(_shown().size(), FeelScript.SHOWN_BEAMS_PER_PLAYER, "enemies' beams show, in their one share")
+	check_equal(_shown(), FeelScript.SHOWN_BEAMS_PER_PLAYER, "enemies' beams show, in their one share")
+	check_equal(_union().players[0], -1, "drawn in the enemy ramp")
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	check_equal(_shown().size(), FeelScript.SHOWN_BEAMS_PER_PLAYER + 1, "and never take a player's slot")
-	var enemy_beam: MeshInstance2D = feel._shown_beams[FeelScript.ENEMY_SHOWN_BEAMS * FeelScript.SHOWN_BEAMS_PER_PLAYER]
-	check_equal(_param(enemy_beam, &"beam_player"), -1, "drawn in the enemy ramp")
+	check_equal(_shown(), FeelScript.SHOWN_BEAMS_PER_PLAYER + 1, "and never take a player's slot")
 
 
 func test_the_shipped_preset_has_the_carrier_card_art() -> void:
@@ -241,51 +242,44 @@ class FakeBeams:
 		return 55
 
 
-func _live_lines() -> Array[MeshInstance2D]:
-	var found: Array[MeshInstance2D] = []
-	for node in feel._live_beams:
-		if node.visible:
-			found.append(node)
-	return found
+## The live beams Feel drew last (the plain beam's union: the stand-in beams name no card).
+func _live() -> BeamUnion:
+	return feel.beam_union(FeelScript.BEAM_SHADER)
 
 
 func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	var beams := own(FakeBeams.new()) as FakeBeams
 	feel.spells = beams
 	feel.step(0.016)
-	var lines: Array[MeshInstance2D] = _live_lines()
-	check_equal(lines.size(), 1, "one live beam on screen")
-	var line: MeshInstance2D = lines[0]
-	var material: ShaderMaterial = line.material as ShaderMaterial
-	check_equal(material.get_shader_parameter(&"beam_start"), Vector2.ZERO, "from the staff")
-	check((material.get_shader_parameter(&"beam_end") as Vector2).is_equal_approx(Vector2(100, 40)), "to its end, on the target")
-	check_equal(material.get_shader_parameter(&"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
-	check(is_equal_approx(material.get_shader_parameter(&"sim_time"), feel._clock), "animated by Feel's clock (the owner, 2026-10-28: beams did not move)")
-	var path: PackedVector3Array = _path(line)
-	var points: int = material.get_shader_parameter(&"beam_points")
+	var union: BeamUnion = _live()
+	check_equal(union.beams if union != null else 0, 1, "one live beam on screen")
+	if union == null or union.beams != 1:
+		return
+	check_equal(union.starts[0], Vector2.ZERO, "from the staff")
+	check(union.ends[0].is_equal_approx(Vector2(100, 40)), "to its end, on the target")
+	check_equal(union.material.get_shader_parameter(&"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
+	check(is_equal_approx(union.material.get_shader_parameter(&"sim_time"), feel._clock), "animated by Feel's clock (the owner, 2026-10-28: beams did not move)")
+	var path: PackedVector3Array = union.path_of(0)
+	var points: int = path.size()
 	check(points > 2, "along its path's points: %d" % points)
 	check(path[0].is_equal_approx(Vector3.ZERO), "from the staff, 0 px along")
 	var middle: Vector3 = path[points / 2]
 	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
-	check(is_equal_approx(path[points - 1].z, material.get_shader_parameter(&"beam_length") as float), "each point says how far along it is, the last as far as the beam got")
-	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
-	check_equal((line.material as ShaderMaterial).get_shader_parameter(&"beam_infusion_count"), 2, "its look is handed every infusion on it")
-	var infusions: PackedColorArray = (line.material as ShaderMaterial).get_shader_parameter(&"beam_infusions")
-	check(infusions.size() == 2 and infusions[1].is_equal_approx(Color(0.88, 0.35, 0.18, 1.0 / 255.0)), "in slot order, with their look kinds")
-	var tint: Color = (line.material as ShaderMaterial).get_shader_parameter(&"body_tint")
-	check(is_equal_approx(tint.a, feel.preset.beam_alpha) and tint.a < 1.0, "a little see-through, so crossing beams all show: %f" % tint.a)
+	check(is_equal_approx(path[points - 1].z, union.lengths[0]), "each point says how far along it is, the last as far as the beam got")
+	check(union.cores[0].is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
+	var infusions: PackedColorArray = union.infusions[0]
+	check(infusions.size() == 2 and infusions[1].is_equal_approx(Color(0.88, 0.35, 0.18, 1.0 / 255.0)), "its look is handed every infusion on it, in slot order, with their look kinds")
+	check(is_equal_approx(union.glows[0], feel.preset.beam_alpha), "glowing as the preset says")
 	beams.reach = 50.0
 	feel.step(0.016)
-	var tip: Vector2 = (line.material as ShaderMaterial).get_shader_parameter(&"beam_end")
-	check(absf(tip.length() - 50.0) < 3.0, "cut where it stopped: %s" % tip)
+	check(absf(union.ends[0].length() - 50.0) < 3.0, "cut where it stopped: %s" % union.ends[0])
 	beams.reach = 500.0
 	beams.on_again = true
 	feel.step(0.016)
-	var second: Vector2 = (line.material as ShaderMaterial).get_shader_parameter(&"beam_end")
-	check(second.is_equal_approx(Vector2(160, 0)), "a beam bending on to a second target is drawn to it: %s" % second)
+	check(union.ends[0].is_equal_approx(Vector2(160, 0)), "a beam bending on to a second target is drawn to it: %s" % union.ends[0])
 	beams.on = false
 	feel.step(0.016)
-	check(_live_lines().is_empty(), "gone when it ends")
+	check(union.beams == 0 and not union.node.visible, "gone when it ends")
 
 
 ## A live beam longer than the shader holds: a zig-zag of 200 points, one pixel apart, turning
@@ -307,14 +301,13 @@ func test_a_beam_longer_than_the_shader_holds_keeps_its_ends_and_its_turns() -> 
 	var beams := own(LongBeams.new()) as LongBeams
 	feel.spells = beams
 	feel.step(0.016)
-	var lines: Array[MeshInstance2D] = _live_lines()
-	check_equal(lines.size(), 1, "one live beam on screen")
-	if lines.is_empty():
+	var union: BeamUnion = _live()
+	check_equal(union.beams if union != null else 0, 1, "one live beam on screen")
+	if union == null or union.beams != 1:
 		return
-	var material: ShaderMaterial = lines[0].material as ShaderMaterial
-	var points: int = material.get_shader_parameter(&"beam_points")
-	check(points <= FeelScript.LIVE_BEAM_POINTS, "it fits the shader: %d points" % points)
-	var path: PackedVector3Array = _path(lines[0])
+	var path: PackedVector3Array = union.path_of(0)
+	var points: int = path.size()
+	check(points <= FeelScript.LIVE_BEAM_POINTS, "thinned to its most points: %d" % points)
 	var drawn: Array[Vector2] = []
 	for n in points:
 		drawn.append(Vector2(path[n].x, path[n].y))
@@ -329,16 +322,17 @@ func test_a_live_beam_is_drawn_by_the_beam_mode_as_long_as_it_got() -> void:
 	beams.reach = 50.0
 	feel.spells = beams
 	feel.step(0.016)
-	var line: MeshInstance2D = _live_lines()[0]
-	var material: ShaderMaterial = line.material as ShaderMaterial
-	check(material.shader == FeelScript.BEAM_SHADER and line.mesh == FeelScript.beam_mesh(), "a beam")
-	check(is_equal_approx(material.get_shader_parameter(&"beam_length") as float, 50.0), "as long as it got along its curve")
-	check_equal(material.get_shader_parameter(&"beam_player"), 1, "in its caster's hat ramp")
-	check_equal(material.get_shader_parameter(&"beam_look"), 6, "with its cards")
-	check_equal(material.get_shader_parameter(&"beam_width"), FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
+	var union: BeamUnion = _live()
+	check(union != null and union.material.shader == FeelScript.BEAM_SHADER and union.beams == 1, "a beam")
+	if union == null or union.beams != 1:
+		return
+	check(is_equal_approx(union.lengths[0], 50.0), "as long as it got along its curve")
+	check_equal(union.players[0], 1, "in its caster's hat ramp")
+	check_equal(union.looks[0], 6, "with its cards")
+	check_equal(union.widths[0], FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
 	beams.caster = ActorSeats.enemy(actors)
 	feel.step(0.016)
-	check_equal(material.get_shader_parameter(&"beam_player"), -1, "an enemy's beam is in the enemy ramp")
+	check_equal(union.players[0], -1, "an enemy's beam is in the enemy ramp")
 
 
 ## The quad kind and slot a mesh made by Feel's `_quads_mesh` gives its `n`th quad.
@@ -365,21 +359,22 @@ func test_a_flash_is_one_mesh_of_small_quads() -> void:
 	check(feel._arc_node.multimesh.mesh != mesh and feel._status_node.multimesh.mesh != mesh, "the arcs and statuses keep their one quad")
 
 
-func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
-	var mesh: ArrayMesh = FeelScript.beam_mesh()
-	check(mesh == FeelScript.beam_mesh(), "one mesh, made once")
-	var pieces: int = FeelScript.LIVE_BEAM_POINTS - 1
-	check_equal(_quad(mesh, 0), Vector2i(FeelScript.BEAM_Q_PIECE_LIGHT, 0), "the pieces' light first")
-	check_equal(_quad(mesh, pieces), Vector2i(FeelScript.BEAM_Q_PIECE, 0), "the beam's own pixels last, on top")
-	check_equal(mesh.surface_get_array_len(0), pieces * 2 * 4, "nothing else: its splash and card particles are motes (S6 item 10)")
+func test_every_beam_is_one_mesh_of_small_quads_never_culled() -> void:
+	for player in 4:
+		bus.carrier_shown.emit(player, &"beam", Vector2(0, player * 30), Vector2.RIGHT, 300.0, FROST, 0)
+	var union: BeamUnion = _union()
+	var mesh: ArrayMesh = union.node.mesh as ArrayMesh
+	check_equal(feel._beam_unions.size(), 1, "every beam of one look in one union")
+	check_equal(mesh.surface_get_array_len(0), union.segment_room() * 4, "a quad a piece of every path, nothing else: its splash and card particles are motes (S6 item 10)")
+	check(union.segments >= 4 * ceili(300.0 / BeamUnion.PIECE_MOST), "each path cut into pieces of at most PIECE_MOST pixels: %d" % union.segments)
 	check(mesh.custom_aabb.size.x >= 100000.0 and mesh.custom_aabb.size.y >= 100000.0, "its box is the world: the shader places it, so it is never culled")
-	var shader: Shader = FeelScript.BEAM_SHADER
-	check(ShaderSource.of(shader).contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
-	var drawn: int = 0
-	for node: MeshInstance2D in feel._shown_beams + feel._live_beams:
-		if node.mesh == mesh:
-			drawn += 1
-	check_equal(drawn, FeelScript.SHOWN_BEAM_SLOTS + FeelScript.LIVE_BEAMS, "every beam draws it")
+	check_equal(union.material.get_shader_parameter(&"seg_count"), union.segments, "the shader is told how many pieces to draw")
+	check(union.material.get_shader_parameter(&"beam_data") is Texture2D, "and their data, in one texture")
+	var children: int = feel.get_child_count()
+	for ray in 100:
+		bus.carrier_shown.emit(ray % 4, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST, 0)
+	_union()
+	check_equal(feel.get_child_count(), children, "more beams make no node: one draw for them all")
 
 
 ## The births in the spectacle's collector now (Feel's own motes this frame, before they are given off).

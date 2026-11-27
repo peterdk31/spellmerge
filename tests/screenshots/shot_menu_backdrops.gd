@@ -48,12 +48,12 @@ class Backdrop extends Control:
 		var image := Image.create(int(LAYOUT.x), int(LAYOUT.y), false, Image.FORMAT_RGBA8)
 		var half: int = int(BAND * 0.5)
 		for x in int(LAYOUT.x):
-			var colours: PackedColorArray = BANDS[(x / int(BAND)) % BANDS.size()]
+			var colours: PackedColorArray = BANDS[floori(float(x) / BAND) % BANDS.size()]
 			var across: int = x % int(BAND)
 			for y in int(LAYOUT.y):
 				var colour: Color = colours[0]
 				if across >= half:
-					colour = colours[1 + ((across - half) / int(SQUARE) + y / int(SQUARE)) % 2]
+					colour = colours[1 + (floori(float(across - half) / SQUARE) + floori(float(y) / SQUARE)) % 2]
 				image.set_pixel(x, y, colour)
 		_bands = ImageTexture.create_from_image(image)
 		queue_redraw()

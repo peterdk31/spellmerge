@@ -89,7 +89,6 @@ const NUMBER_WORDS: Array[String] = ["Slots", "Delay", "Mana"]
 const ENTRY_KEYS: Array[String] = ["bag", "staff", "kind", "card", "item"]
 
 const OUTLINE: Color = Color("#14121f")
-const SHADE: Color = Color(0.078, 0.071, 0.122, 0.86)
 const TILE: Color = Color("#2b2840")
 const LINE: Color = Color("#4a4663")
 const TEXT: Color = Color("#f4f1ea")
@@ -920,7 +919,7 @@ func _changed() -> void:
 func _draw() -> void:
 	if not _open:
 		return
-	draw_rect(_quarter, SHADE)
+	draw_rect(_quarter, RadialMenuScript.SHADE)
 	_draw_bar()
 	_draw_hands()
 	_draw_info()

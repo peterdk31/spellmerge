@@ -104,6 +104,10 @@ func test_the_menu_panels_and_buttons_have_no_borders_and_a_quiet_readable_fill(
 		check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "%s %s is translucent but readable, alpha %s" % [pair[1], pair[0], box.bg_color.a])
 	var focus := SpellmergeTheme.get_stylebox("focus", "Button") as StyleBoxFlat
 	check(focus != null and not focus.draw_center and focus.border_width_top == 1, "a button's focus is a thin gold line")
+	# The pause menu's rows: bare words in their outline (the owner, 2026-11-27).
+	for state: String in ["normal", "hover", "pressed", "disabled"]:
+		check(SpellmergeTheme.get_stylebox(state, "BareButton") is StyleBoxEmpty, "a bare button's %s draws nothing" % state)
+	check(SpellmergeTheme.get_constant("outline_size", "BareButton") >= 2, "a bare button's words have an outline")
 	# The menu tabs outline their selected tab and their words in the face's border colour
 	# (`menu_tabs.gd`), kept the Outline though the face draws no border.
 	var face := SpellmergeTheme.get_stylebox("normal", "Button") as StyleBoxFlat

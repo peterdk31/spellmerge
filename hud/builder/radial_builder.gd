@@ -115,7 +115,6 @@ const KINDS: Array[StringName] = CardKindsScript.KINDS
 const KIND_WORDS: Dictionary = CardKindsScript.WORDS
 const KIND_COLORS: Dictionary = CardKindsScript.COLORS
 const OUTLINE: Color = Color("#14121f")
-const SHADE: Color = Color(0.078, 0.071, 0.122, 0.86)
 const TILE: Color = Color("#2b2840")
 const EMPTY: Color = Color("#1b1929")
 const LINE: Color = Color("#4a4663")
@@ -1361,7 +1360,7 @@ func _thin(rect: Rect2, color: Color) -> void:
 func _draw() -> void:
 	if not _open:
 		return
-	draw_rect(_quarter, SHADE)
+	draw_rect(_quarter, RadialMenuScript.SHADE)
 	_draw_bars()
 	_draw_tabs()
 	_draw_slots()

@@ -48,6 +48,11 @@ const VERB_GAP: float = 6.0
 const DIM_ALPHA: float = 0.4
 const LINE: Color = Color("#4a4663")
 const OUTLINE: Color = Color("#14121f")
+## The quarter's backdrop under a ring menu (the builder's, the inventory's): light, so the game
+## shows through it (the owner, 2026-11-27: lighter or none, the text relying on its outline), and
+## the outline every word is drawn in (`draw_text`), in layout pixels.
+const SHADE: Color = Color(0.078, 0.071, 0.122, 0.45)
+const TEXT_OUTLINE: int = 2
 const TEXT: Color = Color("#f4f1ea")
 const DIM: Color = Color("#7a7694")
 const GOLD: Color = Color("#f2c230")
@@ -409,4 +414,6 @@ func text_width(text: String) -> float:
 func draw_text(text: String, at: Vector2, color: Color, centered: bool = false) -> void:
 	var font: Font = _host.get_theme_default_font()
 	var x: float = at.x - (text_width(text) * 0.5 if centered else 0.0)
-	_host.draw_string(font, Vector2(x, at.y + font.get_ascent(FONT_SIZE)).round(), text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
+	var baseline: Vector2 = Vector2(x, at.y + font.get_ascent(FONT_SIZE)).round()
+	_host.draw_string_outline(font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_OUTLINE, OUTLINE)
+	_host.draw_string(font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)

@@ -514,6 +514,9 @@ func shown_buttons() -> Array[Button]:
 func _add(on_page: Page, node_name: String, text: String, parent: Control = null) -> Button:
 	var made := Button.new()
 	made.name = node_name
+	# Bare words on the quiet panel, in their outline (the owner, 2026-11-27); the focused row is
+	# told by its "> " (FOCUS_MARK).
+	made.theme_type_variation = &"BareButton"
 	made.focus_mode = Control.FOCUS_NONE
 	made.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	made.set_meta(BASE_TEXT_META, text)

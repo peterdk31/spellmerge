@@ -21,8 +21,7 @@ extends RefCounted
 
 ## One art pixel, in layout pixels.
 const ART_PIXEL: float = 0.5
-## The tones a run is drawn in: the index into the colours `draw` is handed (not `Palette`'s shade
-## indices, which run shadow, base, light: `Palette.shade_beside` takes those).
+## The tones a run is drawn in: the index into the colours `draw` is handed.
 const OUTLINE: int = 0
 const LIGHT: int = 1
 const BASE: int = 2
@@ -97,6 +96,27 @@ func draw_at(target: Object, corner: Vector2, tones: PackedColorArray, pixel: fl
 	for at in range(0, runs.size(), 4):
 		var rect := Rect2(corner.x + runs[at] * pixel, corner.y + runs[at + 1] * pixel, runs[at + 2] * pixel, pixel)
 		target.draw_rect(rect, tones[runs[at + 3]])
+
+
+## The light shade of the palette material whose base is `base` (`Palette.MATERIALS`), or `base`
+## itself when no material's is: a look told one colour (a hat colour) is lit in its own ramp.
+## Allocates nothing.
+static func light_of(base: Color) -> Color:
+	return _beside(base, 2)
+
+
+## The shadow shade of the material whose base is `base`, as `light_of`.
+static func shadow_of(base: Color) -> Color:
+	return _beside(base, 0)
+
+
+## Shade `which` (0 shadow, 1 base, 2 light: `Palette.MATERIALS`' order) beside `base`.
+static func _beside(base: Color, which: int) -> Color:
+	for material: StringName in Palette.MATERIALS:
+		var shades: Array = Palette.MATERIALS[material]
+		if (shades[1] as Color).is_equal_approx(base):
+			return shades[which]
+	return base
 
 
 ## The tone of art pixel (`x`, `y`), or -1 where nothing is drawn (for tests).

@@ -747,10 +747,10 @@ static func _draw_pip(canvas: Control, rect: Rect2, colour: Color) -> void:
 	# As `PixelShape` shades: an art pixel with nothing above or left of it lit (so the top-right and
 	# bottom-left corners are lit too), the rest of the bottom and right edges in shadow.
 	_outline_round(canvas, rect)
-	canvas.draw_rect(rect, Palette.shade_beside(colour, Palette.SHADOW))
+	canvas.draw_rect(rect, PixelShape.shadow_of(colour))
 	canvas.draw_rect(Rect2(rect.position, rect.size - Vector2(ART, ART)), colour)
-	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, ART)), Palette.shade_beside(colour, Palette.LIGHT))
-	canvas.draw_rect(Rect2(rect.position, Vector2(ART, rect.size.y)), Palette.shade_beside(colour, Palette.LIGHT))
+	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, ART)), PixelShape.light_of(colour))
+	canvas.draw_rect(Rect2(rect.position, Vector2(ART, rect.size.y)), PixelShape.light_of(colour))
 
 
 ## Seat `seat`'s picked room's outline on `canvas` at its stage (the class doc's PICK_STAGES): a band a
@@ -765,7 +765,7 @@ func _draw_pick(canvas: SeatMap, seat: int, origin: Vector2, scale: int) -> void
 	var corner: Vector2 = origin + ((_rects[room].position - _area.position) / MAP_CELL).floor() * scale - Vector2(2, 2)
 	var size: Vector2 = (_rects[room].size / MAP_CELL).ceil() * scale + Vector2(4, 4)
 	var colour: Color = _wizard_colour[seat]
-	var light: Color = Palette.shade_beside(colour, Palette.LIGHT)
+	var light: Color = PixelShape.light_of(colour)
 	var arm: float = size.x if stage >= PICK_STAGES else (1.0 if stage == 1 else float(mini(BRACKET * scale, int(minf(size.x, size.y) * 0.5))))
 	var tall: float = size.y if stage >= PICK_STAGES else arm
 	# Its Outline first, all round, then its band's base, then its light over it: one corner's Outline

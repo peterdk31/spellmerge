@@ -94,3 +94,9 @@ func test_an_arrow_is_symmetric_about_its_way() -> void:
 				# Light and shadow swap sides in a mirror; only what is drawn must match.
 				mirrored = mirrored and ((head.tone_at(x, y) >= 0) == (other >= 0))
 		check(mirrored, "a head %dx%d is the same either side of its way" % [head.width, head.height])
+
+
+func test_a_base_colour_is_shaded_in_its_own_ramp() -> void:
+	check_equal(PixelShape.light_of(Color("3b73c9")), Color("7fc0f0"), "player 1's light")
+	check_equal(PixelShape.shadow_of(Color("e0592f")), Color("8f2d2a"), "fire's shadow")
+	check_equal(PixelShape.light_of(Color("123456")), Color("123456"), "no ramp: itself")

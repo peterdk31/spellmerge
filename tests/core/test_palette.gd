@@ -54,9 +54,3 @@ func test_the_worlds_colours_name_no_owned_material() -> void:
 	check(Palette.world_problems([&"player_2"], "x")[0].contains("belongs to the players"), "a player's colour is not")
 	check(Palette.world_problems([&"blight"], "x")[0].contains("belongs to"), "nor Blight")
 	check(Palette.world_problems([&"teal"], "x")[0].contains("no palette material"), "an unknown name")
-
-
-func test_a_base_colour_is_shaded_in_its_own_ramp() -> void:
-	check_equal(Palette.shade_beside(Color("3b73c9"), Palette.LIGHT), Color("7fc0f0"), "player 1's light")
-	check_equal(Palette.shade_beside(Color("e0592f"), Palette.SHADOW), Color("8f2d2a"), "fire's shadow")
-	check_equal(Palette.shade_beside(Color("123456"), Palette.LIGHT), Color("123456"), "no ramp: itself")

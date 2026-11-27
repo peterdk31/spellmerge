@@ -13,11 +13,6 @@ const OUTLINE: Color = Color("14121f")
 ## The white heat every ramp starts from: Bone light.
 const WHITE_HOT: Color = Color("f4f1ea")
 
-## A shade's index in a material's three (`MATERIALS`, `shade_beside`).
-const SHADOW: int = 0
-const BASE: int = 1
-const LIGHT: int = 2
-
 ## Each material's shades, shadow, base, light (docs/STYLE.md's columns), by its name in lower case.
 const MATERIALS: Dictionary[StringName, Array] = {
 	&"stone": [Color("2b2840"), Color("4a4663"), Color("7a7694")],
@@ -52,17 +47,6 @@ static func has(material: StringName) -> bool:
 ## The shades of `material`: shadow, base, light (empty for a name the palette does not have).
 static func shades_of(material: StringName) -> PackedColorArray:
 	return PackedColorArray(MATERIALS.get(material, []))
-
-
-## The shade `which` (SHADOW, BASE or LIGHT) of the material whose base is `base`, or `base` itself
-## when no material's is: a look told one colour (a hat colour) shades it in its own ramp. Allocates
-## nothing.
-static func shade_beside(base: Color, which: int) -> Color:
-	for material: StringName in MATERIALS:
-		var shades: Array = MATERIALS[material]
-		if (shades[BASE] as Color).is_equal_approx(base):
-			return shades[which]
-	return base
 
 
 ## The ramp a mote of `material` cools through: white-hot, then its light, base and shadow; empty for

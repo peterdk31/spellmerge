@@ -619,7 +619,7 @@ func _draw_reticle() -> void:
 	var pixel: float = 1.0 / ArtDetail.DETAIL
 	_reticle_tones[PixelShape.LIGHT] = light_color()
 	_reticle_tones[PixelShape.BASE] = ProjectilesScript.ramp_color(actor.ramp)
-	_reticle_tones[PixelShape.SHADOW] = Palette.shade_beside(_reticle_tones[PixelShape.BASE], Palette.SHADOW)
+	_reticle_tones[PixelShape.SHADOW] = PixelShape.shadow_of(_reticle_tones[PixelShape.BASE])
 	# Its corner snapped to the art pixel in the world, not under the body, so it never stands
 	# between two.
 	var middle: Vector2 = reticle_position() - aim * (RETICLE_SIZE * 0.5)

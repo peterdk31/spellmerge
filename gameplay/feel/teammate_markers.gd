@@ -144,9 +144,9 @@ func is_down(at: int) -> bool:
 func _draw() -> void:
 	for at in count:
 		var colour: Color = _colour[at]
-		_tones[PixelShape.LIGHT] = Palette.shade_beside(colour, Palette.LIGHT)
+		_tones[PixelShape.LIGHT] = PixelShape.light_of(colour)
 		_tones[PixelShape.BASE] = colour
-		_tones[PixelShape.SHADOW] = Palette.shade_beside(colour, Palette.SHADOW)
+		_tones[PixelShape.SHADOW] = PixelShape.shadow_of(colour)
 		var look: int = pulse_look(at)
 		if _down[at] != 0:
 			var ring: PixelShape = _rings[look]

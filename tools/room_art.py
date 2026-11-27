@@ -481,7 +481,8 @@ OSSUARY_TOP_SKULLS: list[float] = [42.0, 92.0]
 def ossuary_wall() -> list[Part]:
     """A low wall built of the dead: long bones stacked along its top in three courses, two skulls
     set in them, then a face of bone ends packed in rows round three arched niches, a skull in each,
-    on a stone sill. The bones are dusty and dim (Stone), the skulls their own pale bone."""
+    on a stone sill. The bones are dusty and dim (Stone), the skulls their own bone a shade down
+    (`DIM_BONE`), so the wall stays calm behind a fight."""
     parts: list[Part] = [box(0.4, 0.4, 127.6, 31.6, bevel=1.2, corner=0.6, material="Stone", colour=S0, seam=False)]
     # The top: three courses of long bones end to end, each course set over from the one below.
     courses = [(2.6, [(1.4, 20.0), (21.0, 38.0), (46.4, 64.0), (65.0, 88.0), (96.4, 110.0), (111.0, 126.6)]),
@@ -780,6 +781,22 @@ def _over(parts: Callable[[], list[Part]], lights: Callable[[], list[Part]], w: 
     return draw
 
 
+# The ossuary's skulls a shade down (the owner, 2026-11-27, on #968: a background wall stays calm
+# behind a fight): Bone's light to its base, its base to its shadow, its shadow to Stone's light.
+DIM_BONE = {B2: B1, B1: B0, B0: S2}
+
+
+def _dimmed(draw: Callable[[], Canvas], shades: dict[str, str]) -> Callable[[], Canvas]:
+    """`draw`'s picture with each colour in `shades` a shade down."""
+
+    def dim() -> Canvas:
+        out = draw()
+        out.pixels = [[shades.get(c, c) if c is not None else None for c in row] for row in out.pixels]
+        return out
+
+    return dim
+
+
 def _strip(frame: Callable[[int], list[Part]], count: int, w: int, h: int, outline: bool = True) -> Callable[[], Canvas]:
     def draw() -> Canvas:
         out = Canvas(w * sr.DETAIL * count, h * sr.DETAIL)
@@ -818,7 +835,7 @@ def files() -> dict[Path, Callable[[], Canvas | Light]]:
         c / "bone_pile@2x.svg": _one(bone_pile, 32, 16),
         c / "sarcophagus@2x.svg": _one(sarcophagus, 64, 32),
         c / "fallen_column@2x.svg": _one(fallen_column, 64, 32),
-        c / "ossuary_wall@2x.png": _one(ossuary_wall, 128, 32),
+        c / "ossuary_wall@2x.png": _dimmed(_one(ossuary_wall, 128, 32), DIM_BONE),
         HUB / "void@2x.svg": _one(void, 32, 32, False),
         PROPS / "hub_stone/stone@2x.png": _one(hub_stone, 96, 96),
         PROPS / "hub_stone/stone_lit@2x.svg": _one(hub_stone_lit, 96, 96, False),

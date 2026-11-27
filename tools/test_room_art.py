@@ -121,6 +121,13 @@ class RoomArtTest(unittest.TestCase):
             block = [lit[y * 2 + j][x * 2 + i] for j in (0, 1) for i in (0, 1)]
             self.assertTrue(any(c is not None for c in block), f"({x}, {y}) on the lit runes")
 
+    def test_the_ossuary_skulls_are_a_shade_down(self) -> None:
+        """The owner, 2026-11-27 (#968): no Bone light on the background wall, its skulls dimmed."""
+        wall = self.pictures[room_art.CRYPT / "ossuary_wall@2x.png"].pixels
+        colours = {c for row in wall for c in row}
+        self.assertNotIn(room_art.B2, colours, "no Bone light")
+        self.assertIn(room_art.B1, colours, "the skulls still bone")
+
     def test_a_flame_changes_a_little_each_frame(self) -> None:
         """docs/STYLE.md, "Smooth": the loop's looks are near one another, never the same."""
         for name, count in (("torch_flame", 4), ("candle_flame", 4)):

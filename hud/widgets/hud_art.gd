@@ -18,7 +18,8 @@ extends RefCounted
 ##   `dashed_tile` is the same with its lit edge broken every other art pixel pair (a recharge).
 ## - `trough`: a line's sunken track (the health and mana lines): its top art row in the Outline,
 ##   the rest the track's colour; `line_fill`: the fill in it under that lip (`under_lip`), its
-##   bottom art row in its shade.
+##   bottom art row in its shade; and a hard `drop_shadow` one art pixel under the trough.
+## - `corner_mark`: a player's small L in its ramp, for a panel with no frame and no background.
 ##
 ## Static, display only: each call draws a handful of rects on `target` and allocates nothing.
 ## `target` is the CanvasItem drawn on, or anything with its `draw_rect(rect, color)` (the tests'
@@ -47,6 +48,8 @@ const PLAYERS: Array[PackedColorArray] = [PLAYER_1, PLAYER_2, PLAYER_3, PLAYER_4
 ## How deep `frame` and `tile` are, in layout pixels.
 const FRAME_DEPTH: float = A
 const TILE_DEPTH: float = 2.0 * A
+## How long each arm of `corner_mark` is, in layout pixels.
+const MARK_ARM: float = 6.0
 
 
 ## Seat `seat`'s ramp (clamped to the four).
@@ -101,8 +104,7 @@ static func dashed_tile(target: Object, rect: Rect2, lit: Color, base: Color) ->
 
 
 ## The part of `rect` a fill under a `tile` covers: all but its outer art pixel, so the cut corners
-## show what is under the tile, as a sprite's do (a panel's `frame` takes the same from its theme
-## fill's expand margin of minus one art pixel, `FramedPanel`).
+## show what is under the tile, as a sprite's do.
 static func inside_cut(rect: Rect2) -> Rect2:
 	return rect.grow(-A)
 
@@ -114,6 +116,30 @@ static func trough(target: Object, rect: Rect2, track: Color) -> void:
 		return
 	target.draw_rect(rect, track)
 	target.draw_rect(Rect2(rect.position, Vector2(rect.size.x, A)), OUTLINE)
+	drop_shadow(target, rect)
+
+
+## A hard shadow one art pixel deep under `rect` (layout pixels), in the Outline: what sits straight
+## on the game with no box behind it (the owner, 2026-11-27: no HUD background) keeps its edge over a
+## bright floor. Whole pixels, never a blur.
+static func drop_shadow(target: Object, rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	target.draw_rect(Rect2(rect.position.x + A, rect.end.y, rect.size.x, A), OUTLINE)
+
+
+## A player's corner mark with its top-left corner at `at` (layout pixels): an L, each arm `MARK_ARM`
+## long, its band two art pixels (the ramp's light on the top and left, its base under and right)
+## in an Outline, the outer corner cut. A panel with no frame and no background is told as the
+## player's by it (and by its corner and its coloured words).
+static func corner_mark(target: Object, at: Vector2, ramp: PackedColorArray) -> void:
+	var thick: float = 4.0 * A
+	target.draw_rect(Rect2(at + Vector2(A, 0.0), Vector2(MARK_ARM - A, thick)), OUTLINE)
+	target.draw_rect(Rect2(at + Vector2(0.0, A), Vector2(thick, MARK_ARM - A)), OUTLINE)
+	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(MARK_ARM - 2.0 * A, 2.0 * A)), ramp[BASE])
+	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(2.0 * A, MARK_ARM - 2.0 * A)), ramp[BASE])
+	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(MARK_ARM - 2.0 * A, A)), ramp[LIGHT])
+	target.draw_rect(Rect2(at + Vector2(A, A), Vector2(A, MARK_ARM - 2.0 * A)), ramp[LIGHT])
 
 
 ## The part of a trough's `rect` under its Outline lip, where its fill goes. A line one layout pixel

@@ -48,16 +48,11 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.541176, 0.309804, 0.768627, 0.8)
 
-[sub_resource type="StyleBoxFlat" id="panel_framed"]
+[sub_resource type="StyleBoxEmpty" id="panel_open"]
 content_margin_left = 4.0
 content_margin_top = 3.0
 content_margin_right = 4.0
 content_margin_bottom = 3.0
-expand_margin_left = -0.5
-expand_margin_top = -0.5
-expand_margin_right = -0.5
-expand_margin_bottom = -0.5
-bg_color = Color(0.168627, 0.156863, 0.25098, 0.4)
 
 [sub_resource type="StyleBoxFlat" id="bar_back"]
 bg_color = Color(0.0784314, 0.0705882, 0.121569, 0.7)
@@ -134,8 +129,8 @@ Button/styles/focus = SubResource("button_focus")
 Button/styles/hover = SubResource("button_hover")
 Button/styles/normal = SubResource("button_normal")
 Button/styles/pressed = SubResource("button_pressed")
-FramedPanel/base_type = &"PanelContainer"
-FramedPanel/styles/panel = SubResource("panel_framed")
+OpenPanel/base_type = &"PanelContainer"
+OpenPanel/styles/panel = SubResource("panel_open")
 HealthBar/base_type = &"ProgressBar"
 HealthBar/styles/background = SubResource("bar_back")
 HealthBar/styles/fill = SubResource("bar_health")

@@ -20,10 +20,11 @@ extends PanelContainer
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
-## the same for any player index 0-3. Its fill comes from the shared theme (type variation
-## FramedPanel), its frame is drawn at the art's detail in the player's ramp (`_draw`,
-## `HudArt.frame`: the outline cut at the corners, the light top and left edge, the shaded bottom
-## and right one), and the lines' colours are their own. Updating only changes text when a number changed, and
+## the same for any player index 0-3. It has no frame and no background (the owner, 2026-11-27):
+## its glyphs, cards, lines and words sit straight on the game, each with its own dark outline or
+## hard shadow, and its margins come from the shared theme (type variation OpenPanel). Whose it is
+## the corner says, with the player's small corner mark (`_draw`, `HudArt.corner_mark`) and the
+## words in the player's colour; the lines' colours are their own. Updating only changes text when a number changed, and
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
 ## Beside the staff rows, the seat's four quick-use slots (`set_quick`; `hud/widgets/quick_cross.gd`, a
@@ -56,8 +57,8 @@ const HudArt := preload("res://hud/widgets/hud_art.gd")
 const STAFFS_WIDTH: float = 88.0
 
 const PLAYER_COUNT: int = 4
-## The theme's variation of the panel's fill and margins; its frame is `_draw`'s.
-const FRAMED_PANEL: StringName = &"FramedPanel"
+## The theme's variation of the panel's margins (no background); its corner mark is `_draw`'s.
+const OPEN_PANEL: StringName = &"OpenPanel"
 const STAFF_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
@@ -108,7 +109,7 @@ var _live: Control = null
 
 func _ready() -> void:
 	var player: int = clampi(index, 0, PLAYER_COUNT - 1)
-	theme_type_variation = FRAMED_PANEL
+	theme_type_variation = OPEN_PANEL
 	queue_redraw()
 	for staff in STAFF_COUNT:
 		var row := StaffRowScript.new()
@@ -125,6 +126,8 @@ func _ready() -> void:
 	_purse.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
 	# In the panel's small font, as the health number (owner, 2026-11-19: a smaller HUD).
 	_purse.add_theme_font_size_override(&"font_size", 8)
+	# A wider outline, as the health number's: no background behind it (the owner, 2026-11-27).
+	_purse.add_theme_constant_override(&"outline_size", 3)
 	_purse_row = HBoxContainer.new()
 	_purse_row.name = "PurseRow"
 	_purse_row.add_theme_constant_override(&"separation", 4)
@@ -177,10 +180,10 @@ func _ready() -> void:
 	_refresh_status()
 
 
-## The frame round the panel, in the player's ramp at the art's detail (over the theme's fill).
+## The player's corner mark at the panel's top left, in the player's ramp at the art's detail.
 ## `index` is fixed by `_ready`, so the ramp never changes after.
 func _draw() -> void:
-	HudArt.frame(self, Rect2(Vector2.ZERO, size), HudArt.player_ramp(index))
+	HudArt.corner_mark(self, Vector2.ZERO, HudArt.player_ramp(index))
 
 
 ## The live layer over the picture: each shown row's glyph shade and rim and its mana line, at the

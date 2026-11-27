@@ -42,6 +42,9 @@ const REWARD_REROLL: PackedStringArray = ["lllll.l", "lmdmm.l", "ldddm.l", "lmdm
 const ICON_SIZE: Vector2i = Vector2i(7, 5)
 const ICON_GAP: int = 2
 ## The number's font size (the panel's small font, as the coins).
+## The number's outline: the palette's Outline, as wide as the panel's small words' (GlyphWarmup).
+const OUTLINE: Color = Color("#14121f")
+const OUTLINE_SIZE: int = 3
 const FONT_SIZE: int = 8
 ## The widest number it reserves room for, so it never reflows the row.
 const WIDEST: String = "99"
@@ -219,4 +222,8 @@ func _draw() -> void:
 	if font == null:
 		return
 	var baseline: float = float(offset()) + roundf((size_tall() + font.get_ascent(FONT_SIZE) - font.get_descent(FONT_SIZE)) / 2.0)
-	draw_string(font, Vector2(ICON_SIZE.x + ICON_GAP, baseline), _text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, light)
+	# In a dark outline: the panel has no background (the owner, 2026-11-27), so the number keeps
+	# its edge over a bright floor.
+	var at := Vector2(ICON_SIZE.x + ICON_GAP, baseline)
+	draw_string_outline(font, at, _text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, OUTLINE_SIZE, OUTLINE)
+	draw_string(font, at, _text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, light)

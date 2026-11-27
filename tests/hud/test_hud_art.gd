@@ -151,12 +151,34 @@ func test_every_seat_has_its_own_ramp_and_out_of_range_seats_are_clamped() -> vo
 	check(HudArt.player_ramp(-1) == HudArt.player_ramp(0), "a seat under 0 takes the first ramp")
 
 
-func test_the_corner_panel_takes_the_framed_panel_fill_from_the_theme() -> void:
+## No background (the owner, 2026-11-27): the panel's style draws nothing, only keeps its margins.
+func test_the_corner_panel_has_no_background_only_its_margins() -> void:
 	var theme: Theme = load("res://hud/theme/spellmerge_theme.tres")
-	var box := theme.get_stylebox("panel", PlayerPanelScript.FRAMED_PANEL) as StyleBoxFlat
-	check(box != null, "the theme has the framed panel's fill")
-	if box == null:
-		return
-	check(box.bg_color.a < 1.0, "the fill is see-through, as the panel's was")
-	check_equal(box.border_width_left + box.border_width_top + box.border_width_right + box.border_width_bottom, 0, "no border of its own: the frame is drawn at the art's detail")
-	check_equal(box.expand_margin_left, -HudArt.A, "the fill stops inside the frame's cut corners")
+	var box: StyleBox = theme.get_stylebox("panel", PlayerPanelScript.OPEN_PANEL)
+	check(box is StyleBoxEmpty, "the open panel's style draws nothing")
+	check(box.get_content_margin(SIDE_LEFT) > 0.0 and box.get_content_margin(SIDE_TOP) > 0.0, "it keeps the panel's margins")
+
+
+func test_a_corner_mark_is_an_outlined_l_in_the_players_ramp() -> void:
+	var pen := Recorder.new(Vector2i(8, 8))
+	var ramp: PackedColorArray = HudArt.player_ramp(1)
+	HudArt.corner_mark(pen, Vector2.ZERO, ramp)
+	var arm: int = int(HudArt.MARK_ARM * 2.0)
+	check_equal(pen.off_grid, 0, "every rect on whole art pixels")
+	check(_same(pen.at(0, 0), CLEAR), "its outer corner cut")
+	check(_same(pen.at(arm / 2, 0), HudArt.OUTLINE) and _same(pen.at(0, arm / 2), HudArt.OUTLINE), "outlined on its outer edges")
+	check(_same(pen.at(arm / 2, 1), ramp[HudArt.LIGHT]) and _same(pen.at(1, arm / 2), ramp[HudArt.LIGHT]), "lit on its top and left")
+	check(_same(pen.at(arm / 2, 2), ramp[HudArt.BASE]) and _same(pen.at(2, arm / 2), ramp[HudArt.BASE]), "its base under and right of the light")
+	check(_same(pen.at(arm / 2, 3), HudArt.OUTLINE) and _same(pen.at(arm - 1, 1), HudArt.OUTLINE), "closed inside and at its ends")
+	check(_same(pen.at(arm / 2, arm / 2), CLEAR), "an L, nothing in its crook")
+	check(_same(pen.at(arm, 1), CLEAR), "no longer than its arm")
+	check_equal(_strays(pen.image, _palette()), 0, "only palette colours")
+
+
+func test_a_trough_casts_a_hard_shadow_one_art_pixel_under_it() -> void:
+	var pen := Recorder.new(Vector2i(8, 4))
+	HudArt.trough(pen, Rect2(0.0, 0.0, 6.0, 2.0), HudArt.STONE[HudArt.SHADOW])
+	check_equal(pen.off_grid, 0, "every rect on whole art pixels")
+	check(_same(pen.at(0, 4), CLEAR), "the shadow starts an art pixel right, a drop down and right")
+	check(_same(pen.at(6, 4), HudArt.OUTLINE) and _same(pen.at(12, 4), HudArt.OUTLINE), "the shadow under the trough and one past its end")
+	check(_same(pen.at(6, 5), CLEAR), "one art pixel deep")

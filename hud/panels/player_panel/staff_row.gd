@@ -1,6 +1,6 @@
 extends Control
 ## One staff's row of the corner panel (owner, 2026-10-27): the staff's button glyph, then its
-## cast sequence as small card icons in read order, one framed group per cast of the cycle, so a
+## cast sequence as small card icons in read order, one group per cast of the cycle, so a
 ## player sees which cards fire together and finds a card that does nothing, and under the cards
 ## a thin blue line of the staff's own mana (owner, 2026-11-19; `set_mana`, `meter_line.gd`).
 ##
@@ -80,7 +80,6 @@ enum Style { BUTTON, NEXT_CAST }
 const FIRING_UNKNOWN: int = -2
 
 const FILL: Color = Color(0.11, 0.1, 0.16, 0.85)
-const NEXT_FILL: Color = Color(0.24, 0.21, 0.12, 0.95)
 const GOLD: Color = Color("#f2c230")
 const MUTED: Color = Color("#a39fb8")
 const WASTE_TINT: Color = Color(0.45, 0.45, 0.5, 0.55)
@@ -91,7 +90,8 @@ const EDGE_DELAY: Color = Color("#7fd6f5")
 const EDGE_RECHARGE: Color = Color("#f08a3c")
 ## The edge of a wind-up's charge, a frame the mana does not pay, and a fizzle's rim.
 const EDGE_WIND: Color = Color("#f2c230")
-const SHORT: Color = Color("#d8443a")
+## Short of mana: the palette's Fire base (the owner's decision of 2026-11-27, ART4).
+const SHORT: Color = Color("#e0592f")
 const SHORT_TINT: Color = Color(0.6, 0.5, 0.55, 0.8)
 const RIM: Color = Color.WHITE
 const GLYPH_DIM: Color = Color(0.5, 0.5, 0.58, 1.0)
@@ -546,17 +546,10 @@ func _draw_cards() -> void:
 	var view: float = _strip.size.x
 	_drawn_outline = -1
 	_drawn_dashed = -1
-	# Three passes, each a run of one kind (the frames' fills, the icons, all one page of
-	# `IconAtlas`, then the strikes and the frames' edges), so the strip is three draw calls
-	# however many cards it shows; nothing of one pass overlaps another's in a way the order shows
-	# (an icon lies inside its fill, a strike over its icon, an edge round its own frame).
-	for c in _cast_size.size():
-		var box: Rect2 = _cast_box(c, view)
-		if box.size.x <= 0.0:
-			continue
-		var is_next: bool = c == next and _firing != -1
-		var marked: bool = is_next and (on_button or not recharging)
-		_strip.draw_rect(HudArt.inside_cut(box), NEXT_FILL if marked else FILL)
+	# No fill under the casts (the owner, 2026-11-27: no HUD background): the cards sit straight on
+	# the game, each icon in its own outline, a cast told from the next by the wider gap. Two
+	# passes, each a run of one kind (the icons, all one page of `IconAtlas`, then the strikes and
+	# the marked frames' edges), so the strip is two draw calls however many cards it shows.
 	for c in _cast_size.size():
 		var box: Rect2 = _cast_box(c, view)
 		if box.size.x <= 0.0:
@@ -753,7 +746,6 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 	var box := Rect2(Vector2(x - 1.0, at.y), Vector2(_sigil_icons.size() * ICON_STEP + 1.0, BOX_HEIGHT))
 	for icon: Texture2D in _sigil_icons:
 		var tile := Rect2(Vector2(x, at.y + 1.0), Vector2(ICON, ICON))
-		target.draw_rect(tile, FILL)
 		if icon != null:
 			target.draw_texture_rect(icon, tile, false)
 		x += ICON_STEP
@@ -768,13 +760,13 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 
 ## Cast `box`'s frame at the art's detail (`HudArt.tile`): gold for the cast a press fires, red for
 ## one the mana does not pay, each lit on its top and left edge. Any other cast has no frame, only
-## its quiet fill with its corners cut (the owner, 2026-11-27: a cleaner HUD, fewer boxes): the gap
-## between two fills parts the casts, and a frame marks only what needs the eye.
+## a box (the owner, 2026-11-27: a cleaner HUD, no boxes, no background): the gap between two
+## casts parts them, and a frame marks only what needs the eye.
 func _draw_tile(box: Rect2, marked: bool, short: bool) -> void:
 	if marked:
 		HudArt.tile(_strip, box, HudArt.SPARK[HudArt.LIGHT], GOLD)
 	elif short:
-		HudArt.tile(_strip, box, SHORT, HudArt.FIRE[HudArt.SHADOW])
+		HudArt.tile(_strip, box, HudArt.FIRE[HudArt.BASE], HudArt.FIRE[HudArt.SHADOW])
 
 
 ## The `BUTTON` shade's height over a glyph inside `tall` px high: the wind-up's risen part, or the

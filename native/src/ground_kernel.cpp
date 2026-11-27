@@ -44,15 +44,16 @@ constexpr int64_t ROWS_A_SPAN = 8;
 
 // -- GroundNoise --
 
-inline uint64_t fnv(uint64_t x, int64_t v) { return ((x ^ ((uint64_t)v & 0xFFFFFFFFull)) * 16777619ull) & 0xFFFFFFFFull; }
-inline int64_t finish(uint64_t x) {
+// Each step's `& 0xFFFFFFFF` is a 32-bit number's own wrap, so the hash is worked out in 32 bits.
+inline uint32_t fnv(uint32_t x, int64_t v) { return (x ^ (uint32_t)v) * 16777619u; }
+inline int64_t finish(uint32_t x) {
 	x ^= x >> 13;
-	x = (x * 0x5BD1E995ull) & 0xFFFFFFFFull;
+	x *= 0x5BD1E995u;
 	return (int64_t)(x ^ (x >> 15));
 }
-inline int64_t hash2(int64_t a, int64_t b) { return finish(fnv(fnv(2166136261ull, a), b)); }
-inline int64_t hash3(int64_t a, int64_t b, int64_t c) { return finish(fnv(fnv(fnv(2166136261ull, a), b), c)); }
-inline int64_t hash4(int64_t a, int64_t b, int64_t c, int64_t d) { return finish(fnv(fnv(fnv(fnv(2166136261ull, a), b), c), d)); }
+inline int64_t hash2(int64_t a, int64_t b) { return finish(fnv(fnv(2166136261u, a), b)); }
+inline int64_t hash3(int64_t a, int64_t b, int64_t c) { return finish(fnv(fnv(fnv(2166136261u, a), b), c)); }
+inline int64_t hash4(int64_t a, int64_t b, int64_t c, int64_t d) { return finish(fnv(fnv(fnv(fnv(2166136261u, a), b), c), d)); }
 inline double unit2(int64_t a, int64_t b) { return (double)hash2(a, b) / 4294967296.0; }
 inline double unit3(int64_t a, int64_t b, int64_t c) { return (double)hash3(a, b, c) / 4294967296.0; }
 inline double unit4(int64_t a, int64_t b, int64_t c, int64_t d) { return (double)hash4(a, b, c, d) / 4294967296.0; }
@@ -97,31 +98,49 @@ double noise2(double x, double y, double scale, int64_t seed) {
 	return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty;
 }
 
-// `noise2` at one scale and seed over a w by h room, its cells' corners worked out once: the same
-// numbers, read back (a material asks it of every pixel).
+// `noise2` at one scale and seed over a w by h room's pixels, read at (x + offset, y + offset): its
+// cells' corners, and each column's and row's cell and smoothed fraction, worked out once. The same
+// numbers, read back (a material asks it of every pixel; the frame of every pixel near its edge).
 struct Lattice {
-	double scale = 1.0;
-	int64_t ix0 = 0, iy0 = 0, cols = 0;
+	int64_t cols = 0;
 	std::vector<double> corners;
+	// Each column's first corner (its cell less the lattice's first) and `smooth` of its fraction;
+	// each row's first corner (its cell's row times `cols`) and `smooth` of its fraction.
+	std::vector<int64_t> col_at, row_at;
+	std::vector<double> col_t, row_t;
 
-	Lattice(double p_scale, int64_t seed, int64_t w, int64_t h) : scale(p_scale) {
-		ix0 = floori(0.0 / scale);
-		iy0 = floori(0.0 / scale);
-		cols = floori((double)(w - 1) / scale) + 2 - ix0;
-		const int64_t rows = floori((double)(h - 1) / scale) + 2 - iy0;
+	Lattice(double scale, int64_t seed, int64_t w, int64_t h, double offset = 0.0) {
+		const int64_t ix0 = floori(offset / scale), iy0 = floori(offset / scale);
+		cols = floori(((double)(w - 1) + offset) / scale) + 2 - ix0;
+		const int64_t rows = floori(((double)(h - 1) + offset) / scale) + 2 - iy0;
 		corners.resize(cols * rows);
 		for (int64_t r = 0; r < rows; r++) {
 			for (int64_t c = 0; c < cols; c++) {
 				corners[r * cols + c] = unit3(seed, ix0 + c, iy0 + r);
 			}
 		}
+		col_at.resize(w);
+		col_t.resize(w);
+		for (int64_t x = 0; x < w; x++) {
+			const double fx = ((double)x + offset) / scale;
+			const int64_t ix = floori(fx);
+			col_at[x] = ix - ix0;
+			col_t[x] = smooth(fx - (double)ix);
+		}
+		row_at.resize(h);
+		row_t.resize(h);
+		for (int64_t y = 0; y < h; y++) {
+			const double fy = ((double)y + offset) / scale;
+			const int64_t iy = floori(fy);
+			row_at[y] = (iy - iy0) * cols;
+			row_t[y] = smooth(fy - (double)iy);
+		}
 	}
 
-	double at(double x, double y) const {
-		const double fx = x / scale, fy = y / scale;
-		const int64_t ix = floori(fx), iy = floori(fy);
-		const double tx = smooth(fx - (double)ix), ty = smooth(fy - (double)iy);
-		const int64_t i = (iy - iy0) * cols + ix - ix0;
+	// `noise2(x + offset, y + offset, scale, seed)` at the pixel (x, y).
+	double at(int64_t x, int64_t y) const {
+		const double tx = col_t[x], ty = row_t[y];
+		const int64_t i = row_at[y] + col_at[x];
 		const double a = corners[i];
 		const double b = corners[i + 1];
 		const double c = corners[i + cols];
@@ -131,7 +150,7 @@ struct Lattice {
 };
 
 // `fbm2` read from its octaves' lattices (`Lattice`), each built with `seed + i` as `fbm2` seeds them.
-double fbm2_of(double x, double y, const std::vector<Lattice> &octaves) {
+double fbm2_of(int64_t x, int64_t y, const std::vector<Lattice> &octaves) {
 	double total = 0.0, weight = 0.0, amp = 1.0;
 	for (size_t i = 0; i < octaves.size(); i++) {
 		total += octaves[i].at(x, y) * amp;
@@ -139,6 +158,15 @@ double fbm2_of(double x, double y, const std::vector<Lattice> &octaves) {
 		amp *= 0.5;
 	}
 	return total / weight;
+}
+
+// `fbm2`'s octaves over a w by h room's pixels (at x + offset, y + offset), for `fbm2_of`.
+std::vector<Lattice> octaves_of(const std::vector<double> &scales, int64_t seed, int64_t w, int64_t h, double offset = 0.0) {
+	std::vector<Lattice> octaves;
+	for (size_t i = 0; i < scales.size(); i++) {
+		octaves.emplace_back(scales[i], seed + (int64_t)i, w, h, offset);
+	}
+	return octaves;
 }
 
 double fbm2(double x, double y, const std::vector<double> &scales, int64_t seed) {
@@ -153,17 +181,10 @@ double fbm2(double x, double y, const std::vector<double> &scales, int64_t seed)
 
 inline double length_of(double dx, double dy) { return std::sqrt(dx * dx + dy * dy); }
 
-int64_t round_even(double x) {
-	const double low = std::floor(x);
-	const double part = x - low;
-	if (part > 0.5) {
-		return (int64_t)low + 1;
-	}
-	if (part < 0.5) {
-		return (int64_t)low;
-	}
-	return posmod_i((int64_t)low, 2) == 0 ? (int64_t)low : (int64_t)low + 1;
-}
+// The GDScript's `round_even` (a half to the even number) is the machine's own rounding to the
+// nearest, ties to even (`nearbyint` in the default rounding mode: one instruction on the desktop's
+// x86-64-v2 and the web's wasm), the same number for every finite x.
+inline int64_t round_even(double x) { return (int64_t)std::nearbyint(x); }
 
 int64_t mix(int64_t a, int64_t b, double t) {
 	const int64_t ar = (a >> 16) & 0xFF, ag = (a >> 8) & 0xFF, ab = a & 0xFF;
@@ -220,11 +241,39 @@ int64_t colour(const String &spec, const Dictionary &palette) {
 }
 inline int64_t colour_of(const Variant &spec, const Dictionary &palette) { return colour((String)spec, palette); }
 
-inline void put(std::vector<uint8_t> &image, int64_t p, int64_t rgb, int64_t alpha = 255) {
+// An image the drawing writes and hands back as it is: a PackedByteArray written through its
+// pointer, so nothing is copied into one at the end.
+struct Bytes {
+	PackedByteArray array;
+	uint8_t *data = nullptr;
+	int64_t count = 0;
+
+	void assign(int64_t n, uint8_t value) {
+		array.resize(n);
+		data = n > 0 ? array.ptrw() : nullptr;
+		count = n;
+		for (int64_t i = 0; i < n; i++) {
+			data[i] = value;
+		}
+	}
+	uint8_t &operator[](int64_t i) { return data[i]; }
+	uint8_t operator[](int64_t i) const { return data[i]; }
+};
+
+inline void put(Bytes &image, int64_t p, int64_t rgb, int64_t alpha = 255) {
 	image[p * 4] = (uint8_t)((rgb >> 16) & 0xFF);
 	image[p * 4 + 1] = (uint8_t)((rgb >> 8) & 0xFF);
 	image[p * 4 + 2] = (uint8_t)(rgb & 0xFF);
 	image[p * 4 + 3] = (uint8_t)alpha;
+}
+
+// The column and row of the pixel p of a w wide image, by one division of 32 bits (an image has
+// fewer than 2^32 pixels).
+inline void xy_of(int64_t p, int64_t w, int64_t &x, int64_t &y) {
+	const uint32_t at = (uint32_t)p, wide = (uint32_t)w;
+	const uint32_t row = at / wide;
+	x = (int64_t)(at - row * wide);
+	y = (int64_t)row;
 }
 
 // The four ways a walk steps, in the order the GDScript tries them.
@@ -287,18 +336,48 @@ void fill_polygon(std::vector<uint8_t> &mask, int64_t w, int64_t h, const std::v
 	}
 	const int64_t top = maxi(0, (int64_t)low);
 	const int64_t bottom = mini(h - 1, (int64_t)high + 1);
-	std::vector<double> xs;
-	for (int64_t y = top; y <= bottom; y++) {
-		const double sy = (double)y + 0.5;
-		xs.clear();
+	if (bottom < top) {
+		return;
+	}
+	// Where each side crosses each row's middle, by the GDScript's test and sum, each side asked only
+	// of the rows near it (a row it is far from fails the test): counted, then gathered row by row.
+	// A row's crossings are sorted below, so the order they are gathered in is no matter.
+	const int64_t rows = bottom - top + 1;
+	std::vector<int64_t> starts(rows + 1, 0);
+	std::vector<double> crossings;
+	for (int64_t pass = 0; pass < 2; pass++) {
 		for (int64_t i = 0; i < count; i++) {
 			const double x1 = points[i * 2], y1 = points[i * 2 + 1];
-			const int64_t k = (i + 1) % count;
+			const int64_t k = i + 1 < count ? i + 1 : 0;
 			const double x2 = points[k * 2], y2 = points[k * 2 + 1];
-			if ((y1 <= sy && sy < y2) || (y2 <= sy && sy < y1)) {
-				xs.push_back(x1 + (sy - y1) * (x2 - x1) / (y2 - y1));
+			const int64_t from = maxi(top, floori(minf(y1, y2)) - 1), to = mini(bottom, floori(maxf(y1, y2)) + 1);
+			for (int64_t y = from; y <= to; y++) {
+				const double sy = (double)y + 0.5;
+				if ((y1 <= sy && sy < y2) || (y2 <= sy && sy < y1)) {
+					if (pass == 0) {
+						starts[y - top + 1]++;
+					} else {
+						crossings[starts[y - top]++] = x1 + (sy - y1) * (x2 - x1) / (y2 - y1);
+					}
+				}
 			}
 		}
+		if (pass == 0) {
+			for (int64_t r = 0; r < rows; r++) {
+				starts[r + 1] += starts[r];
+			}
+			crossings.resize(starts[rows]);
+		} else {
+			// Each row's start moved on to the next row's: put back.
+			for (int64_t r = rows; r > 0; r--) {
+				starts[r] = starts[r - 1];
+			}
+			starts[0] = 0;
+		}
+	}
+	std::vector<double> xs;
+	for (int64_t y = top; y <= bottom; y++) {
+		xs.assign(crossings.begin() + starts[y - top], crossings.begin() + starts[y - top + 1]);
 		// Sorted, as the GDScript's `sort` (equal numbers are the same number).
 		for (size_t i = 1; i < xs.size(); i++) {
 			const double v = xs[i];
@@ -420,6 +499,9 @@ struct Geometry {
 		const double reach = maxf(wander_in, wander_out) + 2.0;
 		const double *clear_p = clear.ptr();
 		const int64_t clear_n = clear.size();
+		// Its noise and its bays' at the pixels' middles, read back (`Lattice`).
+		const std::vector<Lattice> rough = octaves_of(scales, seed, w, h, 0.5);
+		const std::vector<Lattice> bay_rough = bays.empty() ? std::vector<Lattice>() : octaves_of(bay_scales, seed + 7, w, h, 0.5);
 		uint8_t *out = land.data();
 		jobs::for_spans(h, ROWS_A_SPAN, threads, [&](int64_t, int64_t y_from, int64_t y_to) {
 			for (int64_t y = y_from; y < y_to; y++) {
@@ -431,22 +513,34 @@ struct Geometry {
 					}
 					const double px = (double)x + 0.5, py = (double)y + 0.5;
 					const double qx = absf(px - cx) - hw, qy = absf(py - cy) - hh;
-					const double inward = -(length_of(maxf(qx, 0.0), maxf(qy, 0.0)) + minf(maxf(qx, qy), 0.0) - corner);
+					// (The length of (0, 0) is 0, so it is not worked out there.)
+					const double out_by = qx > 0.0 || qy > 0.0 ? length_of(maxf(qx, 0.0), maxf(qy, 0.0)) : 0.0;
+					const double inward = -(out_by + minf(maxf(qx, qy), 0.0) - corner);
 					double pinned = 1.0;
 					for (size_t k = 0; k < pins.size(); k += 4) {
 						const double dx = maxf(maxf(pins[k] - px, 0.0), px - pins[k + 2]);
 						const double dy = maxf(maxf(pins[k + 1] - py, 0.0), py - pins[k + 3]);
+						// A length is at least either side (the square root of a square is the number
+						// itself), so a pin that far off leaves `pinned` as it is.
+						if (maxf(dx, dy) / PIN_EASE >= pinned) {
+							continue;
+						}
 						pinned = minf(pinned, length_of(dx, dy) / PIN_EASE);
 					}
 					bool inside = inward > 0.0;
 					if (absf(inward) < reach && pinned > 0.0) {
-						const double n = maxf(-1.0, minf(1.0, (fbm2(px, py, scales, seed) - 0.5) * 2.6));
+						const double n = maxf(-1.0, minf(1.0, (fbm2_of(x, y, rough) - 0.5) * 2.6));
 						inside = inward + (n > 0.0 ? n * wander_out : n * wander_in) * minf(1.0, pinned) > 0.0;
 					}
 					if (!inside && pinned >= 1.0) {
 						for (size_t k = 0; k < bays.size(); k += 3) {
 							const double br = bays[k + 2];
-							if (length_of(px - bays[k], py - bays[k + 1]) + (fbm2(px, py, bay_scales, seed + 7) - 0.5) * br * 0.6 < br) {
+							// Too far along either axis to be in it: the length is at least either
+							// difference, and the noise takes at most 0.3 br off it.
+							if (absf(px - bays[k]) > 2.0 * br + 1.0 || absf(py - bays[k + 1]) > 2.0 * br + 1.0) {
+								continue;
+							}
+							if (length_of(px - bays[k], py - bays[k + 1]) + (fbm2_of(x, y, bay_rough) - 0.5) * br * 0.6 < br) {
 								inside = true;
 								break;
 							}
@@ -454,6 +548,10 @@ struct Geometry {
 					}
 					if (!inside && pinned >= 1.0) {
 						for (int64_t k = 0; k + 2 < clear_n; k += 3) {
+							// Too far along either axis to be in it: the length is at least either difference.
+							if (absf(px - clear_p[k]) > clear_p[k + 2] + 1.0 || absf(py - clear_p[k + 1]) > clear_p[k + 2] + 1.0) {
+								continue;
+							}
 							if (length_of(px - clear_p[k], py - clear_p[k + 1]) < clear_p[k + 2]) {
 								inside = true;
 								break;
@@ -602,8 +700,18 @@ struct Material {
 	std::vector<double> cell_px, cell_py;
 	std::vector<int64_t> cell_tone;
 	int64_t cell_x0 = 0, cell_y0 = 0, cell_cols = 0;
-	// The grit toward the edge's noise (`edge_scales`, seed + 77), read back (`Lattice`).
-	std::vector<Lattice> grit_octaves;
+	// Each column's slab cell (`slab`'s cx0).
+	std::vector<int64_t> col_cell;
+	// The grit toward the edge's noise (`edge_scales`, seed + 77), and the worn light's of a fine
+	// slab (6 a detail, seed + 5), read back (`Lattice`).
+	std::vector<Lattice> grit_octaves, light_octave;
+
+	// What `slab` reads of one row of pixels, worked out once a row: the first of the three cell rows
+	// it looks at, and the `dy` and its square of each of their cells at this row (`slab_row`).
+	struct Row {
+		int64_t y = 0, cy0 = 0;
+		std::vector<double> dy, dy2;
+	};
 
 	Material(const Dictionary &spec, int64_t index, int64_t room_seed, int64_t w, int64_t h, double cx, double cy, const Dictionary &palette,
 			int64_t fine = 1) {
@@ -663,6 +771,13 @@ struct Material {
 			cell_y0 = floori(0.5 / (s * sq)) - 1;
 			cell_cols = floori(((double)(w - 1) + 0.5) / s) + 2 - cell_x0;
 			const int64_t cell_rows = floori(((double)(h - 1) + 0.5) / (s * sq)) + 2 - cell_y0;
+			col_cell.resize(w);
+			for (int64_t x = 0; x < w; x++) {
+				col_cell[x] = floori(((double)x + 0.5) / s);
+			}
+			if (has_light && detail > 1) {
+				light_octave = octaves_of(std::vector<double>{ 6.0 * (double)detail }, seed + 5, w, h);
+			}
 			cell_px.resize(cell_cols * cell_rows);
 			cell_py.resize(cell_cols * cell_rows);
 			cell_tone.resize(cell_cols * cell_rows);
@@ -690,9 +805,7 @@ struct Material {
 			for (double &v : edge_scales) {
 				v *= d;
 			}
-			for (size_t i = 0; i < edge_scales.size(); i++) {
-				grit_octaves.emplace_back(edge_scales[i], seed + 77 + (int64_t)i, w, h);
-			}
+			grit_octaves = octaves_of(edge_scales, seed + 77, w, h);
 		}
 		if (spec.has("strokes")) {
 			const Dictionary strokes = dict(spec, "strokes");
@@ -706,10 +819,31 @@ struct Material {
 		}
 	}
 
-	int64_t colour_at(int64_t x, int64_t y, double edge_distance) const {
+	// The row `y`'s cells as `slab` reads them (`Row`).
+	void slab_row(int64_t y, Row &row) const {
+		if (!has_slabs) {
+			return;
+		}
+		const double s = slab_size, sq = slab_squash;
+		row.y = y;
+		row.cy0 = floori(((double)y + 0.5) / (s * sq));
+		row.dy.resize(3 * cell_cols);
+		row.dy2.resize(3 * cell_cols);
+		for (int64_t r = 0; r < 3; r++) {
+			const int64_t from = (row.cy0 - 1 + r - cell_y0) * cell_cols;
+			for (int64_t c = 0; c < cell_cols; c++) {
+				const double dy = ((double)y + 0.5 - cell_py[from + c]) / sq;
+				row.dy[r * cell_cols + c] = dy;
+				row.dy2[r * cell_cols + c] = dy * dy;
+			}
+		}
+	}
+
+	// The colour at (x, y), `row` being the row y's (`slab_row`).
+	int64_t colour_at(int64_t x, int64_t y, double edge_distance, const Row &row) const {
 		int64_t rgb = base;
 		if (has_slabs) {
-			rgb = slab(x, y);
+			rgb = slab(x, row);
 		}
 		if (has_patches && bilinear((double)x / (double)STEP, (double)y / (double)STEP) > patch_above) {
 			rgb = patch_colour;
@@ -734,7 +868,7 @@ struct Material {
 		}
 		if (has_edge && edge_distance < edge_reach) {
 			const double near = 1.0 - edge_distance / edge_reach;
-			const double grit = fbm2_of((double)x, (double)y, grit_octaves);
+			const double grit = fbm2_of(x, y, grit_octaves);
 			const double share = minf(edge_most, maxf(0.0, near * 1.6 * grit - 0.25));
 			if (share > 0.08) {
 				rgb = mix(rgb, edge_colour, share);
@@ -743,26 +877,24 @@ struct Material {
 		return rgb;
 	}
 
-	int64_t slab(int64_t x, int64_t y) const {
-		const double s = slab_size, sq = slab_squash;
-		const double fx = ((double)x + 0.5) / s, fy = ((double)y + 0.5) / (s * sq);
-		const int64_t cx0 = floori(fx), cy0 = floori(fy);
+	// The slab at (x, y), its row's cells read from `row` (`slab_row`): the nearest jittered middle
+	// and the second nearest, in the order the GDScript looks at them, by the same sums.
+	int64_t slab(int64_t x, const Row &row) const {
+		const int64_t cx0 = col_cell[x];
+		const double here = (double)x + 0.5;
 		double best = 1e18, second = 1e18, best_dy = 0.0;
-		int64_t best_cx = 0, best_cy = 0;
-		for (int64_t cy = cy0 - 1; cy < cy0 + 2; cy++) {
-			const int64_t row = (cy - cell_y0) * cell_cols - cell_x0;
+		int64_t best_at = 0;
+		for (int64_t r = 0; r < 3; r++) {
+			const int64_t cells = (row.cy0 - 1 + r - cell_y0) * cell_cols - cell_x0;
+			const int64_t at_row = r * cell_cols - cell_x0;
 			for (int64_t cx = cx0 - 1; cx < cx0 + 2; cx++) {
-				const double px = cell_px[row + cx];
-				const double py = cell_py[row + cx];
-				const double dx = (double)x + 0.5 - px;
-				const double dy = ((double)y + 0.5 - py) / sq;
-				const double d = dx * dx + dy * dy;
+				const double dx = here - cell_px[cells + cx];
+				const double d = dx * dx + row.dy2[at_row + cx];
 				if (d < best) {
 					second = best;
 					best = d;
-					best_cx = cx;
-					best_cy = cy;
-					best_dy = dy;
+					best_at = cells + cx;
+					best_dy = row.dy[at_row + cx];
 				} else if (d < second) {
 					second = d;
 				}
@@ -770,12 +902,12 @@ struct Material {
 		}
 		const double edge = std::sqrt(second) - std::sqrt(best);
 		if (detail > 1) {
-			return fine_slab(x, y, edge, cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0], best_dy);
+			return fine_slab(x, row.y, edge, cell_tone[best_at], best_dy);
 		}
 		if (edge < joint_width) {
 			return joint;
 		}
-		int64_t rgb = cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0];
+		int64_t rgb = cell_tone[best_at];
 		if (has_light && edge < joint_width + light_width && best_dy < 0.0) {
 			rgb = light;
 		}
@@ -792,8 +924,7 @@ struct Material {
 			return dy > 0.0 ? mix(tone, joint, 0.45) : tone;
 		}
 		if (has_light && dy < 0.0 && edge < jw + light_width * 0.5) {
-			const std::vector<double> scales{ 6.0 * (double)detail };
-			if (fbm2((double)x, (double)y, scales, seed + 5) > 0.38) {
+			if (fbm2_of(x, y, light_octave) > 0.38) {
 				return light;
 			}
 		}
@@ -859,9 +990,10 @@ int64_t fine_face(int64_t x, int64_t k, int64_t face_height, int64_t course, int
 	return rgb;
 }
 
-std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t> &floor, const std::vector<uint8_t> &wall, const Dictionary &style,
+Bytes walls_draw(int64_t w, int64_t h, const std::vector<uint8_t> &floor, const std::vector<uint8_t> &wall, const Dictionary &style,
 		const Dictionary &palette, int64_t seed, int64_t detail = 1) {
-	std::vector<uint8_t> image(w * h * 4, 0);
+	Bytes image;
+	image.assign(w * h * 4, 0);
 	const Dictionary top = dict(style, "top");
 	const Dictionary face = dict(style, "face");
 	if (top.is_empty() && face.is_empty()) {
@@ -936,7 +1068,8 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 			d++;
 			next.clear();
 			for (const int64_t q : frontier) {
-				const int64_t x = q % w, y = q / w;
+				int64_t x, y;
+				xy_of(q, w, x, y);
 				for (int64_t way = 0; way < 4; way++) {
 					const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
 					if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
@@ -1030,7 +1163,7 @@ struct Drawing {
 	Array grounds;
 	std::vector<uint8_t> land, land_before, material, pit, pit_side, solid, side;
 	std::vector<float> crack, t;
-	std::vector<uint8_t> floor_image, under, glow, wall_art;
+	Bytes floor_image, under, glow, wall_art;
 	int64_t glow_w = 0, glow_h = 0;
 	Array rims, drips;
 	PackedInt32Array rim_sides, drip_sides;
@@ -1130,9 +1263,16 @@ struct Drawing {
 			// One row made wide, then copied to the d rows it is.
 			T *first = out.data() + y * d * wide;
 			const T *from = mask.data() + y * w;
-			for (int64_t x = 0; x < w; x++) {
-				for (int64_t k = 0; k < d; k++) {
-					first[x * d + k] = from[x];
+			if (d == 2) {
+				for (int64_t x = 0; x < w; x++) {
+					first[x * 2] = from[x];
+					first[x * 2 + 1] = from[x];
+				}
+			} else {
+				for (int64_t x = 0; x < w; x++) {
+					for (int64_t k = 0; k < d; k++) {
+						first[x * d + k] = from[x];
+					}
 				}
 			}
 			for (int64_t k = 1; k < d; k++) {
@@ -1166,7 +1306,6 @@ struct Drawing {
 		out->h = h * d;
 		out->land = upsampled(land, d);
 		out->pit = upsampled(pit, d);
-		out->pit_side = upsampled(pit_side, d);
 		out->material = upsampled(material, d);
 		out->solid = upsampled(solid, d);
 		out->side = upsampled(side, d);
@@ -1237,7 +1376,8 @@ struct Drawing {
 		for (int64_t step = 0; step < SIDE_REACH; step++) {
 			next.clear();
 			for (const int64_t q : frontier) {
-				const int64_t x = q % w, y = q / w;
+				int64_t x, y;
+				xy_of(q, w, x, y);
 				for (int64_t way = 0; way < 4; way++) {
 					const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
 					if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
@@ -1257,41 +1397,76 @@ struct Drawing {
 		}
 	}
 
+	// Every piece of the solid ground (its pixels joined side to side) that holds no cell's middle
+	// is dropped, from `solid` and `land`: the pieces the GDScript's flood fill finds, found here row
+	// by row as runs of solid pixels, each joined to the runs it touches in the row above.
 	void drop_slivers() {
-		std::vector<uint8_t> seen(w * h, 0);
-		std::vector<int64_t> piece;
-		for (int64_t p0 = 0; p0 < w * h; p0++) {
-			if (solid[p0] == 0 || seen[p0] != 0) {
-				continue;
-			}
-			piece.clear();
-			piece.push_back(p0);
-			seen[p0] = 1;
-			size_t k = 0;
-			bool open_cell = false;
-			while (k < piece.size()) {
-				const int64_t q = piece[k];
-				k++;
-				const int64_t x = q % w, y = q / w;
-				if (x % CELL == CELL / 2 && y % CELL == CELL / 2) {
-					open_cell = true;
+		struct Run {
+			int64_t y, from, to;
+		};
+		std::vector<Run> runs;
+		std::vector<int64_t> row_runs(h + 1, 0);
+		for (int64_t y = 0; y < h; y++) {
+			row_runs[y] = (int64_t)runs.size();
+			const uint8_t *row = solid.data() + y * w;
+			for (int64_t x = 0; x < w;) {
+				if (row[x] == 0) {
+					x++;
+					continue;
 				}
-				for (int64_t way = 0; way < 4; way++) {
-					const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
-					if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-						const int64_t r = ny * w + nx;
-						if (solid[r] != 0 && seen[r] == 0) {
-							seen[r] = 1;
-							piece.push_back(r);
-						}
+				const int64_t from = x;
+				while (x < w && row[x] != 0) {
+					x++;
+				}
+				runs.push_back(Run{ y, from, x });
+			}
+		}
+		row_runs[h] = (int64_t)runs.size();
+		std::vector<int64_t> piece(runs.size());
+		for (size_t r = 0; r < runs.size(); r++) {
+			piece[r] = (int64_t)r;
+		}
+		const auto root = [&](int64_t r) {
+			while (piece[r] != r) {
+				piece[r] = piece[piece[r]];
+				r = piece[r];
+			}
+			return r;
+		};
+		for (int64_t y = 1; y < h; y++) {
+			int64_t a = row_runs[y - 1];
+			for (int64_t b = row_runs[y]; b < row_runs[y + 1]; b++) {
+				while (a < row_runs[y] && runs[a].to <= runs[b].from) {
+					a++;
+				}
+				for (int64_t k = a; k < row_runs[y] && runs[k].from < runs[b].to; k++) {
+					const int64_t ra = root(k), rb = root(b);
+					if (ra != rb) {
+						piece[maxi(ra, rb)] = mini(ra, rb);
 					}
 				}
 			}
-			if (!open_cell) {
-				for (const int64_t q : piece) {
-					solid[q] = 0;
-					land[q] = 0;
-				}
+		}
+		std::vector<uint8_t> open_cell(runs.size(), 0);
+		for (size_t r = 0; r < runs.size(); r++) {
+			const Run &run = runs[r];
+			if (run.y % CELL != CELL / 2) {
+				continue;
+			}
+			// The first pixel of the run at a cell's middle column.
+			const int64_t middle = run.from + posmod_i(CELL / 2 - run.from, CELL);
+			if (middle < run.to) {
+				open_cell[root((int64_t)r)] = 1;
+			}
+		}
+		for (size_t r = 0; r < runs.size(); r++) {
+			if (open_cell[root((int64_t)r)] != 0) {
+				continue;
+			}
+			const Run &run = runs[r];
+			for (int64_t x = run.from; x < run.to; x++) {
+				solid[run.y * w + x] = 0;
+				land[run.y * w + x] = 0;
 			}
 		}
 	}
@@ -1357,10 +1532,14 @@ struct Drawing {
 	}
 
 	bool is_edge(int64_t p) const {
+		return is_edge_at(p % w, p / w, p);
+	}
+
+	// `is_edge` of the pixel p at (x, y).
+	bool is_edge_at(int64_t x, int64_t y, int64_t p) const {
 		if (land[p] == 0) {
 			return false;
 		}
-		const int64_t x = p % w, y = p / w;
 		return x + 1 >= w || land[p + 1] == 0 || x == 0 || land[p - 1] == 0 || y + 1 >= h || land[p + w] == 0 || y == 0 || land[p - w] == 0;
 	}
 
@@ -1386,16 +1565,19 @@ struct Drawing {
 		if (reach > 0) {
 			edge_distance.assign(w * h, (int32_t)(reach + 1));
 			std::vector<int64_t> frontier, next;
-			for (int64_t p = 0; p < w * h; p++) {
-				if (is_edge(p)) {
-					frontier.push_back(p);
-					edge_distance[p] = 0;
+			for (int64_t y = 0, p = 0; y < h; y++) {
+				for (int64_t x = 0; x < w; x++, p++) {
+					if (is_edge_at(x, y, p)) {
+						frontier.push_back(p);
+						edge_distance[p] = 0;
+					}
 				}
 			}
 			for (int64_t d = 1; d < reach + 1; d++) {
 				next.clear();
 				for (const int64_t q : frontier) {
-					const int64_t x = q % w, y = q / w;
+					int64_t x, y;
+					xy_of(q, w, x, y);
 					for (int64_t way = 0; way < 4; way++) {
 						const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
 						if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
@@ -1411,16 +1593,24 @@ struct Drawing {
 			}
 		}
 		jobs::for_spans(h, ROWS_A_SPAN, threads, [&](int64_t, int64_t y_from, int64_t y_to) {
-			for (int64_t p = y_from * w; p < y_to * w; p++) {
-				if (solid[p] == 0) {
-					continue;
+			// Each material's slab cells of the row (`Material::slab_row`), this span's own.
+			std::vector<Material::Row> rows(mats.size());
+			for (int64_t y = y_from; y < y_to; y++) {
+				for (size_t k = 0; k < mats.size(); k++) {
+					mats[k].slab_row(y, rows[k]);
 				}
-				if (land[p] == 0) {
-					put(floor_image, p, deeps[side[p]]);
-					continue;
+				for (int64_t x = 0; x < w; x++) {
+					const int64_t p = y * w + x;
+					if (solid[p] == 0) {
+						continue;
+					}
+					if (land[p] == 0) {
+						put(floor_image, p, deeps[side[p]]);
+						continue;
+					}
+					const double ed = edge_distance.empty() ? 1e9 : (double)edge_distance[p];
+					put(floor_image, p, mats[material[p]].colour_at(x, y, ed, rows[material[p]]));
 				}
-				const double ed = edge_distance.empty() ? 1e9 : (double)edge_distance[p];
-				put(floor_image, p, mats[material[p]].colour_at(p % w, p / w, ed));
 			}
 		});
 	}
@@ -1541,7 +1731,8 @@ struct Drawing {
 		for (int64_t step = 0; step < reach; step++) {
 			next.clear();
 			for (const int64_t q : frontier) {
-				const int64_t x = q % w, y = q / w;
+				int64_t x, y;
+				xy_of(q, w, x, y);
 				const int32_t b = band[q];
 				for (int64_t way = 0; way < 4; way++) {
 					const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
@@ -1561,14 +1752,37 @@ struct Drawing {
 		}
 	}
 
-	// The seam's three shades at `p`; false where it has none.
-	bool seam_colour(int64_t p, PackedInt32Array &ramp) const {
+	// Each side's seam as the edges read it, worked out once (`read_seams`): whether its style has
+	// one, and its bands' three shades each (none where its seam is no dictionary).
+	bool seamed[2] = { false, false };
+	std::vector<int32_t> seam_ramps[2];
+
+	void read_seams() {
+		for (int64_t i = 0; i < 2; i++) {
+			seamed[i] = styles[i].has("seam");
+			seam_ramps[i].clear();
+			const Dictionary seam_spec = dict(styles[i], "seam");
+			if (seam_spec.is_empty()) {
+				continue;
+			}
+			const Array colours = arr(seam_spec, "colours");
+			for (int64_t b = 0; b < colours.size(); b++) {
+				const PackedInt32Array ramp = palette[colours[b]];
+				for (int64_t k = 0; k < 3; k++) {
+					seam_ramps[i].push_back(ramp[k]);
+				}
+			}
+		}
+	}
+
+	// The seam's three shades at `p` (`read_seams`); false where it has none.
+	bool seam_colour(int64_t p, const int32_t *&ramp) const {
 		const int32_t b = band[p];
-		const Dictionary seam_spec = dict(styles[side[p]], "seam");
-		if (b < 0 || seam_spec.is_empty()) {
+		const std::vector<int32_t> &ramps = seam_ramps[side[p]];
+		if (b < 0 || (size_t)b * 3 + 3 > ramps.size()) {
 			return false;
 		}
-		ramp = palette[arr(seam_spec, "colours")[b]];
+		ramp = ramps.data() + b * 3;
 		return true;
 	}
 
@@ -1585,18 +1799,22 @@ struct Drawing {
 		}
 		const int64_t lip_most = maxi(lip_widths[0], lip_widths[1]);
 		const int64_t k = detail;
+		read_seams();
 		std::vector<uint8_t> dist(w * h, 0);
 		std::vector<int64_t> frontier, next;
-		for (int64_t p = 0; p < w * h; p++) {
-			if (is_edge(p)) {
-				frontier.push_back(p);
-				dist[p] = 1;
+		for (int64_t y = 0, p = 0; y < h; y++) {
+			for (int64_t x = 0; x < w; x++, p++) {
+				if (is_edge_at(x, y, p)) {
+					frontier.push_back(p);
+					dist[p] = 1;
+				}
 			}
 		}
 		for (int64_t d = 2; d < (lip_most + 1) * k + 1; d++) {
 			next.clear();
 			for (const int64_t q : frontier) {
-				const int64_t x = q % w, y = q / w;
+				int64_t x, y;
+				xy_of(q, w, x, y);
 				for (int64_t way = 0; way < 4; way++) {
 					const int64_t nx = x + WAY_X[way], ny = y + WAY_Y[way];
 					if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
@@ -1611,7 +1829,7 @@ struct Drawing {
 			frontier.swap(next);
 		}
 		std::vector<int64_t> edge_pixels;
-		PackedInt32Array ramp;
+		const int32_t *ramp = nullptr;
 		for (int64_t p = 0; p < w * h; p++) {
 			const int64_t d = dist[p];
 			if (d == 0) {
@@ -1619,11 +1837,13 @@ struct Drawing {
 			}
 			const int64_t at_side = side[p];
 			const double tp = (double)t[p];
-			double roll = unit3(p % w, p / w, 5051);
+			int64_t px, py;
+			xy_of(p, w, px, py);
+			double roll = unit3(px, py, 5051);
 			if (d == 1) {
 				edge_pixels.push_back(p);
 			}
-			const bool seamed = styles[at_side].has("seam");
+			const bool seamed = this->seamed[at_side];
 			if (d <= k && seamed) {
 				if (!seam_colour(p, ramp)) {
 					continue;
@@ -1845,14 +2065,18 @@ struct Drawing {
 		}
 		const int64_t seed = inum(shape, "seed", 0) + 21;
 		const int64_t fk = detail;
-		// The rock's bottoms in the order the GDScript sorts them (column by column, top down),
-		// which is the order they are found in: each lies below the last in its column.
+		// The rock's bottoms, which the GDScript sorts column by column, top down.
 		struct Bottom {
 			int64_t x, y, edge;
 		};
 		std::vector<Bottom> bottoms;
-		for (int64_t x = 0; x < w; x++) {
-			for (int64_t y = 0; y < h - 1; y++) {
+		// The rock's shading noise, read back (`Lattice`).
+		const Lattice shading(7.0 * (double)fk, seed + 1, w, h);
+		// The GDScript draws the rock column by column, top down; each column's rock and roots lie in
+		// that column alone, so it is drawn row by row here (its pixels read in the order they lie),
+		// each column's rock still top down.
+		for (int64_t y = 0; y < h - 1; y++) {
+			for (int64_t x = 0; x < w; x++) {
 				const int64_t p = y * w + x;
 				if (solid[p] == 0 || solid[p + w] != 0) {
 					continue;
@@ -1866,6 +2090,7 @@ struct Drawing {
 				const double tp = (double)t[p];
 				const int64_t depth = (int64_t)((rock.lo + (rock.hi - rock.lo) * std::pow(noise1((double)x / (14.0 * (double)fk), seed), 1.8)) * tp * (double)fk);
 				int64_t bottom = y;
+				const double sway = noise1((double)x / (9.0 * (double)fk), seed + 2) * 18.0;
 				for (int64_t d = 1; d < depth + 1; d++) {
 					const int64_t yy = y + d;
 					if (yy >= h) {
@@ -1875,9 +2100,9 @@ struct Drawing {
 					if (solid[q] != 0) {
 						break;
 					}
-					const double k = noise2((double)x, (double)yy, 7.0 * (double)fk, seed + 1);
+					const double k = shading.at(x, yy);
 					int64_t rgb = k > 0.55 ? rock.shades[1] : rock.shades[0];
-					const double turn = ((double)yy / (double)fk + noise1((double)x / (9.0 * (double)fk), seed + 2) * 18.0) / 5.0;
+					const double turn = ((double)yy / (double)fk + sway) / 5.0;
 					const double layer = std::sin(turn);
 					if (layer > 0.85) {
 						rgb = rock.strata;
@@ -1911,6 +2136,19 @@ struct Drawing {
 		if (fk > 1) {
 			return;
 		}
+		// In the GDScript's order: column by column (a stable sort), top down.
+		std::vector<int64_t> starts(w + 1, 0);
+		for (const Bottom &b : bottoms) {
+			starts[b.x + 1]++;
+		}
+		for (int64_t x = 0; x < w; x++) {
+			starts[x + 1] += starts[x];
+		}
+		std::vector<Bottom> by_column(bottoms.size());
+		for (const Bottom &b : bottoms) {
+			by_column[starts[b.x]++] = b;
+		}
+		bottoms.swap(by_column);
 		std::vector<PackedVector2Array> runs;
 		std::vector<int64_t> run_bands, run_sides;
 		bool has_last = false;
@@ -1963,7 +2201,7 @@ struct Drawing {
 		for (int64_t c = 0; c < 3; c++) {
 			out[c].assign(size, 0.0f);
 		}
-		PackedInt32Array ramp;
+		const int32_t *ramp = nullptr;
 		for (int64_t at_side = 0; at_side < 2; at_side++) {
 			const Dictionary spec = dict(styles[at_side], "glow");
 			if (spec.is_empty() || (at_side == 1 && style_of_side[1] == style_of_side[0])) {
@@ -2053,12 +2291,12 @@ Dictionary GroundKernel::draw(const Dictionary &spec) const {
 	out["width"] = drawing.w;
 	out["height"] = drawing.h;
 	out["solid"] = bytes(drawing.solid);
-	out["floor"] = bytes(drawing.floor_image);
-	out["under"] = bytes(drawing.under);
+	out["floor"] = drawing.floor_image.array;
+	out["under"] = drawing.under.array;
 	out["glow_width"] = drawing.glow_w;
 	out["glow_height"] = drawing.glow_h;
-	out["glow"] = bytes(drawing.glow);
-	out["wall"] = bytes(drawing.wall_art);
+	out["glow"] = drawing.glow.array;
+	out["wall"] = drawing.wall_art.array;
 	out["rims"] = drawing.rims;
 	out["rim_sides"] = drawing.rim_sides;
 	out["drips"] = drawing.drips;
@@ -2068,8 +2306,8 @@ Dictionary GroundKernel::draw(const Dictionary &spec) const {
 	Drawing fine;
 	drawing.draw_fine(fine, DETAIL);
 	out["detail"] = fine.detail;
-	out["fine_floor"] = bytes(fine.floor_image);
-	out["fine_under"] = bytes(fine.under);
-	out["fine_wall"] = bytes(fine.wall_art);
+	out["fine_floor"] = fine.floor_image.array;
+	out["fine_under"] = fine.under.array;
+	out["fine_wall"] = fine.wall_art.array;
 	return out;
 }

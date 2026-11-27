@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 
 const RoomData := preload("res://content/rooms/crypt/arena_04.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
-const Sarcophagus := preload("res://art/tilesets/crypt/sarcophagus.svg")
+const Sarcophagus := preload("res://art/tilesets/crypt/sarcophagus@2x.svg")
 
 ## How far every spawn stands from the pit: a body's width and more.
 const SPAWN_CLEAR: float = 32.0

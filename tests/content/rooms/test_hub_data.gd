@@ -90,7 +90,7 @@ func _layer_rect(layer: PropLayer, feet: Vector2) -> Rect2:
 
 
 ## The stone is a prop (props W8), the one Flow lights (`Flow.STONE_PROP`), stood on where its own
-## ground is (W8b), in the states Flow puts it in, its slab's art on its ground in both, on the floor; walked onto (it blocks nothing and takes no hit),
+## ground is (W8b), in the states Flow puts it in, its slab's art on its ground in both, on the floor (its runes' mote mask hidden); walked onto (it blocks nothing and takes no hit),
 ## invincible, never in the yard, and its lit look plays the stone's cue.
 func test_the_stone_is_a_prop_on_the_stone() -> void:
 	var stone: PropBase = _prop(&"hub_stone")
@@ -109,7 +109,9 @@ func test_the_stone_is_a_prop_on_the_stone() -> void:
 			continue
 		for layer in look.layers:
 			check_equal(_layer_rect(layer, feet), HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START), "%s: its art lies on the stone" % state.state_id)
-			check_equal(layer.drawn, PropLayer.Drawn.ON_FLOOR, "%s: on the floor" % state.state_id)
+			# Drawn on the floor; its lit runes' mote mask (1x, ART3) is never drawn.
+			if layer.drawn != PropLayer.Drawn.HIDDEN or not layer.has_mask():
+				check_equal(layer.drawn, PropLayer.Drawn.ON_FLOOR, "%s: on the floor" % state.state_id)
 	check(stone.invincible and stone.role == HubRules.ROLE_RUN_START, "invincible, the hub's run_start (so never in the yard)")
 	check_equal(stone.look_of(HubRules.LIT).cue, &"stone_lit", "it plays the stone's cue as it lights")
 	check_equal(stone.look_of(HubRules.UNLIT).cue, &"", "and none as it goes out")

@@ -8,8 +8,8 @@ extends "res://tests/support/suite.gd"
 
 const RoomData := preload("res://content/rooms/crypt/arena_03.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
-const BoneWall := preload("res://art/tilesets/crypt/ossuary_wall.svg")
-const BonePile := preload("res://art/tilesets/crypt/bone_pile.svg")
+const BoneWall := preload("res://art/tilesets/crypt/ossuary_wall@2x.png")
+const BonePile := preload("res://art/tilesets/crypt/bone_pile@2x.svg")
 
 ## The slab's edge line on the sides (the frame's inset) and the old way's width beside a side pillar.
 const EDGE: float = 32.0

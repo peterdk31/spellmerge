@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="PropBase" load_steps=14 format=3]
+[gd_resource type="Resource" script_class="PropBase" load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://core/base/prop_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="2_scene"]
@@ -6,8 +6,9 @@
 [ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="4_look"]
 [ext_resource type="Script" path="res://core/base/prop_layer.gd" id="5_layer"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="6_motes"]
-[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone.svg" id="7_stone"]
-[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone_lit.svg" id="8_lit"]
+[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone@2x.png" id="7_stone"]
+[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone_lit@2x.svg" id="8_lit"]
+[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone_lit_motes.svg" id="9_lit_motes"]
 
 [sub_resource type="Resource" id="slab"]
 script = ExtResource("5_layer")
@@ -34,12 +35,18 @@ script = ExtResource("5_layer")
 texture = ExtResource("8_lit")
 offset = Vector2(0, 48)
 drawn = 2
+
+[sub_resource type="Resource" id="rune_mask"]
+script = ExtResource("5_layer")
+texture = ExtResource("9_lit_motes")
+offset = Vector2(0, 48)
+drawn = 3
 motes = Array[ExtResource("6_motes")]([SubResource("rune_glimmer")])
 
 [sub_resource type="Resource" id="lit_look"]
 script = ExtResource("4_look")
 state_id = &"lit"
-layers = Array[ExtResource("5_layer")]([SubResource("slab"), SubResource("runes")])
+layers = Array[ExtResource("5_layer")]([SubResource("slab"), SubResource("runes"), SubResource("rune_mask")])
 light_reach = 72.0
 light_at = Vector2(0, 0)
 light_flicker = 0.15

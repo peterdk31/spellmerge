@@ -25,7 +25,7 @@
       ]
     },
     {
-      "path": "art/tilesets/crypt/wall.svg",
+      "path": "art/tilesets/crypt/wall@2x.svg",
       "shows": "A raised tile: lit top and left edge, shaded bottom and right edge",
       "rules": [
         "light from the top-left",
@@ -34,7 +34,7 @@
       ]
     },
     {
-      "path": "art/tilesets/crypt/floor.svg",
+      "path": "art/tilesets/crypt/floor@2x.svg",
       "shows": "A flat tile: Stone base, a few inner details, nothing on the outer edge so it repeats",
       "rules": [
         "seamless tile",

@@ -60,6 +60,12 @@ func new_frame() -> void:
 	_casters = 0
 
 
+## True when this frame's beams hold all the sounds they may (`hold` would refuse another): Feel
+## then asks nothing more of a beam for its sound.
+func full() -> bool:
+	return held == null or _holds >= MOST_HOLDS
+
+
 ## Holds, for RENEW seconds, the sound of a beam of the carrier card `card` with the infusions
 ## `elements` (element card ids, in slot order) cast by `caster`, following `follow` (null: at
 ## `at`), `volume` decibels on top of its sounds' own. Returns how many sounds it holds.

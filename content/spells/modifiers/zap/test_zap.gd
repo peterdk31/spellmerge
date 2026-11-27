@@ -101,7 +101,7 @@ func test_a_body_rolls_again_after_a_second() -> void:
 
 ## The owner's case: a held zap orbit (a cluster of three bolts) keeps zapping the imp beside its circle.
 func test_a_held_zap_orbit_keeps_zapping() -> void:
-	var zaps: Array[int] = _zaps(["hold", "zap", "orbit", "split", "bolt"], [Vector2(0.0, 70.0)] as Array[Vector2], 1, 6.0)
+	var zaps: Array[int] = _zaps(["hold", "zap", "orbit", "plus_two", "bolt"], [Vector2(0.0, 70.0)] as Array[Vector2], 1, 6.0)
 	check(zaps[0] >= 3, "the imp beside the held orbit is zapped again and again in 6 s (%d)" % zaps[0])
 
 

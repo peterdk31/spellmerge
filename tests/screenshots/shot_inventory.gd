@@ -31,7 +31,7 @@ func take() -> void:
 	var moon: StaffBase = registry.call("get_resource", &"wizard", &"moon") as StaffBase
 	for index in 4:
 		var inventory: Inventory = (flow.call("get_wizard", index) as Actor).inventory
-		inventory.add(ItemStack.of_staff(crystal, [&"bolt", &"split"] as Array[StringName]))
+		inventory.add(ItemStack.of_staff(crystal, [&"bolt", &"plus_two"] as Array[StringName]))
 		inventory.add(ItemStack.of_staff(moon))
 	if not await _open([0]):
 		return

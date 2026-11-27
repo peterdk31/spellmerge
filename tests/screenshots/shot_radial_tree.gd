@@ -11,7 +11,7 @@ const NESTED: Array[StringName] = [&"timer", &"on_hurt", &"hold", &"decoy", &"on
 const OTHERS: Array = [
 	[&"on_hit", &"on_expire", &"bolt", &"fire", &"nova", &"bolt", &"frost", &"nova", &"bolt"],
 	[&"double", &"bolt", &"on_hit", &"orbit", &"lightning", &"nova", &"bolt"],
-	[&"homing", &"bolt", &"split", &"bolt", &"on_wall", &"bolt", &"rune"],
+	[&"homing", &"bolt", &"plus_two", &"bolt", &"on_wall", &"bolt", &"rune"],
 ]
 
 var _input: Node = null

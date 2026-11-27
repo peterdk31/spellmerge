@@ -128,19 +128,19 @@ const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit",
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
 const STAFFS: Array[Array] = [
 	[
-		[&"fire", &"split", &"bigger", &"on_hit", &"nova", &"bolt", &"storm", &"bolt"],
-		[&"frost", &"timer", &"orbit", &"fire", &"split", &"bolt"],
+		[&"fire", &"plus_two", &"bigger", &"on_hit", &"nova", &"bolt", &"storm", &"bolt"],
+		[&"frost", &"timer", &"orbit", &"fire", &"plus_two", &"bolt"],
 	],
 	[
 		[&"storm", &"chain", &"pierce", &"beam"],
-		[&"void", &"homing", &"split", &"on_expire", &"bolt", &"fire", &"nova", &"bolt"],
+		[&"void", &"homing", &"plus_two", &"on_expire", &"bolt", &"fire", &"nova", &"bolt"],
 	],
 	[
 		[&"frost", &"timer", &"rune", &"frost", &"nova", &"bolt"],
-		[&"storm", &"split", &"pierce", &"nova", &"bolt"],
+		[&"storm", &"plus_two", &"pierce", &"nova", &"bolt"],
 	],
 	[
-		[&"fire", &"split", &"homing", &"faster", &"on_hit", &"bolt", &"frost", &"split", &"bolt"],
+		[&"fire", &"plus_two", &"homing", &"faster", &"on_hit", &"bolt", &"frost", &"plus_two", &"bolt"],
 		[&"void", &"on_hit", &"nova", &"bolt", &"fire", &"nova", &"bolt"],
 	],
 ]

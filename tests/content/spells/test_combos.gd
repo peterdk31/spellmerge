@@ -294,7 +294,7 @@ func test_a_plain_fan_misses_what_the_homing_fan_reaches() -> void:
 	var arena := ArenaScript.new(root)
 	var up: Node2D = arena.add_imp(Vector2(110.0, -60.0))
 	var down: Node2D = arena.add_imp(Vector2(110.0, 60.0))
-	arena.install_cards(0, 0, ["split", "bolt"])
+	arena.install_cards(0, 0, ["plus_two", "bolt"])
 	check(arena.cast(0, 0), "the plain fan is cast")
 	arena.run(1.5)
 	check_equal(arena.lost(up) + arena.lost(down), 0, "without homing the fan flies past both imps")

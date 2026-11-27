@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/plus_three/icon@2x.svg" id="2_icon_2x"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/plus_three/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"plus_three"
+display_name = "+3"
+description = "Three more shots, each at full strength."
+complexity = 3
+icon = ExtResource("2_icon_2x")
+icon_small = ExtResource("2_icon")
+shot_add = 3
+look_id = &"burst"

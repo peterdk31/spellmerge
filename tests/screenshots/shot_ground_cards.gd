@@ -4,7 +4,7 @@ extends "res://tests/support/screenshot.gd"
 ## art pixel one pixel of the picture; ART2, the owner's answer of 2026-11-26). `ground_cards` is the
 ## screen; `ground_cards_4x` a crop four times bigger.
 
-const CARDS: Array[StringName] = [&"fire", &"bolt", &"split", &"on_hit"]
+const CARDS: Array[StringName] = [&"fire", &"bolt", &"plus_two", &"on_hit"]
 
 
 func take() -> void:

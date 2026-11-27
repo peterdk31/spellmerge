@@ -56,7 +56,7 @@ func test_the_parts_stand_through_a_fight() -> void:
 	arena.add_imp(Vector2(140, 10))
 	var peak: int = 0
 	var older: int = 0
-	var builds: Array = [[&"bolt"], [&"split", &"bolt"], [&"on_hit", &"bolt", &"nova", &"bolt"], [&"echo", &"fire", &"bolt"], [&"timer", &"bolt", &"blast", &"bolt"]]
+	var builds: Array = [[&"bolt"], [&"plus_two", &"bolt"], [&"on_hit", &"bolt", &"nova", &"bolt"], [&"echo", &"fire", &"bolt"], [&"timer", &"bolt", &"blast", &"bolt"]]
 	for step in 40:
 		var caster: int = step % 4
 		if step % 3 == 0:
@@ -107,7 +107,7 @@ func test_every_parted_table_is_hashed_or_checked() -> void:
 			var spells: SpellsScript = arena.spells
 			# Caster 0's build differs from caster 1's: what a case puts in is another spell (a FROZEN
 			# spell hashes by what it holds, so an equal one would change nothing).
-			arena.install_cards(0, 0, [&"split", &"bolt"])
+			arena.install_cards(0, 0, [&"plus_two", &"bolt"])
 			arena.install_cards(1, 0, [&"bolt"])
 			if alive:
 				arena.cast(1, 0)

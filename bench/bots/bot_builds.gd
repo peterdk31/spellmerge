@@ -47,7 +47,7 @@ const MEND_TEAM: int = 2
 ## The fighters' builds: a name (for the report lines) and the cards of each staff by hand.
 const FIGHTERS: Array[Dictionary] = [
 	{"name": "seeker", "staffs": [[&"dash"], [&"homing", &"bigger", &"bolt"]]},
-	{"name": "fan", "staffs": [[&"dash"], [&"homing", &"split", &"bolt"]]},
+	{"name": "fan", "staffs": [[&"dash"], [&"homing", &"plus_two", &"bolt"]]},
 	{"name": "lance", "staffs": [[&"dash"], [&"faster", &"overcharge", &"bolt"]]},
 	{"name": "beam", "staffs": [[&"dash"], [&"beam"]]},
 ]

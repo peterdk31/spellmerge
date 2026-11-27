@@ -38,7 +38,7 @@ func take() -> void:
 	await settle()
 	# A fire field, and a teammate's plain bolts into it.
 	_install(_wizards[0], FIELD_STAFF, [&"fire", &"field"])
-	_install(_wizards[1], BOLT_STAFF, [&"split", &"split", &"bolt"])
+	_install(_wizards[1], BOLT_STAFF, [&"plus_two", &"plus_two", &"bolt"])
 	await _clear()
 	var from := Vector2(120.0, 180.0)
 	var middle: Vector2 = from + Vector2(72.0, 0.0)
@@ -57,7 +57,7 @@ func take() -> void:
 	await snap(middle + Vector2(70.0, 0.0), "field_burst", Vector2i(150, 70), 2)
 	# A frost field, and an enemy's bolts at the wizard into it.
 	_install(_wizards[0], FIELD_STAFF, [&"frost", &"field"])
-	_install(_enemy, BOLT_STAFF, [&"split", &"split", &"bolt"])
+	_install(_enemy, BOLT_STAFF, [&"plus_two", &"plus_two", &"bolt"])
 	await _clear()
 	_cast(_wizards[0], FIELD_STAFF, from, Vector2.RIGHT)
 	await _frames(20)

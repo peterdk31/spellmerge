@@ -6,7 +6,7 @@ Spellmerge's own C++, loaded by Godot as a GDExtension: faster versions of hot l
 
 | Class | What it runs | GDScript it stands for |
 |---|---|---|
-| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's passes, the hit pass's eventless shots, draw batches, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows` | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`) |
+| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's passes, the hit pass's eventless shots, draw batches, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows`, `ray_walks` (beams' rays between their hits, #972) | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`, `projectile_rays.gd`) |
 | `MoteKernel` (`src/mote_kernel.cpp`) | the motes' trail births, settling marks, `region_rows` | `gameplay/feel/mote.gd` (`give_off`, `burst`), `gameplay/feel/mote_regions.gd` |
 | `LightKernel` (`src/light_grid.cpp`) | grid lighting: `light_grid_rows`, `light_grid_beam`, `light_grid_bake`, checked by `check_light_grid` | `gameplay/feel/light_grid.gd` |
 | `GroundKernel` (`src/ground_kernel.cpp`) | a room's ground drawn from `GroundShape.spec` (`draw`) | `gameplay/feel/ground/ground_drawing.gd` (twin of `tools/ground_shape.py`) |
@@ -30,7 +30,7 @@ This folder is Claude's and the owner's only (the owner's decision of 2026-11-02
 - **One loader.** `core/native/native.gd` is the only GDScript that asks whether the module is loaded and makes its classes, by literal name (`NATIVE_FILE` in the rules).
 - **Nothing built is committed** (hard rule 2). `ci/build/native.sh` builds into `native/bin/` and writes `native/spellmerge.gdextension`; both are git-ignored, as are SCons' object files.
 
-Tests, side by side, byte for byte: `tests/core/test_native_kernel.gd` (one thread and four), `tests/gameplay/feel/test_native_motes.gd`, `tests/core/test_wall_slide.gd`, `tests/core/test_grid_rays.gd`, `tests/core/test_body_walk.gd`, `tests/gameplay/feel/test_light_grid.gd`, `tests/gameplay/feel/test_ground_drawing.gd`, `tests/gameplay/flow/test_room_life.gd`, `tests/core/test_draw_regions.gd`, `tests/gameplay/feel/test_mote_regions.gd`, `tests/core/test_dmath.gd`; the recording `test_projectiles_step_exact.gd`; `test_determinism.gd`.
+Tests, side by side, byte for byte: `tests/core/test_native_kernel.gd` (one thread and four), `tests/gameplay/feel/test_native_motes.gd`, `tests/core/test_wall_slide.gd`, `tests/core/test_grid_rays.gd`, `tests/core/test_ray_walks.gd`, `tests/core/test_body_walk.gd`, `tests/gameplay/feel/test_light_grid.gd`, `tests/gameplay/feel/test_ground_drawing.gd`, `tests/gameplay/flow/test_room_life.gd`, `tests/core/test_draw_regions.gd`, `tests/gameplay/feel/test_mote_regions.gd`, `tests/core/test_dmath.gd`; the recording `test_projectiles_step_exact.gd`; `test_determinism.gd`.
 
 ## Threads (shot scale H5)
 

@@ -61,7 +61,7 @@ func test_a_gate_is_met_where_a_segment_goes_into_it() -> void:
 
 func test_one_cast_opens_a_mouth_and_its_exits() -> void:
 	_arena = ArenaScript.new(root)
-	_arena.install_cards(0, 0, ["split", "portal"])
+	_arena.install_cards(0, 0, ["plus_two", "portal"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	check_equal(_gates(), Vector2i(1, 3), "one mouth and three exits (split)")
 	var pm: ManagerScript = _arena.projectiles
@@ -76,7 +76,7 @@ func test_one_cast_opens_a_mouth_and_its_exits() -> void:
 func test_split_fans_the_exits_each_facing_its_own_way() -> void:
 	_arena = ArenaScript.new(root)
 	_arena.add_imp(Vector2(150, 0))
-	_arena.install_cards(0, 0, ["homing", "split", "portal"])
+	_arena.install_cards(0, 0, ["homing", "plus_two", "portal"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	var pm: ManagerScript = _arena.projectiles
 	var faces: Array[float] = []
@@ -116,7 +116,7 @@ func _bolt_through_hits(portal: Array) -> bool:
 
 func test_a_beam_into_the_mouth_goes_on_from_every_exit() -> void:
 	_arena = ArenaScript.new(root)
-	_arena.install_cards(0, 0, ["split", "portal"])
+	_arena.install_cards(0, 0, ["plus_two", "portal"])
 	_arena.install_cards(0, 1, ["hold", "beam"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	check(_arena.cast(0, 1), "the beam is cast")
@@ -157,10 +157,10 @@ func test_beams_through_portals_that_lead_into_each_other_end_when_their_length_
 	check_equal(_beams().beam_count(), legs, "and stops making legs once its length is spent")
 
 
-## No cap on a portal's exits (owner, 2026-11-09; it was 24): three splits open 27.
+## No cap on a portal's exits (owner, 2026-11-09; it was 24): three +3 open ten.
 func test_a_portal_opens_every_exit_its_cards_ask_for() -> void:
 	_arena = ArenaScript.new(root)
-	_arena.install_cards(0, 0, ["split", "split", "split", "portal"])
+	_arena.install_cards(0, 0, ["plus_three", "plus_three", "plus_three", "portal"])
 	check(_arena.spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100000.0) != SpellsScript.REFUSED, "the portal is cast")
 	var portals: CarrierPortal = _portals()
 	var at: int = -1
@@ -169,12 +169,12 @@ func test_a_portal_opens_every_exit_its_cards_ask_for() -> void:
 			at = row
 	check(at >= 0, "it opened")
 	if at >= 0:
-		check_equal(portals.portal_gate_count(at), 28, "its mouth and twenty-seven exits")
+		check_equal(portals.portal_gate_count(at), 11, "its mouth and ten exits")
 
 
 func test_a_shot_into_the_mouth_comes_out_of_every_exit() -> void:
 	_arena = ArenaScript.new(root)
-	_arena.install_cards(0, 0, ["split", "portal"])
+	_arena.install_cards(0, 0, ["plus_two", "portal"])
 	_arena.install_cards(0, 1, ["bolt"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	check(_arena.cast(0, 1), "the bolt is cast")
@@ -253,7 +253,7 @@ func test_the_same_casts_open_the_same_gates() -> void:
 func _cast_and_read() -> Array:
 	_arena = ArenaScript.new(root)
 	_arena.add_imp(Vector2(150, 10))
-	_arena.install_cards(0, 0, ["homing", "split", "portal"])
+	_arena.install_cards(0, 0, ["homing", "plus_two", "portal"])
 	_arena.cast(0, 0)
 	_arena.run(0.3)
 	var out: Array = []
@@ -268,7 +268,7 @@ func _cast_and_read() -> Array:
 
 func test_its_look_reads_the_open_portals_through_one_view() -> void:
 	_arena = ArenaScript.new(root)
-	_arena.install_cards(0, 0, ["fire", "frost", "split", "portal"])
+	_arena.install_cards(0, 0, ["fire", "frost", "plus_two", "portal"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	_arena.run(0.5)
 	check_equal(_portals().look_drawer(), Carrier.LOOK_PORTAL, "a portal is drawn by the portal look")

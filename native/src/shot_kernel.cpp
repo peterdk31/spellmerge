@@ -21,6 +21,7 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -165,6 +166,11 @@ constexpr int TEAM_NONE = -1;
 constexpr int TEAM_WORLD = 2;
 // The threat grid.
 constexpr int THREAT_SPAN_MAX = 16;
+// The manager's ACTORS (core/actors' table size): a ray's caster is an actor below it, or none
+// (TEAM_NONE is ActorsScript.NONE, -1, as `is_caster` reads it).
+constexpr int64_t ACTORS = 1024;
+// The most targets one ray of `ray_walks` keeps (its pierce + 1); a ray that wants more is handed back.
+constexpr int64_t RAY_WALK_KEEP = 64;
 // The slots one task of a loop over every shot takes (jobs.h: fixed, whatever the threads).
 constexpr int64_t SLOT_SPAN = 512;
 
@@ -218,6 +224,20 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_along, "_cand_along", PACKED_FLOAT32_ARRAY) \
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
 	X(room_grid, "_room_grid", OBJECT) \
+	X(ray_scratch, "_path", PACKED_VECTOR2_ARRAY) \
+	X(ray_path, "ray_path", PACKED_VECTOR2_ARRAY) \
+	X(ray_path_count, "ray_path_count", INT) \
+	X(ray_end, "ray_end", VECTOR2) \
+	X(ray_end_heading, "ray_end_heading", VECTOR2) \
+	X(ray_gate, "ray_gate", INT) \
+	X(ray_gate_at, "ray_gate_at", VECTOR2) \
+	X(ray_gate_heading, "ray_gate_heading", VECTOR2) \
+	X(ray_gate_left, "ray_gate_left", FLOAT) \
+	X(ray_gates, "ray_gates", BOOL) \
+	X(ray_air, "ray_air", FLOAT) \
+	X(ray_caster, "_ray_caster", INT) \
+	X(path_heading, "_path_heading", VECTOR2) \
+	X(path_piece, "_path_piece", INT) \
 	X(places_found, "_places_found", PACKED_BYTE_ARRAY) \
 	X(trail, "_trail", PACKED_BYTE_ARRAY) \
 	X(trail_x, "_trail_x", PACKED_INT32_ARRAY) \
@@ -1357,6 +1377,7 @@ struct Constant {
 const Constant CONSTANTS[] = {
 	{ "PI", (double)PI_D },
 	{ "TAU", (double)TAU_D },
+	{ "ACTORS", (double)ACTORS },
 	{ "MOTION_STRAIGHT", (double)MOTION_STRAIGHT },
 	{ "MOTION_STILL", (double)MOTION_STILL },
 	{ "MOTION_ORBIT", (double)MOTION_ORBIT },
@@ -2694,6 +2715,263 @@ int64_t ShotKernel::nearest_target(Object *m, const Vector2 &point, double radiu
 	return best;
 }
 
+// `ProjectileRays.ray_walks`' rays from `from` on: each ray as `ray_points` (hit false, no bounce, no
+// steer) walks it after the beam carrier set `ray_gates`, with no gate open and no ray caster set (the
+// caller's to see): its path cut to its length into `_path`, cut at the first wall, the nearest
+// `pierces[n] + 1` targets it touches kept (`_ray_keep`) and its end found (`_path_point`), its walk
+// kept in `ray_path`. How far it got, where it ended and its heading there go to `got`, `ends` and
+// `headings`; the manager's members are left as those calls leave them. Returns the first ray it
+// hands back, untouched in the manager (GDScript's `ray_points` then walks it: a ray not cast, a
+// `_path` or `ray_path` to grow, the targets' grid stale (`stale`) when the ray needs it, more targets
+// kept than RAY_WALK_KEEP), `rays` when every one is walked, or -1 on bad sizes. Line by line
+// `ray_points`, `_ray_path` and `_path_point`, their float types kept.
+int64_t ShotKernel::ray_walks(Object *m, int64_t from, int64_t rays, const PackedInt32Array &actors, const PackedVector2Array &points, const PackedInt32Array &offsets,
+		const PackedInt32Array &counts, const PackedFloat64Array &lengths, const PackedInt32Array &pierces, const PackedFloat64Array &widths,
+		const PackedByteArray &ghosts, const PackedInt32Array &skips, int64_t layers, int64_t targets, bool stale, const PackedFloat64Array &got,
+		const PackedVector2Array &ends, const PackedVector2Array &headings) {
+	const Names &k = *names;
+	ERR_FAIL_COND_V(from < 0 || rays < from || actors.size() < rays || offsets.size() < rays || counts.size() < rays || lengths.size() < rays ||
+					pierces.size() < rays || widths.size() < rays || ghosts.size() < rays || skips.size() < rays || got.size() < rays ||
+					ends.size() < rays || headings.size() < rays,
+			-1);
+	Object *grid = m->get(k.room_grid);
+	ERR_FAIL_NULL_V(grid, -1);
+	Arr<PackedVector2Array> path, walk, target_pos, target_half;
+	Arr<PackedFloat32Array> target_radius;
+	Arr<PackedInt32Array> target_layer, target_next, cell_head;
+	Arr<PackedInt64Array> target_id;
+	Arr<PackedByteArray> wall_cells;
+	path.load(m, k.ray_scratch);
+	walk.load(m, k.ray_path);
+	target_pos.load(m, k.target_pos);
+	target_half.load(m, k.target_half);
+	target_radius.load(m, k.target_radius);
+	target_layer.load(m, k.target_layer);
+	target_next.load(m, k.target_next);
+	cell_head.load(m, k.cell_head);
+	target_id.load(m, k.target_id);
+	wall_cells.load(grid, k.wall_cells);
+	const int64_t wall_w = grid->get(k.wall_w);
+	const int64_t wall_h = grid->get(k.wall_h);
+	const bool has_walls = grid->get(k.has_walls);
+	const Vector2 wall_origin = ((Rect2)grid->get(k.wall_bounds)).position;
+	const int64_t grid_w = m->get(k.grid_w);
+	const int64_t grid_h = m->get(k.grid_h);
+	const Rect2 bounds = m->get(k.bounds);
+	const double max_target_reach = m->get(k.max_target_reach);
+	ERR_FAIL_COND_V(has_walls && wall_cells.n < wall_w * wall_h, -1);
+	ERR_FAIL_COND_V(targets > 0 && (grid_w <= 0 || grid_h <= 0 || cell_head.n < grid_w * grid_h || target_next.n < targets || target_pos.n < targets ||
+											target_half.n < targets || target_radius.n < targets || target_layer.n < targets || target_id.n < targets),
+			-1);
+	const Vector2 *in = points.ptr();
+	const int64_t in_n = points.size();
+	double *out_got = const_cast<double *>(got.ptr());
+	Vector2 *out_end = const_cast<Vector2 *>(ends.ptr());
+	Vector2 *out_heading = const_cast<Vector2 *>(headings.ptr());
+	// What the manager holds after the last ray walked here (written back at the end).
+	Vector2 ray_end = m->get(k.ray_end);
+	Vector2 ray_end_heading = m->get(k.ray_end_heading);
+	int64_t walked_count = m->get(k.ray_path_count);
+	Vector2 path_heading = m->get(k.path_heading);
+	int64_t path_piece = m->get(k.path_piece);
+	int64_t kept_ids[RAY_WALK_KEEP];
+	double kept_along[RAY_WALK_KEEP];
+	int64_t n = from;
+	for (; n < rays; n++) {
+		// `ray_points`: a ray it would not cast (`_no_ray`) is GDScript's.
+		const int64_t offset = offsets[n];
+		const int64_t count = counts[n];
+		const double length = lengths[n];
+		if (count < 2 || offset < 0 || offset + count > in_n || !std::isfinite(length) || length <= 0.0 || !in[offset].is_finite() || count > path.n) {
+			break;
+		}
+		path[0] = in[offset];
+		double total = 0.0;
+		int64_t used = 0;
+		for (int64_t i = 1; i < count; i++) {
+			const Vector2 point = in[offset + i];
+			if (!point.is_finite()) {
+				break;
+			}
+			const double piece = (double)path[i - 1].distance_to(point);
+			used = i;
+			if (total + piece >= length) {
+				path[i] = path[i - 1].move_toward(point, (real_t)(length - total));
+				break;
+			}
+			total += piece;
+			path[i] = point;
+		}
+		const int64_t actor = actors[n];
+		if (used == 0 || actor < TEAM_NONE || actor >= ACTORS) {
+			break;
+		}
+		const int64_t segments = used;
+		// `_ray_path`: no air, no gate, no turn, no wall of its own.
+		const bool ghost = ghosts[n] != 0;
+		double reach = 0.0;
+		used = 0;
+		int64_t at_piece = 0;
+		while (at_piece < segments) {
+			const Vector2 a = path[at_piece];
+			const Vector2 b = path[at_piece + 1];
+			const double piece = (double)a.distance_to(b);
+			used = at_piece + 1;
+			if (has_walls && !ghost) {
+				const double cut = grid_ray::wall_hit(wall_cells.p, wall_w, wall_h, WALL_CELL, wall_origin, a, b);
+				if (cut >= 0.0) {
+					path[at_piece + 1] = a.lerp(b, (real_t)cut);
+					reach += piece * cut;
+					break;
+				}
+			}
+			reach += piece;
+			at_piece += 1;
+		}
+		const int64_t wanted = MAX((int64_t)pierces[n], (int64_t)0) + 1;
+		int64_t found = 0;
+		if (targets > 0 && reach > 0.0) {
+			// `_query_ready` would fill a stale grid first: GDScript's.
+			if (stale || wanted > RAY_WALK_KEEP) {
+				break;
+			}
+			const double wide = MAX(widths[n], 0.0);
+			const Vector2 pad = vmul(Vector2(1, 1), wide + max_target_reach);
+			double start = 0.0;
+			int64_t skip_at = skips[n];
+			for (int64_t i = 0; i < used; i++) {
+				const Vector2 a = path[i];
+				const Vector2 b = path[i + 1];
+				if (skip_at >= 0 && i > 0) {
+					const double on = wide + (double)target_radius[skip_at];
+					if (gap_sq(a - target_pos[skip_at], target_half[skip_at]) > on * on) {
+						skip_at = -1;
+					}
+				}
+				const double piece = (double)a.distance_to(b);
+				if (piece <= 0.0) {
+					continue;
+				}
+				const Vector2 heading = (b - a) / (real_t)piece;
+				const Vector2 low = vmin(a, b) - pad;
+				const Vector2 high = vmax(a, b) + pad;
+				const int64_t x0 = clampi(floori(((double)low.x - (double)bounds.position.x) / GRID_CELL), 0, grid_w - 1);
+				const int64_t x1 = clampi(floori(((double)high.x - (double)bounds.position.x) / GRID_CELL), 0, grid_w - 1);
+				const int64_t y0 = clampi(floori(((double)low.y - (double)bounds.position.y) / GRID_CELL), 0, grid_h - 1);
+				const int64_t y1 = clampi(floori(((double)high.y - (double)bounds.position.y) / GRID_CELL), 0, grid_h - 1);
+				for (int64_t y = y0; y <= y1; y++) {
+					for (int64_t x = x0; x <= x1; x++) {
+						int64_t t = cell_head[y * grid_w + x];
+						while (t >= 0) {
+							if ((target_layer[t] & layers) != 0 && t != skip_at &&
+									::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr) {
+								const Vector2 box = target_half[t];
+								double along = 0.0;
+								if (box == Vector2()) {
+									along = clampf((double)(target_pos[t] - a).dot(heading), 0.0, piece);
+								} else {
+									const Vector2 span = b - a;
+									along = shape_along(a, span, (double)span.length_squared(), target_pos[t], box) * piece;
+								}
+								const Vector2 closest = a + vmul(heading, along);
+								const double touch = wide + (double)target_radius[t];
+								if (gap_sq(closest - target_pos[t], box) <= touch * touch) {
+									// `_ray_keep`, by the target's instance id (its node).
+									const int64_t id = target_id[t];
+									const double here = start + along;
+									bool keep = true;
+									for (int64_t j = 0; j < found; j++) {
+										if (kept_ids[j] == id) {
+											if (here >= kept_along[j]) {
+												keep = false;
+											} else {
+												for (int64_t q = j; q < found - 1; q++) {
+													kept_along[q] = kept_along[q + 1];
+													kept_ids[q] = kept_ids[q + 1];
+												}
+												found -= 1;
+											}
+											break;
+										}
+									}
+									if (keep && !(found == wanted && here >= kept_along[found - 1])) {
+										int64_t to = mini(found, wanted - 1);
+										while (to > 0 && kept_along[to - 1] > here) {
+											kept_along[to] = kept_along[to - 1];
+											kept_ids[to] = kept_ids[to - 1];
+											to -= 1;
+										}
+										kept_along[to] = here;
+										kept_ids[to] = id;
+										found = mini(found + 1, wanted);
+									}
+								}
+							}
+							t = target_next[t];
+						}
+					}
+				}
+				start += piece;
+			}
+		}
+		double reached = reach;
+		if (found > 0 && found == wanted) {
+			reached = kept_along[found - 1];
+		}
+		// `_path_point(used, reached)`.
+		double left = MAX(reached, 0.0);
+		Vector2 heading_here = Vector2();
+		int64_t piece_here = 0;
+		Vector2 end = path[0];
+		for (int64_t i = 0; i < used; i++) {
+			const Vector2 a = path[i];
+			const Vector2 b = path[i + 1];
+			const double piece = (double)a.distance_to(b);
+			piece_here = i;
+			if (piece > 0.0) {
+				heading_here = (b - a) / (real_t)piece;
+			}
+			if (left <= piece || i == used - 1) {
+				end = a + vmul(heading_here, MIN(left, piece));
+				break;
+			}
+			left -= piece;
+		}
+		// `_keep_ray_path`: a walk longer than `ray_path` is GDScript's (it grows it).
+		const int64_t walked = piece_here + 2;
+		if (walk.n < walked) {
+			break;
+		}
+		for (int64_t q = 0; q <= piece_here; q++) {
+			walk[q] = path[q];
+		}
+		walk[piece_here + 1] = end;
+		walked_count = walked;
+		ray_end = end;
+		ray_end_heading = heading_here;
+		path_heading = heading_here;
+		path_piece = piece_here;
+		out_got[n] = reached;
+		out_end[n] = end;
+		out_heading[n] = heading_here;
+	}
+	if (n > from) {
+		m->set(k.ray_path_count, walked_count);
+		m->set(k.ray_end, ray_end);
+		m->set(k.ray_end_heading, ray_end_heading);
+		m->set(k.path_heading, path_heading);
+		m->set(k.path_piece, path_piece);
+		m->set(k.ray_gate, -1);
+		m->set(k.ray_gate_at, Vector2(INFINITY, INFINITY));
+		m->set(k.ray_gate_heading, Vector2());
+		m->set(k.ray_gate_left, 0.0);
+		m->set(k.ray_gates, false);
+		m->set(k.ray_air, 0.0);
+		m->set(k.ray_caster, -1);
+	}
+	return n;
+}
+
 // `shot_places`' loop from slot `from`: each live shot in a square of the room grid's
 // `_place_whole` that names a place marks it in `_places_found`, a square of none is passed by. Returns
 // the first slot GDScript must ask `place_at` about (a square of PLACE_ASK, or a shot outside the
@@ -2975,6 +3253,7 @@ void ShotKernel::region_rows(Object *regions, const PackedFloat32Array &rows, in
 
 void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("nearest_target", "manager", "point", "radius", "layers", "skip", "skip_also", "team"), &ShotKernel::nearest_target);
+	ClassDB::bind_method(D_METHOD("ray_walks", "manager", "from", "rays", "actors", "points", "offsets", "counts", "lengths", "pierces", "widths", "ghosts", "skips", "layers", "targets", "stale", "got", "ends", "headings"), &ShotKernel::ray_walks);
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
 	ClassDB::bind_method(D_METHOD("set_threads", "threads"), &ShotKernel::set_threads);
 	ClassDB::bind_method(D_METHOD("get_threads"), &ShotKernel::get_threads);

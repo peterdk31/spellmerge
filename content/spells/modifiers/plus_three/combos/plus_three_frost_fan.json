@@ -1,0 +1,9 @@
+{
+	"id": "plus_three_frost_fan",
+	"name": "Frost wall of four",
+	"does": "Four frost bolts in a fan, each at full strength, chill the four imps lined up across the aim.",
+	"casts": [{"staff": 0, "cards": ["plus_three", "frost", "bolt"]}],
+	"imps": [[120, -31], [120, -10], [120, 10], [120, 31]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status_count", "status": "chill", "min": 3}]
+}

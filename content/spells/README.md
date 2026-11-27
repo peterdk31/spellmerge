@@ -57,7 +57,7 @@ Element interactions are rows in `reactions.tres` (`ReactionTable` of `ReactionR
 
 ## Examples to copy
 
-Carrier `carriers/bolt/`; element `elements/frost/`; modifier `modifiers/split/` (names only the fields it changes); trigger `triggers/on_hit/` (timer: `event = 2`, `wind_up`).
+Carrier `carriers/bolt/`; element `elements/frost/`; modifier `modifiers/plus_two/` (names only the fields it changes); trigger `triggers/on_hit/` (timer: `event = 2`, `wind_up`).
 
 ## Validate
 

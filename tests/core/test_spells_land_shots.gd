@@ -23,58 +23,58 @@ const STEPS: int = 90
 ## folder is covered with no edit here.
 const SETS: Array = [
 	[
-		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova", &"bolt"],
-		[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"bolt", &"fire", &"triple", &"bolt"],
-		[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"bolt", &"frost", &"deflect", &"return", &"split", &"nova", &"bolt"],
-		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"bolt", &"void", &"chain", &"split", &"atom"],
-		[&"timer", &"split", &"split", &"orbit", &"bolt", &"fire", &"bolt"],
-		[&"growth", &"homing", &"split", &"rune"],
-		[&"on_expire", &"split", &"bolt", &"split", &"orbit", &"bolt"],
-		[&"on_expire", &"triple", &"bolt", &"homing", &"split", &"rune"],
-		[&"split", &"beam"],
-		[&"split", &"swing"],
-		[&"split", &"slam"],
-		[&"split", &"wall"],
-		[&"skyfall", &"split", &"bolt"],
-		[&"on_expire", &"triple", &"bolt", &"split", &"decoy"],
-		[&"split", &"familiar"],
-		[&"on_hit", &"split", &"bolt", &"split", &"swap"],
+		[&"homing", &"bounce", &"spiral", &"plus_two", &"plus_two", &"nova", &"bolt"],
+		[&"timer", &"ghost", &"linger", &"growth", &"plus_two", &"nova", &"bolt", &"fire", &"triple", &"bolt"],
+		[&"on_expire", &"sticky", &"shield", &"magnet", &"plus_two", &"nova", &"bolt", &"frost", &"deflect", &"return", &"plus_two", &"nova", &"bolt"],
+		[&"on_hit", &"zap", &"lightning", &"pierce", &"plus_two", &"nova", &"bolt", &"void", &"chain", &"plus_two", &"atom"],
+		[&"timer", &"plus_two", &"plus_two", &"orbit", &"bolt", &"fire", &"bolt"],
+		[&"growth", &"homing", &"plus_two", &"rune"],
+		[&"on_expire", &"plus_two", &"bolt", &"plus_two", &"orbit", &"bolt"],
+		[&"on_expire", &"triple", &"bolt", &"homing", &"plus_two", &"rune"],
+		[&"plus_two", &"beam"],
+		[&"plus_two", &"swing"],
+		[&"plus_two", &"slam"],
+		[&"plus_two", &"wall"],
+		[&"skyfall", &"plus_two", &"bolt"],
+		[&"on_expire", &"triple", &"bolt", &"plus_two", &"decoy"],
+		[&"plus_two", &"familiar"],
+		[&"on_hit", &"plus_two", &"bolt", &"plus_two", &"swap"],
 	],
 	[
-		[&"on_expire", &"split", &"bolt", &"split", &"beam"],
-		[&"on_expire", &"split", &"bolt", &"split", &"swing"],
-		[&"on_expire", &"split", &"bolt", &"slam"],
-		[&"on_expire", &"split", &"bolt", &"wall"],
-		[&"on_expire", &"split", &"bolt", &"skyfall", &"bolt"],
-		[&"on_expire", &"split", &"bolt", &"familiar"],
-		[&"on_expire", &"split", &"bolt", &"split", &"atom"],
-		[&"timer", &"split", &"rune", &"split", &"nova", &"bolt"],
-		[&"on_hit", &"split", &"orbit", &"bolt", &"split", &"rune"],
+		[&"on_expire", &"plus_two", &"bolt", &"plus_two", &"beam"],
+		[&"on_expire", &"plus_two", &"bolt", &"plus_two", &"swing"],
+		[&"on_expire", &"plus_two", &"bolt", &"slam"],
+		[&"on_expire", &"plus_two", &"bolt", &"wall"],
+		[&"on_expire", &"plus_two", &"bolt", &"skyfall", &"bolt"],
+		[&"on_expire", &"plus_two", &"bolt", &"familiar"],
+		[&"on_expire", &"plus_two", &"bolt", &"plus_two", &"atom"],
+		[&"timer", &"plus_two", &"rune", &"plus_two", &"nova", &"bolt"],
+		[&"on_hit", &"plus_two", &"orbit", &"bolt", &"plus_two", &"rune"],
 		[&"dash"],
 		[&"teleport"],
 		[&"on_expire", &"bolt", &"dash"],
 		[&"on_expire", &"bolt", &"teleport"],
-		[&"bigger", &"split", &"split", &"orbit", &"bolt"],
-		[&"triple", &"split", &"rune"],
-		[&"double", &"split", &"nova", &"bolt"],
+		[&"bigger", &"plus_two", &"plus_two", &"orbit", &"bolt"],
+		[&"triple", &"plus_two", &"rune"],
+		[&"double", &"plus_two", &"nova", &"bolt"],
 	],
 	[
-		[&"blast", &"split", &"nova", &"bolt"],
-		[&"burst", &"split", &"bolt", &"split", &"portal"],
-		[&"echo", &"split", &"nova", &"bolt"],
-		[&"faster", &"heavy", &"split", &"nova", &"bolt"],
-		[&"hold", &"split", &"orbit", &"bolt"],
-		[&"mend", &"split", &"nova", &"bolt"],
-		[&"mirror", &"split", &"rune", &"penta", &"bolt"],
-		[&"on_block", &"shield", &"split", &"orbit", &"bolt", &"split", &"nova", &"bolt"],
-		[&"on_cast", &"split", &"nova", &"bolt", &"split", &"bolt"],
-		[&"on_hurt", &"split", &"orbit", &"bolt", &"fire", &"nova", &"bolt"],
-		[&"on_kill", &"overcharge", &"split", &"nova", &"bolt", &"split", &"rune"],
-		[&"on_reaction", &"fire", &"split", &"nova", &"bolt", &"frost", &"split", &"nova", &"bolt"],
-		[&"on_wall", &"bounce", &"split", &"nova", &"bolt", &"split", &"atom"],
-		[&"possess", &"pull", &"split", &"bolt"],
-		[&"reach", &"recoil", &"relay", &"split", &"nova", &"bolt"],
-		[&"scatter", &"faster_casting", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt", &"bolt"],
+		[&"blast", &"plus_two", &"nova", &"bolt"],
+		[&"burst", &"plus_two", &"bolt", &"plus_two", &"portal"],
+		[&"echo", &"plus_two", &"nova", &"bolt"],
+		[&"faster", &"heavy", &"plus_two", &"nova", &"bolt"],
+		[&"hold", &"plus_two", &"orbit", &"bolt"],
+		[&"mend", &"plus_two", &"nova", &"bolt"],
+		[&"mirror", &"plus_two", &"rune", &"penta", &"bolt"],
+		[&"on_block", &"shield", &"plus_two", &"orbit", &"bolt", &"plus_two", &"nova", &"bolt"],
+		[&"on_cast", &"plus_two", &"nova", &"bolt", &"plus_two", &"bolt"],
+		[&"on_hurt", &"plus_two", &"orbit", &"bolt", &"fire", &"nova", &"bolt"],
+		[&"on_kill", &"overcharge", &"plus_two", &"nova", &"bolt", &"plus_two", &"rune"],
+		[&"on_reaction", &"fire", &"plus_two", &"nova", &"bolt", &"frost", &"plus_two", &"nova", &"bolt"],
+		[&"on_wall", &"bounce", &"plus_two", &"nova", &"bolt", &"plus_two", &"atom"],
+		[&"possess", &"pull", &"plus_two", &"bolt"],
+		[&"reach", &"recoil", &"relay", &"plus_two", &"nova", &"bolt"],
+		[&"scatter", &"faster_casting", &"siphon", &"slow", &"sniper", &"storm", &"plus_two", &"nova", &"bolt", &"bolt"],
 	],
 ]
 ## The spread of the staff they are on, in degrees: every shot draws from the generator.
@@ -154,12 +154,12 @@ func _plain_staff(id: StringName) -> Array:
 	var card: SpellComponent = _registry.call("get_resource", &"spells", id) as SpellComponent
 	match card.kind() if card != null else &"":
 		&"carrier":
-			return [&"split", id]
+			return [&"plus_two", id]
 		&"trigger":
-			return [id, &"split", &"bolt", &"split", &"nova", &"bolt"]
+			return [id, &"plus_two", &"bolt", &"plus_two", &"nova", &"bolt"]
 		&"multicast":
-			return [id, &"split", &"nova", &"bolt", &"bolt"]
-	return [id, &"split", &"bolt"]
+			return [id, &"plus_two", &"nova", &"bolt", &"bolt"]
+	return [id, &"plus_two", &"bolt"]
 
 
 func test_a_launch_together_leaves_what_one_at_a_time_leaves() -> void:

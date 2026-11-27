@@ -75,7 +75,7 @@ func test_the_rule_decides_not_a_list() -> void:
 	check(on_pulse.call(["penta"]), "a penta strikes from a ring round the caster")
 	check(on_pulse.call(["deflect"]), "a deflect turns the shots round the caster")
 	check(on_pulse.call(["faster_casting"]), "faster casting halves its wind-down")
-	check(not on_pulse.call(["split"]), "a split is wasted: the strike fires no shots")
+	check(not on_pulse.call(["plus_two"]), "a split is wasted: the strike fires no shots")
 	check(on_pulse.call(["hold"]), "a hold keeps even a bare Pulse striking")
 	check(on_pulse.call(["recoil"]), "a recoil pushes its caster")
 	arena.free_all()

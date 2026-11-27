@@ -1,0 +1,9 @@
+{
+	"id": "plus_two_fire_fan",
+	"name": "Fire fan",
+	"does": "Three fire bolts leave in a fan, each at full strength, and set all three imps spread across the aim burning.",
+	"casts": [{"staff": 0, "cards": ["plus_two", "fire", "bolt"]}],
+	"imps": [[120, -31], [120, 0], [120, 31]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status_count", "status": "burn", "min": 3}]
+}

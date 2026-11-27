@@ -12,7 +12,7 @@ const DUMMY := preload("res://content/enemies/training_dummy/idle@2x.svg")
 ## Each row: the portal's cards, the beam's cards, where both are cast from, and a dummy (INF for none).
 const ROWS: Array = [
 	[[&"hold", &"portal"], [&"hold", &"beam"], Vector2(40.0, 60.0), Vector2.INF],
-	[[&"hold", &"fire", &"homing", &"split", &"portal"], [&"hold", &"beam"], Vector2(40.0, 200.0), Vector2(270.0, 240.0)],
+	[[&"hold", &"fire", &"homing", &"plus_two", &"portal"], [&"hold", &"beam"], Vector2(40.0, 200.0), Vector2(270.0, 240.0)],
 	[[&"hold", &"frost", &"portal"], [&"hold", &"beam"], Vector2(40.0, 330.0), Vector2(320.0, 330.0)],
 ]
 

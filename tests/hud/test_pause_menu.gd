@@ -289,6 +289,16 @@ func test_the_focus_is_marked_with_text() -> void:
 	check(_focused("Resume"), "the focus is marked with text")
 
 
+## The rows are bare words in their outline on the quiet panel (ART4, the owner, 2026-11-27), the
+## panel the theme's MenuPanel.
+func test_the_rows_are_bare_words_on_the_quiet_panel() -> void:
+	_setup(1)
+	_open(0)
+	check_equal(_menu().theme_type_variation, &"MenuPanel", "the menu is the quiet panel")
+	for shown: Button in _menu().shown_buttons():
+		check_equal(shown.theme_type_variation, &"BareButton", "%s is a bare row" % shown.name)
+
+
 func test_another_players_buttons_do_nothing_to_it() -> void:
 	_setup(2)
 	_open(0)

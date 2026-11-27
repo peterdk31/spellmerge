@@ -60,9 +60,9 @@ const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
 const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
 const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const NONE: int = -1
-const PLAYER_COUNT: int = 4
 const HANDS: int = 4
 ## Each hand's button, by hand (0 RB, 1 RT, 2 LB, 3 LT).
 const HAND_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
@@ -89,12 +89,11 @@ const NUMBER_WORDS: Array[String] = ["Slots", "Delay", "Mana"]
 const ENTRY_KEYS: Array[String] = ["bag", "staff", "kind", "card", "item"]
 
 const OUTLINE: Color = Color("#14121f")
-const SHADE: Color = Color(0.078, 0.071, 0.122, 0.86)
 const TILE: Color = Color("#2b2840")
 const LINE: Color = Color("#4a4663")
 const TEXT: Color = Color("#f4f1ea")
 const MUTED: Color = Color("#a39fb8")
-const DIM: Color = Color("#7a7694")
+const DIM: Color = RadialMenuScript.DIM
 const GOLD: Color = Color("#f2c230")
 const WARN: Color = Color("#e0592f")
 ## The arrows: a better number, a worse one (and their shape says up or down).
@@ -102,12 +101,13 @@ const BETTER: Color = Color("#6fd46a")
 const WORSE: Color = Color("#e0592f")
 ## The HUD's health colour (`meter_line.gd`), as on the corner panel and the builder.
 const HEALTH_COLOR: Color = MeterLineScript.HEALTH_COLOR
-const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 
 ## The layout, in the view's pixels from the quarter's top left, the same in every quarter.
 const EDGE: float = 4.0
 const COLUMN_WIDTH: float = 112.0
 const BAR_HEIGHT: float = 4.0
+## How far outside the HP line's top-left corner the player's corner mark starts.
+const MARK_OUT: Vector2 = Vector2(3.0, 2.0)
 const HANDS_FROM_TOP: float = 8.0
 const HAND_ROW: float = 18.0
 const HEAD_SIZE: float = 16.0
@@ -919,7 +919,7 @@ func _changed() -> void:
 func _draw() -> void:
 	if not _open:
 		return
-	draw_rect(_quarter, SHADE)
+	draw_rect(_quarter, RadialMenuScript.SHADE)
 	_draw_bar()
 	_draw_hands()
 	_draw_info()
@@ -928,14 +928,13 @@ func _draw() -> void:
 	_menu.draw_hints()
 
 
-## The HP bar on top of the column, framed in the player's colour.
+## The HP line on top of the column in its trough, with no frame round it (ART4, the owner,
+## 2026-11-27: no HUD boxes); the player's small corner L just outside its top-left corner (inside the quarter) says
+## whose inventory it is.
 func _draw_bar() -> void:
-	var frame := Rect2(_column.position, Vector2(COLUMN_WIDTH, BAR_HEIGHT))
-	draw_rect(frame, PLAYER_COLORS[clampi(index, 0, PLAYER_COUNT - 1)])
-	var inner := Rect2(frame.position + Vector2(1.0, 1.0), Vector2(frame.size.x - 2.0, 2.0))
-	draw_rect(inner, OUTLINE)
 	var share: float = clampf(_health / _max_health, 0.0, 1.0) if _health >= 0.0 else 1.0
-	draw_rect(Rect2(inner.position, Vector2(roundf(inner.size.x * share), 2.0)), HEALTH_COLOR)
+	HudArt.meter(self, Rect2(_column.position, Vector2(COLUMN_WIDTH, BAR_HEIGHT - 1.0)), share, HEALTH_COLOR, MeterLineScript.HEALTH_SHADE)
+	HudArt.corner_mark(self, _column.position - MARK_OUT, HudArt.player_ramp(index))
 
 
 ## The four hands: the numbers' headers, then per hand its glyph, its staff's head and numbers,
@@ -951,8 +950,10 @@ func _draw_hands() -> void:
 		var base: StaffBase = _mirror.base_of(number)
 		var head := Rect2(Vector2(_hands_at.x + 14.0, y + 0.0), Vector2(HEAD_SIZE, HEAD_SIZE))
 		var pointed_here: bool = _layer == Layer.STAFFS and not pointed().is_empty() and int(pointed()["staff"]) == number and number != NONE
-		draw_rect(head, TILE if base != null else OUTLINE)
-		_frame(head, GOLD if pointed_here else LINE)
+		# A quiet slot with no frame; a gold one round the staff pointed at (ART4).
+		draw_rect(HudArt.inside_cut(head), TILE if base != null else OUTLINE)
+		if pointed_here:
+			HudArt.tile(self, head, HudArt.SPARK[HudArt.LIGHT], HudArt.SPARK[HudArt.BASE])
 		if base == null:
 			_text("-", Vector2(head.get_center().x, y + 4.0), DIM, true)
 			continue
@@ -998,8 +999,8 @@ static func number_text(value: float, seconds: bool) -> String:
 ## The info box: what is pointed at, and a refusal's note over its top.
 func _draw_info() -> void:
 	var box: Rect2 = _info
-	draw_rect(box, OUTLINE)
-	_frame(box, LINE)
+	# No box round it (ART4): a rule along its top.
+	HudArt.rule(self, box.position, box.size.x, LINE)
 	var entry: Dictionary = pointed()
 	var at: Vector2 = box.position + Vector2(3.0, 2.0)
 	if entry.has("staff"):
@@ -1056,7 +1057,7 @@ func _draw_info() -> void:
 	if note_text() != "":
 		var note := Rect2(box.position, Vector2(box.size.x, LINE_STEP + 3.0))
 		draw_rect(note, OUTLINE)
-		_frame(note, WARN)
+		HudArt.rule(self, Vector2(note.position.x, note.end.y - HudArt.A), note.size.x, WARN)
 		_text(_fit(_note, box.size.x - 6.0), note.position + Vector2(3.0, 1.0), WARN)
 
 

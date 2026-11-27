@@ -91,7 +91,7 @@ const EDGE_RECHARGE: Color = Color("#f08a3c")
 ## The edge of a wind-up's charge, a frame the mana does not pay, and a fizzle's rim.
 const EDGE_WIND: Color = Color("#f2c230")
 ## Short of mana: the palette's Fire base (the owner's decision of 2026-11-27, ART4).
-const SHORT: Color = Color("#e0592f")
+const SHORT: Color = HudArt.FIRE[HudArt.BASE]
 const SHORT_TINT: Color = Color(0.6, 0.5, 0.55, 0.8)
 const RIM: Color = Color.WHITE
 const GLYPH_DIM: Color = Color(0.5, 0.5, 0.58, 1.0)
@@ -547,7 +547,7 @@ func _draw_cards() -> void:
 	_drawn_outline = -1
 	_drawn_dashed = -1
 	# No fill under the casts (the owner, 2026-11-27: no HUD background): the cards sit straight on
-	# the game, each icon in its own outline, a cast told from the next by the wider gap. Two
+	# the game, each icon in its own outline, a cast told from the next by its wider gap (CAST_GAP). Two
 	# passes, each a run of one kind (the icons, all one page of `IconAtlas`, then the strikes and
 	# the marked frames' edges), so the strip is two draw calls however many cards it shows.
 	for c in _cast_size.size():
@@ -759,9 +759,9 @@ func _draw_sigils_onto(target: CanvasItem, at: Vector2) -> void:
 
 
 ## Cast `box`'s frame at the art's detail (`HudArt.tile`): gold for the cast a press fires, red for
-## one the mana does not pay, each lit on its top and left edge. Any other cast has no frame, only
-## a box (the owner, 2026-11-27: a cleaner HUD, no boxes, no background): the gap between two
-## casts parts them, and a frame marks only what needs the eye.
+## one the mana does not pay, each lit on its top and left edge. Any other cast has no frame (the
+## owner, 2026-11-27: a cleaner HUD, no boxes, no background): the gap between two casts (CAST_GAP,
+## wider than between two cards) parts them, and a frame marks only what needs the eye.
 func _draw_tile(box: Rect2, marked: bool, short: bool) -> void:
 	if marked:
 		HudArt.tile(_strip, box, HudArt.SPARK[HudArt.LIGHT], GOLD)

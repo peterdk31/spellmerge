@@ -55,7 +55,7 @@ class Backdrop extends Control:
 
 
 func take() -> void:
-	if not need(["PlayerInput", "Hud", "Flow"]):
+	if not need(["PlayerInput", "Hud", "Flow", "Registry", "Events"]):
 		return
 	var input: Node = root.get_node("PlayerInput")
 	var flow: Node = root.get_node("Flow")
@@ -72,6 +72,7 @@ func take() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 9
 	var backdrop := Backdrop.new()
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(backdrop)
 	root.add_child(layer)
 	PictureGrid.keep_fitted(layer, backdrop)

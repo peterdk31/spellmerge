@@ -179,6 +179,14 @@ func test_a_trough_casts_a_hard_shadow_one_art_pixel_under_it() -> void:
 	var pen := Recorder.new(Vector2i(8, 4))
 	HudArt.trough(pen, Rect2(0.0, 0.0, 6.0, 2.0), HudArt.STONE[HudArt.SHADOW])
 	check_equal(pen.off_grid, 0, "every rect on whole art pixels")
-	check(_same(pen.at(0, 4), CLEAR), "the shadow starts an art pixel right, a drop down and right")
+	check(_same(pen.at(0, 4), CLEAR), "no shadow under the first art pixel: it starts an art pixel in")
 	check(_same(pen.at(6, 4), HudArt.OUTLINE) and _same(pen.at(12, 4), HudArt.OUTLINE), "the shadow under the trough and one past its end")
 	check(_same(pen.at(6, 5), CLEAR), "one art pixel deep")
+
+
+func test_a_drop_shadow_of_nothing_draws_nothing() -> void:
+	var pen := Recorder.new(Vector2i(4, 4))
+	HudArt.drop_shadow(pen, Rect2(1.0, 1.0, 0.0, 2.0))
+	HudArt.drop_shadow(pen, Rect2(1.0, 1.0, 2.0, 0.0))
+	check_equal(pen.off_grid, 0, "nothing off the grid")
+	check(pen.image.is_invisible(), "nothing drawn")

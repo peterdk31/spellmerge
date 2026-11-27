@@ -150,6 +150,8 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 
 ### R4: decide with the owner, then implement (rules 1, 4, 5)
 
+**Done** (checked 2026-11-27): every cell below is decided and built (R4a-R4i, F1-F8). The two items once left for the owner are settled: a rune, decoy or familiar is placed a step ahead, so its mirror lands behind it (F3), and two pulls on the wizard add up (F1). The rule 2 checks deferred from R3 stay in docs/BACKLOG.md.
+
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).

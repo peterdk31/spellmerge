@@ -61,7 +61,7 @@ var cue: CueBase = null
 ## `prepare` made of it).
 var players: Array[Callable] = []
 var prepared: Array = []
-## The part types no player plays, one entry a part (`Feel._unknown_cue_part`).
+## The part types no player plays, one entry a part (`FeelCues._unknown_cue_part`).
 var unknown: Array[StringName] = []
 ## Whether it has any weight (a hold, the game-wide stop, shake, a punch or a sound), and its own
 ## colour and power (`CueBase`), read once.

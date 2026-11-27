@@ -22,7 +22,7 @@ Room templates, one folder per biome. A room is an arena where the enemies the r
 - Every crypt room marks a 24 px `RoomZone` `rune` under `Zones`, clear of doorways, props and spawns. A zone `key` is where a dropped key lies.
 - Seams (`content/rooms/crypt/seams/`) are laid only between a secret room and the room whose wall it stands against.
 - Space for four: playable and readable with 4 players, room to dodge, no spot to get stuck; every way at least 24 px wide.
-- Tiles come from `art/tilesets/`, a shape's ground art from `art/grounds/<room>/`; no art here.
+- Tiles come from `art/tilesets/`, a shape's ground art from `art/grounds/<room>/`; no art here. The crypt's set pieces there are drawn at 2x detail by `tools/room_art.py` (`<name>@2x`), so a Sprite2D or AnimatedSprite2D showing one has `scale = Vector2(0.5, 0.5)` (`ArtDetail`; a region in its texture's pixels, twice its world size).
 - The `Floor` sprite is at `RoomBase.FLOOR_Z` (-2). Walls inside the room block spell light; walls and light-blocking props fit `LightBlockers.MAX` (32) boxes. A crypt room's cobwebs stay at most 6% of its floor.
 - Set `debris_colors` / `floor_mark_colors` only when the sample looks wrong, and always on a room whose ground is drawn from a large shape.
 

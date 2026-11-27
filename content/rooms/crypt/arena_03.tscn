@@ -3,10 +3,10 @@
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_03_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
 [ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/ossuary_wall.svg" id="5_ossuary"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/bone_pile.svg" id="6_bones"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/ossuary_wall@2x.png" id="5_ossuary"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/bone_pile@2x.svg" id="6_bones"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble@2x.svg" id="7_rubble"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull@2x.svg" id="8_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar.tres" id="12_pillar"]
 [ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
@@ -33,6 +33,7 @@ shape = SubResource("RectangleShape2D_128x32")
 [node name="Bones1" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(160, 128)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_ossuary")
 centered = false
 
@@ -43,6 +44,7 @@ shape = SubResource("RectangleShape2D_128x32")
 [node name="Bones2" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(352, 128)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_ossuary")
 centered = false
 
@@ -53,6 +55,7 @@ shape = SubResource("RectangleShape2D_128x32")
 [node name="Bones3" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(96, 288)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_ossuary")
 centered = false
 
@@ -63,6 +66,7 @@ shape = SubResource("RectangleShape2D_128x32")
 [node name="Bones4" type="Sprite2D" parent="Walls"]
 texture_filter = 1
 position = Vector2(416, 288)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("5_ossuary")
 centered = false
 
@@ -114,78 +118,91 @@ position = Vector2(320, 228)
 [node name="Bones1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(172, 162)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Bones2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(436, 162)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Bones3" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(172, 322)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Bones4" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(436, 322)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Bones5" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(252, 111)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Bones6" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(440, 112)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("6_bones")
 centered = false
 
 [node name="Rubble1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(56, 56)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Rubble2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(560, 352)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Rubble3" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(112, 360)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Rubble4" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(496, 52)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Skull1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(288, 236)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("8_skull")
 centered = false
 
 [node name="Skull2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(368, 176)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("8_skull")
 centered = false
 
 [node name="Skull3" type="Sprite2D" parent="Decor"]
 texture_filter = 1
 position = Vector2(104, 152)
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("8_skull")
 centered = false
 

@@ -46,7 +46,7 @@ Threads never change a result: the bits are the same on one thread or sixteen.
 
 ## The same on every platform (online-ready N7)
 
-What a kernel computes for the simulation uses `src/dmath.h` for every C-library function (sin, cos, tan, atan2, exp, log, pow, `from_angle`, `rotated`, `angle`, `angle_to`), never `std::sin` or the engine's `Vector2::rotated`. dmath.h uses only `+ - * /`, `sqrt`, `floor`, `fmod`. Everything is built with `-ffp-contract=off` and `-fno-fast-math`. GDScript the kernels mirror calls `DMath` where they call dmath.h (`tests/core/test_dmath.gd`). What only draws (`MoteKernel`, `GroundKernel`) may keep `std::` maths.
+What a kernel computes for the simulation uses `src/dmath.h` for every C-library function (sin, cos, tan, atan2, exp, log, pow, `from_angle`, `rotated`, `angle`, `angle_to`), never `std::sin` or the engine's `Vector2::rotated`. dmath.h uses only `+ - * /`, `sqrt`, `floor`, `fmod`. Everything is built with `-ffp-contract=off` and `-fno-fast-math`. GDScript the kernels mirror calls `DMath` where they call dmath.h (`tests/core/test_dmath.gd`). What only draws (`MoteKernel`, `GroundKernel`) may keep `std::` maths. A kernel may work a number out once where its GDScript works it out at every pixel (`GroundKernel`: a lattice's corners and each column's and row's fraction, a slab row's sums, a floor's slivers found as runs, a rock face's bottoms read row by row), or leave out a step that cannot change the result (a circle too far off along one axis), only when every number it hands back is the same; the twin tests compare the bytes (#972).
 
 ### The desktop builds optimised (the owner, 2026-11-22)
 

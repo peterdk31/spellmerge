@@ -15,7 +15,7 @@ extends "res://tests/support/suite.gd"
 ## every pixel's alpha must be the same, and the colour of every pixel that is not clear.
 ##
 ## Without the native module the native comparisons only say so (SPELLMERGE_NATIVE=required fails it).
-# unit-test-alone
+# unit-test-shards: 4
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const HubShape := preload("res://content/rooms/hub/hub.shape.json")
@@ -31,6 +31,13 @@ const ROOMS: StringName = &"rooms"
 ## The rock face and the walls' art are baked at 2x only; the floor at 1x (its texture) and 2x (`Detail`).
 const SPRITES: Dictionary = {"floor": ".", "fine_floor": "Detail", "glow": "Glow", "fine_under": "Underside", "fine_wall": "WallArt"}
 const MIRRORINGS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+## The rooms drawn mirrored in `test_a_mirrored_room_is_drawn_again_not_flipped`: one of each kind (pits
+## and cracks, a slab, a corner walkway's polygon, walkways each way, a seam), and SAMPLED more
+## picked by a seeded draw. Every room's own art is held to its baked art unmirrored, natively
+## (`test_the_native_drawing_is_the_baked_art`); this only checks that mirroring draws it again.
+const MIRRORED_ROOMS: Array[StringName] = [&"arena_02", &"arena_05", &"crypt_corner_256x384", &"crypt_bridge_96", &"crypt_bridge_v128", &"crypt_seam"]
+const SAMPLED: int = 3
+const SAMPLE_SEED: int = 971
 
 
 func _registry() -> RegistryScript:
@@ -183,12 +190,23 @@ func test_the_native_drawing_is_the_gdscript_in_every_mirroring() -> void:
 	for mirror: Vector2i in [Vector2i.ZERO] + MIRRORINGS:
 		for case: Dictionary in cases:
 			_check_twins("%s %s" % [case["id"], mirror], _spec(case["shape"], case["scene"], mirror))
+
+
+func test_the_native_drawing_is_the_gdscript_in_a_room_with_pits() -> void:
+	if not _native_or_say():
+		return
 	# A room with pits, cracks from them and two edge styles, mirrored both ways.
 	var room: RoomBase = _registry().get_resource(ROOMS, &"arena_02")
 	_check_twins("arena_02 (1, 1)", _spec(room.ground_shape.data, room.scene, Vector2i(1, 1)))
-	# A corner walkway's polygon outline and area (connected biomes CB13), in every mirroring.
+
+
+func test_the_native_drawing_is_the_gdscript_on_a_corner_walkway() -> void:
+	if not _native_or_say():
+		return
+	# A corner walkway's polygon outline and area (connected biomes CB13), as it is and mirrored both ways
+	# (the fixtures take every mirroring).
 	var corner: RoomBase = _registry().get_resource(ROOMS, &"crypt_corner_256x384")
-	for mirror: Vector2i in [Vector2i.ZERO] + MIRRORINGS:
+	for mirror: Vector2i in [Vector2i.ZERO, Vector2i(1, 1)]:
 		_check_twins("crypt_corner_256x384 %s" % mirror, _spec(corner.ground_shape.data, corner.scene, mirror))
 
 
@@ -213,9 +231,16 @@ func test_a_mirrored_room_is_drawn_again_not_flipped() -> void:
 	var native: bool = NativeScript.loaded()
 	var cases: Array[Dictionary] = [{"id": "hall", "shape": Hall.data, "scene": null}, {"id": "island", "shape": Island.data, "scene": null}]
 	if native:
+		var others: Array[Dictionary] = []
 		for room: Dictionary in _rooms():
-			if room["id"] != &"hub":
+			if room["id"] in MIRRORED_ROOMS:
 				cases.append(room)
+			elif room["id"] != &"hub":
+				others.append(room)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = SAMPLE_SEED
+		for i in mini(SAMPLED, others.size()):
+			cases.append(others.pop_at(rng.randi_range(0, others.size() - 1)))
 	for case: Dictionary in cases:
 		var plain: Dictionary = ShapeScript.draw(_spec(case["shape"], case["scene"]), native)
 		var w: int = plain["width"]

@@ -47,7 +47,7 @@ On a real GPU with compute (`GpuCompute.available`) the grid is worked out by `l
 
 ### The ground, drawn as a room is laid out
 
-`ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped. `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
+`ground/` draws a room's ground from its `<room>.shape.json` as `tools/ground_shape.py` bakes it, mirrored, never flipped. `ground_drawing.gd` is the tool's `Drawing` line by line and `GroundKernel.draw` its twin: **a change to `tools/ground_shape.py`, `ground_materials.py` or `ground_walls.py` is made here and in the C++ too, in the same PR.** **At 2x** (ArtDetail; ART3): the floor, the rock face and the walls' art are drawn again on the same outline at 2 art pixels a world pixel (`GroundDrawing._fine`, the tool's `Drawing._fine`, `GroundKernel`'s `draw_fine`); the floor keeps its 1x texture, which the room's readers measure and sample, under its `Detail` child (the 2x art at half size); the rock face and walls are 2x only. A floor is baked into one texture (`ground/floor_bake.gd`); decal art goes on one page (`decal_pages.gd`).
 
 ### Damage numbers
 

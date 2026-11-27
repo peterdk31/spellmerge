@@ -19,6 +19,10 @@ extends RefCounted
 ## `GroundKernel.draw` (native/src/ground_kernel.cpp), gives the same bytes, and is what the game
 ## calls when the module is loaded (`GroundShape.draw`); this is the reference and the fallback.
 ##
+## **At 2x** (`DETAIL`, ArtDetail): the floor, the rock face and the walls' art are drawn again on the
+## same outline, every pixel `DETAIL` by `DETAIL` art pixels, by the same rules at that detail (`_fine`;
+## the tool's `Drawing._fine`). The glow, the rims and the drips are drawn once.
+##
 ## A crack's width and an edge's share of it (`crack`, `t`) and the glow's sums are single precision,
 ## as the tool's `array("f")`; everything else is a double, as a Python float.
 
@@ -32,6 +36,18 @@ const CELL: int = 8
 const TRIM_ROUND: int = 5
 ## How far from open ground a pixel still takes its edge style's side, in pixels.
 const SIDE_REACH: int = 130
+## Art pixels a world pixel of the fine art (ArtDetail.DETAIL).
+const DETAIL: int = 2
+
+## Art pixels a world pixel of what this drawing draws (1; its fine twin's `DETAIL`), and the 1x
+## drawing a fine one is drawn on (only while it is drawn; null for the 1x one).
+var detail: int = 1
+var coarse: GroundDrawing = null
+## The fine twin (`_fine`), drawn after this one.
+var fine: GroundDrawing = null
+## Where the 1x drawing put its pebbles (x, y a pair) and its rubble (x, y, size a triple), by side.
+var pebbles_at: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
+var stones_at: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
 
 var w: int = 0
 var h: int = 0
@@ -77,7 +93,8 @@ var _mirror_y: bool = false
 ## only, how many threads it draws on, 0 or absent the machine's), as a dictionary of what is drawn:
 ## `width`, `height`, `solid` (1 where a body stands), `floor` and `under` (RGBA, a pixel each),
 ## `glow` (RGBA at half size, `glow_width` by `glow_height`), `wall` (RGBA, empty for none), `rims`
-## and `drips` (their points), `rim_sides`, `drip_sides` and `drip_colours`.
+## and `drips` (their points), `rim_sides`, `drip_sides` and `drip_colours`; and at 2x (`detail`, its
+## `DETAIL`): `fine_floor`, `fine_under` and `fine_wall` (RGBA, `width` * `detail` by `height` * `detail`).
 static func draw(spec: Dictionary) -> Dictionary:
 	var drawing := new()
 	drawing._draw(spec)
@@ -89,6 +106,7 @@ func result() -> Dictionary:
 		"width": w, "height": h, "solid": solid, "floor": floor_image, "under": under,
 		"glow_width": glow_w, "glow_height": glow_h, "glow": glow, "wall": wall_art,
 		"rims": rims, "rim_sides": rim_sides, "drips": drips, "drip_sides": drip_sides, "drip_colours": drip_colours,
+		"detail": fine.detail, "fine_floor": fine.floor_image, "fine_under": fine.under, "fine_wall": fine.wall_art,
 	}
 
 
@@ -154,6 +172,67 @@ func _draw(spec: Dictionary) -> void:
 	_draw_under()
 	_draw_glow()
 	_draw_wall_art()
+	fine = _fine(DETAIL)
+
+
+## The same ground drawn again at `d` art pixels a world pixel: this one's outline, each pixel `d` by `d`,
+## and on it the floor, the edges, the rock face and the walls' art by the same rules at that detail.
+func _fine(d: int) -> GroundDrawing:
+	var out: GroundDrawing = GroundDrawing.new()
+	out.detail = d
+	out.coarse = self
+	out.shape = shape
+	out.palette = palette
+	out.styles = styles
+	out.style_of_side = style_of_side
+	out.deeps = deeps
+	out.grounds = grounds
+	out._mirror_x = _mirror_x
+	out._mirror_y = _mirror_y
+	out.w = w * d
+	out.h = h * d
+	out.land = _upsampled_bytes(land, d)
+	out.pit = _upsampled_bytes(pit, d)
+	out.pit_side = _upsampled_bytes(pit_side, d)
+	out.material = _upsampled_bytes(material, d)
+	out.solid = _upsampled_bytes(solid, d)
+	out.side = _upsampled_bytes(side, d)
+	out.crack = _upsampled_floats(crack, d)
+	out.t = _upsampled_floats(t, d)
+	out.band.resize(out.w * out.h)
+	for y in out.h:
+		for x in out.w:
+			out.band[y * out.w + x] = band[(y / d) * w + x / d]
+	out.floor_image.resize(out.w * out.h * 4)
+	out.under.resize(out.w * out.h * 4)
+	out._draw_floor()
+	out._draw_edges()
+	out._draw_under()
+	out._draw_wall_art()
+	# Let go of the 1x drawing: it holds the fine one (`fine`), so keeping it would be a cycle of
+	# references, and both would leak.
+	out.coarse = null
+	return out
+
+
+func _upsampled_bytes(mask: PackedByteArray, d: int) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(w * d * h * d)
+	var wide: int = w * d
+	for y in h * d:
+		for x in wide:
+			out[y * wide + x] = mask[(y / d) * w + x / d]
+	return out
+
+
+func _upsampled_floats(values: PackedFloat32Array, d: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(w * d * h * d)
+	var wide: int = w * d
+	for y in h * d:
+		for x in wide:
+			out[y * wide + x] = values[(y / d) * w + x / d]
+	return out
 
 
 ## The shape's outline as placed: every mask mirrored along x and/or y (pixel x to w - 1 - x).
@@ -319,7 +398,7 @@ func _draw_floor() -> void:
 	var mats: Array[GroundMaterial] = []
 	var reach: int = 0
 	for k in grounds.size():
-		var mat: GroundMaterial = MaterialScript.new(grounds[k], k, seed, size, centres[k * 2], centres[k * 2 + 1], palette)
+		var mat: GroundMaterial = MaterialScript.new(grounds[k], k, seed, size, centres[k * 2], centres[k * 2 + 1], palette, detail)
 		mats.append(mat)
 		if mat.has_edge:
 			reach = maxi(reach, int(mat.edge_reach))
@@ -334,10 +413,10 @@ func _draw_floor() -> void:
 		WallsScript.put(floor_image, p, mats[material[p]].at(p % w, p / w, ed))
 
 
-## An area's centre as placed (its strokes go round it): mirrored with the room.
+## An area's centre as placed (its strokes go round it), in this drawing's pixels: mirrored with the room.
 func _area_centre(centre: Array) -> PackedFloat64Array:
-	var x: float = float(centre[0])
-	var y: float = float(centre[1])
+	var x: float = float(centre[0]) * float(detail)
+	var y: float = float(centre[1]) * float(detail)
 	return PackedFloat64Array([float(w) - x if _mirror_x else x, float(h) - y if _mirror_y else y])
 
 
@@ -521,6 +600,7 @@ func _draw_edges() -> void:
 		lip_colours.append(shades)
 		lip_widths.append(int(st["lip"]["width"]))
 	var lip_most: int = maxi(lip_widths[0], lip_widths[1])
+	var k: int = detail
 	var dist := PackedByteArray()
 	dist.resize(w * h)
 	var frontier := PackedInt32Array()
@@ -528,7 +608,7 @@ func _draw_edges() -> void:
 		if _is_edge(p):
 			frontier.append(p)
 			dist[p] = 1
-	for d in range(2, lip_most + 2):
+	for d in range(2, (lip_most + 1) * k + 1):
 		var next := PackedInt32Array()
 		for q: int in frontier:
 			var x: int = q % w
@@ -552,10 +632,14 @@ func _draw_edges() -> void:
 		var roll: float = N.unit3(p % w, p / w, 5051)
 		if d == 1:
 			edge_pixels.append(p)
-		if d == 1 and styles[at_side].has("seam"):
+		var seamed: bool = styles[at_side].has("seam")
+		if d <= k and seamed:
 			var ramp: PackedInt32Array = _seam_colour(p)
 			if ramp.is_empty():
 				continue
+			if k > 1:
+				# Finer: the seam's inner row toward its light, its outer toward its shadow.
+				roll = roll * 0.5 if d > 1 else 0.5 + roll * 0.5
 			# Light and base where the edge is whole, base then shadow as a crack narrows.
 			var rgb: int
 			if roll < tp * 0.5:
@@ -566,55 +650,90 @@ func _draw_edges() -> void:
 				rgb = ramp[0]
 			WallsScript.put(floor_image, p, rgb)
 			seam.append(p)
-		elif float(d - 1) <= float(lip_widths[at_side]) * tp + 0.2 and tp > 0.2:
-			WallsScript.put(floor_image, p, lip_colours[at_side][1] if roll < 0.3 else lip_colours[at_side][0])
+		elif float(d - k) / float(k) <= float(lip_widths[at_side]) * tp + 0.2 and tp > 0.2:
+			# Finer: the lip's outer row (under the seam, or the edge's own) in its shadow.
+			if k > 1 and d == (k + 1 if seamed else 1):
+				WallsScript.put(floor_image, p, lip_colours[at_side][0])
+			else:
+				WallsScript.put(floor_image, p, lip_colours[at_side][1] if roll < 0.3 else lip_colours[at_side][0])
+	# The pebbles and the rubble lie where the 1x drawing put them.
+	var placed: GroundDrawing = coarse if coarse != null else self
 	for at_side in styles.size():
 		var style: Dictionary = styles[at_side]
 		var lip: Dictionary = style["lip"]
 		if lip.has("pebbles") and not (lip["pebbles"] as Dictionary).is_empty():
-			var mine := PackedInt32Array()
-			for p: int in seam:
-				if side[p] == at_side:
-					mine.append(p)
-			_draw_pebbles(lip["pebbles"], mine)
+			if k == 1:
+				var mine := PackedInt32Array()
+				for p: int in seam:
+					if side[p] == at_side:
+						mine.append(p)
+				pebbles_at[at_side] = _pebble_places(lip["pebbles"], mine)
+			_draw_pebbles(lip["pebbles"], placed.pebbles_at[at_side])
 		if lip.has("rubble") and not (lip["rubble"] as Dictionary).is_empty():
-			var mine := PackedInt32Array()
-			for p: int in edge_pixels:
-				if side[p] == at_side:
-					mine.append(p)
-			_draw_rubble(lip["rubble"], mine)
+			if k == 1:
+				var mine := PackedInt32Array()
+				for p: int in edge_pixels:
+					if side[p] == at_side:
+						mine.append(p)
+				stones_at[at_side] = _rubble_places(lip["rubble"], mine)
+			_draw_rubble(lip["rubble"], placed.stones_at[at_side])
 		var face: Dictionary = style.get("face", {})
 		if not face.is_empty() and face.has("foot") and at_side == 0:
 			_draw_foot(face["foot"])
 
 
-func _draw_pebbles(pebbles: Dictionary, along: PackedInt32Array) -> void:
-	var shades := PackedInt32Array()
-	for c: Variant in pebbles["shades"]:
-		shades.append(N.colour(c, palette))
+## The seam pixels a pebble lies above (x, y pairs): one every `every` where the edge is whole.
+func _pebble_places(pebbles: Dictionary, along: PackedInt32Array) -> PackedInt32Array:
 	var every: int = int(pebbles["every"])
+	var found := PackedInt32Array()
 	for p: int in along:
 		if t[p] < 0.9 or N.hash2(p, 6061) % every != 0:
 			continue
-		var x: int = p % w
-		var y: int = p / w
-		for dy in range(-6, -3):
-			for dx in range(-2, 2):
-				var q: int = (y + dy) * w + x + dx
-				if y + dy >= 0 and y + dy < h and x + dx >= 0 and x + dx < w and land[q] != 0:
-					var inner: bool = dy >= -5 and dy <= -4 and dx >= -1 and dx <= 0
-					WallsScript.put(floor_image, q, shades[2] if (inner and dx == -1 and dy == -5) else (shades[1] if inner else shades[0]))
+		found.append(p % w)
+		found.append(p / w)
+	return found
 
 
-func _draw_rubble(rubble: Dictionary, edge: PackedInt32Array) -> void:
-	var shades: Array = rubble["shades"]
-	var dark: int = N.colour(shades[0], palette)
-	var base: int = N.colour(shades[1], palette)
-	var light: int = N.colour(shades[2], palette)
+## A pebble above each place (world pixels, x, y pairs), 4 by 3 world pixels; finer, rounded.
+func _draw_pebbles(pebbles: Dictionary, places: PackedInt32Array) -> void:
+	var shades := PackedInt32Array()
+	for c: Variant in pebbles["shades"]:
+		shades.append(N.colour(c, palette))
+	var k: int = detail
+	for at in range(0, places.size(), 2):
+		var x0: int = places[at]
+		var y0: int = places[at + 1]
+		for j in 3 * k:
+			for i in 4 * k:
+				var xx: int = (x0 - 2) * k + i
+				var yy: int = (y0 - 6) * k + j
+				var q: int = yy * w + xx
+				if yy < 0 or yy >= h or xx < 0 or xx >= w or land[q] == 0:
+					continue
+				var inner: bool = i >= k and i < 3 * k and j >= k and j < 3 * k
+				var rgb: int
+				if k == 1:
+					rgb = shades[2] if (inner and i == 1 and j == 1) else (shades[1] if inner else shades[0])
+				elif (i == 0 or i == 4 * k - 1) and (j == 0 or j == 3 * k - 1):
+					continue
+				elif not inner:
+					rgb = shades[0]
+				elif i < 2 * k and j < 2 * k and i + j < 3 * k:
+					rgb = shades[2]
+				elif i == 3 * k - 1 and j == 3 * k - 1:
+					rgb = shades[0]
+				else:
+					rgb = shades[1]
+				WallsScript.put(floor_image, q, rgb)
+
+
+## Where each stone of rubble lies and how big (x, y, size triples, world pixels).
+func _rubble_places(rubble: Dictionary, edge: PackedInt32Array) -> PackedInt32Array:
 	var sizes: Array = rubble["sizes"]
 	var lo: int = int(sizes[0])
 	var hi: int = int(sizes[1])
 	var every: int = int(rubble["every"])
+	var found := PackedInt32Array()
 	for p: int in edge:
 		if t[p] < 0.6 or N.hash2(p, 7071) % every != 0:
 			continue
@@ -631,21 +750,53 @@ func _draw_rubble(rubble: Dictionary, edge: PackedInt32Array) -> void:
 				x = nx
 				y = ny
 				break
-		for dy in size + 1:
-			for dx in size + 1:
-				var xx: int = x + dx
-				var yy: int = y + dy
+		found.append(x)
+		found.append(y)
+		found.append(size)
+	return found
+
+
+## The stones (x, y, size triples, world pixels): each its base colour, a lit top row and a dark row
+## under it; finer, its upper corners rounded, its left side lit too, its shadow a step softer.
+func _draw_rubble(rubble: Dictionary, stones: PackedInt32Array) -> void:
+	var shades: Array = rubble["shades"]
+	var dark: int = N.colour(shades[0], palette)
+	var base: int = N.colour(shades[1], palette)
+	var light: int = N.colour(shades[2], palette)
+	var k: int = detail
+	for at in range(0, stones.size(), 3):
+		var x0: int = stones[at]
+		var y0: int = stones[at + 1]
+		var size: int = stones[at + 2]
+		for dy in (size + 1) * k:
+			for dx in (size + 1) * k:
+				var xx: int = x0 * k + dx
+				var yy: int = y0 * k + dy
 				if xx < 0 or xx >= w or yy < 0 or yy >= h or land[yy * w + xx] == 0:
 					continue
-				var rgb: int = dark if dy == size else (light if dy == 0 and size > 1 else base)
-				if dx == size and dy < size:
+				if dx / k == size and dy / k < size:
 					continue
-				WallsScript.put(floor_image, yy * w + xx, rgb)
+				var q: int = yy * w + xx
+				var rgb: int
+				if k == 1:
+					rgb = dark if dy == size else (light if dy == 0 and size > 1 else base)
+				elif dy >= size * k:
+					if dy == size * k:
+						rgb = dark
+					else:
+						rgb = N.mix((floor_image[q * 4] << 16) | (floor_image[q * 4 + 1] << 8) | floor_image[q * 4 + 2], dark, 0.5)
+				elif size > 1 and dy == 0 and (dx == 0 or dx == size * k - 1):
+					continue
+				elif size > 1 and (dy == 0 or dx == 0):
+					rgb = light
+				else:
+					rgb = base
+				WallsScript.put(floor_image, q, rgb)
 
 
 func _draw_foot(foot: Array) -> void:
 	var shade: int = N.colour(foot[0], palette)
-	var rows: int = int(foot[1])
+	var rows: int = int(foot[1]) * detail
 	for p in range(w, w * h):
 		if land[p] == 0 or land[p - w] != 0 or pit[p - w] != 0 or crack[p - w] > 0.0:
 			continue
@@ -672,6 +823,7 @@ func _draw_under() -> void:
 		rocks.append({"shades": shades, "strata": N.colour(rock["strata"], palette), "roots": N.colour(rock["roots"], palette),
 			"lo": float(depth[0]), "hi": float(depth[1])})
 	var seed: int = int(shape.get("seed", 0)) + 21
+	var fine_k: int = detail
 	var bottoms: Dictionary = {}
 	var edges: Dictionary = {}
 	for x in w:
@@ -689,7 +841,7 @@ func _draw_under() -> void:
 			var hi: float = rock["hi"]
 			var deep: int = deeps[below_side]
 			var tp: float = t[p]
-			var depth: int = int((lo + (hi - lo) * pow(N.noise1(float(x) / 14.0, seed), 1.8)) * tp)
+			var depth: int = int((lo + (hi - lo) * pow(N.noise1(float(x) / (14.0 * float(fine_k)), seed), 1.8)) * tp * float(fine_k))
 			var bottom: int = y
 			for d in range(1, depth + 1):
 				var yy: int = y + d
@@ -698,24 +850,38 @@ func _draw_under() -> void:
 				var q: int = yy * w + x
 				if solid[q] != 0:
 					break
-				var k: float = N.noise2(float(x), float(yy), 7.0, seed + 1)
+				var k: float = N.noise2(float(x), float(yy), 7.0 * float(fine_k), seed + 1)
 				var rgb: int = shades[1] if k > 0.55 else shades[0]
-				if sin((float(yy) + N.noise1(float(x) / 9.0, seed + 2) * 18.0) / 5.0) > 0.85:
+				var turn: float = (float(yy) / float(fine_k) + N.noise1(float(x) / (9.0 * float(fine_k)), seed + 2) * 18.0) / 5.0
+				var layer: float = sin(turn)
+				if layer > 0.85:
 					rgb = strata
+				elif fine_k > 1 and layer > 0.6 and cos(turn) < 0.0:
+					# Finer: the shadow a stratum casts on the rock under it.
+					rgb = N.mix(rgb, strata, 0.5)
+				elif fine_k > 1 and d == 1:
+					# Finer: the face's top row catching the light under the edge.
+					rgb = shades[1]
 				rgb = N.mix(deep, rgb, tp)
 				WallsScript.put(under, q, rgb)
 				bottom = yy
 			if bottom > y and tp > 0.6:
 				var q: int = bottom * w + x
 				WallsScript.put(under, q, strata)
-				bottoms[x * h + bottom] = q
-				edges[x * h + bottom] = p
-				if N.hash3(x, y, seed) % 7 == 0:
-					var length: int = 6 + N.hash4(x, y, seed, 2) % 30
+				if fine_k == 1:
+					bottoms[x * h + bottom] = q
+					edges[x * h + bottom] = p
+				# A root hangs from a world pixel's edge (finer, from one column of its pixels).
+				var xr: int = x / fine_k
+				var yr: int = y / fine_k
+				if N.hash3(xr, yr, seed) % 7 == 0 and (fine_k == 1 or x % fine_k == N.hash4(xr, yr, seed, 3) % fine_k):
+					var length: int = (6 + N.hash4(xr, yr, seed, 2) % 30) * fine_k
 					for d in range(1, length):
 						var yy: int = bottom + d
 						if yy < h and solid[yy * w + x] == 0:
 							WallsScript.put(under, yy * w + x, rock["roots"])
+	if fine_k > 1:
+		return
 	# The drips leave from the rock's bottom: runs of neighbouring columns under one band of the
 	# seam, each in that band's colour alone; a line runs right to left, so the left of its way
 	# (where a line throws its motes) is down.
@@ -857,4 +1023,4 @@ func _draw_wall_art() -> void:
 	for p in w * h:
 		if solid[p] == 0 and crack[p] == 0.0 and pit[p] == 0:
 			wall[p] = 1
-	wall_art = WallsScript.draw(w, h, solid, wall, style, palette, int(shape.get("seed", 0)) + 61)
+	wall_art = WallsScript.draw(w, h, solid, wall, style, palette, int(shape.get("seed", 0)) + 61, detail)

@@ -29,6 +29,8 @@ const GROUNDS: StringName = &"grounds"
 const GROUND_FILE: String = "ground.json"
 ## The names of the drawn nodes in a ground scene (`tools/ground_shape.py`'s `scene_text`).
 const GLOW: StringName = &"Glow"
+## The floor at 2x (ArtDetail), the floor's first child, over its 1x texture exactly.
+const DETAIL: StringName = &"Detail"
 const UNDERSIDE: StringName = &"Underside"
 const WALL_ART: StringName = &"WallArt"
 const WALLS: StringName = &"Walls"
@@ -140,11 +142,24 @@ static func _properties(state: SceneState, node: int) -> Dictionary:
 ## Put the drawn `art` (`draw`'s) on `ground`, a laid-out room's `Floor` (an instanced ground scene):
 ## its floor, glow, rock face and wall art become the drawn ones, and its rims' and drips' mote lines
 ## are made again from the drawing, in the styles of `ground_spec`. Before it is in the tree (Feel
-## hears `room_built` first), so the motes read the new lines as the room is shown.
+## hears `room_built` first), so the motes read the new lines as the room is shown. The floor keeps its
+## 1x texture (what a room's readers measure and sample) under its `Detail` child, the 2x art drawn
+## over it at its size (ArtDetail); the rock face and the wall art are the 2x art.
 static func apply(ground: Sprite2D, art: Dictionary, ground_spec: Dictionary) -> void:
 	var w: int = art["width"]
 	var h: int = art["height"]
+	var d: int = art["detail"]
 	ground.texture = _texture(art["floor"], w, h)
+	var detail := ground.get_node_or_null(NodePath(DETAIL)) as Sprite2D
+	if detail == null:
+		detail = Sprite2D.new()
+		detail.name = DETAIL
+		detail.centered = false
+		detail.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ground.add_child(detail)
+		ground.move_child(detail, 0)
+	detail.texture = _texture(art["fine_floor"], w * d, h * d, d)
+	ArtDetail.fit(detail)
 	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
 	if glow != null:
 		# Filtered (linear), so its clear pixels take their neighbours' colour, as the import does the
@@ -154,13 +169,15 @@ static func apply(ground: Sprite2D, art: Dictionary, ground_spec: Dictionary) ->
 		glow.texture = ImageTexture.create_from_image(glow_image)
 	var under := ground.find_child(UNDERSIDE, true, false) as Sprite2D
 	if under != null:
-		under.texture = _texture(art["under"], w, h)
+		under.texture = _texture(art["fine_under"], w * d, h * d, d)
+		ArtDetail.fit(under)
 	var wall_art := ground.find_child(WALL_ART, true, false) as Sprite2D
 	if wall_art != null:
-		var wall: PackedByteArray = art["wall"]
+		var wall: PackedByteArray = art["fine_wall"]
 		wall_art.visible = not wall.is_empty()
 		if not wall.is_empty():
-			wall_art.texture = _texture(wall, w, h)
+			wall_art.texture = _texture(wall, w * d, h * d, d)
+			ArtDetail.fit(wall_art)
 	for child: Node in ground.get_children():
 		if child is Line2D and child.is_in_group(MoteSource.GROUP):
 			ground.remove_child(child)
@@ -208,8 +225,12 @@ static func _add_line(ground: Node, line_name: String, points: PackedVector2Arra
 	ground.add_child(line)
 
 
-static func _texture(rgba: PackedByteArray, w: int, h: int) -> ImageTexture:
-	return ImageTexture.create_from_image(Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, rgba))
+## A texture of `rgba` (w by h), marked `detail` art pixels a world pixel (ArtDetail).
+static func _texture(rgba: PackedByteArray, w: int, h: int, detail: int = 1) -> ImageTexture:
+	var texture := ImageTexture.create_from_image(Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, rgba))
+	if detail > 1:
+		ArtDetail.mark(texture, detail)
+	return texture
 
 
 static func _length(points: PackedVector2Array, closed: bool) -> float:

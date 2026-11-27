@@ -577,13 +577,22 @@
       "prompt": "The hub's island floor, drawn per pixel by tools/ground_shape.py from content/rooms/hub/hub.shape.json: dark turf in soft patches flecked with Leaf (content/grounds/turf), its coast of bays and points with a seam of the elements' light in long bands, a turf lip and pebbles inside it, and seven cracks running in from the coast, their seam and lip thinning with their width (content/edges/magic); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/hub/hub_ground_under.png",
+      "path": "art/grounds/hub/hub_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock face under the hub's island, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along the edge, with Outline strata and Wood roots, darker and shallower down a crack as it narrows (content/edges/magic)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The hub's island floor, drawn per pixel by tools/ground_shape.py from content/rooms/hub/hub.shape.json: dark turf in soft patches flecked with Leaf (content/grounds/turf), its coast of bays and points with a seam of the elements' light in long bands, a turf lip and pebbles inside it, and seven cracks running in from the coast, their seam and lip thinning with their width (content/edges/magic); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/hub/hub_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock face under the hub's island, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along the edge, with Outline strata and Wood roots, darker and shallower down a crack as it narrows (content/edges/magic). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/hub/hub_ground_glow.png",
@@ -667,13 +676,22 @@
       "prompt": "The antechamber's floor (crypt rework CR3), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_01.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/arena_01/arena_01_ground_under.png",
+      "path": "art/grounds/arena_01/arena_01_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock of the antechamber slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The antechamber's floor (crypt rework CR3), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_01.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/arena_01/arena_01_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock of the antechamber slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/arena_01/arena_01_ground_glow.png",
@@ -721,13 +739,22 @@
       "prompt": "The nave's floor (crypt rework CR4), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_02.shape.json: a long floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); the floor of its south-west aisle fallen into a pit ringed by floor, with broken flagstone teeth on its lip and two cracks running out of it toward the nave (content/edges/crypt_pit); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/arena_02/arena_02_ground_under.png",
+      "path": "art/grounds/arena_02/arena_02_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock of the nave slab's underside and of its pit's shaft, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down and under the pit's north lip, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge, crypt_pit)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The nave's floor (crypt rework CR4), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_02.shape.json: a long floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); the floor of its south-west aisle fallen into a pit ringed by floor, with broken flagstone teeth on its lip and two cracks running out of it toward the nave (content/edges/crypt_pit); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/arena_02/arena_02_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock of the nave slab's underside and of its pit's shaft, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down and under the pit's north lip, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge, crypt_pit). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/arena_02/arena_02_ground_glow.png",
@@ -748,13 +775,22 @@
       "prompt": "The ossuary court's floor (crypt rework CR5), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_03.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge), held straight beside the side pillars; clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/arena_03/arena_03_ground_under.png",
+      "path": "art/grounds/arena_03/arena_03_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock of the ossuary court slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The ossuary court's floor (crypt rework CR5), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_03.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge), held straight beside the side pillars; clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/arena_03/arena_03_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock of the ossuary court slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/arena_03/arena_03_ground_glow.png",
@@ -775,13 +811,22 @@
       "prompt": "The crossing's floor (crypt rework CR6), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_04.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); in its middle a round pit with broken flagstone teeth on its lip and a faint cold seam, two cracks running out of it (content/edges/crypt_pit); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/arena_04/arena_04_ground_under.png",
+      "path": "art/grounds/arena_04/arena_04_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock of the crossing slab's underside and of its pit's shaft, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down and under the pit's north lip, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge, crypt_pit)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The crossing's floor (crypt rework CR6), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_04.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); in its middle a round pit with broken flagstone teeth on its lip and a faint cold seam, two cracks running out of it (content/edges/crypt_pit); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/arena_04/arena_04_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock of the crossing slab's underside and of its pit's shaft, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down and under the pit's north lip, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge, crypt_pit). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/arena_04/arena_04_ground_glow.png",
@@ -802,13 +847,22 @@
       "prompt": "The broom's hall's floor (crypt rework CR7), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/boss_broom/boss_broom.shape.json: a floating slab of the crypt under thick dust, a quiet grey a shade off the stone in soft patches, heaped a little paler toward its edge (content/grounds/dust), and in its middle a rough oval ring swept clean: the crypt's large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, faint broken arcs of a broom's bristles going round its middle (content/grounds/swept); its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/boss_broom/boss_broom_ground_under.png",
+      "path": "art/grounds/boss_broom/boss_broom_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The rock of the broom's hall slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The broom's hall's floor (crypt rework CR7), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/boss_broom/boss_broom.shape.json: a floating slab of the crypt under thick dust, a quiet grey a shade off the stone in soft patches, heaped a little paler toward its edge (content/grounds/dust), and in its middle a rough oval ring swept clean: the crypt's large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, faint broken arcs of a broom's bristles going round its middle (content/grounds/swept); its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/boss_broom/boss_broom_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "The rock of the broom's hall slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/boss_broom/boss_broom_ground_glow.png",

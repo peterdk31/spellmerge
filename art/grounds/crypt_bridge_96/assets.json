@@ -10,13 +10,22 @@
       "prompt": "Crypt bridge (96 px)'s floor (connected biomes CB13), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_96/crypt_bridge_96.shape.json: a 64 px band of the crypt's causeway running west to east across the dark, 96 px long: narrow dressed stones laid across it in courses, each lit along its upper joint, the light from the upper left (content/grounds/causeway), its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
     },
     {
-      "path": "art/grounds/crypt_bridge_96/crypt_bridge_96_ground_under.png",
+      "path": "art/grounds/crypt_bridge_96/crypt_bridge_96_ground_floor@2x.png",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "Crypt bridge (96 px)'s underside (connected biomes CB13), drawn by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_96/crypt_bridge_96.shape.json: the rock of the walkway hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "Crypt bridge (96 px)'s floor (connected biomes CB13), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_96/crypt_bridge_96.shape.json: a 64 px band of the crypt's causeway running west to east across the dark, 96 px long: narrow dressed stones laid across it in courses, each lit along its upper joint, the light from the upper left (content/grounds/causeway), its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand. Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
+    },
+    {
+      "path": "art/grounds/crypt_bridge_96/crypt_bridge_96_ground_under@2x.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16; drawn at 2x detail for ART3, 2026-11-27)",
+      "prompt": "Crypt bridge (96 px)'s underside (connected biomes CB13), drawn by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_96/crypt_bridge_96.shape.json: the rock of the walkway hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge). Drawn at 2x detail (two art pixels a world unit, drawn at half size in the game) on the same outline as the 1x floor, by the same rules with what finer pixels show: thin joints with a shaded lower lip and a worn lit upper lip, a few pits worn into each slab, finer flecks and grains, a two-step seam and lip, rounded pebbles and stones, a stepped rock face; never the 1x art made bigger, the floor kept quiet behind a fight (docs/STYLE.md, \"Readability\")."
     },
     {
       "path": "art/grounds/crypt_bridge_96/crypt_bridge_96_ground_glow.png",

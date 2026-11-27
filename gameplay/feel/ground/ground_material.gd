@@ -3,6 +3,8 @@ extends RefCounted
 ## One ground material ready to draw (connected biomes CB4; content/grounds/README.md): its colours
 ## looked up once, its patches' noise worked out on a coarse grid over the room and read back. The
 ## twin of `Material` in `tools/ground_materials.py`, line by line; a colour is a whole `0xRRGGBB`.
+## At a finer `detail` (art pixels a world pixel, ArtDetail) every length is the same in the world,
+## drawn with more pixels and what they show (`_fine_slab`, the `fine` grains).
 
 const N := preload("res://gameplay/feel/ground/ground_noise.gd")
 
@@ -10,6 +12,7 @@ const N := preload("res://gameplay/feel/ground/ground_noise.gd")
 const STEP: int = 4
 
 var base: int = 0
+var detail: int = 1
 var cols: int = 0
 var patch_map := PackedFloat64Array()
 var has_patches: bool = false
@@ -17,6 +20,10 @@ var patch_colour: int = 0
 var patch_above: float = 2.0
 var speckle_colours := PackedInt32Array()
 var speckle_shares := PackedFloat64Array()
+## The `fine` grains (finer detail only): each a top and an under colour and a share.
+var grain_tops := PackedInt32Array()
+var grain_unders := PackedInt32Array()
+var grain_shares := PackedFloat64Array()
 var seed: int = 0
 var has_slabs: bool = false
 var slab_size: float = 0.0
@@ -44,8 +51,11 @@ var centre_y: float = 0.0
 
 
 ## The material `spec` (a `ground.json`'s data), the `index`th of the shape's (0 its floor's), in a
-## room of `size` seeded `room_seed`; its strokes go round (`middle_x`, `middle_y`).
-func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, middle_x: float, middle_y: float, palette: Dictionary) -> void:
+## room of `size` seeded `room_seed`, `fine` art pixels a world pixel; its strokes go round
+## (`middle_x`, `middle_y`).
+func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, middle_x: float, middle_y: float, palette: Dictionary, fine: int = 1) -> void:
+	detail = fine
+	var d: float = float(fine)
 	base = N.colour(spec["base"], palette)
 	cols = size.x / STEP + 2
 	var rows: int = size.y / STEP + 2
@@ -55,7 +65,7 @@ func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, middle_
 		var patch_seed: int = room_seed * 13 + index * 101 + int(patches.get("seed", 0))
 		var scales := PackedFloat64Array()
 		for v: Variant in patches["scales"]:
-			scales.append(float(v))
+			scales.append(float(v) * d)
 		patch_map.resize(rows * cols)
 		for cy in rows:
 			for cx in cols:
@@ -64,38 +74,45 @@ func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, middle_
 		patch_above = float(patches.get("above", 0.5))
 	for pair: Array in spec.get("speckle", []):
 		speckle_colours.append(N.colour(pair[0], palette))
-		speckle_shares.append(float(pair[1]))
+		speckle_shares.append(float(pair[1]) / d)
+	if detail > 1:
+		for triple: Array in (spec.get("fine", {}) as Dictionary).get("grains", []):
+			grain_tops.append(N.colour(triple[0], palette))
+			grain_unders.append(N.colour(triple[1], palette))
+			grain_shares.append(float(triple[2]))
 	seed = room_seed * 7 + index * 31
 	if spec.has("slabs"):
 		var slabs: Dictionary = spec["slabs"]
 		has_slabs = true
-		slab_size = float(slabs["size"])
+		slab_size = float(slabs["size"]) * d
 		slab_jitter = float(slabs.get("jitter", 0.8))
 		slab_squash = float(slabs.get("squash", 1.0))
 		slab_tone = N.colour(slabs["tone"], palette) if slabs.has("tone") else base
 		slab_vary = float(slabs.get("vary", 0.0))
 		joint = N.colour(slabs["joint"], palette)
-		joint_width = float(slabs.get("joint_width", 1.2))
+		joint_width = float(slabs.get("joint_width", 1.2)) * d
 		has_light = slabs.has("light")
 		light = N.colour(slabs["light"], palette) if has_light else 0
-		light_width = float(slabs.get("light_width", 1.0))
+		light_width = float(slabs.get("light_width", 1.0)) * d
 	if spec.has("toward_edge"):
 		var edge: Dictionary = spec["toward_edge"]
 		has_edge = true
 		edge_colour = N.colour(edge["colour"], palette)
-		edge_reach = float(edge["reach"])
+		edge_reach = float(edge["reach"]) * d
 		edge_most = float(edge.get("most", 0.6))
 		if edge.has("scales"):
 			edge_scales = PackedFloat64Array()
 			for v: Variant in edge["scales"]:
-				edge_scales.append(float(v))
+				edge_scales.append(float(v) * d)
+		else:
+			edge_scales = PackedFloat64Array([10.0 * d, 4.0 * d])
 	if spec.has("strokes"):
 		var strokes: Dictionary = spec["strokes"]
 		has_strokes = true
 		stroke_colour = N.colour(strokes["colour"], palette)
-		stroke_spacing = float(strokes.get("spacing", 10.0))
+		stroke_spacing = float(strokes.get("spacing", 10.0)) * d
 		stroke_share = float(strokes.get("share", 0.4))
-		stroke_inner = float(strokes.get("inner", 24.0))
+		stroke_inner = float(strokes.get("inner", 24.0)) * d
 		centre_x = middle_x
 		centre_y = middle_y
 
@@ -110,6 +127,11 @@ func at(x: int, y: int, edge_distance: float = 1e9) -> int:
 		rgb = patch_colour
 	if has_strokes:
 		rgb = _stroke(x, y, rgb)
+	for i in grain_shares.size():
+		if N.unit4(x, y, seed, 4061 + i) < grain_shares[i]:
+			rgb = grain_tops[i]
+		elif N.unit4(x, y - 1, seed, 4061 + i) < grain_shares[i]:
+			rgb = grain_unders[i]
 	var roll: float = N.unit3(x, y, 4041)
 	for i in speckle_shares.size():
 		if roll < speckle_shares[i]:
@@ -155,6 +177,8 @@ func _slab(x: int, y: int) -> int:
 			elif d < second:
 				second = d
 	var edge: float = sqrt(second) - sqrt(best)
+	if detail > 1:
+		return _fine_slab(x, y, edge, N.mix(base, slab_tone, N.unit4(seed, best_cx, best_cy, 3) * slab_vary), best_dy)
 	if edge < joint_width:
 		return joint
 	var rgb: int = N.mix(base, slab_tone, N.unit4(seed, best_cx, best_cy, 3) * slab_vary)
@@ -162,6 +186,22 @@ func _slab(x: int, y: int) -> int:
 	if has_light and edge < joint_width + light_width and best_dy < 0.0:
 		rgb = light
 	return rgb
+
+
+## A slab's pixel at a finer detail: the joint's dark core, the lower lip shaded toward it, the upper
+## lip lit in a thin line broken where worn, a few pits worn into its face.
+func _fine_slab(x: int, y: int, edge: float, tone: int, dy: float) -> int:
+	var jw: float = joint_width
+	if edge < jw * 0.5:
+		return joint
+	if edge < jw:
+		return N.mix(tone, joint, 0.45) if dy > 0.0 else tone
+	if has_light and dy < 0.0 and edge < jw + light_width * 0.5:
+		if N.fbm2(float(x), float(y), PackedFloat64Array([6.0 * float(detail)]), seed + 5) > 0.38:
+			return light
+	if N.unit4(x, y, seed, 4049) < 0.004:
+		return N.mix(tone, joint, 0.35)
+	return tone
 
 
 func _stroke(x: int, y: int, rgb: int) -> int:
@@ -175,7 +215,7 @@ func _stroke(x: int, y: int, rgb: int) -> int:
 	var ring: int = floori(r / stroke_spacing + 0.5)
 	if absf(r - float(ring) * stroke_spacing) >= 0.5:
 		return rgb
-	var pieces: int = maxi(3, N.round_even(N.TURN * float(ring) * stroke_spacing / 40.0))
+	var pieces: int = maxi(3, N.round_even(N.TURN * float(ring) * stroke_spacing / (40.0 * float(detail))))
 	if N.noise1(turn * float(pieces), seed + 31 * ring, pieces) < 1.0 - stroke_share:
 		return rgb
 	return N.mix(rgb, stroke_colour, 0.5)

@@ -37,6 +37,8 @@ constexpr double PIN_EASE = 12.0;
 constexpr int64_t TRIM_ROUND = 5;
 constexpr int64_t SIDE_REACH = 130;
 constexpr int64_t STEP = 4;
+// Art pixels a world pixel of the fine art (ArtDetail.DETAIL; ground_drawing.gd DETAIL).
+constexpr int64_t DETAIL = 2;
 // The rows a span of the per-pixel loops covers (jobs.h: each span writes its own rows only).
 constexpr int64_t ROWS_A_SPAN = 8;
 
@@ -93,6 +95,50 @@ double noise2(double x, double y, double scale, int64_t seed) {
 	const double c = unit3(seed, ix, iy + 1);
 	const double d = unit3(seed, ix + 1, iy + 1);
 	return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty;
+}
+
+// `noise2` at one scale and seed over a w by h room, its cells' corners worked out once: the same
+// numbers, read back (a material asks it of every pixel).
+struct Lattice {
+	double scale = 1.0;
+	int64_t ix0 = 0, iy0 = 0, cols = 0;
+	std::vector<double> corners;
+
+	Lattice(double p_scale, int64_t seed, int64_t w, int64_t h) : scale(p_scale) {
+		ix0 = floori(0.0 / scale);
+		iy0 = floori(0.0 / scale);
+		cols = floori((double)(w - 1) / scale) + 2 - ix0;
+		const int64_t rows = floori((double)(h - 1) / scale) + 2 - iy0;
+		corners.resize(cols * rows);
+		for (int64_t r = 0; r < rows; r++) {
+			for (int64_t c = 0; c < cols; c++) {
+				corners[r * cols + c] = unit3(seed, ix0 + c, iy0 + r);
+			}
+		}
+	}
+
+	double at(double x, double y) const {
+		const double fx = x / scale, fy = y / scale;
+		const int64_t ix = floori(fx), iy = floori(fy);
+		const double tx = smooth(fx - (double)ix), ty = smooth(fy - (double)iy);
+		const int64_t i = (iy - iy0) * cols + ix - ix0;
+		const double a = corners[i];
+		const double b = corners[i + 1];
+		const double c = corners[i + cols];
+		const double d = corners[i + cols + 1];
+		return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty;
+	}
+};
+
+// `fbm2` read from its octaves' lattices (`Lattice`), each built with `seed + i` as `fbm2` seeds them.
+double fbm2_of(double x, double y, const std::vector<Lattice> &octaves) {
+	double total = 0.0, weight = 0.0, amp = 1.0;
+	for (size_t i = 0; i < octaves.size(); i++) {
+		total += octaves[i].at(x, y) * amp;
+		weight += amp;
+		amp *= 0.5;
+	}
+	return total / weight;
 }
 
 double fbm2(double x, double y, const std::vector<double> &scales, int64_t seed) {
@@ -524,13 +570,15 @@ struct Geometry {
 // -- GroundMaterial --
 
 struct Material {
-	int64_t base = 0, cols = 0;
+	int64_t base = 0, cols = 0, detail = 1;
 	std::vector<double> patch_map;
 	bool has_patches = false;
 	int64_t patch_colour = 0;
 	double patch_above = 2.0;
 	std::vector<int64_t> speckle_colours;
 	std::vector<double> speckle_shares;
+	std::vector<int64_t> grain_tops, grain_unders;
+	std::vector<double> grain_shares;
 	int64_t seed = 0;
 	bool has_slabs = false;
 	double slab_size = 0.0, slab_jitter = 0.8, slab_squash = 1.0;
@@ -549,8 +597,18 @@ struct Material {
 	int64_t stroke_colour = 0;
 	double stroke_spacing = 10.0, stroke_share = 0.4, stroke_inner = 24.0;
 	double centre_x = 0.0, centre_y = 0.0;
+	// Every slab cell the room's pixels look at, worked out once (its jittered middle and its tone,
+	// by the same expressions `slab` used per pixel): cells cell_x0.. and cell_y0.., row by row.
+	std::vector<double> cell_px, cell_py;
+	std::vector<int64_t> cell_tone;
+	int64_t cell_x0 = 0, cell_y0 = 0, cell_cols = 0;
+	// The grit toward the edge's noise (`edge_scales`, seed + 77), read back (`Lattice`).
+	std::vector<Lattice> grit_octaves;
 
-	Material(const Dictionary &spec, int64_t index, int64_t room_seed, int64_t w, int64_t h, double cx, double cy, const Dictionary &palette) {
+	Material(const Dictionary &spec, int64_t index, int64_t room_seed, int64_t w, int64_t h, double cx, double cy, const Dictionary &palette,
+			int64_t fine = 1) {
+		detail = fine;
+		const double d = (double)fine;
 		base = colour_of(spec["base"], palette);
 		cols = w / STEP + 2;
 		const int64_t rows = h / STEP + 2;
@@ -558,7 +616,10 @@ struct Material {
 			const Dictionary patches = dict(spec, "patches");
 			has_patches = true;
 			const int64_t patch_seed = room_seed * 13 + index * 101 + inum(patches, "seed", 0);
-			const std::vector<double> scales = numbers(arr(patches, "scales"));
+			std::vector<double> scales = numbers(arr(patches, "scales"));
+			for (double &v : scales) {
+				v *= d;
+			}
 			patch_map.assign(rows * cols, 0.0);
 			for (int64_t y = 0; y < rows; y++) {
 				for (int64_t x = 0; x < cols; x++) {
@@ -572,40 +633,74 @@ struct Material {
 		for (int64_t i = 0; i < speckle.size(); i++) {
 			const Array pair = speckle[i];
 			speckle_colours.push_back(colour_of(pair[0], palette));
-			speckle_shares.push_back(at(pair, 1));
+			speckle_shares.push_back(at(pair, 1) / d);
+		}
+		if (detail > 1) {
+			const Array grains = arr(dict(spec, "fine"), "grains");
+			for (int64_t i = 0; i < grains.size(); i++) {
+				const Array triple = grains[i];
+				grain_tops.push_back(colour_of(triple[0], palette));
+				grain_unders.push_back(colour_of(triple[1], palette));
+				grain_shares.push_back(at(triple, 2));
+			}
 		}
 		seed = room_seed * 7 + index * 31;
 		if (spec.has("slabs")) {
 			const Dictionary slabs = dict(spec, "slabs");
 			has_slabs = true;
-			slab_size = num(slabs, "size", 0.0);
+			slab_size = num(slabs, "size", 0.0) * d;
 			slab_jitter = num(slabs, "jitter", 0.8);
 			slab_squash = num(slabs, "squash", 1.0);
 			slab_tone = slabs.has("tone") ? colour_of(slabs["tone"], palette) : base;
 			slab_vary = num(slabs, "vary", 0.0);
 			joint = colour_of(slabs["joint"], palette);
-			joint_width = num(slabs, "joint_width", 1.2);
+			joint_width = num(slabs, "joint_width", 1.2) * d;
 			has_light = slabs.has("light");
 			light = has_light ? colour_of(slabs["light"], palette) : 0;
-			light_width = num(slabs, "light_width", 1.0);
+			light_width = num(slabs, "light_width", 1.0) * d;
+			const double s = slab_size, sq = slab_squash;
+			cell_x0 = floori(0.5 / s) - 1;
+			cell_y0 = floori(0.5 / (s * sq)) - 1;
+			cell_cols = floori(((double)(w - 1) + 0.5) / s) + 2 - cell_x0;
+			const int64_t cell_rows = floori(((double)(h - 1) + 0.5) / (s * sq)) + 2 - cell_y0;
+			cell_px.resize(cell_cols * cell_rows);
+			cell_py.resize(cell_cols * cell_rows);
+			cell_tone.resize(cell_cols * cell_rows);
+			for (int64_t r = 0; r < cell_rows; r++) {
+				const int64_t cy = cell_y0 + r;
+				const double shift = cy % 2 != 0 ? 0.5 : 0.0;
+				for (int64_t c = 0; c < cell_cols; c++) {
+					const int64_t cx = cell_x0 + c;
+					const int64_t i = r * cell_cols + c;
+					cell_px[i] = ((double)cx + shift + 0.5 + (unit4(seed, cx, cy, 1) - 0.5) * slab_jitter) * s;
+					cell_py[i] = ((double)cy + 0.5 + (unit4(seed, cx, cy, 2) - 0.5) * slab_jitter) * s * sq;
+					cell_tone[i] = mix(base, slab_tone, unit4(seed, cx, cy, 3) * slab_vary);
+				}
+			}
 		}
 		if (spec.has("toward_edge")) {
 			const Dictionary edge = dict(spec, "toward_edge");
 			has_edge = true;
 			edge_colour = colour_of(edge["colour"], palette);
-			edge_reach = num(edge, "reach", 0.0);
+			edge_reach = num(edge, "reach", 0.0) * d;
 			edge_most = num(edge, "most", 0.6);
 			if (edge.has("scales")) {
 				edge_scales = numbers(arr(edge, "scales"));
+			}
+			for (double &v : edge_scales) {
+				v *= d;
+			}
+			for (size_t i = 0; i < edge_scales.size(); i++) {
+				grit_octaves.emplace_back(edge_scales[i], seed + 77 + (int64_t)i, w, h);
 			}
 		}
 		if (spec.has("strokes")) {
 			const Dictionary strokes = dict(spec, "strokes");
 			has_strokes = true;
 			stroke_colour = colour_of(strokes["colour"], palette);
-			stroke_spacing = num(strokes, "spacing", 10.0);
+			stroke_spacing = num(strokes, "spacing", 10.0) * d;
 			stroke_share = num(strokes, "share", 0.4);
-			stroke_inner = num(strokes, "inner", 24.0);
+			stroke_inner = num(strokes, "inner", 24.0) * d;
 			centre_x = cx;
 			centre_y = cy;
 		}
@@ -622,6 +717,13 @@ struct Material {
 		if (has_strokes) {
 			rgb = stroke(x, y, rgb);
 		}
+		for (size_t i = 0; i < grain_shares.size(); i++) {
+			if (unit4(x, y, seed, 4061 + (int64_t)i) < grain_shares[i]) {
+				rgb = grain_tops[i];
+			} else if (unit4(x, y - 1, seed, 4061 + (int64_t)i) < grain_shares[i]) {
+				rgb = grain_unders[i];
+			}
+		}
 		double roll = unit3(x, y, 4041);
 		for (size_t i = 0; i < speckle_shares.size(); i++) {
 			if (roll < speckle_shares[i]) {
@@ -632,7 +734,7 @@ struct Material {
 		}
 		if (has_edge && edge_distance < edge_reach) {
 			const double near = 1.0 - edge_distance / edge_reach;
-			const double grit = fbm2((double)x, (double)y, edge_scales, seed + 77);
+			const double grit = fbm2_of((double)x, (double)y, grit_octaves);
 			const double share = minf(edge_most, maxf(0.0, near * 1.6 * grit - 0.25));
 			if (share > 0.08) {
 				rgb = mix(rgb, edge_colour, share);
@@ -648,10 +750,10 @@ struct Material {
 		double best = 1e18, second = 1e18, best_dy = 0.0;
 		int64_t best_cx = 0, best_cy = 0;
 		for (int64_t cy = cy0 - 1; cy < cy0 + 2; cy++) {
-			const double shift = cy % 2 != 0 ? 0.5 : 0.0;
+			const int64_t row = (cy - cell_y0) * cell_cols - cell_x0;
 			for (int64_t cx = cx0 - 1; cx < cx0 + 2; cx++) {
-				const double px = ((double)cx + shift + 0.5 + (unit4(seed, cx, cy, 1) - 0.5) * slab_jitter) * s;
-				const double py = ((double)cy + 0.5 + (unit4(seed, cx, cy, 2) - 0.5) * slab_jitter) * s * sq;
+				const double px = cell_px[row + cx];
+				const double py = cell_py[row + cx];
 				const double dx = (double)x + 0.5 - px;
 				const double dy = ((double)y + 0.5 - py) / sq;
 				const double d = dx * dx + dy * dy;
@@ -667,14 +769,38 @@ struct Material {
 			}
 		}
 		const double edge = std::sqrt(second) - std::sqrt(best);
+		if (detail > 1) {
+			return fine_slab(x, y, edge, cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0], best_dy);
+		}
 		if (edge < joint_width) {
 			return joint;
 		}
-		int64_t rgb = mix(base, slab_tone, unit4(seed, best_cx, best_cy, 3) * slab_vary);
+		int64_t rgb = cell_tone[(best_cy - cell_y0) * cell_cols + best_cx - cell_x0];
 		if (has_light && edge < joint_width + light_width && best_dy < 0.0) {
 			rgb = light;
 		}
 		return rgb;
+	}
+
+	// A slab's pixel at a finer detail (ground_material.gd `_fine_slab`).
+	int64_t fine_slab(int64_t x, int64_t y, double edge, int64_t tone, double dy) const {
+		const double jw = joint_width;
+		if (edge < jw * 0.5) {
+			return joint;
+		}
+		if (edge < jw) {
+			return dy > 0.0 ? mix(tone, joint, 0.45) : tone;
+		}
+		if (has_light && dy < 0.0 && edge < jw + light_width * 0.5) {
+			const std::vector<double> scales{ 6.0 * (double)detail };
+			if (fbm2((double)x, (double)y, scales, seed + 5) > 0.38) {
+				return light;
+			}
+		}
+		if (unit4(x, y, seed, 4049) < 0.004) {
+			return mix(tone, joint, 0.35);
+		}
+		return tone;
 	}
 
 	int64_t stroke(int64_t x, int64_t y, int64_t rgb) const {
@@ -690,7 +816,7 @@ struct Material {
 		if (absf(r - (double)ring * stroke_spacing) >= 0.5) {
 			return rgb;
 		}
-		const int64_t pieces = maxi(3, round_even(TURN * (double)ring * stroke_spacing / 40.0));
+		const int64_t pieces = maxi(3, round_even(TURN * (double)ring * stroke_spacing / (40.0 * (double)detail)));
 		if (noise1(turn * (double)pieces, seed + 31 * ring, pieces) < 1.0 - stroke_share) {
 			return rgb;
 		}
@@ -707,8 +833,34 @@ struct Material {
 
 // -- GroundWalls --
 
+// A face's pixel at a finer detail (ground_walls.gd `_fine_face`).
+int64_t fine_face(int64_t x, int64_t k, int64_t face_height, int64_t course, int64_t block, int64_t low, int64_t high, int64_t joint, int64_t light,
+		int64_t cap, int64_t seed, int64_t detail) {
+	if (k > face_height) {
+		return k > face_height + detail / 2 ? cap : mix(cap, joint, 0.5);
+	}
+	if (k > face_height - detail) {
+		return k == face_height ? light : mix(light, high, 0.5);
+	}
+	const int64_t row = (k - 1) / course;
+	const int64_t up = (k - 1) % course;
+	const int64_t across = (x + row * (block / 2)) % block;
+	if (up == course - 1 || across == 0) {
+		return joint;
+	}
+	const double n = noise2((double)(x / block * block + row * 7 * detail), (double)(row * detail), 3.0 * (double)detail, seed + 41);
+	const int64_t rgb = mix(low, high, minf(1.0, (double)(k - 1) / (double)face_height * 0.8 + n * 0.3));
+	if (up == course - 2 || across == 1) {
+		return mix(rgb, light, 0.35);
+	}
+	if (up == 0 || across == block - 1) {
+		return mix(rgb, joint, 0.4);
+	}
+	return rgb;
+}
+
 std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t> &floor, const std::vector<uint8_t> &wall, const Dictionary &style,
-		const Dictionary &palette, int64_t seed) {
+		const Dictionary &palette, int64_t seed, int64_t detail = 1) {
 	std::vector<uint8_t> image(w * h * 4, 0);
 	const Dictionary top = dict(style, "top");
 	const Dictionary face = dict(style, "face");
@@ -717,13 +869,13 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 	}
 	std::vector<uint8_t> rows(w * h, 0);
 	if (!face.is_empty()) {
-		const int64_t face_height = inum(face, "height", 0);
+		const int64_t face_height = inum(face, "height", 0) * detail;
 		for (int64_t p = w; p < w * h; p++) {
 			if (floor[p] == 0 || wall[p - w] == 0) {
 				continue;
 			}
 			const int64_t x = p % w, y = p / w;
-			for (int64_t k = 1; k < face_height + 2; k++) {
+			for (int64_t k = 1; k < face_height + detail + 1; k++) {
 				const int64_t yy = y - k;
 				if (yy < 0 || wall[yy * w + x] == 0) {
 					break;
@@ -731,7 +883,7 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 				rows[yy * w + x] = (uint8_t)k;
 			}
 		}
-		const int64_t course = inum(face, "course", 1), block = inum(face, "block", 1);
+		const int64_t course = inum(face, "course", 1) * detail, block = inum(face, "block", 1) * detail;
 		const Array shades = arr(face, "shades");
 		const int64_t low = colour_of(shades[0], palette), high = colour_of(shades[1], palette);
 		const int64_t joint = colour_of(face["joint"], palette), light = colour_of(face["light"], palette), cap = colour_of(face["cap"], palette);
@@ -742,7 +894,9 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 			}
 			const int64_t x = p % w;
 			int64_t rgb;
-			if (k == face_height + 1) {
+			if (detail > 1) {
+				rgb = fine_face(x, k, face_height, course, block, low, high, joint, light, cap, seed, detail);
+			} else if (k == face_height + 1) {
 				rgb = cap;
 			} else if (k == face_height) {
 				rgb = light;
@@ -763,7 +917,9 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 		const int64_t dark = colour_of(shades[0], palette), stone = colour_of(shades[1], palette);
 		const int64_t joint = colour_of(top["joint"], palette), rim = colour_of(top["rim"], palette), deep = colour_of(top["deep"], palette);
 		const Array fade_range = arr(top, "fade");
-		const double near = at(fade_range, 0), far = at(fade_range, 1);
+		const double near = at(fade_range, 0) * (double)detail, far = at(fade_range, 1) * (double)detail;
+		const double fine_scale = detail == 1 ? 3.0 : 2.0 * (double)detail;
+		const double rough_scale = 9.0 * (double)detail;
 		std::vector<int32_t> dist(w * h, 0);
 		std::vector<int64_t> frontier, next;
 		for (int64_t p = 0; p < w * h; p++) {
@@ -804,9 +960,13 @@ std::vector<uint8_t> walls_draw(int64_t w, int64_t h, const std::vector<uint8_t>
 			if (dd == 1) {
 				rgb = rim;
 			} else {
-				const double fine = noise2((double)x, (double)y, 3.0, seed + 51);
-				const double rough = noise2((double)x, (double)y, 9.0, seed + 52);
-				rgb = fine < 0.28 ? joint : mix(dark, stone, rough);
+				const double fine = noise2((double)x, (double)y, fine_scale, seed + 51);
+				const double rough = noise2((double)x, (double)y, rough_scale, seed + 52);
+				if (detail > 1 && dd == 2) {
+					rgb = mix(rim, mix(dark, stone, rough), 0.5);
+				} else {
+					rgb = fine < 0.28 ? joint : mix(dark, stone, rough);
+				}
 			}
 			const double fade = minf(1.0, maxf(0.0, ((double)dd - near) / maxf(1.0, far - near)));
 			put(image, p, mix(rgb, deep, fade));
@@ -881,6 +1041,12 @@ struct Drawing {
 	std::vector<int64_t> rim_every, rim_path_sides;
 	bool mirror_x = false, mirror_y = false;
 	int threads = 1;
+	// Art pixels a world pixel of what this drawing draws (1; its fine twin's DETAIL), and the 1x
+	// drawing a fine one is drawn on (ground_drawing.gd `_fine`; `draw_fine`).
+	int64_t detail = 1;
+	const Drawing *coarse = nullptr;
+	// Where the 1x drawing put its pebbles (x, y pairs) and its rubble (x, y, size triples), by side.
+	std::vector<int64_t> pebbles_at[2], stones_at[2];
 
 	void run(const Dictionary &spec) {
 		// How many threads the per-pixel loops run on: the spec's `threads`, else the machine's (jobs.h).
@@ -954,6 +1120,65 @@ struct Drawing {
 		draw_under();
 		draw_glow();
 		draw_wall_art();
+	}
+
+	template <typename T>
+	std::vector<T> upsampled(const std::vector<T> &mask, int64_t d) const {
+		const int64_t wide = w * d;
+		std::vector<T> out(wide * h * d);
+		for (int64_t y = 0; y < h; y++) {
+			// One row made wide, then copied to the d rows it is.
+			T *first = out.data() + y * d * wide;
+			const T *from = mask.data() + y * w;
+			for (int64_t x = 0; x < w; x++) {
+				for (int64_t k = 0; k < d; k++) {
+					first[x * d + k] = from[x];
+				}
+			}
+			for (int64_t k = 1; k < d; k++) {
+				for (int64_t x = 0; x < wide; x++) {
+					first[k * wide + x] = first[x];
+				}
+			}
+		}
+		return out;
+	}
+
+	// The same ground drawn again at `d` art pixels a world pixel on this one's outline (ground_drawing.gd
+	// `_fine`): its floor, edges, rock face and walls' art.
+	void draw_fine(Drawing &into, int64_t d) const {
+		Drawing *out = &into;
+		out->detail = d;
+		out->coarse = this;
+		out->threads = threads;
+		out->shape = shape;
+		out->palette = palette;
+		out->styles[0] = styles[0];
+		out->styles[1] = styles[1];
+		out->style_of_side[0] = style_of_side[0];
+		out->style_of_side[1] = style_of_side[1];
+		out->deeps[0] = deeps[0];
+		out->deeps[1] = deeps[1];
+		out->grounds = grounds;
+		out->mirror_x = mirror_x;
+		out->mirror_y = mirror_y;
+		out->w = w * d;
+		out->h = h * d;
+		out->land = upsampled(land, d);
+		out->pit = upsampled(pit, d);
+		out->pit_side = upsampled(pit_side, d);
+		out->material = upsampled(material, d);
+		out->solid = upsampled(solid, d);
+		out->side = upsampled(side, d);
+		out->crack = upsampled(crack, d);
+		out->t = upsampled(t, d);
+		out->band = upsampled(band, d);
+		out->floor_image.assign(out->w * out->h * 4, 0);
+		out->under.assign(out->w * out->h * 4, 0);
+		out->draw_floor();
+		out->draw_edges();
+		out->draw_under();
+		out->draw_wall_art();
 	}
 
 	static std::vector<uint8_t> mirrored(const std::vector<uint8_t> &mask, int64_t w, int64_t h, bool along_x, bool along_y) {
@@ -1145,14 +1370,14 @@ struct Drawing {
 		const Array areas = arr(shape, "areas");
 		for (int64_t i = 0; i < areas.size(); i++) {
 			const Array centre = arr(areas[i], "centre");
-			const double x = at(centre, 0), y = at(centre, 1);
+			const double x = at(centre, 0) * (double)detail, y = at(centre, 1) * (double)detail;
 			centres.push_back(mirror_x ? (double)w - x : x);
 			centres.push_back(mirror_y ? (double)h - y : y);
 		}
 		std::vector<Material> mats;
 		int64_t reach = 0;
 		for (int64_t k = 0; k < grounds.size(); k++) {
-			mats.emplace_back((Dictionary)grounds[k], k, seed, w, h, centres[k * 2], centres[k * 2 + 1], palette);
+			mats.emplace_back((Dictionary)grounds[k], k, seed, w, h, centres[k * 2], centres[k * 2 + 1], palette, detail);
 			if (mats.back().has_edge) {
 				reach = maxi(reach, (int64_t)mats.back().edge_reach);
 			}
@@ -1359,6 +1584,7 @@ struct Drawing {
 			lip_widths[i] = inum(lip, "width", 0);
 		}
 		const int64_t lip_most = maxi(lip_widths[0], lip_widths[1]);
+		const int64_t k = detail;
 		std::vector<uint8_t> dist(w * h, 0);
 		std::vector<int64_t> frontier, next;
 		for (int64_t p = 0; p < w * h; p++) {
@@ -1367,7 +1593,7 @@ struct Drawing {
 				dist[p] = 1;
 			}
 		}
-		for (int64_t d = 2; d < lip_most + 2; d++) {
+		for (int64_t d = 2; d < (lip_most + 1) * k + 1; d++) {
 			next.clear();
 			for (const int64_t q : frontier) {
 				const int64_t x = q % w, y = q / w;
@@ -1393,13 +1619,17 @@ struct Drawing {
 			}
 			const int64_t at_side = side[p];
 			const double tp = (double)t[p];
-			const double roll = unit3(p % w, p / w, 5051);
+			double roll = unit3(p % w, p / w, 5051);
 			if (d == 1) {
 				edge_pixels.push_back(p);
 			}
-			if (d == 1 && styles[at_side].has("seam")) {
+			const bool seamed = styles[at_side].has("seam");
+			if (d <= k && seamed) {
 				if (!seam_colour(p, ramp)) {
 					continue;
+				}
+				if (k > 1) {
+					roll = d > 1 ? roll * 0.5 : 0.5 + roll * 0.5;
 				}
 				int64_t rgb;
 				if (roll < tp * 0.5) {
@@ -1411,32 +1641,43 @@ struct Drawing {
 				}
 				put(floor_image, p, rgb);
 				seam.push_back(p);
-			} else if ((double)(d - 1) <= (double)lip_widths[at_side] * tp + 0.2 && tp > 0.2) {
-				put(floor_image, p, roll < 0.3 ? lip_colours[at_side][1] : lip_colours[at_side][0]);
+			} else if ((double)(d - k) / (double)k <= (double)lip_widths[at_side] * tp + 0.2 && tp > 0.2) {
+				if (k > 1 && d == (seamed ? k + 1 : 1)) {
+					put(floor_image, p, lip_colours[at_side][0]);
+				} else {
+					put(floor_image, p, roll < 0.3 ? lip_colours[at_side][1] : lip_colours[at_side][0]);
+				}
 			}
 		}
+		const Drawing &placed = coarse != nullptr ? *coarse : *this;
 		for (int64_t at_side = 0; at_side < 2; at_side++) {
 			const Dictionary &style = styles[at_side];
 			const Dictionary lip = dict(style, "lip");
 			const Dictionary pebbles = dict(lip, "pebbles");
 			if (!pebbles.is_empty()) {
-				std::vector<int64_t> mine;
-				for (const int64_t p : seam) {
-					if (side[p] == at_side) {
-						mine.push_back(p);
+				if (k == 1) {
+					std::vector<int64_t> mine;
+					for (const int64_t p : seam) {
+						if (side[p] == at_side) {
+							mine.push_back(p);
+						}
 					}
+					pebbles_at[at_side] = pebble_places(pebbles, mine);
 				}
-				draw_pebbles(pebbles, mine);
+				draw_pebbles(pebbles, placed.pebbles_at[at_side]);
 			}
 			const Dictionary rubble = dict(lip, "rubble");
 			if (!rubble.is_empty()) {
-				std::vector<int64_t> mine;
-				for (const int64_t p : edge_pixels) {
-					if (side[p] == at_side) {
-						mine.push_back(p);
+				if (k == 1) {
+					std::vector<int64_t> mine;
+					for (const int64_t p : edge_pixels) {
+						if (side[p] == at_side) {
+							mine.push_back(p);
+						}
 					}
+					stones_at[at_side] = rubble_places(rubble, mine);
 				}
-				draw_rubble(rubble, mine);
+				draw_rubble(rubble, placed.stones_at[at_side]);
 			}
 			const Dictionary face = dict(style, "face");
 			if (!face.is_empty() && face.has("foot") && at_side == 0) {
@@ -1445,33 +1686,97 @@ struct Drawing {
 		}
 	}
 
-	void draw_pebbles(const Dictionary &pebbles, const std::vector<int64_t> &along) {
+	std::vector<int64_t> pebble_places(const Dictionary &pebbles, const std::vector<int64_t> &along) const {
+		const int64_t every = inum(pebbles, "every", 1);
+		std::vector<int64_t> found;
+		for (const int64_t p : along) {
+			if ((double)t[p] < 0.9 || hash2(p, 6061) % every != 0) {
+				continue;
+			}
+			found.push_back(p % w);
+			found.push_back(p / w);
+		}
+		return found;
+	}
+
+	void draw_pebbles(const Dictionary &pebbles, const std::vector<int64_t> &places) {
 		const Array shade_list = arr(pebbles, "shades");
 		int64_t shades[3];
 		for (int64_t k = 0; k < 3; k++) {
 			shades[k] = colour_of(shade_list[k], palette);
 		}
-		const int64_t every = inum(pebbles, "every", 1);
-		for (const int64_t p : along) {
-			if ((double)t[p] < 0.9 || hash2(p, 6061) % every != 0) {
-				continue;
-			}
-			const int64_t x = p % w, y = p / w;
-			for (int64_t dy = -6; dy < -3; dy++) {
-				for (int64_t dx = -2; dx < 2; dx++) {
-					const int64_t q = (y + dy) * w + x + dx;
-					if (y + dy >= 0 && y + dy < h && x + dx >= 0 && x + dx < w && land[q] != 0) {
-						const bool inner = dy >= -5 && dy <= -4 && dx >= -1 && dx <= 0;
-						put(floor_image, q, (inner && dx == -1 && dy == -5) ? shades[2] : (inner ? shades[1] : shades[0]));
+		const int64_t k = detail;
+		for (size_t at = 0; at + 1 < places.size(); at += 2) {
+			const int64_t x0 = places[at], y0 = places[at + 1];
+			for (int64_t j = 0; j < 3 * k; j++) {
+				for (int64_t i = 0; i < 4 * k; i++) {
+					const int64_t xx = (x0 - 2) * k + i, yy = (y0 - 6) * k + j;
+					const int64_t q = yy * w + xx;
+					if (yy < 0 || yy >= h || xx < 0 || xx >= w || land[q] == 0) {
+						continue;
 					}
+					const bool inner = i >= k && i < 3 * k && j >= k && j < 3 * k;
+					int64_t rgb;
+					if (k == 1) {
+						rgb = (inner && i == 1 && j == 1) ? shades[2] : (inner ? shades[1] : shades[0]);
+					} else if ((i == 0 || i == 4 * k - 1) && (j == 0 || j == 3 * k - 1)) {
+						continue;
+					} else if (!inner) {
+						rgb = shades[0];
+					} else if (i < 2 * k && j < 2 * k && i + j < 3 * k) {
+						rgb = shades[2];
+					} else if (i == 3 * k - 1 && j == 3 * k - 1) {
+						rgb = shades[0];
+					} else {
+						rgb = shades[1];
+					}
+					put(floor_image, q, rgb);
 				}
 			}
 		}
 	}
 
-	void draw_rubble(const Dictionary &rubble, const std::vector<int64_t> &edge) {
+	void draw_rubble(const Dictionary &rubble, const std::vector<int64_t> &stones) {
 		const Array shades = arr(rubble, "shades");
 		const int64_t dark = colour_of(shades[0], palette), base = colour_of(shades[1], palette), light = colour_of(shades[2], palette);
+		const int64_t k = detail;
+		for (size_t at = 0; at + 2 < stones.size(); at += 3) {
+			const int64_t x0 = stones[at], y0 = stones[at + 1], size = stones[at + 2];
+			for (int64_t dy = 0; dy < (size + 1) * k; dy++) {
+				for (int64_t dx = 0; dx < (size + 1) * k; dx++) {
+					const int64_t xx = x0 * k + dx, yy = y0 * k + dy;
+					if (xx < 0 || xx >= w || yy < 0 || yy >= h || land[yy * w + xx] == 0) {
+						continue;
+					}
+					if (dx / k == size && dy / k < size) {
+						continue;
+					}
+					const int64_t q = yy * w + xx;
+					int64_t rgb;
+					if (k == 1) {
+						rgb = dy == size ? dark : ((dy == 0 && size > 1) ? light : base);
+					} else if (dy >= size * k) {
+						if (dy == size * k) {
+							rgb = dark;
+						} else {
+							const int64_t old = ((int64_t)floor_image[q * 4] << 16) | ((int64_t)floor_image[q * 4 + 1] << 8) | (int64_t)floor_image[q * 4 + 2];
+							rgb = mix(old, dark, 0.5);
+						}
+					} else if (size > 1 && dy == 0 && (dx == 0 || dx == size * k - 1)) {
+						continue;
+					} else if (size > 1 && (dy == 0 || dx == 0)) {
+						rgb = light;
+					} else {
+						rgb = base;
+					}
+					put(floor_image, q, rgb);
+				}
+			}
+		}
+	}
+
+	std::vector<int64_t> rubble_places(const Dictionary &rubble, const std::vector<int64_t> &edge) const {
+		std::vector<int64_t> found;
 		const Array sizes = arr(rubble, "sizes");
 		const int64_t lo = (int64_t)at(sizes, 0), hi = (int64_t)at(sizes, 1);
 		const int64_t every = inum(rubble, "every", 1);
@@ -1491,25 +1796,16 @@ struct Drawing {
 					break;
 				}
 			}
-			for (int64_t dy = 0; dy < size + 1; dy++) {
-				for (int64_t dx = 0; dx < size + 1; dx++) {
-					const int64_t xx = x + dx, yy = y + dy;
-					if (xx < 0 || xx >= w || yy < 0 || yy >= h || land[yy * w + xx] == 0) {
-						continue;
-					}
-					const int64_t rgb = dy == size ? dark : ((dy == 0 && size > 1) ? light : base);
-					if (dx == size && dy < size) {
-						continue;
-					}
-					put(floor_image, yy * w + xx, rgb);
-				}
-			}
+			found.push_back(x);
+			found.push_back(y);
+			found.push_back(size);
 		}
+		return found;
 	}
 
 	void draw_foot(const Array &foot) {
 		const int64_t shade = colour_of(foot[0], palette);
-		const int64_t rows = (int64_t)at(foot, 1);
+		const int64_t rows = (int64_t)at(foot, 1) * detail;
 		for (int64_t p = w; p < w * h; p++) {
 			if (land[p] == 0 || land[p - w] != 0 || pit[p - w] != 0 || (double)crack[p - w] > 0.0) {
 				continue;
@@ -1548,6 +1844,7 @@ struct Drawing {
 			rocks[i].hi = at(depth, 1);
 		}
 		const int64_t seed = inum(shape, "seed", 0) + 21;
+		const int64_t fk = detail;
 		// The rock's bottoms in the order the GDScript sorts them (column by column, top down),
 		// which is the order they are found in: each lies below the last in its column.
 		struct Bottom {
@@ -1567,7 +1864,7 @@ struct Drawing {
 				}
 				const int64_t deep = deeps[below_side];
 				const double tp = (double)t[p];
-				const int64_t depth = (int64_t)((rock.lo + (rock.hi - rock.lo) * std::pow(noise1((double)x / 14.0, seed), 1.8)) * tp);
+				const int64_t depth = (int64_t)((rock.lo + (rock.hi - rock.lo) * std::pow(noise1((double)x / (14.0 * (double)fk), seed), 1.8)) * tp * (double)fk);
 				int64_t bottom = y;
 				for (int64_t d = 1; d < depth + 1; d++) {
 					const int64_t yy = y + d;
@@ -1578,10 +1875,16 @@ struct Drawing {
 					if (solid[q] != 0) {
 						break;
 					}
-					const double k = noise2((double)x, (double)yy, 7.0, seed + 1);
+					const double k = noise2((double)x, (double)yy, 7.0 * (double)fk, seed + 1);
 					int64_t rgb = k > 0.55 ? rock.shades[1] : rock.shades[0];
-					if (std::sin(((double)yy + noise1((double)x / 9.0, seed + 2) * 18.0) / 5.0) > 0.85) {
+					const double turn = ((double)yy / (double)fk + noise1((double)x / (9.0 * (double)fk), seed + 2) * 18.0) / 5.0;
+					const double layer = std::sin(turn);
+					if (layer > 0.85) {
 						rgb = rock.strata;
+					} else if (fk > 1 && layer > 0.6 && std::cos(turn) < 0.0) {
+						rgb = mix(rgb, rock.strata, 0.5);
+					} else if (fk > 1 && d == 1) {
+						rgb = rock.shades[1];
 					}
 					rgb = mix(deep, rgb, tp);
 					put(under, q, rgb);
@@ -1589,9 +1892,12 @@ struct Drawing {
 				}
 				if (bottom > y && tp > 0.6) {
 					put(under, bottom * w + x, rock.strata);
-					bottoms.push_back(Bottom{ x, bottom, p });
-					if (hash3(x, y, seed) % 7 == 0) {
-						const int64_t length = 6 + hash4(x, y, seed, 2) % 30;
+					if (fk == 1) {
+						bottoms.push_back(Bottom{ x, bottom, p });
+					}
+					const int64_t xr = x / fk, yr = y / fk;
+					if (hash3(xr, yr, seed) % 7 == 0 && (fk == 1 || x % fk == hash4(xr, yr, seed, 3) % fk)) {
+						const int64_t length = (6 + hash4(xr, yr, seed, 2) % 30) * fk;
 						for (int64_t d = 1; d < length; d++) {
 							const int64_t yy = bottom + d;
 							if (yy < h && solid[yy * w + x] == 0) {
@@ -1601,6 +1907,9 @@ struct Drawing {
 					}
 				}
 			}
+		}
+		if (fk > 1) {
+			return;
 		}
 		std::vector<PackedVector2Array> runs;
 		std::vector<int64_t> run_bands, run_sides;
@@ -1717,7 +2026,7 @@ struct Drawing {
 				wall[p] = 1;
 			}
 		}
-		wall_art = walls_draw(w, h, solid, wall, style, palette, inum(shape, "seed", 0) + 61);
+		wall_art = walls_draw(w, h, solid, wall, style, palette, inum(shape, "seed", 0) + 61, detail);
 	}
 };
 
@@ -1755,5 +2064,12 @@ Dictionary GroundKernel::draw(const Dictionary &spec) const {
 	out["drips"] = drawing.drips;
 	out["drip_sides"] = drawing.drip_sides;
 	out["drip_colours"] = drawing.drip_colours;
+	// At 2x (ArtDetail): the floor, rock face and walls' art drawn again on the same outline.
+	Drawing fine;
+	drawing.draw_fine(fine, DETAIL);
+	out["detail"] = fine.detail;
+	out["fine_floor"] = bytes(fine.floor_image);
+	out["fine_under"] = bytes(fine.under);
+	out["fine_wall"] = bytes(fine.wall_art);
 	return out;
 }

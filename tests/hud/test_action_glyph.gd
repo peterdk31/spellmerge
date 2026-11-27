@@ -150,3 +150,17 @@ func test_each_dpad_arm_lights_the_up_arms_arrow_turned() -> void:
 			same = same and drawn.has(pixel)
 		check(same, "%s's arrow is up's turned" % label)
 	check_equal(_arrow("all", side).size(), up.size() * 4, "all four for the whole d-pad")
+
+
+## Regression (#972): a glyph's body is baked once for its shape and size and shared by every glyph
+## alike (it is never changed once baked), so the HUD's start, which makes some hundred glyphs, bakes
+## none twice; a glyph of another shape, or the same glyph after its kind changes, has its own.
+func test_glyphs_alike_share_one_baked_body() -> void:
+	_input.join(0)
+	var first: ActionGlyphScript = _glyph(0, &"accept")
+	var second: ActionGlyphScript = _glyph(0, &"accept")
+	check(first.body() != null and first.body() == second.body(), "two A buttons share one body")
+	var key: ActionGlyphScript = _glyph(1, &"accept")
+	check(key.body() != null and key.body() != first.body(), "a key cap has its own")
+	_input.leave(0)
+	check(first.body() == key.body(), "the glyph whose pad went shows the key cap's body")

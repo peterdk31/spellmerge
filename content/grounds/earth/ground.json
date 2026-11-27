@@ -2,5 +2,6 @@
 	"about": "Trodden earth: clearings and paths, Wood's shades in patches, flecked with pebbles.",
 	"base": "#4a3a2a",
 	"patches": {"colour": "#6b5238", "scales": [10, 4], "above": 0.6},
-	"speckle": [["wood.shadow", 0.03], ["stone.base", 0.006]]
+	"speckle": [["wood.shadow", 0.03], ["stone.base", 0.006]],
+	"fine": {"grains": [["stone.base", "wood.shadow", 0.012]]}
 }

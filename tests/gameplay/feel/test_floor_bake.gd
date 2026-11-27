@@ -40,11 +40,11 @@ func _in(node: Node, layout: Node) -> Transform2D:
 	return xf
 
 
-## The canvas items of the floor's stack shown: the floor, its rock face and glow, the shades.
+## The canvas items of the floor's stack shown: the floor, its 2x art, its rock face and glow, the shades.
 func _stack_shown(layout: Node) -> int:
 	var shown: int = 0
 	var ground := layout.get_node("Floor") as Sprite2D
-	var items: Array[CanvasItem] = [ground, ground.get_node("Glow"), ground.find_child("Underside", true, false), ground.get_node_or_null(NodePath(BakeScript.SHOWN))]
+	var items: Array[CanvasItem] = [ground, ground.get_node_or_null(NodePath(BakeScript.DETAIL)), ground.get_node("Glow"), ground.find_child("Underside", true, false), ground.get_node_or_null(NodePath(BakeScript.SHOWN))]
 	for shade: Node in layout.get_node("Shade").get_children():
 		items.append(shade as CanvasItem)
 	for item: CanvasItem in items:
@@ -75,19 +75,22 @@ func test_the_bake_holds_the_floor_s_layers_in_order_where_they_lie() -> void:
 	check_equal(viewport.size, Vector2i(ground.texture.get_size()), "the floor's size")
 	check(viewport.transparent_bg and viewport.render_target_update_mode == SubViewport.UPDATE_ONCE, "clear, drawn once")
 	var copies: Array[Node] = viewport.get_children()
-	check_equal(copies.size(), 3 + shades.size(), "the floor, its rock face, its glow and every shade")
+	check_equal(copies.size(), 4 + shades.size(), "the floor, its 2x art, its rock face, its glow and every shade")
 	check((copies[0] as Sprite2D).texture == ground.texture, "the floor first")
-	check((copies[1] as Sprite2D).texture == (ground.find_child("Underside", true, false) as Sprite2D).texture, "then its rock face")
-	var glow := copies[2] as Sprite2D
+	var detail := ground.get_node(NodePath(BakeScript.DETAIL)) as Sprite2D
+	check((copies[1] as Sprite2D).texture == detail.texture, "then its 2x art (ART3)")
+	check((copies[1] as Sprite2D).transform.is_equal_approx(_in(detail, layout)), "the 2x art where it lies, at half its size")
+	check((copies[2] as Sprite2D).texture == (ground.find_child("Underside", true, false) as Sprite2D).texture, "then its rock face")
+	var glow := copies[3] as Sprite2D
 	check(glow.texture == (ground.get_node("Glow") as Sprite2D).texture and glow.material == BakeScript.glow_material(), "then its glow, added by the bake's material")
 	check(glow.transform.is_equal_approx(_in(ground.get_node("Glow"), layout)), "the glow where it lies (its scale too)")
 	var to_bake: Transform2D = Transform2D(0.0, -ground.get_rect().position) * _in(ground, layout).affine_inverse()
 	for i in shades.size():
-		var copy := copies[3 + i] as Polygon2D
+		var copy := copies[4 + i] as Polygon2D
 		check(copy != null and copy.polygon == shades[i].polygon and copy.color == shades[i].color, "shade %d copied" % i)
 		if copy != null:
 			check(copy.transform.is_equal_approx(to_bake * _in(shades[i], layout)), "shade %d where it lies on the floor" % i)
-	check_equal(_stack_shown(layout), 3 + shades.size(), "until it is drawn the layers show")
+	check_equal(_stack_shown(layout), 4 + shades.size(), "until it is drawn the layers show")
 	check(_bake().bake(layout) == null, "baked once a layout")
 
 
@@ -109,7 +112,8 @@ func test_the_bake_is_drawn_at_the_picture_s_scale_and_stands_where_the_floor_st
 	check_equal(viewport.size, Vector2i(ground.texture.get_size() * 2.0), "twice the floor's size each way")
 	var base := Transform2D(0.0, Vector2(2.0, 2.0), 0.0, -ground.get_rect().position * 2.0)
 	check((viewport.get_child(0) as Sprite2D).transform.is_equal_approx(base), "the floor drawn twice as big from the viewport's corner")
-	check((viewport.get_child(2) as Sprite2D).transform.is_equal_approx(base * _in(ground, layout).affine_inverse() * _in(ground.get_node("Glow"), layout)), "the glow twice as big where it lies")
+	check((viewport.get_child(3) as Sprite2D).transform.is_equal_approx(base * _in(ground, layout).affine_inverse() * _in(ground.get_node("Glow"), layout)), "the glow twice as big where it lies")
+	check((viewport.get_child(1) as Sprite2D).transform.is_equal_approx(base * _in(ground, layout).affine_inverse() * _in(ground.get_node(NodePath(BakeScript.DETAIL)), layout)), "the 2x art pixel for pixel in the bake")
 	var children: Array[Transform2D] = []
 	for child: Node in ground.get_children():
 		if child is Node2D:
@@ -149,7 +153,8 @@ func test_drawn_the_floor_shows_the_bake_and_its_stack_is_one_item() -> void:
 	var shown := ground.get_node_or_null(NodePath(BakeScript.SHOWN)) as Sprite2D
 	check(shown != null and shown.texture == viewport.get_texture() and shown.material == BakeScript.shown_material() and ground.texture == null, "a sprite under the floor draws the bake, premultiplied; the floor nothing more")
 	check_equal(_stack_shown(layout), 1, "the floor's whole stack is one item drawn (one draw call)")
-	check((ground.get_node("Glow") as Sprite2D).texture == null and (ground.find_child("Underside", true, false) as Sprite2D).texture == null, "the layers' textures let go")
+	check((ground.get_node("Glow") as Sprite2D).texture == null and (ground.find_child("Underside", true, false) as Sprite2D).texture == null \
+		and (ground.get_node(NodePath(BakeScript.DETAIL)) as Sprite2D).texture == null, "the layers' textures let go")
 	check_equal(viewport.render_target_update_mode, SubViewport.UPDATE_DISABLED, "never drawn again")
 	await process_frame
 	check_equal(viewport.get_child_count(), 0, "its copies freed")

@@ -7,13 +7,15 @@ extends "res://tests/support/suite.gd"
 ## island's outline, cracks from it, patches and strokes, and a room with pits), and the GDScript draws
 ## those fixtures as the tool does (its hashes, `ground_fixtures.json`); and a mirrored room
 ## is drawn again, not flipped: the floor a body stands on is the exact mirror of the unmirrored
-## one, its art differs, and its rock face still hangs below its edges.
+## one, its art differs, and its rock face still hangs below its edges. The 2x art (ArtDetail; ART3)
+## is held to the baked @2x files and the tool's hashes the same way, and is opaque exactly where
+## its 1x pixel is.
 ##
 ## A baked PNG is read from its file (its import fills the colour of clear pixels, `fix_alpha_border`):
 ## every pixel's alpha must be the same, and the colour of every pixel that is not clear.
 ##
 ## Without the native module the native comparisons only say so (SPELLMERGE_NATIVE=required fails it).
-# unit-test-alone
+# unit-test-shards: 4
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const HubShape := preload("res://content/rooms/hub/hub.shape.json")
@@ -26,8 +28,16 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 
 const ROOMS: StringName = &"rooms"
 ## The baked art's sprites, by what the drawing calls them.
-const SPRITES: Dictionary = {"floor": ".", "glow": "Glow", "under": "Underside", "wall": "WallArt"}
+## The rock face and the walls' art are baked at 2x only; the floor at 1x (its texture) and 2x (`Detail`).
+const SPRITES: Dictionary = {"floor": ".", "fine_floor": "Detail", "glow": "Glow", "fine_under": "Underside", "fine_wall": "WallArt"}
 const MIRRORINGS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+## The rooms drawn mirrored in `test_a_mirrored_room_is_drawn_again_not_flipped`: one of each kind (pits
+## and cracks, a slab, a corner walkway's polygon, walkways each way, a seam), and SAMPLED more
+## picked by a seeded draw. Every room's own art is held to its baked art unmirrored, natively
+## (`test_the_native_drawing_is_the_baked_art`); this only checks that mirroring draws it again.
+const MIRRORED_ROOMS: Array[StringName] = [&"arena_02", &"arena_05", &"crypt_corner_256x384", &"crypt_bridge_96", &"crypt_bridge_v128", &"crypt_seam"]
+const SAMPLED: int = 3
+const SAMPLE_SEED: int = 971
 
 
 func _registry() -> RegistryScript:
@@ -106,7 +116,7 @@ func _check_baked(room: Dictionary, spec: Dictionary, art: Dictionary) -> void:
 		var sprite := (ground if SPRITES[kind] == "." else ground.find_child(SPRITES[kind], true, false)) as Sprite2D
 		var drawn: PackedByteArray = art[kind]
 		if sprite == null:
-			check(drawn.is_empty() or kind != "wall", "%s: no wall art baked, none drawn" % room["id"])
+			check(drawn.is_empty() or kind != "fine_wall", "%s: no wall art baked, none drawn" % room["id"])
 			continue
 		var image := Image.new()
 		image.load_png_from_buffer(FileAccess.get_file_as_bytes(sprite.texture.resource_path))
@@ -154,7 +164,7 @@ func test_the_fixtures_are_drawn_as_the_tool_draws_them() -> void:
 	for case: Array in [["ground_hall", Hall], ["ground_island", Island]]:
 		var art: Dictionary = ShapeScript.draw(_spec((case[1] as JSON).data, null), false)
 		var want: Dictionary = expected[case[0]]
-		for kind: String in ["floor", "under", "glow", "wall"]:
+		for kind: String in ["floor", "under", "glow", "wall", "fine_floor", "fine_under", "fine_wall"]:
 			check_equal(_sha(art[kind]), want[kind], "%s: the %s is the tool's" % [case[0], kind])
 		var lines := PackedStringArray()
 		for points: PackedVector2Array in (art["rims"] as Array) + (art["drips"] as Array):
@@ -180,12 +190,23 @@ func test_the_native_drawing_is_the_gdscript_in_every_mirroring() -> void:
 	for mirror: Vector2i in [Vector2i.ZERO] + MIRRORINGS:
 		for case: Dictionary in cases:
 			_check_twins("%s %s" % [case["id"], mirror], _spec(case["shape"], case["scene"], mirror))
+
+
+func test_the_native_drawing_is_the_gdscript_in_a_room_with_pits() -> void:
+	if not _native_or_say():
+		return
 	# A room with pits, cracks from them and two edge styles, mirrored both ways.
 	var room: RoomBase = _registry().get_resource(ROOMS, &"arena_02")
 	_check_twins("arena_02 (1, 1)", _spec(room.ground_shape.data, room.scene, Vector2i(1, 1)))
-	# A corner walkway's polygon outline and area (connected biomes CB13), in every mirroring.
+
+
+func test_the_native_drawing_is_the_gdscript_on_a_corner_walkway() -> void:
+	if not _native_or_say():
+		return
+	# A corner walkway's polygon outline and area (connected biomes CB13), as it is and mirrored both ways
+	# (the fixtures take every mirroring).
 	var corner: RoomBase = _registry().get_resource(ROOMS, &"crypt_corner_256x384")
-	for mirror: Vector2i in [Vector2i.ZERO] + MIRRORINGS:
+	for mirror: Vector2i in [Vector2i.ZERO, Vector2i(1, 1)]:
 		_check_twins("crypt_corner_256x384 %s" % mirror, _spec(corner.ground_shape.data, corner.scene, mirror))
 
 
@@ -210,9 +231,16 @@ func test_a_mirrored_room_is_drawn_again_not_flipped() -> void:
 	var native: bool = NativeScript.loaded()
 	var cases: Array[Dictionary] = [{"id": "hall", "shape": Hall.data, "scene": null}, {"id": "island", "shape": Island.data, "scene": null}]
 	if native:
+		var others: Array[Dictionary] = []
 		for room: Dictionary in _rooms():
-			if room["id"] != &"hub":
+			if room["id"] in MIRRORED_ROOMS:
 				cases.append(room)
+			elif room["id"] != &"hub":
+				others.append(room)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = SAMPLE_SEED
+		for i in mini(SAMPLED, others.size()):
+			cases.append(others.pop_at(rng.randi_range(0, others.size() - 1)))
 	for case: Dictionary in cases:
 		var plain: Dictionary = ShapeScript.draw(_spec(case["shape"], case["scene"]), native)
 		var w: int = plain["width"]
@@ -229,6 +257,24 @@ func test_a_mirrored_room_is_drawn_again_not_flipped() -> void:
 			check(opaque, "%s: the floor art is opaque exactly where a body stands" % what)
 			check(floor_art != _mirrored(plain["floor"], w, h, mirror, 4), "%s: the floor is drawn again, not flipped" % what)
 			check(_hangs_below(art["under"], solid, w, h), "%s: the rock face hangs below the floor's edges (lit from above)" % what)
+			var d: int = art["detail"]
+			var fine_solid: PackedByteArray = _upsampled(solid, w, h, d)
+			var fine_floor: PackedByteArray = art["fine_floor"]
+			var fine_opaque: bool = fine_floor.size() == fine_solid.size() * 4
+			for p in fine_solid.size() if fine_opaque else 0:
+				fine_opaque = fine_opaque and fine_floor[p * 4 + 3] == (255 if fine_solid[p] != 0 else 0)
+			check(fine_opaque, "%s: the 2x floor is opaque exactly where its 1x pixel is" % what)
+			check(_hangs_below(art["fine_under"], fine_solid, w * d, h * d), "%s: the 2x rock face hangs below the floor's edges" % what)
+
+
+## `mask` (w by h) with every value `d` by `d` times.
+func _upsampled(mask: PackedByteArray, w: int, h: int, d: int) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(w * d * h * d)
+	for y in h * d:
+		for x in w * d:
+			out[y * w * d + x] = mask[(y / d) * w + x / d]
+	return out
 
 
 ## Whether every pixel of the rock face `under` hangs from solid ground above it in its column.
@@ -266,3 +312,23 @@ func _mirrored(data: PackedByteArray, w: int, h: int, mirror: Vector2i, stride: 
 			for k in stride:
 				out[(y * w + x) * stride + k] = data[from + k]
 	return out
+
+
+func test_the_2x_floor_is_put_on_a_floor_that_has_no_detail_yet() -> void:
+	# A floor with no `Detail` child (a ground scene from before ART3): `apply` makes one, the
+	# floor's first child, the 2x art at half its size over the 1x texture the floor keeps.
+	var spec: Dictionary = _spec(Hall.data, null)
+	var art: Dictionary = ShapeScript.draw(spec, false)
+	var ground := Sprite2D.new()
+	ground.centered = false
+	var glow := Sprite2D.new()
+	glow.name = "Glow"
+	ground.add_child(glow)
+	ShapeScript.apply(ground, art, spec)
+	var detail := ground.get_node_or_null(NodePath(ShapeScript.DETAIL)) as Sprite2D
+	check(detail != null and detail.get_index() == 0, "a Detail sprite, the floor's first child (under its glow)")
+	if detail != null:
+		check_equal(ArtDetail.of(detail.texture), 2, "its texture marked at 2x")
+		check(detail.scale.is_equal_approx(Vector2(0.5, 0.5)) and not detail.centered, "drawn at half its size from the floor's corner")
+		check_equal(Vector2i(detail.texture.get_size()), Vector2i(ground.texture.get_size()) * 2, "twice the floor's pixels each way")
+	ground.free()

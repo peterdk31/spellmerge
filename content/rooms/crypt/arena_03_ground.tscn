@@ -1,7 +1,8 @@
-[gd_scene load_steps=34 format=3]
+[gd_scene load_steps=35 format=3]
 
 [ext_resource type="Texture2D" path="res://art/grounds/arena_03/arena_03_ground_floor.png" id="1_floor"]
-[ext_resource type="Texture2D" path="res://art/grounds/arena_03/arena_03_ground_under.png" id="2_under"]
+[ext_resource type="Texture2D" path="res://art/grounds/arena_03/arena_03_ground_floor@2x.png" id="6_fine"]
+[ext_resource type="Texture2D" path="res://art/grounds/arena_03/arena_03_ground_under@2x.png" id="2_under"]
 [ext_resource type="Texture2D" path="res://art/grounds/arena_03/arena_03_ground_glow.png" id="3_glow"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
 
@@ -104,7 +105,13 @@ z_index = -2
 texture_filter = 1
 texture = ExtResource("1_floor")
 centered = false
-metadata/ground_inputs = "5ccfe2c9d66d9c96"
+metadata/ground_inputs = "7f77290a9f2c503a"
+
+[node name="Detail" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("6_fine")
+centered = false
 
 [node name="Glow" type="Sprite2D" parent="."]
 material = SubResource("GlowAdd")
@@ -123,6 +130,7 @@ collision_mask = 0
 z_as_relative = false
 z_index = -2
 texture_filter = 1
+scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_under")
 centered = false
 

@@ -63,8 +63,12 @@ const ZAP_SPARK_LONGEST: float = 22.0
 const MAX_PULLS_PER_STEP: int = 16
 ## Pixels per second a `magnet` shot pulls the enemies near it toward itself.
 const MAGNET_PULL: float = 200.0
-## Degrees a split fan covers when the carrier card has no spread of its own.
+## Degrees a fan of shots (+2, +3) covers when the carrier card has no spread of its own.
 const SPLIT_SPREAD: float = 30.0
+## The share of a spell's mana each shot a card adds (+2, +3) costs, added up over its cards: +2 costs
+## twice the mana, +3 two and a half times, +2 and +3 together three and a half (the owner's decision
+## of 2026-11-27: every shot at full damage, paid in mana; #972).
+const SHOT_ADD_MANA: float = 0.5
 ## Builds of one staff (the generations) whose shots can be in the air at once.
 const GENERATIONS: int = 8
 ## Staffs per caster, one per button for a seat: A, X, Y and B.

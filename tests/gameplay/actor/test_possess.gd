@@ -160,7 +160,7 @@ func test_every_actor_a_cast_hits_is_possessed_and_the_seat_drives_the_first() -
 
 
 func test_a_split_bolt_possesses_both_imps_it_hits() -> void:
-	var wizard := _possessor([&"possess", &"split", &"bolt"])
+	var wizard := _possessor([&"possess", &"plus_two", &"bolt"])
 	var left := _imp(Vector2(-14.0, 70.0))
 	var right := _imp(Vector2(14.0, 70.0))
 	_tap(0, &"staff_1")

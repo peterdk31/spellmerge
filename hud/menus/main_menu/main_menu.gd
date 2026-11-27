@@ -27,6 +27,9 @@ extends Control
 const EventsScript := preload("res://core/events/events.gd")
 const OnlineWords := preload("res://hud/widgets/online_words.gd")
 const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
+## The game's name is drawn in the title type, as a boss's is (the owner, 2026-11-27, on #975): its
+## own theme, `TitleLabel` (hud/README.md, "The theme": the project theme names no imported file).
+const TITLE_THEME: Theme = preload("res://hud/theme/title_theme.tres")
 
 ## The player index sent with `hub_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
@@ -106,6 +109,7 @@ var runner_factory: Callable = Callable()
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
 
+@onready var _title: Label = $Center/Lines/Title
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
 @onready var _fullscreen: Button = %Fullscreen
@@ -141,6 +145,8 @@ func _ready() -> void:
 	z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	# Laid out in layout pixels (640 x 360) and drawn at the picture's scale (core/display/picture_grid.gd).
 	PictureGrid.fit_control(self)
+	_title.theme = TITLE_THEME
+	_title.theme_type_variation = &"TitleLabel"
 	_version.text = BuildInfo.describe()
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript

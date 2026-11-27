@@ -7,7 +7,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The first six modifiers, which never share a look with each other.
-const FIRST_SIX: Array[StringName] = [&"split", &"pierce", &"homing", &"chain", &"bigger", &"faster"]
+const FIRST_SIX: Array[StringName] = [&"plus_two", &"pierce", &"homing", &"chain", &"bigger", &"faster"]
 
 ## The looks later modifiers may share (docs/DECISIONS.md, "The later cards' looks"). A share is for
 ## cards that rarely sit on one shot or say the same thing; a new card may take one of these looks

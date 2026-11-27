@@ -64,7 +64,7 @@ func test_a_cast_without_the_card_asks_for_no_push() -> void:
 
 
 func test_a_split_volley_is_one_kick() -> void:
-	var moves: Array = _moves(["recoil", "split", "bolt"])
+	var moves: Array = _moves(["recoil", "plus_two", "bolt"])
 	check_equal(moves.size(), 1, "the volley is one firing, so one push")
 
 

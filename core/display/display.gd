@@ -18,6 +18,8 @@ extends Node
 ## shows it 1.5 times, each picture pixel 1 or 2 screen pixels. A 2560 x 1440 or 3840 x 2160 screen
 ## stays at 2 and 3. `stretch_for(window, picture)` decides, every time the window's size changes.
 ## View only: nothing in the game reads it.
+##
+## It also makes the game's pixel font every theme's default as the game starts (`PixelFont.install`).
 
 ## Fullscreen went on or off through `set_fullscreen` (the window may also leave on its own).
 signal fullscreen_changed(on: bool)
@@ -30,6 +32,11 @@ const FILL_LEAST: float = 0.85
 ## How the window mode is read and set; tests swap them for fakes (headless has no window).
 var get_mode: Callable = DisplayServer.window_get_mode
 var set_mode: Callable = DisplayServer.window_set_mode
+
+
+func _enter_tree() -> void:
+	# The game's pixel font, the default of every theme before anything draws text (core/display/pixel_font.gd).
+	PixelFont.install()
 
 
 func _ready() -> void:

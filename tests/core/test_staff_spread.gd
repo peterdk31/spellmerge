@@ -62,7 +62,7 @@ func test_a_staff_with_no_spread_aims_true() -> void:
 
 
 func test_spread_stays_inside_its_degrees() -> void:
-	var angles: Array[float] = _cast_angles([&"split", &"bolt"], 10.0)
+	var angles: Array[float] = _cast_angles([&"plus_two", &"bolt"], 10.0)
 	for player in range(1, 4):
 		angles.append_array(_cast_angles([&"triple", &"bolt", &"bolt", &"bolt"], 10.0, player))
 	check_equal(angles.size(), 12, "twelve shots")
@@ -140,7 +140,7 @@ func test_the_dev_staff_aims_true() -> void:
 func test_a_spread_factor_of_zero_aims_the_next_carrier_true() -> void:
 	# What a sniper card does with `spread_mult`: here set on the compiled carrier, as the
 	# compiler does from the modifiers before it.
-	var compiled: CompiledStaff = _spells.compile_staff([&"double", &"split", &"bolt", &"split", &"bolt"] as Array[StringName], _staff(30.0))
+	var compiled: CompiledStaff = _spells.compile_staff([&"double", &"plus_two", &"bolt", &"plus_two", &"bolt"] as Array[StringName], _staff(30.0))
 	compiled.casts[0].group.spells[0].spread_mult = 0.0
 	_spells.install_staff(0, 0, compiled)
 	_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0)

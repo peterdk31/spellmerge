@@ -90,7 +90,7 @@ func test_a_command_applies_at_the_next_tick_start() -> void:
 
 
 func test_commands_keep_their_order_and_types() -> void:
-	var cards: Array[StringName] = [&"split", &"", &"nova"]
+	var cards: Array[StringName] = [&"plus_two", &"", &"nova"]
 	_bus.staff_cards_requested.emit(0, 2, cards, BODY)
 	_bus.staff_change_requested.emit(0, 1, 3, &"", BODY)
 	_bus.staff_change_requested.emit(1, 0, 0, &"bolt", BODY)

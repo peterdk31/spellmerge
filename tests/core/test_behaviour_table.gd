@@ -120,7 +120,7 @@ func test_a_wasted_card_changes_nothing_else() -> void:
 
 func test_infusions_and_numbers_that_mean_nothing_are_listed() -> void:
 	# Found by tests/core/test_card_rules.gd: silent on main before R2.
-	for cards: Array in [["fire", "decoy"], ["frost", "decoy"], ["overcharge", "decoy"], ["pierce", "dash"], ["split", "dash"], ["slow", "teleport"], ["pierce", "swing"]]:
+	for cards: Array in [["fire", "decoy"], ["frost", "decoy"], ["overcharge", "decoy"], ["pierce", "dash"], ["plus_two", "dash"], ["slow", "teleport"], ["pierce", "swing"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
 	for cards: Array in [["fire", "blast", "dash"], ["overcharge", "blast", "teleport"], ["fire", "dash"], ["overcharge", "teleport"], ["mend", "teleport"], ["sniper", "bolt"], ["pierce", "rune"], ["timer", "bolt", "nova", "bolt"], ["zap", "bolt"], ["slow", "bolt"], ["timer", "swap", "nova", "bolt"], ["zap", "nova", "bolt"]]:

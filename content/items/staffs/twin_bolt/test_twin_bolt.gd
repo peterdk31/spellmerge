@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Twin bolt (content/items/staffs/twin_bolt): one of the hub rack's normal premade staffs (the owner,
-## 2026-11-20, on #891: real, balanced builds beside the crazy ones), a bolt split in two, on the curl
+## 2026-11-20, on #891: real, balanced builds beside the crazy ones), a bolt and +2 (three bolts in a fan), on the curl
 ## staff, a starter staff's numbers. Its data is sound, every card it names is a card, its build
 ## wastes none of them, and it is a fair staff: no dev staff's endless mana or missing cooldown.
 const SpellsScript := preload("res://core/spells/spells.gd")

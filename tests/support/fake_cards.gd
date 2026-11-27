@@ -13,7 +13,7 @@ extends RefCounted
 const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
 const ICONS: Array[Texture2D] = [
 	preload("res://content/spells/carriers/bolt/icon.svg"),
-	preload("res://content/spells/modifiers/split/icon.svg"),
+	preload("res://content/spells/modifiers/plus_two/icon.svg"),
 	preload("res://content/spells/elements/fire/icon.svg"),
 	preload("res://content/spells/triggers/on_hit/icon.svg"),
 	preload("res://content/spells/multicasts/double/icon.svg"),

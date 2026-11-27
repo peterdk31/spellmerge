@@ -10,7 +10,7 @@ const FramesScript := preload("res://core/sim/frames.gd")
 func _sample() -> GroundLoadout:
 	var made := GroundLoadout.new()
 	check(made.set_room(&"hub"), "a room")
-	check(made.add_item(&"staff", &"star", "Wild star", 1, Vector2(448.25, 560.125), 87.123456789, [&"lightning", &"", &"split"] as Array[StringName]), "a staff")
+	check(made.add_item(&"staff", &"star", "Wild star", 1, Vector2(448.25, 560.125), 87.123456789, [&"lightning", &"", &"plus_two"] as Array[StringName]), "a staff")
 	check(made.add_item(&"card", &"bolt", "", 1, Vector2(-3.5, 1e6), 0.0, [] as Array[StringName]), "a card")
 	return made
 
@@ -27,7 +27,7 @@ func test_it_comes_back_from_its_bytes_as_it_was() -> void:
 	check(read.equals(ground), "the same")
 	check_equal(read.mana_of(0), 87.123456789, "the mana to the bit")
 	check_equal(read.place_of(0), Vector2(448.25, 560.125), "the place to the bit")
-	check_equal(read.cards_of(0), [&"lightning", &"", &"split"] as Array[StringName], "the cards, an empty slot too")
+	check_equal(read.cards_of(0), [&"lightning", &"", &"plus_two"] as Array[StringName], "the cards, an empty slot too")
 	check(ground.copy().equals(ground), "a copy is the same")
 	var empty := GroundLoadout.new()
 	var none := PackedByteArray()

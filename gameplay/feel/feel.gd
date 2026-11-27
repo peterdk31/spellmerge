@@ -673,6 +673,10 @@ var unknown_cue_parts: int = 0
 var _cue_flash: int = -1
 var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
+## What each live beam's node (`_live_beams`, by index) was last given of the uniforms that seldom
+## change, in `FeelBeams.LiveSet`'s order: the beams job sets one only when its value changes, and
+## every one again when the node's shader changes. An entry is made with its node.
+var _live_set: Array[Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
 var _thin_points: PackedVector2Array = PackedVector2Array()

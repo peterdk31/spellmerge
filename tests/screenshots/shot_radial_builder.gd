@@ -47,7 +47,7 @@ func take() -> void:
 	await _point(0, &"atom", true)
 	await shot("radial_pointing")
 	tap(0, &"staff_2")
-	await _point(0, &"split", true)
+	await _point(0, &"plus_two", true)
 	tap(0, &"staff_2")
 	await _point(0, &"homing", true)
 	await shot("radial_built")

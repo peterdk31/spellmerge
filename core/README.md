@@ -68,7 +68,7 @@ Its code is split by job; its state is not. `projectile_manager.gd` holds every 
 | walls | `projectile_walls.gd` | wall bodies, solid shots, what a shot does at a wall |
 | guards | `projectile_guards.gd` | deflect, block, shots in a wedge, `threat`, shields |
 | places | `projectile_places.gd` | portal gates, fields, `shot_places`, `pass_shot` |
-| rays | `projectile_rays.gd` | `ray`, `sweep`, `strike` and a beam's path |
+| rays | `projectile_rays.gd` | `ray`, `sweep`, `strike`, a beam's path, and many beams' rays between their hits walked in one call (`ray_walks`, natively `ShotKernel.ray_walks`) |
 | batches | `projectile_batches.gd` | the MultiMesh batches, card bodies, the heads' mesh |
 | draw | `projectile_draw.gd` | `update_draw`, motes and tails, the row codes |
 
@@ -96,6 +96,10 @@ Every 2D MultiMesh is made by `Batches.multimesh()` (box `Batches.WORLD`), never
 ## The render thread
 
 Desktop builds draw on a separate render thread (`tests/core/test_render_thread.gd`). So: a picture the game keeps writing goes through `TextureUpload.hand(image)`, never `ImageTexture.update`/`set_image` (`tests/core/test_texture_upload.gd`); RenderingServer calls only from the main thread; no `get_image()` or viewport read back during play; every font size and outline the HUD or Feel draws is in `GlyphWarmup`'s list (`tests/core/test_glyph_warmup.gd`).
+
+## The game's font
+
+Every text but the boss names' title type is drawn in one original pixel font at art-pixel detail (two art pixels a layout pixel), `PixelFont` (`display/pixel_font.gd`): a bitmap FontFile made at boot from the glyph sheet `art/ui/fonts/text.png` and its metrics `text.json` (drawn by `tools/font_art.py`), with a cache for every size from `FIRST_SIZE` to `LAST_SIZE` and outline up to `MAX_OUTLINE`, and made every theme's default by `Display` as it enters the tree. A size is drawn by the largest face at or under it (only a size past twice the last face by a face scaled); its line (ascent, descent) is the old default font's, so layouts are unchanged; advances are whole layout pixels. An outline of any size is the glyph's one-art-pixel outline, from `HEAVY` (3) up with a pixel's hard shadow down-right. Nothing is rasterized in play, so nothing races the render thread. A size or outline outside the lists draws nothing, and `GlyphWarmup.drawn_since_warm` names it; a character the font lacks draws nothing either (no system font), so a new one goes in `tools/font_art.py` and `GlyphWarmup.EXTRA`. Glyphs are placed on half layout pixels (art pixels), so text must be drawn on a canvas at the picture's scale: text drawn into a texture of its own must draw it `ArtDetail.DETAIL` times (the damage numbers' sheet, `gameplay/feel/number_glyphs.gd`), or half its art pixels are lost. `tests/core/test_pixel_font.gd`.
 
 ## Compute effects
 

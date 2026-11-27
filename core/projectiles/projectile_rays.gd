@@ -8,7 +8,7 @@ const Manager := preload("res://core/projectiles/projectile_manager.gd")
 
 ## Not state (core/sim/README.md): the manager, the other jobs this one calls and the manager's
 ## arrays it works on, each the manager's own array (shared, never a copy), linked by `link`.
-const DERIVED: Array[StringName] = [&"pm", &"_job_places", &"_job_targets", &"_job_walls", &"_targets", &"_target_radius", &"_target_half", &"_target_layer", &"_target_pos", &"_cell_head", &"_target_next", &"_room_grid", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"_path", &"ray_path", &"sweep_nodes", &"sweep_points", &"sweep_heads"]
+const DERIVED: Array[StringName] = [&"pm", &"_job_places", &"_job_targets", &"_job_walls", &"_targets", &"_target_radius", &"_target_half", &"_target_layer", &"_target_pos", &"_cell_head", &"_target_next", &"_room_grid", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"_path", &"ray_path", &"_walk_skips", &"sweep_nodes", &"sweep_points", &"sweep_heads"]
 
 var pm: Manager = null
 var _job_places: ProjectilePlaces = null
@@ -30,6 +30,7 @@ var _ray_walks: Array[Array]
 var _ray_turns: Array[Array]
 var _path: PackedVector2Array
 var ray_path: PackedVector2Array
+var _walk_skips: PackedInt32Array
 var sweep_nodes: Array
 var sweep_points: PackedVector2Array
 var sweep_heads: PackedVector2Array
@@ -85,6 +86,59 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 	if used == 0:
 		return _no_ray()
 	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
+
+
+## Many beams' rays between their hits at once (the beam carrier's, `CarrierBeam.step`: a fan of
+## split beams walks dozens a step, #972), each as `ray_points` walks it, with `hit` false, no bounce
+## and no steer, after `ray_gates` is set (the carrier's call for a beam between its hits): ray `n` of
+## `rays` is the `counts[n]` points of `points` from `offsets[n]`, `lengths[n]` pixels long, cast by
+## `actors[n]` on `layers`, `widths[n]` either side, spent on its `pierces[n] + 1`th target, sparing
+## `sources[n]` (null: none), through walls when `ghosts[n]` is 1. It sends nothing: how far each got
+## goes to `got[n]`, where it ended and its heading there to `ends[n]` and `headings[n]` (`ray_end`,
+## `ray_end_heading` after its `ray_points`), and the manager is left as those calls, one after
+## another, leave it. The native kernel walks them (`ShotKernel.ray_walks`) when it is loaded, handing
+## back each ray `ray_points` must walk here (one not cast, a scratch to grow, the targets' grid to fill
+## first); else `ray_points` walks each. Only with no gate open and no ray caster set (`ray_cast_by`):
+## the caller's to see (`walks_batch`).
+func ray_walks(rays: int, actors: PackedInt32Array, points: PackedVector2Array, offsets: PackedInt32Array, counts: PackedInt32Array, lengths: PackedFloat64Array, pierces: PackedInt32Array, widths: PackedFloat64Array, ghosts: PackedByteArray, sources: Array[Node], layers: int, got: PackedFloat64Array, ends: PackedVector2Array, headings: PackedVector2Array) -> void:
+	var kernel: Object = pm._kernel if pm._kernel_rays and walks_batch() else null
+	var at: int = 0
+	# The rows below are read again only after a ray here may have filled a stale grid.
+	var skips_read: bool = false
+	while at < rays:
+		if kernel != null:
+			if not skips_read:
+				if _walk_skips.size() < rays:
+					_walk_skips.resize(rays)
+				# The bodies they are cast from, as rows of the targets' grid (`_ray_path`'s `skip_at`): a
+				# stale grid is filled by the ray that needs it, handed back, and these are read again after.
+				for n in range(at, rays):
+					_walk_skips[n] = pm._target_row(sources[n])
+				skips_read = true
+			var stale: bool = pm._grid_stale and not pm._stepping
+			if stale:
+				skips_read = false
+			var stop: int = kernel.call(&"ray_walks", pm, at, rays, actors, points, offsets, counts, lengths, pierces, widths, ghosts, _walk_skips, layers | Manager.ACTOR_LAYERS, _targets.size(), stale, got, ends, headings)
+			if stop < 0:
+				# Bad sizes (logged): the rest here.
+				kernel = null
+			else:
+				at = stop
+			if at >= rays:
+				break
+		# One ray here: the kernel handed it back, or there is none.
+		pm.ray_gates = true
+		pm.ray_air = 0.0
+		got[at] = ray_points(actors[at], points, offsets[at], counts[at], lengths[at], pierces[at], layers, 0, widths[at], sources[at], false, 0, Callable(), ghosts[at] != 0)
+		ends[at] = pm.ray_end
+		headings[at] = pm.ray_end_heading
+		at += 1
+
+
+## True when `ray_walks` may walk rays together: no gate is open (a ray would stop at one, P4) and no
+## ray caster is set (a wall's own ray lifts its stone, `ray_cast_by`).
+func walks_batch() -> bool:
+	return pm._gate_live <= 0 and pm._ray_caster < 0
 
 
 ## `_path`'s first `used` pieces with the first `air` pixels taken off its start (`ray_air`): returns

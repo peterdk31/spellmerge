@@ -14,7 +14,7 @@ func _full() -> InputFrame:
 	frame.hold(3, true)
 	frame.captured = true
 	check(frame.add_command(&"staff_change_requested", [1, 4, &"fire", 9]), "a staff change is a command")
-	check(frame.add_command(&"staff_cards_requested", [2, [&"split", &"", &"nova"] as Array[StringName], 9]), "a whole staff is a command")
+	check(frame.add_command(&"staff_cards_requested", [2, [&"plus_two", &"", &"nova"] as Array[StringName], 9]), "a whole staff is a command")
 	check(frame.add_command(&"door_vote_requested", [-2]), "a door vote is a command")
 	check(frame.add_command(InputFrame.JOIN), "a join is a command")
 	return frame
@@ -67,7 +67,7 @@ func test_a_frame_comes_back_from_its_bytes() -> void:
 	check_equal(back.commands[0], [&"staff_change_requested", 1, 4, &"fire", 9], "a staff change with its arguments")
 	check_equal(back.commands[2], [&"door_vote_requested", -2], "a negative int survives")
 	var cards: Array = back.commands[1][2]
-	check_equal(cards, [&"split", &"", &"nova"], "a list of ids, an empty one too")
+	check_equal(cards, [&"plus_two", &"", &"nova"], "a list of ids, an empty one too")
 	check(back.commands[1][2] is Array[StringName], "the list is typed as the event's")
 	check_equal(back.to_bytes(), bytes, "the same bytes again")
 	var empty := InputFrame.new()

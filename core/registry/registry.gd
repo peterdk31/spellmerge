@@ -19,6 +19,14 @@ extends Node
 ##
 ## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
+## A scan lists the files and loads none: a folder's files are loaded, all at once, the first time
+## the folder is asked for (`get_resource`, `get_ids`, `get_all`, `add`, `remove`; `get_folders`
+## loads every folder, since a folder is listed only when one of its files has an id). What a folder
+## gives is the same either way, but the menu's start no longer waits for content it does not show,
+## such as the rooms' scenes with their art (#972). Once the game runs (the menu is up), the folders
+## nobody asked for yet are loaded a few milliseconds a frame (`warm_step`), so none is first asked
+## for in play. Nothing the simulation reads depends on when a folder loads.
+##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
 ## runs' (`validate_runs()`) and the items' (`validate_items()`: each item's use),
 ## and pushes one warning per problem, so broken spell, run or item content shows up on the first run.
@@ -40,8 +48,14 @@ const DEFAULT_AUDIO_ROOT: String = "res://audio"
 ## naming both files), for the validator.
 var _content_root: String = DEFAULT_CONTENT_ROOT
 var _duplicates: PackedStringArray = PackedStringArray()
-## folder -> { id -> Resource }
+## folder -> { id -> Resource }, for each folder loaded so far (`_load_folder`)
 var _resources: Dictionary = {}
+## folder -> PackedStringArray of its `.tres` files, in sorted path order, for each folder the last
+## scan found and nothing has asked for yet
+var _unloaded: Dictionary = {}
+## The files of the first folder of `_unloaded` that `warm_step` has loaded so far, held so they stay
+## in the resource cache until the folder is registered.
+var _warmed: Array[Resource] = []
 ## folder -> sorted Array[StringName] of every id
 var _ids: Dictionary = {}
 ## sound id -> path
@@ -56,6 +70,9 @@ var _data: Dictionary = {}
 var _plain: RegEx = RegEx.create_from_string("^[a-z0-9_]+$")
 ## The templates' shapes by biome (`piece_shapes`), kept until the content changes.
 var _piece_shapes: Dictionary = {}
+
+## How long a frame may spend loading content nobody asked for yet (`warm_step`), in microseconds.
+const WARM_USEC_PER_FRAME: int = 4000
 
 ## The folder a content item keeps its sounds in, and a sound's folder of baked variants: never ids.
 const SOUNDS_FOLDER: String = "sounds"
@@ -73,12 +90,36 @@ func _ready() -> void:
 		warn_item_problems()
 
 
+func _process(_delta: float) -> void:
+	if warm_step(WARM_USEC_PER_FRAME):
+		set_process(false)
+
+
+## Loads content no one has asked for yet, file by file in folder order, until `budget_usec` has
+## passed (at least one file a call), and registers each folder whose files are all loaded. True
+## when every folder is loaded. Only when a folder loads changes: what each gives is the same.
+func warm_step(budget_usec: int) -> bool:
+	var start: int = Time.get_ticks_usec()
+	while not _unloaded.is_empty():
+		var folder: StringName = _unloaded.keys()[0]
+		var paths: PackedStringArray = _unloaded[folder]
+		if _warmed.size() >= paths.size():
+			_load_folder(folder)
+			continue
+		_warmed.append(ResourceLoader.load(paths[_warmed.size()]))
+		if Time.get_ticks_usec() - start >= budget_usec:
+			break
+	return _unloaded.is_empty()
+
+
 ## Reads the content and audio folders again. The roots can be changed so
 ## tests can scan a fixture folder; `sound_extensions` is for tests as well.
 func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFAULT_AUDIO_ROOT, sound_extensions: PackedStringArray = SOUND_EXTENSIONS) -> void:
 	_content_root = content_root
 	_duplicates.clear()
 	_resources.clear()
+	_unloaded.clear()
+	_warmed.clear()
 	_piece_shapes.clear()
 	_ids.clear()
 	_sound_paths.clear()
@@ -86,18 +127,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_sound_clashes.clear()
 	_data.clear()
 	for folder_name: String in _list_dir(content_root, true):
-		var folder: StringName = StringName(folder_name)
-		var duplicates: Array[String] = []
-		var found: Dictionary = _read_folder(content_root.path_join(folder_name), duplicates)
-		if folder == &"spells":
-			_duplicates.append_array(PackedStringArray(duplicates))
-		if not found.is_empty():
-			_resources[folder] = found
-			var ids: Array[StringName] = []
-			for id: StringName in found:
-				ids.append(id)
-			ids.sort_custom(_name_less)
-			_ids[folder] = ids
+		_unloaded[StringName(folder_name)] = _find_files(content_root.path_join(folder_name), PackedStringArray(["tres"]), SOUNDS_FOLDER)
 	var sound_files: PackedStringArray = PackedStringArray()
 	_collect_sounds(audio_root, sound_extensions, true, sound_files)
 	var content_sounds: PackedStringArray = PackedStringArray()
@@ -112,6 +142,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 			_sound_clashes.append("'%s' in %s and %s" % [sound_id, _sound_paths[sound_id], path])
 			continue
 		_sound_paths[sound_id] = path
+	set_process(not _unloaded.is_empty())
 
 
 ## Every sound id with a file, in id order (the sound room lists them, tests/sound_room).
@@ -157,11 +188,48 @@ static func scan_folder(folder: StringName, content_root: String = DEFAULT_CONTE
 	return result
 
 
+## The folder `folder` of the last scan loaded, if it is not yet (its files listed in `_unloaded`):
+## each of its resources with an id is registered, as the scan once did at the start. Called by
+## everything that reads a folder, before it reads it.
+func _load_folder(folder: StringName) -> void:
+	if not _unloaded.has(folder):
+		return
+	var warmed: bool = folder == _unloaded.keys()[0]
+	var paths: PackedStringArray = _unloaded[folder]
+	_unloaded.erase(folder)
+	var duplicates: Array[String] = []
+	var found: Dictionary = _load_files(paths, duplicates)
+	if warmed:
+		_warmed.clear()  # after the load, which found them in the cache
+	if folder == &"spells":
+		_duplicates.append_array(PackedStringArray(duplicates))
+	if found.is_empty():
+		return
+	_resources[folder] = found
+	var ids: Array[StringName] = []
+	for id: StringName in found:
+		ids.append(id)
+	ids.sort_custom(_name_less)
+	_ids[folder] = ids
+
+
+## Every folder of the last scan loaded (`_load_folder`).
+func _load_all_folders() -> void:
+	for folder: StringName in _unloaded.keys():
+		_load_folder(folder)
+
+
 ## Every `.tres` with an `id` below `folder_path`, by id (the first in sorted path order wins a
 ## duplicate, with a warning, and a line in `duplicates`).
 static func _read_folder(folder_path: String, duplicates: Array[String]) -> Dictionary:
+	return _load_files(_find_files(folder_path, PackedStringArray(["tres"]), SOUNDS_FOLDER), duplicates)
+
+
+## Each of `paths` (`.tres` files, in sorted path order) that loads as a resource with an `id`, by
+## id (the first wins a duplicate, with a warning, and a line in `duplicates`).
+static func _load_files(paths: PackedStringArray, duplicates: Array[String]) -> Dictionary:
 	var found: Dictionary = {}
-	for path: String in _find_files(folder_path, PackedStringArray(["tres"]), SOUNDS_FOLDER):
+	for path: String in paths:
 		var res: Resource = ResourceLoader.load(path)
 		if res == null or not ("id" in res):
 			continue
@@ -196,6 +264,8 @@ func warn_story_problems() -> int:
 ## reaction table `<content root>/spells/reactions.tres`, which is skipped when there is
 ## none, and on every staff found under `wizard` (`SpellValidator.check_staff`). Returns the problems as `SpellValidator` describes them; empty when all is well.
 func validate_spells() -> Array[Dictionary]:
+	_load_folder(&"spells")
+	_load_folder(&"wizard")
 	var spells: Array[Resource] = []
 	var found: Dictionary = _resources.get(&"spells", {})
 	for id: StringName in found:
@@ -337,6 +407,7 @@ func warn_run_problems() -> int:
 
 ## The resource with this id in this folder, or `null` when there is none.
 func get_resource(folder: StringName, id: StringName) -> Resource:
+	_load_folder(folder)
 	var found: Dictionary = _resources.get(folder, {})
 	return found.get(id) as Resource
 
@@ -364,6 +435,7 @@ func get_data(folder: StringName, id: StringName, file_name: String) -> Dictiona
 ## no id or the folder already holds that id.
 func add(folder: StringName, resource: Resource) -> bool:
 	var id: StringName = resource.get("id") if resource != null and "id" in resource else &""
+	_load_folder(folder)
 	var found: Dictionary = _resources.get(folder, {})
 	if id == &"" or found.has(id):
 		return false
@@ -380,6 +452,7 @@ func add(folder: StringName, resource: Resource) -> bool:
 ## Take the resource of id `id` out of `folder` (tests: undo an `add` on the game's registry, so a
 ## fixture is not left for the next suite). False when the folder has no such id.
 func remove(folder: StringName, id: StringName) -> bool:
+	_load_folder(folder)
 	var found: Dictionary = _resources.get(folder, {})
 	if not found.has(id):
 		return false
@@ -393,6 +466,7 @@ func remove(folder: StringName, id: StringName) -> bool:
 
 ## Every id in the folder, sorted. Empty for an unknown folder.
 func get_ids(folder: StringName) -> Array[StringName]:
+	_load_folder(folder)
 	var result: Array[StringName] = []
 	result.assign(_ids.get(folder, []))
 	return result
@@ -408,6 +482,7 @@ func get_all(folder: StringName) -> Array[Resource]:
 
 ## Folders that hold at least one resource, sorted.
 func get_folders() -> Array[StringName]:
+	_load_all_folders()
 	var result: Array[StringName] = []
 	for folder: StringName in _resources:
 		result.append(folder)

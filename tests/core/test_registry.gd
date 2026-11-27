@@ -242,3 +242,81 @@ func test_an_ogg_and_a_tres_of_one_id_clash() -> void:
 func test_the_games_sounds_have_no_clash() -> void:
 	var game: Node = root.get_node("Registry")
 	check_equal(game.sound_clashes(), PackedStringArray(), "no sound id is two files in audio/ and content/")
+
+
+# A folder loads when it is first asked for (#972): the menu's start does not wait for content it
+# does not show, such as the rooms' scenes.
+
+const LAZY_ROOT: String = "user://registry_lazy_test"
+const LAZY_ROOM: String = LAZY_ROOT + "/content/rooms/hall.tres"
+const LAZY_SPELL: String = LAZY_ROOT + "/content/spells/spark.tres"
+
+
+## A content root under user:// of one room and one spell, files no test has loaded yet.
+func _lazy_content() -> void:
+	DirAccess.make_dir_recursive_absolute(LAZY_ROOT + "/content/rooms")
+	DirAccess.make_dir_recursive_absolute(LAZY_ROOT + "/content/spells")
+	var room := RoomBase.new()
+	room.id = &"hall"
+	ResourceSaver.save(room, LAZY_ROOM)
+	var spell := CarrierCard.new()
+	spell.id = &"spark"
+	ResourceSaver.save(spell, LAZY_SPELL)
+
+
+func _remove_lazy_content() -> void:
+	for path: String in [LAZY_ROOM, LAZY_SPELL]:
+		DirAccess.remove_absolute(path)
+
+
+func test_a_scan_loads_no_folder_until_it_is_asked_for() -> void:
+	_lazy_content()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(LAZY_ROOT + "/content", LAZY_ROOT + "/audio")
+	check(not ResourceLoader.has_cached(LAZY_ROOM) and not ResourceLoader.has_cached(LAZY_SPELL), "a scan loads no content file")
+	check_equal(fresh.get_ids(&"spells"), _names([&"spark"]), "asking for a folder finds its ids")
+	check(ResourceLoader.has_cached(LAZY_SPELL), "the folder asked for is loaded")
+	check(not ResourceLoader.has_cached(LAZY_ROOM), "a folder not asked for is not")
+	check(fresh.get_resource(&"rooms", &"hall") is RoomBase, "and loads when it is")
+	_remove_lazy_content()
+
+
+func test_folders_lists_every_folder_none_asked_for_before() -> void:
+	_lazy_content()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(LAZY_ROOT + "/content", LAZY_ROOT + "/audio")
+	check_equal(fresh.get_folders(), _names([&"rooms", &"spells"]), "every folder with an id is listed, none asked for before")
+	_remove_lazy_content()
+
+
+func test_a_rescan_before_a_folder_is_asked_for_forgets_it() -> void:
+	registry.scan(FIXTURE + "/missing", FIXTURE + "/missing")
+	check_equal(registry.get_ids(&"spells"), _names([]), "the first scan's folders, never asked for, are gone")
+	check(registry.get_folders().is_empty(), "and none is listed")
+
+
+func test_warming_loads_every_folder_none_asked_for() -> void:
+	_lazy_content()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(LAZY_ROOT + "/content", LAZY_ROOT + "/audio")
+	check(not fresh.warm_step(0), "one file a step: two folders are not loaded by one step")
+	check(ResourceLoader.has_cached(LAZY_ROOM) and not ResourceLoader.has_cached(LAZY_SPELL), "a step loads the next file, in folder order")
+	var steps: int = 1
+	while not fresh.warm_step(0) and steps < 10:
+		steps += 1
+	check(fresh._unloaded.is_empty(), "every folder is loaded in a few steps (%d)" % steps)
+	check(ResourceLoader.has_cached(LAZY_SPELL), "the last folder's file too")
+	check_equal(fresh.get_ids(&"rooms"), _names([&"hall"]), "a warmed folder gives its ids")
+	check(fresh.get_resource(&"spells", &"spark") is CarrierCard, "and its resources")
+	_remove_lazy_content()
+
+
+func test_a_folder_asked_for_while_warming_is_the_same() -> void:
+	_lazy_content()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(LAZY_ROOT + "/content", LAZY_ROOT + "/audio")
+	fresh.warm_step(0)
+	check_equal(fresh.get_ids(&"spells"), _names([&"spark"]), "a folder after the one being warmed loads when asked")
+	check_equal(fresh.get_ids(&"rooms"), _names([&"hall"]), "the one being warmed too")
+	check(fresh.warm_step(0), "and nothing is left to warm")
+	_remove_lazy_content()

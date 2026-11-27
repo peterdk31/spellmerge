@@ -19,7 +19,7 @@ The shared services every other area stands on.
 ## Services (one folder each)
 
 - `events/`: `Events` autoload, a typed signal per event; core owns the definitions, each area's README lists what it sends and hears.
-- `registry/`: `Registry` autoload: `get_resource(folder, id)`, `get_ids`, `get_all`, `get_sound(id)` (null plays nothing), `validate_spells()`; `scan_folder` for the editor.
+- `registry/`: `Registry` autoload: `get_resource(folder, id)`, `get_ids`, `get_all`, `get_sound(id)` (null plays nothing), `validate_spells()`; `scan_folder` for the editor. A scan lists the files; a folder loads when it is first asked for (#972).
 - `input/`: `PlayerInput` autoload, asked by player index (`get_move`, `get_aim`, `is_action_just_pressed`, `get_press_count`, `set_captured`, `menu_move`, `glyph_kind`); `LocalInput`; `InputGlyphs`. The d-pad never walks. Menus and the HUD never read `Input` themselves.
 - `actors/`: `Actors` autoload, ids 0–1023. See `actors/README.md`.
 - `items/`: `ItemKinds.RULES`, `ItemStack`. See `items/README.md`.

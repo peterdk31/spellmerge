@@ -381,7 +381,7 @@ static func _kinds_given(line: RewardEntry, cards: RewardCards) -> Array[StringN
 ## One attempt's map as it grows (steps 1 to 5): a generator's scratch, never state.
 class Growth:
 	extends RefCounted
-	const DERIVED: Array[StringName] = [&"rules", &"content", &"shapes", &"dice", &"style", &"mirrored", &"crossings", &"room_templates", &"room_places", &"room_mirrors", &"room_lines", &"room_kinds", &"room_shapes", &"room_rects", &"room_depths", &"room_free", &"room_bridges", &"bridge_templates", &"bridge_places", &"bridge_mirrors", &"bridge_ends", &"bridge_rects", &"free_at", &"used", &"end_depth", &"last_off_way", &"loops_left", &"secret_dice", &"seam_crossings", &"rune_ends", &"placing"]
+	const DERIVED: Array[StringName] = [&"rules", &"content", &"shapes", &"dice", &"style", &"mirrored", &"crossings", &"room_templates", &"room_places", &"room_mirrors", &"room_lines", &"room_kinds", &"room_shapes", &"room_rects", &"room_depths", &"room_free", &"room_bridges", &"bridge_templates", &"bridge_places", &"bridge_mirrors", &"bridge_ends", &"bridge_rects", &"free_at", &"used", &"end_depth", &"last_off_way", &"loops_left", &"secret_dice", &"seam_crossings", &"rune_ends", &"placing", &"whole_spans", &"loop_ends", &"loop_ends_made", &"loops_known"]
 
 	var rules: MapRules = null
 	var content: RunContent = null
@@ -431,6 +431,19 @@ class Growth:
 	var rune_ends: PackedInt32Array = PackedInt32Array()
 	## How the room being placed is joined (`MapRules.SECRET_BRIDGE`, `SECRET_WALL`, `SECRET_RUNE`).
 	var placing: int = MapRules.SECRET_BRIDGE
+	## `_closable`'s scratch while the map stands as it is (`_changed` drops it as a piece is laid;
+	## #972: a style with a loop pull weighs every placement of every template, tens of thousands a
+	## map, and looking each of its sockets' crossings up in `free_at` was most of a map's time):
+	## `loop_ends`, by where a room's socket would stand and the way it faces (`Vector3i(x, y,
+	## facing)`), each crossing from there whose far end meets a free socket a loop may join, as
+	## [crossing, that socket's room] (`loop_ends_made` once worked out); `loops_known`, what
+	## `_loop_keeps` answered, by [parent, kind, other]. `whole_spans`: every crossing spans whole
+	## pixels, so a socket at whole pixels is looked up exactly (else `_closable` asks `free_at` as
+	## before).
+	var whole_spans: bool = true
+	var loop_ends: Dictionary = {}
+	var loop_ends_made: bool = false
+	var loops_known: Dictionary = {}
 
 	func _init(of_rules: MapRules, of_content: RunContent, of_shapes: Dictionary, of_dice: MapDice) -> void:
 		rules = of_rules
@@ -441,6 +454,10 @@ class Growth:
 			_add_crossings(walkway.id, crossings)
 		for seam: RoomBase in rules.biome_seams(content, shapes):
 			_add_crossings(seam.id, seam_crossings)
+		for facing: Array in crossings:
+			for crossing: Crossing in facing:
+				if crossing.span != crossing.span.round():
+					whole_spans = false
 
 	## Grows the map: "" when it is made, else why not.
 	func grow() -> String:
@@ -823,21 +840,72 @@ class Growth:
 	## be, `_loop_keeps`: such spans are few).
 	func _closable(shape: PieceShape, place: Vector2, joined: int, parent: int, kind: StringName) -> int:
 		var count: int = 0
+		var ends: Dictionary = _loop_ends() if whole_spans else {}
 		for socket in shape.sockets():
 			if socket == joined:
 				continue
 			var at: Vector2 = place + shape.socket_at[socket]
-			for crossing: Crossing in crossings[shape.socket_facing[socket]]:
-				var far: Vector2 = at + crossing.span
-				var key := Vector3i(roundi(far.x), roundi(far.y), RoomSocket.opposite(crossing.far_facing))
-				if not free_at.has(key):
-					continue
-				var other: int = (free_at[key] as Vector2i).x
+			if not whole_spans or at != at.round():
+				count += _closable_from(at, shape.socket_facing[socket], parent, kind)
+				continue
+			var from := Vector3i(roundi(at.x), roundi(at.y), shape.socket_facing[socket])
+			if not ends.has(from):
+				continue
+			for end: Array in ends[from]:
+				var crossing: Crossing = end[0]
+				var other: int = end[1]
 				if other == parent or not _bridge_clear(Rect2(at - crossing.from_at, crossing.size), other, -1):
 					continue
-				if _loop_keeps(parent, kind, other):
+				if _loop_keeps_known(parent, kind, other):
 					count += 1
 		return count
+
+	## `_closable`'s count for one socket at `at` facing `facing`, each of its crossings looked up in
+	## `free_at` (a socket off whole pixels, or a crossing that is).
+	func _closable_from(at: Vector2, facing: int, parent: int, kind: StringName) -> int:
+		var count: int = 0
+		for crossing: Crossing in crossings[facing]:
+			var far: Vector2 = at + crossing.span
+			var key := Vector3i(roundi(far.x), roundi(far.y), RoomSocket.opposite(crossing.far_facing))
+			if not free_at.has(key):
+				continue
+			var other: int = (free_at[key] as Vector2i).x
+			if other == parent or not _bridge_clear(Rect2(at - crossing.from_at, crossing.size), other, -1):
+				continue
+			if _loop_keeps_known(parent, kind, other):
+				count += 1
+		return count
+
+	## `loop_ends` (above) for the map as it stands: for each free socket a loop may join, every
+	## crossing whose far end meets it, by where that crossing's near end stands and faces.
+	func _loop_ends() -> Dictionary:
+		if loop_ends_made:
+			return loop_ends
+		loop_ends_made = true
+		for key: Vector3i in free_at:
+			var other: int = (free_at[key] as Vector2i).x
+			for facing in crossings.size():
+				for crossing: Crossing in crossings[facing]:
+					if RoomSocket.opposite(crossing.far_facing) != key.z:
+						continue
+					var from := Vector3i(key.x - roundi(crossing.span.x), key.y - roundi(crossing.span.y), facing)
+					if not loop_ends.has(from):
+						loop_ends[from] = []
+					(loop_ends[from] as Array).append([crossing, other])
+		return loop_ends
+
+	## `_loop_keeps`, asked once for each parent, kind and other room while the map stands as it is.
+	func _loop_keeps_known(parent: int, kind: StringName, other: int) -> bool:
+		var key: Array = [parent, kind, other]
+		if not loops_known.has(key):
+			loops_known[key] = _loop_keeps(parent, kind, other)
+		return loops_known[key]
+
+	## A piece was laid (a room, a bridge, a rune): what `_closable` worked out goes.
+	func _changed() -> void:
+		loop_ends.clear()
+		loop_ends_made = false
+		loops_known.clear()
 
 	func _shape(id: StringName, mirror: int) -> PieceShape:
 		var key: String = "%s:%d" % [id, mirror]
@@ -864,6 +932,7 @@ class Growth:
 		var loops: bool = rule == null or not (rule.dead_end or rule.stands_deepest())
 		room_free.append(free)
 		room_bridges.append(0)
+		_changed()
 		if rule != null:
 			used[template] = true
 		if loops:
@@ -874,6 +943,7 @@ class Growth:
 	## A rune in room `host` leading to room `to` (no piece: both rooms count it as a join).
 	func _add_rune(host: int, to: int) -> void:
 		rune_ends.append_array(PackedInt32Array([host, to]))
+		_changed()
 		room_bridges[host] += 1
 		room_bridges[to] += 1
 
@@ -896,6 +966,7 @@ class Growth:
 		bridge_mirrors.append(mirror)
 		bridge_ends.append_array(ends)
 		bridge_rects.append(rect)
+		_changed()
 		for end: Vector2i in [Vector2i(ends[0], ends[1]), Vector2i(ends[2], ends[3])]:
 			room_free[end.x][end.y] = 0
 			room_bridges[end.x] += 1

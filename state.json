@@ -29,13 +29,13 @@
       "task": "Owner's relic idea for M3, when relics arrive. The Nuke: the wizard has zero mana regeneration, every spellcast spends all current mana however much or little there is, and mana refills completely every X seconds (X to be tuned). Done when it exists as a relic content folder with tests and the spell cost and mana rules support it. Open points for design then: how a cast scales with the mana spent, and the refill interval.",
       "title": "Relic idea: The Nuke (no mana regen, all-in casts, timed refill)"
     },
-    "417": {
-      "author": "peterdk31",
-      "kind": "idea",
-      "priority": "p3",
-      "source": "https://github.com/peterdk31/spellmerge/discussions/286",
-      "task": "Add a downed animation for wizards: when downed, the wizard shrinks into its hat so only the hat remains visible; on revive it pops back out of the hat. Use the existing wizard animation strips and actor downed/revive state (actor id, not seat). Placeholder pixel art in 32x32 style following docs/STYLE.md, listed in the asset manifest. Done when the downed and revive states play these visuals, with a test for the animation state switching.",
-      "title": "Downed wizard shrinks into its hat; revive pops back out"
+    "972": {
+      "author": "hallethebest",
+      "kind": "bug",
+      "priority": "p2",
+      "source": "https://github.com/peterdk31/spellmerge/issues/972",
+      "task": "A player on the web build (Preview edition, 1 player) reports poor performance at load, and a heavy frame-rate drop when a beam spell carries several Split cards. Reproduce in the web (Compatibility renderer) build: build a staff with a beam carrier and 2 to 4 Split modifiers, cast it, and measure frame time and the number of projectiles and segments spawned. Find where the cost grows (projectile count, per-beam work, drawing, shader or batch setup) and cut it, keeping the GDScript and native kernels identical and the simulation deterministic. Also check what is slow at startup on the web (shader warmup, resource loading) and trim it if there is something clear. Done when the beam with several Splits stays smooth on the web build, with a benchmark or test covering the case.",
+      "title": "Fix: web slowdown when a beam has several Split cards, and slow load"
     }
   },
   "last_own_merge": "2026-10-29T17:12:19Z",

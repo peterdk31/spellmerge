@@ -5,7 +5,9 @@ extends Node2D
 ## nothing: a frame with no new stamps renders nothing.
 ##
 ## **The layer** is a `SubViewport` the size of the room's bounds (the projectile manager's
-## `bounds()`) at one texel a world pixel, with `CLEAR_MODE_NEVER` and `UPDATE_DISABLED`; a frame
+## `bounds()`) at DETAIL texels a world pixel each way (the art's detail, ArtDetail; ART3: its canvas
+## scaled by DETAIL, so the stamps are placed in world pixels and worked out at art pixels, and
+## shown by its sprite at 1 / DETAIL), with `CLEAR_MODE_NEVER` and `UPDATE_DISABLED`; a frame
 ## with stamps sets `UPDATE_ONCE`, so the viewport renders that frame alone. Its texture is shown
 ## by one `Sprite2D` at the layer's corner, at `z` (Feel's MARK_Z: over the room's floor, which
 ## is at `RoomBase.FLOOR_Z`, and under the bodies at 0). Nothing is allocated while playing: the
@@ -69,9 +71,12 @@ const SETTLE_SLOT: float = 1.0 / 30.0
 const SETTLE_SLOTS: int = 128
 const SETTLE_SLOT_ROWS: int = 256
 const SETTLE_STRIDE: int = 8
-## The longest side of a layer, in texels: a bigger room's layer covers its first MAX_SIDE pixels
-## across and down (rooms are at most 1,344 px across today; a biome has a layer a room).
-const MAX_SIDE: int = 4096
+## Texels a world pixel each way (the art's detail: ArtDetail.DETAIL, the shader's ART_DETAIL).
+const DETAIL: int = ArtDetail.DETAIL
+## The longest side of a layer, in world pixels (MAX_SIDE x DETAIL texels, 4096, within every
+## renderer's texture): a bigger room's layer covers its first MAX_SIDE pixels across and down
+## (rooms are at most 1,344 px across today; a biome has a layer a room).
+const MAX_SIDE: int = 2048
 ## How far past a stamp's radius it may draw (px): what a layer near it takes it for.
 const STAMP_PAD: float = 4.0
 
@@ -100,7 +105,7 @@ var _rows: PackedFloat32Array = PackedFloat32Array()
 var _pending: PackedFloat32Array = PackedFloat32Array()
 var _pending_head: int = 0
 var _pending_count: int = 0
-## The corner the waiting stamps are kept from (the bounds'), and the first layer's size in texels.
+## The corner the waiting stamps are kept from (the bounds'), and the first layer's size in world pixels.
 var _origin: Vector2 = Vector2.ZERO
 var _size: Vector2i = Vector2i.ZERO
 var _z: int = 0
@@ -116,7 +121,7 @@ var _settle_forget: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
-## One layer: its viewport, sprite, batch and material, its corner in the world and size in texels,
+## One layer: its viewport, sprite, batch and material, its corner in the world and size in world pixels,
 ## the rows it draws this frame, and whether a render was asked (a clear) or is due.
 class Piece:
 	extends RefCounted
@@ -319,7 +324,7 @@ func _mask(piece: Piece, mask: Image, cell: float, known: bool) -> void:
 	piece.material.set_shader_parameter(&"mask_cell", cell)
 
 
-## The mask of place `place`'s layer: `size` texels at `corner` (the `walls` square `from`, each
+## The mask of place `place`'s layer: `size` world pixels at `corner` (the `walls` square `from`, each
 ## `step` px), white for a wall (and a hole) of `walls` and for each square whose middle `grid` says
 ## is not in `place`.
 static func _place_mask(walls: Image, from: Vector2i, size: Vector2i, step: float, grid: RoomGrid, place: int, corner: Vector2) -> Image:
@@ -579,7 +584,7 @@ func batch() -> MultiMeshInstance2D:
 	return _batch
 
 
-## The layer's corner in the world, and its size in texels (for tests).
+## The layer's corner in the world, and its size in world pixels (DETAIL texels each; for tests).
 func origin() -> Vector2:
 	return _origin
 
@@ -588,12 +593,13 @@ func layer_size() -> Vector2i:
 	return _size
 
 
-## The textures' bytes (RGBA8; every layer's), for the measurements.
+## The textures' bytes (RGBA8, DETAIL x DETAIL texels a world pixel; every layer's), for the
+## measurements.
 func texture_bytes() -> int:
 	var bytes: int = 0
 	for piece in _pieces:
 		if piece.viewport != null:
-			bytes += piece.size.x * piece.size.y * 4
+			bytes += piece.size.x * piece.size.y * 4 * DETAIL * DETAIL
 	return bytes
 
 
@@ -642,7 +648,7 @@ func _make_layer(piece: Piece, size: Vector2i) -> void:
 	var named: String = "" if _pieces.find(piece) <= 0 else str(_pieces.find(piece))
 	var viewport := SubViewport.new()
 	viewport.name = "Layer" + named
-	viewport.size = size
+	viewport.size = size * DETAIL
 	viewport.transparent_bg = true
 	viewport.disable_3d = true
 	viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
@@ -660,10 +666,14 @@ func _make_layer(piece: Piece, size: Vector2i) -> void:
 	batch.material = piece.material
 	viewport.add_child(batch)
 	add_child(viewport)
+	# The stamps are placed in world pixels; the canvas makes each DETAIL texels (set once the
+	# viewport is in the tree, where its canvas is).
+	viewport.canvas_transform = Transform2D.IDENTITY.scaled(Vector2(DETAIL, DETAIL))
 	var sprite := Sprite2D.new()
 	sprite.name = "Marks" + named
 	sprite.texture = viewport.get_texture()
 	sprite.centered = false
+	sprite.scale = Vector2.ONE / float(DETAIL)
 	sprite.top_level = true
 	sprite.z_index = _z
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

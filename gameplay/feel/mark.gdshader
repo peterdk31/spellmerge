@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 shader_type canvas_item;
-// world_vertex_coords: VERTEX is in the mark layer's own pixels in vertex() (the batch sits
-// untransformed at its origin), so each stamp's quad is placed there by its row alone.
+// world_vertex_coords: VERTEX is in the mark layer's own world pixels in vertex() (the batch sits
+// untransformed at its origin; the layer's canvas is scaled by ART_DETAIL to its texels), so each
+// stamp's quad is placed there by its row alone.
 render_mode blend_mix, world_vertex_coords;
 
 // Floor marks (gameplay/feel/marks.gd; docs/milestones/spell-spectacle.md, P2): the stamps of one
@@ -9,6 +10,13 @@ render_mode blend_mix, world_vertex_coords;
 // ends. A stamp is a quad round its middle; its shape is worked out here from its kind's form
 // and numbers at any size, one pixel a line however big. Pixels are hard (docs/STYLE.md): a pixel
 // is its colour or nothing, never in between.
+//
+// **At the art's detail** (ART3; ArtDetail, art_detail.gdshaderinc): the layer has ART_DETAIL texels
+// a world pixel each way and every shape is worked out at the middle of each art pixel, in world
+// units, so a mark keeps its size and steps by the finer pixel: a crack's line is two art pixels
+// over most of it and one out at its tips, with a rim beside it near its middle; a rune's outer circle
+// two and its inner circle and strokes one; a rime's crosses and a blot's speckle are art pixels; a
+// speck is its world pixel less its lower right art pixel (a chip lit from the top-left).
 //
 // Nothing here is a kind or a colour of its own:
 // - the kinds are data (`MarkKind`, content/marks), handed over by marks.gd as `kind_form` (form:
@@ -23,13 +31,13 @@ render_mode blend_mix, world_vertex_coords;
 // - a surface's colours (a dying body's own art, a room's walls) are a row of `ramp_table`, none
 //   drawn when it has no such row (`table_rows`).
 // Marks stay off the walls: `floor_mask` is the projectile manager's wall grid, one texel a
-// `mask_cell` square from the layer's corner, white for a wall.
+// `mask_cell` square (world px) from the layer's corner, white for a wall.
 //
 // A row (Marks.DRAW_STRIDE floats; the transform carries data, in full floats on every renderer):
 //   MODEL_MATRIX[0].x   its radius (px); 0 for none (folded away)
 //   MODEL_MATRIX[0].y   how far it is turned (radians)
 //   MODEL_MATRIX[1].x   a seed (0-1)
-//   MODEL_MATRIX[3].xy  its middle, in the layer's pixels
+//   MODEL_MATRIX[3].xy  its middle, in world pixels from the layer's corner
 //   COLOR               its kind / KIND_CODE, its source / SOURCE_CODE (0-3 a hat ramp, 4 the
 //                       enemies', +8 an exact colour; Motes.spell_source; from 16 a table row),
 //                       its surface / SOURCE_CODE (a table row; below 16 none)
@@ -37,6 +45,8 @@ render_mode blend_mix, world_vertex_coords;
 // The colour and custom data are between 0 and 1 and need no more than bytes.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+// One art pixel, in world pixels.
+const float ART_PX = 1.0 / ART_DETAIL;
 // A mark is in one infusion's colours, as the mote it is of: its look is never woven.
 #define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
@@ -57,7 +67,7 @@ const float SOURCE_CODE = 128.0;
 const int MAX_KINDS = 16;
 const float EXACT_SOURCE = 8.0;
 const float TABLE_SOURCE = 16.0;
-// A blot's solid share of its radius; a crack's crushed middle; a rime's crystal squares (px).
+// A blot's solid share of its radius; a crack's crushed middle; a rime's crystal squares (world px).
 const float BLOT_CORE = 0.6;
 const float CRACK_CRUSH = 0.2;
 const float RIME_CELL = 5.0;
@@ -166,15 +176,21 @@ int mark_crack(vec2 q, float r, float h) {
 		float fi = float(i);
 		float angle = (fi + mark_hash(fi, 1.0, 5.0) * 0.7) * TAU / float(n);
 		float len = k_radius * (0.55 + 0.45 * mark_hash(fi, 2.0, 5.0));
-		float width = r < k_radius * 0.45 ? 1.0 : 0.6;
-		if (mark_on_line(q, vec2(0.0), angle, len, fi, width)) {
+		// Two art pixels wide over most of it, with a rim an art pixel past it near the middle; one
+		// out at the tips.
+		bool thick = r < k_radius * 0.7;
+		bool rimmed = r < k_radius * 0.45;
+		if (mark_on_line(q, vec2(0.0), angle, len, fi, thick ? ART_PX : 0.5 * ART_PX)) {
 			return 1;
+		}
+		if (rimmed && mark_on_line(q, vec2(0.0), angle, len, fi, 1.5 * ART_PX) && h < 0.6) {
+			return 2;
 		}
 		float fork_at = len * (0.4 + 0.25 * mark_hash(fi, 3.0, 5.0));
 		vec2 dir = vec2(cos(angle), sin(angle));
 		vec2 fork = dir * fork_at + vec2(-dir.y, dir.x) * mark_jag(fork_at, fi);
 		float turn = (mark_hash(fi, 4.0, 5.0) < 0.5 ? -1.0 : 1.0) * (0.45 + 0.3 * mark_hash(fi, 5.0, 5.0));
-		if (mark_on_line(q, fork, angle + turn, (len - fork_at) * 0.6, fi + 10.0, 0.6)) {
+		if (mark_on_line(q, fork, angle + turn, (len - fork_at) * 0.6, fi + 10.0, 0.5 * ART_PX)) {
 			return 1;
 		}
 	}
@@ -183,17 +199,19 @@ int mark_crack(vec2 q, float r, float h) {
 
 // 1 the body, 2 the edge, 0 nothing: a ragged patch of film specks thinning out to its rim,
 // strewn with small crosses.
-int mark_rime(vec2 pixel, vec2 q, float r, float h) {
+// `art` is the art pixel (its whole number); its crosses are in art pixels, an arm two long.
+int mark_rime(vec2 art, vec2 q, float r, float h) {
 	float edge = k_radius * (1.0 - k_form.y * mark_rim(atan(q.y, q.x)));
 	if (r > edge) {
 		return 0;
 	}
 	float u = r / max(edge, 1.0);
-	vec2 cell = floor(pixel / RIME_CELL);
-	vec2 at = cell * RIME_CELL + 1.0 + floor(vec2(mark_hash(cell.x, cell.y, 11.0), mark_hash(cell.x, cell.y, 13.0)) * (RIME_CELL - 2.0));
+	float side = RIME_CELL * ART_DETAIL;
+	vec2 cell = floor(art / side);
+	vec2 at = cell * side + 2.0 + floor(vec2(mark_hash(cell.x, cell.y, 11.0), mark_hash(cell.x, cell.y, 13.0)) * (side - 4.0));
 	if (mark_hash(cell.x, cell.y, 17.0) < k_form.z * (1.0 - 0.7 * u)) {
-		vec2 d = abs(pixel - at);
-		if ((d.x < 0.5 && d.y < 1.5) || (d.y < 0.5 && d.x < 1.5)) {
+		vec2 d = abs(art - at);
+		if ((d.x < 0.5 && d.y < 2.5) || (d.y < 0.5 && d.x < 2.5)) {
 			return 2;
 		}
 	}
@@ -214,15 +232,15 @@ int mark_ring(vec2 q, float r, float h) {
 	return 0;
 }
 
-// 1 the body, 2 the edge, 0 nothing: a circle at the rim and one inside it, one pixel wide, with
+// 1 the body, 2 the edge, 0 nothing: a circle at the rim (two art pixels) and one inside it (one), with
 // `lines` strokes between them, each a tick out from the inner circle with a hook at its end.
 int mark_rune(vec2 q, float r, float h) {
 	float outer = k_radius - 1.0;
 	float inner = k_radius * 0.62;
-	if (abs(r - outer) < 0.6) {
+	if (abs(r - outer) < ART_PX) {
 		return h < 0.9 ? 1 : 0;
 	}
-	if (abs(r - inner) < 0.6) {
+	if (abs(r - inner) < 0.5 * ART_PX) {
 		return h < 0.7 ? 2 : 0;
 	}
 	if (r < inner || r > outer) {
@@ -242,13 +260,13 @@ int mark_rune(vec2 q, float r, float h) {
 		vec2 rel = q - from;
 		float along = dot(rel, dir);
 		float across = dot(rel, vec2(-dir.y, dir.x));
-		if (along >= 0.0 && along <= len && abs(across) < 0.6) {
+		if (along >= 0.0 && along <= len && abs(across) < 0.5 * ART_PX) {
 			return 1;
 		}
 		// The hook: a stroke across the tick's end, to one side.
 		float side = mark_hash(fi, 3.0, 7.0) < 0.5 ? -1.0 : 1.0;
 		float hook = max(2.0, len * 0.4);
-		if (abs(along - len) < 0.6 && across * side >= 0.0 && abs(across) <= hook) {
+		if (abs(along - len) < 0.5 * ART_PX && across * side >= 0.0 && abs(across) <= hook) {
 			return 1;
 		}
 	}
@@ -278,29 +296,33 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 pixel = floor(k_px);
+	// The art pixel (its whole number) and its middle (world px).
+	vec2 art = floor(k_px * ART_DETAIL);
+	vec2 at = (art + 0.5) * ART_PX;
 	// Off the floor (a wall's cell, or past the layer): nothing.
-	vec2 cell = floor(pixel / mask_cell);
+	vec2 cell = floor(at / mask_cell);
 	if (any(lessThan(cell, vec2(0.0))) || any(greaterThanEqual(cell, mask_size)) || texelFetch(floor_mask, ivec2(cell), 0).r > 0.5) {
 		discard;
 	}
-	vec2 d = pixel + 0.5 - k_centre;
+	vec2 d = at - k_centre;
 	vec2 q = vec2(k_turn.x * d.x + k_turn.y * d.y, -k_turn.y * d.x + k_turn.x * d.y);
 	float r = length(q);
-	float h = mark_hash(pixel.x, pixel.y, 7.0);
+	float h = mark_hash(art.x, art.y, 7.0);
 	int part = 0;
 	if (k_form.x < 0.5) {
 		part = mark_blot(q, r, h);
 	} else if (k_form.x < 1.5) {
 		part = mark_crack(q, r, h);
 	} else if (k_form.x < 2.5) {
-		part = mark_rime(pixel, q, r, h);
+		part = mark_rime(art, q, r, h);
 	} else if (k_form.x < 3.5) {
 		part = mark_ring(q, r, h);
 	} else if (k_form.x < 4.5) {
 		part = mark_rune(q, r, h);
 	} else {
-		part = all(equal(pixel + 0.5, k_centre + 0.5)) ? 1 : 0;
+		// Its world pixel (the middle is whole), less the art pixel at its lower right.
+		vec2 in_px = art - k_centre * ART_DETAIL;
+		part = all(greaterThanEqual(in_px, vec2(0.0))) && all(lessThan(in_px, vec2(ART_DETAIL))) && !all(equal(in_px, vec2(ART_DETAIL - 1.0))) ? 1 : 0;
 	}
 	vec4 c = part == 1 ? k_body : (part == 2 ? k_edge : vec4(0.0));
 	if (c.a < 0.5) {

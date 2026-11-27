@@ -163,10 +163,10 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 func test_a_stamp_waits_for_the_frame_and_draws_once() -> void:
 	var marks: MarksScript = _layer()
 	check(marks.viewport() != null and marks.sprite() != null and marks.batch() != null, "a layer once it has a room")
-	check_equal(marks.layer_size(), Vector2i(704, 448), "as big as the room's bounds, a texel a pixel")
+	check_equal(marks.layer_size(), Vector2i(704, 448), "as big as the room's bounds, in world pixels")
 	check_equal(marks.origin(), BOUNDS.position, "from its corner")
 	check_equal(marks.sprite().position, BOUNDS.position, "shown there")
-	check_equal(marks.texture_bytes(), 704 * 448 * 4, "RGBA8: about 1.2 MB for the arena")
+	check_equal(marks.texture_bytes(), 704 * 448 * 4 * 4, "RGBA8 at 2x detail: about 5 MB for the arena")
 	check_equal(marks.viewport().render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "a new room is wiped once")
 	marks.step()
 	marks.step()
@@ -680,8 +680,8 @@ func test_a_biome_has_a_layer_a_room() -> void:
 		check(marks.layer_rect(k).encloses(grid.place_rect(k)), "layer %d covers its place (%s)" % [k, marks.layer_rect(k)])
 		check(marks.layer_rect(k).size.x <= grid.place_rect(k).size.x + 8.0, "and no more than a square past it")
 		check_equal(marks.layer_sprite(k).position, marks.layer_rect(k).position, "shown at its corner")
-	check(marks.layer_rect(3).end.x > float(MarksScript.MAX_SIDE), "a room past 4,096 px has its marks")
-	check_equal(marks.texture_bytes(), (640 * 384 * 3 + 96 * 64) * 4, "the rooms' texels only, not the world's")
+	check(marks.layer_rect(3).end.x > float(MarksScript.MAX_SIDE), "a room past MAX_SIDE px has its marks")
+	check_equal(marks.texture_bytes(), (640 * 384 * 3 + 96 * 64) * 4 * 4, "the rooms' texels only, not the world's")
 	# A scorch on the mouth reaches both rooms and the bridge; one far off only its own room.
 	marks.stamp(0, Vector2(672.0, 192.0), 40.0, 0.0, 0, Color.WHITE)
 	marks.stamp(0, Vector2(8300.0, 800.0), 10.0, 0.0, 0, Color.WHITE)
@@ -704,3 +704,18 @@ func test_a_biome_has_a_layer_a_room() -> void:
 	marks.enter(BOUNDS, null, 8.0)
 	check_equal(marks.layer_count(), 1, "a room of its own again: one layer")
 	check_equal(marks.layer_size(), Vector2i(704, 448), "its bounds'")
+
+
+## ART3: the layer is drawn at the art's detail: DETAIL texels a world pixel each way, its canvas
+## scaled so the stamps are placed in world pixels, shown at 1 / DETAIL over exactly the room, and
+## the shader works its shapes out at the middle of each art pixel.
+func test_the_layer_is_at_the_arts_detail() -> void:
+	var marks: MarksScript = _layer()
+	check_equal(MarksScript.DETAIL, ArtDetail.DETAIL, "the art's detail")
+	check_equal(marks.viewport().size, Vector2i(704, 448) * ArtDetail.DETAIL, "DETAIL texels a world pixel")
+	check_equal(marks.viewport().canvas_transform, Transform2D.IDENTITY.scaled(Vector2(2.0, 2.0)), "its canvas in world pixels")
+	check_equal(marks.sprite().scale, Vector2(0.5, 0.5), "shown at half size")
+	check(MarksScript.MAX_SIDE * MarksScript.DETAIL <= 4096, "no layer past 4,096 texels (every renderer's textures)")
+	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mark.gdshader")
+	check(code.contains("vec2 art = floor(k_px * ART_DETAIL);"), "its pixels are art pixels")
+	check(not code.contains("floor(k_px);"), "never a world pixel")

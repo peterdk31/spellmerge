@@ -96,13 +96,15 @@ func has(code: int) -> bool:
 	return _left.has(code)
 
 
-## The sheet's region of `code`'s glyph (`outline`: its outline's).
+## The sheet's region of `code`'s glyph (`outline`: its outline's), in sheet pixels: DETAIL a pixel
+## of `place_of`'s.
 func region_of(code: int, outline: bool) -> Rect2:
 	var top: float = float(cell_height) if outline else 0.0
 	return Rect2(float(_left[code] * DETAIL), top * DETAIL, float(_wide[code] * DETAIL), float(cell_height * DETAIL))
 
 
-## Where `code`'s cell is drawn for a glyph whose baseline starts at `at`: the same pixels as the
+## Where `code`'s cell is drawn for a glyph whose baseline starts at `at`, in the drawer's pixels (a
+## DETAIL-th of its region's size): the same pixels as the
 ## font drawing the character there.
 func place_of(code: int, at: Vector2) -> Rect2:
 	return Rect2(at.x - float(pad), at.y - float(baseline), float(_wide[code]), float(cell_height))

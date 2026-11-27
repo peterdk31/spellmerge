@@ -11,6 +11,9 @@ func test_it_is_every_themes_default_font() -> void:
 	var label: Label = own(Label.new()) as Label
 	root.add_child(label)
 	check(label.get_theme_font(&"font") == PixelFont.font(), "a label draws with it")
+	# Installed before the HUD and Feel warm the default font (Display is an autoload before them).
+	GlyphWarmup.warm_game()
+	check(GlyphWarmup._warmed.has(PixelFont.font()), "the glyph warm-up noted the pixel font, not the engine's")
 
 
 func test_every_size_the_game_draws_is_made() -> void:
@@ -24,11 +27,11 @@ func test_every_size_the_game_draws_is_made() -> void:
 func test_every_character_the_game_writes_has_a_glyph() -> void:
 	var font: FontFile = PixelFont.font()
 	var text: String = GlyphWarmup.EXTRA
-	for code in range(GlyphWarmup.FIRST, GlyphWarmup.LAST + 1):
+	for code: int in range(GlyphWarmup.FIRST, GlyphWarmup.LAST + 1):
 		text += String.chr(code)
-	for size in [8, 12, 40]:
+	for size: int in [8, 12, 40]:
 		var cache := Vector2i(size, 0)
-		for i in text.length():
+		for i: int in text.length():
 			var code: int = text.unicode_at(i)
 			check(font.get_glyph_advance(0, size, code).x > 0.0, "%s at %d px has an advance" % [String.chr(code), size])
 			check(font.get_glyph_size(0, cache, code).x > 0.0, "%s at %d px has a glyph" % [String.chr(code), size])
@@ -40,26 +43,31 @@ func test_lines_are_the_old_fonts_and_advances_whole_pixels() -> void:
 	var old: Dictionary[int, Vector2i] = {8: Vector2i(9, 3), 10: Vector2i(11, 3), 12: Vector2i(13, 4), 14: Vector2i(15, 5), 16: Vector2i(18, 5), 40: Vector2i(43, 12)}
 	for size: int in old:
 		check_equal(Vector2i(roundi(font.get_ascent(size)), roundi(font.get_descent(size))), old[size], "%d px: the old line" % size)
-		for code in ["0", "1", "W", "i", " ", "m"]:
+		for code: String in ["0", "1", "W", "i", " ", "m"]:
 			var advance: float = font.get_char_size(code.unicode_at(0), size).x
 			check(advance == roundf(advance), "%d px: %s advances a whole pixel (%s)" % [size, code, advance])
 
 
 func test_a_size_is_drawn_by_the_largest_face_under_it() -> void:
-	var faces: Array = [{"size": 8}, {"size": 10}, {"size": 16}]
+	var faces: Array[Dictionary] = [{"size": 8}, {"size": 10}, {"size": 16}]
 	check_equal(PixelFont.face_of(8, faces), Vector2i(8, 1), "its own face")
 	check_equal(PixelFont.face_of(9, faces), Vector2i(8, 1), "the face under it")
-	check_equal(PixelFont.face_of(20, faces), Vector2i(10, 2), "a face doubled past the last, the finer on a tie")
+	check_equal(PixelFont.face_of(20, faces), Vector2i(16, 1), "never a smaller face doubled while a face is under it")
+	check_equal(PixelFont.face_of(32, faces), Vector2i(16, 2), "the last face doubled past twice its size")
 	check_equal(PixelFont.face_of(6, faces), Vector2i(8, 1), "the smallest under the smallest face")
+	var real: Array[Dictionary] = []
+	real.assign(PixelFont.METRICS.data["faces"])
+	for size: int in range(PixelFont.FIRST_SIZE, PixelFont.LAST_SIZE + 1):
+		check_equal(PixelFont.face_of(size, real).y, 1, "%d px: drawn by a face at its own art pixel" % size)
 
 
 func test_the_sheet_is_whole_pixels() -> void:
 	var sheet: Image = PixelFont.SHEET
 	check(sheet.get_width() > 0 and sheet.get_height() > 0, "the sheet loads")
-	# A row of every face's band, through glyphs and outlines: every pixel clear or solid white.
+	# Every pixel clear or solid white.
 	var bad: int = 0
-	for y in range(0, sheet.get_height(), 7):
-		for x in sheet.get_width():
+	for y: int in sheet.get_height():
+		for x: int in sheet.get_width():
 			var c: Color = sheet.get_pixel(x, y)
 			if c.a != 0.0 and (c.a != 1.0 or c.r != 1.0 or c.g != 1.0 or c.b != 1.0):
 				bad += 1

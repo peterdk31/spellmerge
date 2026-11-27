@@ -10,8 +10,8 @@ extends RefCounted
 ##
 ## **A bitmap font with every size made up front.** The FontFile has no font data, only caches:
 ## one for each font size in SIZES and outline size up to MAX_OUTLINE, each glyph a region of its
-## face's band of the sheet. A size is drawn by the largest face at or under it (a size past the
-## last face by a face doubled, tripled: whole art pixels), its line's ascent and descent the size's
+## face's band of the sheet. A size is drawn by the largest face at or under it (a size past twice
+## the last face by that face doubled, tripled: whole art pixels), its line's ascent and descent the size's
 ## own (`line_of`, the old default font's, so layouts are unchanged). An outline is the sheet's
 ## one-art-pixel outline (the owner's rule of 2026-11-27: text sits on the game with a one-art-pixel
 ## dark outline or a hard shadow, whole pixels), and from HEAVY up that outline with a pixel's hard
@@ -59,20 +59,24 @@ static func has_size(size: int, outline: int) -> bool:
 ## A font size's line in layout pixels: its ascent and descent (those of the engine's default font
 ## the game drew with before, so every layout keeps its lines).
 static func line_of(size: int) -> Vector2i:
-	return Vector2i(roundi(size * 1.075 + 0.3), roundi(size * 0.3 + 0.4))
+	# Fitted to the old font's lines at 8, 10, 12, 14, 16 and 40 px (tests/core/test_pixel_font.gd),
+	# clear of a rounding tie at each.
+	return Vector2i(roundi(size * 1.075 + 0.31), roundi(size * 0.3 + 0.4))
 
 
-## The face a font size is drawn by and its whole-number scale: the largest face times scale at or
-## under the size, the smaller scale on a tie (the finer pixel); the smallest face under it.
-static func face_of(size: int, faces: Array) -> Vector2i:
+## The face a font size is drawn by and its whole-number scale: the largest face at or under the
+## size, drawn as it is (the art pixel); only a size past twice the last face is drawn by the last
+## face scaled by a whole number (the largest that fits); a size under every face by the smallest.
+static func face_of(size: int, faces: Array[Dictionary]) -> Vector2i:
 	var best := Vector2i(int(faces[0]["size"]), 1)
-	var best_at: int = 0
-	for scale in range(1, 9):
-		for face: Dictionary in faces:
-			var at: int = int(face["size"]) * scale
-			if at <= size and at > best_at:
-				best_at = at
-				best = Vector2i(int(face["size"]), scale)
+	var largest: int = 0
+	for face: Dictionary in faces:
+		var face_size: int = int(face["size"])
+		largest = maxi(largest, face_size)
+		if face_size <= size and face_size > best.x * best.y:
+			best = Vector2i(face_size, 1)
+	if size >= largest * 2:
+		best = Vector2i(largest, floori(float(size) / float(largest)))
 	return best
 
 
@@ -82,7 +86,8 @@ static func make() -> FontFile:
 	var detail: float = float(data["detail"])
 	var pad: int = int(data["pad"])
 	var chars: String = data["chars"]
-	var faces: Array = data["faces"]
+	var faces: Array[Dictionary] = []
+	faces.assign(data["faces"])
 	var by_size: Dictionary[int, Dictionary] = {}
 	var pages: Dictionary[int, Image] = {}
 	for face: Dictionary in faces:
@@ -97,7 +102,7 @@ static func make() -> FontFile:
 	file.hinting = TextServer.HINTING_NONE
 	file.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	file.fixed_size = 0
-	for size in range(FIRST_SIZE, LAST_SIZE + 1):
+	for size: int in range(FIRST_SIZE, LAST_SIZE + 1):
 		var pick: Vector2i = face_of(size, faces)
 		var face: Dictionary = by_size[pick.x]
 		var page: Image = pages[pick.x]
@@ -111,18 +116,18 @@ static func make() -> FontFile:
 		var glyphs: Array = face["glyphs"]
 		file.set_cache_ascent(0, size, float(line.x))
 		file.set_cache_descent(0, size, float(line.y))
-		for outline in range(0, MAX_OUTLINE + 1):
+		for outline: int in range(0, MAX_OUTLINE + 1):
 			var cache := Vector2i(size, outline)
 			var band: int = 0 if outline == 0 else (1 if outline < HEAVY else 2)
 			file.set_texture_image(0, cache, 0, page)
-			for i in chars.length():
+			for i: int in chars.length():
 				var code: int = chars.unicode_at(i)
 				var glyph: Array = glyphs[i]
 				var cell := Rect2(float(glyph[0]), float(int(glyph[1]) + band * cell_height), float(glyph[2]), float(cell_height))
 				var art_width: int = int(glyph[3])
 				# The pen at the baseline: the cell's top is the face's ascent and the pad above it,
 				# its left edge the pad left of half the gap (the glyph's left bearing).
-				var left: int = gap / 2 - pad
+				var left: int = floori(float(gap) * 0.5) - pad
 				var top: int = -(int(face["ascent"]) + pad)
 				if outline == 0:
 					# A whole layout pixel: the pen stays on the layout's pixels, so every gap is the same.

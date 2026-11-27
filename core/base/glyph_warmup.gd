@@ -16,9 +16,9 @@ extends RefCounted
 ## and `drawn_since_warm` names a size or outline drawn that it does not have (a cache it did not
 ## have before) instead.
 
-## The characters warmed: printable ASCII, and the few others the game writes (characters the
-## font lacks, arrows or a tick, are drawn by a system font of the engine's, which no warm-up
-## reaches: the game writes none).
+## The characters warmed: printable ASCII, and the few others the game writes. The game's pixel
+## font draws these and no others (a character it lacks draws nothing: it has no system fallback),
+## so a new character is drawn in `tools/font_art.py` and listed here (`test_pixel_font.gd`).
 const FIRST: int = 32
 const LAST: int = 126
 const EXTRA: String = "×·•–—…∞°"
@@ -99,12 +99,14 @@ static func drawn_since_warm() -> PackedStringArray:
 	var out := PackedStringArray()
 	for font: FontFile in _warmed:
 		var before: Dictionary = _warmed[font]
+		var bitmap: bool = font.data.is_empty()
+		var font_name: String = font.resource_path if not font.resource_path.is_empty() else "the default font"
 		var now: Dictionary = glyphs(font)
 		for key: String in now:
 			var had: PackedInt32Array = before.get(key, PackedInt32Array())
 			var has: PackedInt32Array = now[key]
-			if font.data.is_empty() and not before.has(key):
-				out.append("%s %s: a size or outline the font does not have" % [font.resource_path if not font.resource_path.is_empty() else "the default font", key])
+			if bitmap and not before.has(key):
+				out.append("%s %s: a size or outline the font does not have" % [font_name, key])
 				continue
 			if has.size() == had.size():
 				continue
@@ -113,7 +115,7 @@ static func drawn_since_warm() -> PackedStringArray:
 			for glyph: int in has:
 				if not had.has(glyph):
 					new_chars += characters_of(font, size, glyph)
-			out.append("%s %s: %d -> %d glyphs (%s)" % [font.resource_path if not font.resource_path.is_empty() else "the default font", key, had.size(), has.size(), new_chars.c_escape()])
+			out.append("%s %s: %d -> %d glyphs (%s)" % [font_name, key, had.size(), has.size(), new_chars.c_escape()])
 	return out
 
 

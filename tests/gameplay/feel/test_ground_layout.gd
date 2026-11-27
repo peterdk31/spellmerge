@@ -1,12 +1,13 @@
 extends "res://tests/support/suite.gd"
 ## The ground drawn when a room is laid out (connected biomes CB4, gameplay/feel/ground/ground_layout.gd):
-## Feel's part hears `room_built` and draws a room's ground again from its shape onto the layout's
-## `Floor` before it is shown (its floor, glow and rock face as drawn textures, its rims made again),
-## mirrored when the layout says so; the hub, which names no shape, keeps its baked art; and it is
-## quick: it says how long each crypt room took (`GROUND LAYOUT` lines), and, with the native module,
-## a room is drawn within `MOST_REFERENCES` (no load stall), and every room drawn on one thread (the
-## web's) within `ONE_THREAD_USUAL` times `ONE_THREAD_SLACK`, so the kernel's own 2x slowdown fails;
-## without the module an unmirrored room keeps its baked art rather than stall. Both are in units of
+## Feel's part hears `room_built` and draws a mirrored room's ground again from its shape onto the
+## layout's `Floor` before it is shown (its floor, glow and rock face as drawn textures, its rims made
+## again); an unmirrored room, and the hub, which names no shape, keep their baked art, which is what
+## the drawing would show (test_ground_drawing.gd), so a biome's unmirrored pieces cost nothing at a
+## run's start (#972); and it is quick: it says how long each crypt room took mirrored (`GROUND LAYOUT`
+## lines), and, with the native module, a room is drawn within `MOST_REFERENCES` (no load stall), and
+## every room drawn on one thread (the web's) within `ONE_THREAD_USUAL` times `ONE_THREAD_SLACK`, so
+## the kernel's own 2x slowdown fails. Both are in units of
 ## a reference workload measured beside the drawing (tests/support/wall_clock.gd), so a loaded or slow
 ## machine slows both alike (the owner, 2026-11-20: 155 ms against a budget of 150 under the
 ## parallel suite, when the budget was in milliseconds).
@@ -78,7 +79,7 @@ func test_a_laid_room_gets_its_ground_drawn_quickly() -> void:
 	var one_thread_usec: int = 0
 	var pixels: int = 0
 	for room: RoomBase in rooms:
-		var layout: Node = room.build()
+		var layout: Node = _mirrored(room.build())
 		var ground := layout.get_node("Floor") as Sprite2D
 		var baked: Texture2D = ground.texture
 		var lines_before: int = _lines(ground)
@@ -94,7 +95,7 @@ func test_a_laid_room_gets_its_ground_drawn_quickly() -> void:
 		# for), in turn with the reference, the fastest of each (tests/support/wall_clock.gd).
 		var fresh: Array[Node] = []
 		for run in LAY_RUNS:
-			fresh.append(room.build())
+			fresh.append(_mirrored(room.build()))
 		var next: Array[int] = [0]
 		var timed: WallClock.Timed = WallClock.against(func() -> void:
 			part.lay(room, fresh[next[0]])
@@ -126,9 +127,9 @@ func test_it_is_heard_on_room_built() -> void:
 	part.events = events
 	part._ready()
 	var room: RoomBase = _crypt_rooms()[0]
-	var layout: Node = room.build()
+	var layout: Node = _mirrored(room.build())
 	events.room_built.emit(room.id, 0, layout)
-	check(part.drawn == 1, "a room laid out is drawn")
+	check(part.drawn == 1, "a mirrored room laid out is drawn")
 	check((layout.get_node("Floor") as Sprite2D).texture is ImageTexture, "its floor is the drawn one")
 	layout.free()
 
@@ -149,10 +150,9 @@ func test_a_mirrored_layout_is_drawn_mirrored() -> void:
 	var part: LayoutScript = _part()
 	var plain: Node = room.build()
 	part.lay(room, plain)
-	var mirrored: Node = room.build()
-	mirrored.set_meta(ShapeScript.MIRROR_META, Vector2i(1, 0))
-	part.lay(room, mirrored)
-	var a: Image = ((plain.get_node("Floor") as Sprite2D).texture as ImageTexture).get_image()
+	var mirrored: Node = _mirrored(room.build())
+	check(part.lay(room, mirrored), "the mirrored room is drawn")
+	var a: Image = (plain.get_node("Floor") as Sprite2D).texture.get_image()
 	var b: Image = ((mirrored.get_node("Floor") as Sprite2D).texture as ImageTexture).get_image()
 	var same_alpha: bool = true
 	for y in range(0, a.get_height(), 3):
@@ -163,16 +163,41 @@ func test_a_mirrored_layout_is_drawn_mirrored() -> void:
 	mirrored.free()
 
 
-func test_without_the_module_an_unmirrored_room_keeps_its_baked_art() -> void:
-	# The GDScript takes seconds; the baked art is what it would draw.
-	var room: RoomBase = _crypt_rooms()[0]
-	var part: LayoutScript = _part()
-	part.native = false
-	var layout: Node = room.build()
-	var baked: Texture2D = (layout.get_node("Floor") as Sprite2D).texture
-	check(not part.lay(room, layout), "nothing is drawn")
-	check((layout.get_node("Floor") as Sprite2D).texture == baked, "its floor is the baked art")
-	layout.free()
+func test_an_unmirrored_room_keeps_its_baked_art() -> void:
+	# The baked art is what the drawing would show (test_ground_drawing.gd), so no room laid unmirrored
+	# is drawn, with the native module or without (#972: it was half a biome's ground at a run's start).
+	var events: EventsScript = own(EventsScript.new()) as EventsScript
+	for native: bool in [true, false]:
+		var part: LayoutScript = _part()
+		part.native = native
+		part.events = events
+		part._ready()
+		for room: RoomBase in _crypt_rooms():
+			var layout: Node = room.build()
+			var ground := layout.get_node("Floor") as Sprite2D
+			var baked: Array[Texture2D] = [ground.texture, (ground.get_node("Glow") as Sprite2D).texture]
+			var lines: Array[Node] = _line_nodes(ground)
+			events.room_built.emit(room.id, 1, layout)
+			check(not part.lay(room, layout), "%s: nothing is drawn" % room.id)
+			check(ground.texture == baked[0] and (ground.get_node("Glow") as Sprite2D).texture == baked[1], "%s: its floor and glow are the baked art" % room.id)
+			check(_line_nodes(ground) == lines, "%s: its rims and drips are the baked scene's own" % room.id)
+			layout.free()
+		check_equal(part.drawn, 0, "no unmirrored room was drawn (native %s)" % native)
+		events.room_built.disconnect(part._on_room_built)
+
+
+## `layout` placed mirrored left to right, as a biome lays a piece (`GroundShape.MIRROR_META`).
+func _mirrored(layout: Node) -> Node:
+	layout.set_meta(ShapeScript.MIRROR_META, Vector2i(1, 0))
+	return layout
+
+
+func _line_nodes(ground: Node) -> Array[Node]:
+	var found: Array[Node] = []
+	for child: Node in ground.get_children():
+		if child is Line2D and child.is_in_group(MoteSource.GROUP):
+			found.append(child)
+	return found
 
 
 func _lines(ground: Node) -> int:

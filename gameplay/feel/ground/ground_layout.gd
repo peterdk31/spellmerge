@@ -7,15 +7,19 @@ extends Node
 ## keeps its baked art. View only: it changes no node the simulation reads (the walls' and holes'
 ## bodies stay the layout's).
 ##
+## Only a mirrored piece is drawn: an unmirrored one keeps its baked art, which is what the drawing
+## would put on screen (tests/gameplay/feel/test_ground_drawing.gd holds every room's drawing to its
+## baked art, pixel for pixel, and its imported textures to the drawn ones as shown, rims and drips
+## alike), so drawing it again was a whole room's work at the run's start for nothing (#972: about
+## a third of a biome's pieces, half its ground's time on the web).
+##
 ## No load stall: the native module draws a crypt room in a few tens of milliseconds on the module's
 ## threads (`GroundKernel.draw`); `last_usec` holds how long the last room took, drawing and
-## textures together (tests/gameplay/feel/test_ground_layout.gd reports it). Without the module an
-## unmirrored room keeps its baked art, which is what would be drawn, rather than stall for seconds.
+## textures together (tests/gameplay/feel/test_ground_layout.gd reports it).
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
-const NativeScript := preload("res://core/native/native.gd")
 const MirroredArtScript := preload("res://gameplay/feel/ground/mirrored_art.gd")
 const FloorBakeScript := preload("res://gameplay/feel/ground/floor_bake.gd")
 
@@ -55,8 +59,9 @@ func _on_room_built(room_id: StringName, _room: int, layout_root: Node) -> void:
 	bake.bake(layout_root)
 
 
-## Draw `room`'s ground onto `layout_root`, its layout as built (nothing when the room names no shape
-## or the layout has no `Floor` sprite). True when it was drawn.
+## Draw `room`'s ground onto `layout_root`, its layout as built (nothing when the room names no shape,
+## the layout has no `Floor` sprite, or it is not mirrored: its baked art is the drawing). True when it
+## was drawn.
 func lay(room: RoomBase, layout_root: Node) -> bool:
 	if room.ground_shape == null or layout_root == null or registry == null:
 		return false
@@ -65,9 +70,9 @@ func lay(room: RoomBase, layout_root: Node) -> bool:
 		return false
 	var began: int = Time.get_ticks_usec()
 	var mirror: Vector2i = layout_root.get_meta(ShapeScript.MIRROR_META, Vector2i.ZERO)
-	# Without the native module the GDScript would take seconds; an unmirrored room's baked art is what
-	# it would draw, so it stays (a mirrored one is drawn all the same: it has no other art).
-	if mirror == Vector2i.ZERO and not (native and NativeScript.loaded()):
+	# An unmirrored room's baked art is what it would draw, so it stays (a mirrored one is drawn, by the
+	# GDScript too without the native module, slowly: it has no other art).
+	if mirror == Vector2i.ZERO:
 		return false
 	var spec: Dictionary = ShapeScript.spec(room.ground_shape.data, room.scene, registry, mirror)
 	if spec.is_empty():

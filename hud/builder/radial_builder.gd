@@ -120,7 +120,7 @@ const EMPTY: Color = Color("#1b1929")
 const LINE: Color = Color("#4a4663")
 const TEXT: Color = Color("#f4f1ea")
 const MUTED: Color = Color("#a39fb8")
-const DIM: Color = Color("#7a7694")
+const DIM: Color = RadialMenuScript.DIM
 const GOLD: Color = Color("#f2c230")
 const WARN: Color = Color("#e0592f")
 ## The frames round the casts of the cycle in the slots, every other cast in the other shade.

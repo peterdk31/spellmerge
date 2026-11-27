@@ -54,7 +54,10 @@ const OUTLINE: Color = Color("#14121f")
 const SHADE: Color = Color(0.078, 0.071, 0.122, 0.45)
 const TEXT_OUTLINE: int = 2
 const TEXT: Color = Color("#f4f1ea")
-const DIM: Color = Color("#7a7694")
+## The dimmest words (an empty slot, a verb that does nothing now): a step lighter than the Stone
+## ramp's light, so they read on the light backdrop over bright floors too (the owner, 2026-11-27:
+## readability first). The builder, the inventory and the tree view take it from here.
+const DIM: Color = Color("#a39fb8")
 const GOLD: Color = Color("#f2c230")
 
 ## The player 0-3 it is for (`bind`).

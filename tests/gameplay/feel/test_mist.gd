@@ -345,7 +345,10 @@ func test_the_shader_is_warmed_and_its_numbers_are_the_scripts() -> void:
 	var code: String = MistScript.SHADER.code + density
 	check(MistScript.SHADER.code.contains("#include \"res://gameplay/feel/mist_density.gdshaderinc\""), "the mist works out how thick it is")
 	check(density.contains("#include \"res://gameplay/feel/stir.gdshaderinc\""), "it reads the world's stirs")
-	check(code.contains("view_light(floor(world) + 0.5)"), "it reads the light grid under each world pixel, as the apply rect does")
+	check(code.contains("view_light(art_centre(world))"), "it reads the light grid under each art pixel, as the apply rect does (ART3)")
+	check(density.contains("vec2 p = art_centre(world);"), "and is worked out an art pixel at a time")
+	var apply: String = FileAccess.get_file_as_string("res://gameplay/feel/light_apply.gdshader")
+	check(apply.contains("vec2 at = art_centre(world_at);"), "the apply rect lights an art pixel at a time too")
 	for pair: Array in [["STIR_SHOT_PIXELS", MistScript.STIR_SHOT_PIXELS], ["STIR_BLAST_PIXELS", MistScript.STIR_BLAST_PIXELS], ["STIR_THIN", MistScript.STIR_THIN], ["PART_PIXELS", MistScript.PART_PIXELS], ["PART_THIN", MistScript.PART_THIN], ["THICKEST_DRAWN", MistScript.THICKEST_DRAWN]]:
 		check(code.contains("const float %s = %s;" % [pair[0], String.num(pair[1] as float, 1) if fmod(pair[1] as float, 1.0) == 0.0 else str(pair[1])]), "the shader's %s is the script's" % pair[0])
 	var shading := _mist().material as ShaderMaterial

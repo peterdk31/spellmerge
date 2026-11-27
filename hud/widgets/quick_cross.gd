@@ -23,6 +23,7 @@ extends Control
 ## allocates nothing a frame.
 
 const RechargeShutter := preload("res://hud/widgets/recharge_shutter.gd")
+const HudArt := preload("res://hud/widgets/hud_art.gd")
 
 const SLOTS: int = 4
 ## A cell's side (an 8-pixel icon in a 1-pixel frame) and where each slot's cell sits in the cross
@@ -193,8 +194,9 @@ func _wanted(slot: int) -> int:
 
 func _draw() -> void:
 	var nub := Rect2(Vector2(NUB), Vector2(CELL, CELL))
-	draw_rect(nub.grow(-2.0), OUTLINE)
-	draw_rect(nub.grow(-3.0), LINE)
+	# The nub: a small stone stud, lit on its top and left (`HudArt.tile`).
+	draw_rect(HudArt.inside_cut(nub.grow(-2.0)), LINE)
+	HudArt.tile(self, nub.grow(-2.0), HudArt.STONE[HudArt.LIGHT], HudArt.STONE[HudArt.SHADOW])
 	for slot in SLOTS:
 		_draw_slot(slot)
 
@@ -205,13 +207,14 @@ func _draw_slot(slot: int) -> void:
 	if _nod[slot] > 0:
 		nod = (NOD_UP if _nod_way[slot] > 0 else NOD_DOWN)[_nod[slot] - 1]
 	var cell := Rect2(Vector2(AT[slot] + Vector2i(0, nod)), Vector2(CELL, CELL))
-	draw_rect(cell, OUTLINE)
+	# Each cell a slot at the art's detail (`HudArt.tile`): the Outline cut at the corners, a stone
+	# edge lit on its top and left; dark inside while empty, so the arm reads as a slot to bind.
 	if stage < SHADOW:
-		# An empty cell: a frame round nothing, so the arm reads as a slot to bind.
-		draw_rect(cell.grow(-1.0), LINE)
-		draw_rect(cell.grow(-2.0), OUTLINE)
+		draw_rect(HudArt.inside_cut(cell), OUTLINE)
+		HudArt.tile(self, cell, LINE, HudArt.STONE[HudArt.SHADOW])
 		return
-	draw_rect(cell.grow(-1.0), CELL_FACE)
+	draw_rect(HudArt.inside_cut(cell), CELL_FACE)
+	HudArt.tile(self, cell, DIM, LINE)
 	if _drawn_icon[slot] != null:
 		# Shadow, the shades between, full: whole steps of the tint, never a fade of the icon.
 		var tint: Color = GREY.lerp(Color.WHITE, float(stage - SHADOW) / float(FULL - SHADOW))

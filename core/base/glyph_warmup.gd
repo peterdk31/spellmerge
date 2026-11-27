@@ -26,8 +26,8 @@ const EXTRA: String = "×·•–—…∞°"
 const LIGATURES: String = "fi fl ff ffi ffl ft fj"
 ## The default font's sizes the game draws (font size, outline size): the labels (8 to 16 px and
 ## the theme's outline 2; the panels' 3 and 4), the damage numbers (8 px, outline 3), the frame
-## rate's readout (10 px, outline 3), the altar's code (16 px, outline 4) and the main menu's title
-## (40 px). Measured on a whole biome's play (seed 11, two players) and the menus; a size drawn
+## rate's readout (10 px, outline 3), the altar's code (16 px, outline 4) and 40 px (the main menu's title
+## until 2026-11-27, now in the title type; kept for any large text). Measured on a whole biome's play (seed 11, two players) and the menus; a size drawn
 ## and not listed is named by `drawn_since_warm` (`tests/core/test_glyph_warmup.gd` shows the
 ## menu and the HUD's widgets). About 10 ms a pair for a font that rasterizes (none for the pixel font, which has them all).
 const GAME_SIZES: Array[Vector2i] = [

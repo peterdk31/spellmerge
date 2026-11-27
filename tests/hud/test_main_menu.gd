@@ -62,6 +62,12 @@ func _count_named(node_name: String) -> int:
 	return count
 
 
+func test_the_title_is_drawn_in_the_title_type() -> void:
+	var title: Label = _menu.get_node("Center/Lines/Title") as Label
+	check(title.get_theme_font(&"font") == preload("res://art/ui/fonts/title.svg"), "the game's name in the title type, as a boss's")
+	check_equal(title.get_theme_font_size(&"font_size"), 32, "at the title type's 2×, a whole-number scale")
+
+
 func test_entering_the_menu_without_the_argument_adds_no_runner() -> void:
 	check_equal(_built, 0, "no runner was made")
 	check_equal(_count_named(RUNNER_NODE), 0, "no runner on the root")

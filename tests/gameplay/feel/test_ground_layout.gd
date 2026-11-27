@@ -31,8 +31,10 @@ const MOST_REFERENCES: float = 24.0
 ## changes it little: 22.9 for the 54 rooms of 2026-11-20, 8.8 megapixels in 1.2 s; 51 for the 56
 ## rooms of 2026-11-27, ART3, which draws each floor, rock face and wall again at 2x, four times the
 ## pixels, its slab cells and grit noise worked out once a material: 8.8 megapixels of world in
-## 3.9 s); the limit is ONE_THREAD_SLACK times that.
-const ONE_THREAD_USUAL: float = 51.0
+## 3.9 s; 27.6 for the same rooms of 2026-11-27 after #972's kernel work, each slab row's and noise's
+## sums worked out once a row or column, the slivers found as runs, the images written in place:
+## 2.1 s); the limit is ONE_THREAD_SLACK times that, so the kernel before that work (51) fails.
+const ONE_THREAD_USUAL: float = 27.6
 const ONE_THREAD_SLACK: float = 1.5
 const ONE_THREAD_RUNS: int = 2
 ## A room laid out again this many times (fresh layouts), in turn with the reference, for

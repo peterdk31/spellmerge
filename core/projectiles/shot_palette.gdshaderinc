@@ -137,15 +137,8 @@ bool on(vec2 q, vec2 at) {
 	return all(equal(floor(q), floor(at)));
 }
 
-// The art's detail (ArtDetail.DETAIL; docs/STYLE.md, "The picture and the art's detail"; ART2): the
-// shot shaders work their shapes out at the middle of each art pixel, two a world pixel each way, so
-// a curve, a diagonal and an edge step by the finer pixel while every shape keeps its world size.
-const float ART_DETAIL = 2.0;
-
-// The middle of the art pixel under `p` (world pixels): `floor(p) + 0.5` at the art's detail.
-vec2 art_centre(vec2 p) {
-	return (floor(p * ART_DETAIL) + 0.5) / ART_DETAIL;
-}
+// The art's detail (ART2): ART_DETAIL and art_centre, shared with the room looks.
+#include "res://core/display/art_detail.gdshaderinc"
 
 // 1 at the middle, 0 from `reach` on, eased: the shape of every glow.
 float falloff(float x, float reach) {

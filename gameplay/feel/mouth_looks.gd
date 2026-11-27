@@ -21,12 +21,18 @@ extends Node2D
 ## rune goes out and the bars rise again, the same frames back. Every change steps by whole pixels at
 ## FPS (docs/STYLE.md, "Smooth").
 ##
+## **At the art's detail** (ART3; ArtDetail): drawn in art pixels, DETAIL a world pixel each way, at
+## the same sizes: the shimmer's dots are half as thick and its glints taper to a two-pixel head; a
+## flare is a lens stepping by the finer pixel; a bar is lit on its top-left side and shaded on the
+## other, and the seal's rune is RUNE_2X, a lit diamond round a stone.
+##
 ## A child of Feel, top level (world space), over the floor and under the bodies. Feel steps it once
 ## a frame (`step`); it redraws only while something moves or a mouth shimmers.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UnseenMaskScript := preload("res://gameplay/feel/unseen_mask.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
+const StoneBarsScript := preload("res://gameplay/feel/stone_bars.gd")
 
 ## Over the floor and the cover's marks, under the bodies.
 const Z: int = 1
@@ -49,9 +55,23 @@ const RUNE_STAGES: int = 3
 ## A bar's thickness and the gap between two (pixels).
 const BAR: int = 2
 const BAR_GAP: int = 4
-## The rune, 5 by 5 (1: lit).
-const RUNE: PackedByteArray = [0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0]
+## Art pixels a world pixel each way (ArtDetail).
+const DETAIL: int = ArtDetail.DETAIL
+## The rune, RUNE_SIDE world pixels a side, drawn at the art's detail: RUNE_2X, a row a line of
+## RUNE_SIDE x DETAIL art pixels (`#` its shade, `+` its lit pixel, `.` none).
 const RUNE_SIDE: int = 5
+const RUNE_2X: PackedStringArray = [
+	"....+#....",
+	"...+##+...",
+	"..##..##..",
+	".##.+#.##.",
+	"##.+##+.##",
+	"##.####.##",
+	".##.##.##.",
+	"..##..##..",
+	"...####...",
+	"....##....",
+]
 ## The light when a room's kind names none.
 const DEFAULT_LIGHT: StringName = &"spark"
 
@@ -331,6 +351,8 @@ func _size_lists() -> void:
 
 
 func _draw() -> void:
+	# Everything below is in art pixels (DETAIL a world pixel each way).
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE / float(DETAIL))
 	for mouth in _areas.size():
 		if unseen != null and unseen.hides(Rect2(_areas[mouth]).get_center()):
 			continue
@@ -340,87 +362,113 @@ func _draw() -> void:
 			_draw_flare(mouth)
 		if _seal[mouth] > 0:
 			_draw_seal(mouth)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The dotted line along the mouth's middle and its glints, in the shades its glow has come to.
+## The dotted line along the mouth's middle and its glints, in the shades its glow has come to: a dot
+## an art pixel thick every 4 world pixels, a glint GLINT world pixels long, thin at its tail and two
+## art pixels thick at its head, its last two art pixels lit at the full glow.
 func _draw_shimmer(mouth: int) -> void:
 	var area: Rect2i = _areas[mouth]
 	var wide: bool = _wide[mouth] != 0
-	var length: int = area.size.x if wide else area.size.y
+	var length: int = (area.size.x if wide else area.size.y) * DETAIL
 	var lights: PackedColorArray = _lights[mouth]
 	var glow: int = _glow[mouth]
-	var shift: int = _shimmer_frame * GLINT_EVERY / SHIMMER_FRAMES
-	for along in range(0, length, 2):
-		var glint: int = (along - shift + length * GLINT_EVERY) % GLINT_EVERY
-		var colour: Color
-		if glint < GLINT and glow >= 2:
-			colour = lights[2] if glint == GLINT - 1 and glow >= GLOW_STAGES else lights[1]
-		elif along % 4 == 0:
-			colour = lights[0]
-		else:
-			continue
-		draw_rect(Rect2(_point(area, wide, along, 0), Vector2.ONE), colour)
+	var every: int = GLINT_EVERY * DETAIL
+	var glint_long: int = GLINT * DETAIL
+	var shift: int = _shimmer_frame * every / SHIMMER_FRAMES
+	for along in length:
+		var glint: int = (along - shift + length * every) % every
+		if glint < glint_long and glow >= 2:
+			var head: bool = glint >= glint_long - DETAIL
+			var colour: Color = lights[2] if head and glow >= GLOW_STAGES else lights[1]
+			_art_pixel(area, wide, along, 0, colour)
+			if glint >= DETAIL:
+				_art_pixel(area, wide, along, 1, colour)
+		elif along % (4 * DETAIL) < DETAIL:
+			_art_pixel(area, wide, along, 0, lights[0])
 
 
-## The flare: a dash along the mouth, as long and thick as its stage, its core white-hot at the peak.
+## The flare: a lens along the mouth, as long and thick as its stage, its core white-hot at the peak,
+## worked out at the middle of each art pixel so its ends step by the finer pixel.
 func _draw_flare(mouth: int) -> void:
 	var area: Rect2i = _areas[mouth]
 	var wide: bool = _wide[mouth] != 0
 	var stage: int = FLARE_STAGES[_flare[mouth]]
 	var lights: PackedColorArray = _lights[mouth]
 	var start: int = area.position.x if wide else area.position.y
-	var middle: int = _flare_at[mouth] - start
-	var length: int = area.size.x if wide else area.size.y
-	for across in range(-(stage - 1), stage):
-		var half: int = stage * 3 - absi(across) * 2
-		for along in range(maxi(middle - half, 0), mini(middle + half + 1, length)):
-			var colour: Color = lights[2] if absi(along - middle) < half - 1 else lights[1]
-			if stage == FLARE_STAGES[FLARE_PEAK] and across == 0 and absi(along - middle) <= 1:
+	var middle: float = float(_flare_at[mouth] - start) + 0.5
+	var length: int = (area.size.x if wide else area.size.y) * DETAIL
+	var side: float = 1.0 / float(DETAIL)
+	var thick: float = float(stage) - 0.5
+	var reach: float = float(stage * 3) + 0.5
+	var low: int = maxi(floori((middle - reach) * DETAIL), 0)
+	var high: int = mini(ceili((middle + reach) * DETAIL), length)
+	for across in range(-stage * DETAIL, stage * DETAIL):
+		# How far the art row's middle is from the mouth's middle line (world pixels).
+		var off: float = absf((float(across) + 0.5) * side - 0.5)
+		if off >= thick:
+			continue
+		var half: float = float(stage * 3) - off * 2.0
+		for along in range(low, high):
+			var from_middle: float = absf((float(along) + 0.5) * side - middle)
+			if from_middle > half + 0.5:
+				continue
+			var colour: Color = lights[2] if from_middle < half - 1.0 else lights[1]
+			if stage == FLARE_STAGES[FLARE_PEAK] and off < 0.5 and from_middle <= 1.5:
 				colour = Palette.WHITE_HOT
-			draw_rect(Rect2(_point(area, wide, along, across), Vector2.ONE), colour)
+			_art_pixel(area, wide, along, across, colour)
 
 
-## The seal's bars, dropped in from above by its step, then its rune in the room's light.
+## The seal's bars, dropped in from above by its step (by art pixels), each lit on its top-left side
+## and shaded on the other, then its rune in the room's light.
 func _draw_seal(mouth: int) -> void:
-	var area: Rect2i = _areas[mouth]
+	var area := Rect2i(_areas[mouth].position * DETAIL, _areas[mouth].size * DETAIL)
 	var wide: bool = _wide[mouth] != 0
 	var bars: int = mini(_seal[mouth], SEAL_FRAMES)
+	var bar_w: int = BAR * DETAIL
+	var gap: int = BAR_GAP * DETAIL
 	if wide:
 		# A mouth across the screen: bars standing up its depth, growing down from its top edge.
 		var down: int = (area.size.y * bars) / SEAL_FRAMES
-		var at: int = BAR_GAP / 2
-		while at + BAR <= area.size.x:
-			var bar := Rect2i(area.position.x + at, area.position.y, BAR, down)
-			draw_rect(Rect2(bar), bar_colours[1])
-			draw_rect(Rect2(Rect2i(bar.position, Vector2i(1, bar.size.y))), bar_colours[2])
-			at += BAR + BAR_GAP
+		var at: int = gap / 2
+		while at + bar_w <= area.size.x:
+			StoneBarsScript.draw(self, Rect2i(area.position.x + at, area.position.y, bar_w, down), true, bar_colours)
+			at += bar_w + gap
 	else:
 		# A mouth up the screen: a portcullis of bars across its depth, slid down from above.
 		var lowered: int = area.size.y - (area.size.y * bars) / SEAL_FRAMES
-		var at: int = BAR_GAP / 2
-		while at + BAR <= area.size.y:
+		var at: int = gap / 2
+		while at + bar_w <= area.size.y:
 			var y: int = at - lowered
 			if y >= 0:
-				var bar := Rect2i(area.position.x, area.position.y + y, area.size.x, BAR)
-				draw_rect(Rect2(bar), bar_colours[1])
-				draw_rect(Rect2(Rect2i(bar.position, Vector2i(bar.size.x, 1))), bar_colours[2])
-			at += BAR + BAR_GAP
+				StoneBarsScript.draw(self, Rect2i(area.position.x, area.position.y + y, area.size.x, bar_w), false, bar_colours)
+			at += bar_w + gap
 	var rune: int = _seal[mouth] - SEAL_FRAMES
 	if rune <= 0:
 		return
-	var colour: Color = Palette.OUTLINE if rune == 1 else _lights[mouth][rune - 1]
-	var corner: Vector2i = Vector2i(Rect2(area).get_center()) - Vector2i(RUNE_SIDE / 2, RUNE_SIDE / 2)
-	for y in RUNE_SIDE:
-		for x in RUNE_SIDE:
-			if RUNE[y * RUNE_SIDE + x] != 0:
-				draw_rect(Rect2(corner + Vector2i(x, y), Vector2i.ONE), colour)
+	var lights: PackedColorArray = _lights[mouth]
+	var colour: Color = Palette.OUTLINE if rune == 1 else lights[rune - 1]
+	var lit: Color = Palette.OUTLINE if rune == 1 else lights[2]
+	var corner: Vector2i = (Vector2i(Rect2(_areas[mouth]).get_center()) - Vector2i(RUNE_SIDE / 2, RUNE_SIDE / 2)) * DETAIL
+	for y in RUNE_2X.size():
+		var line: String = RUNE_2X[y]
+		for x in line.length():
+			if line[x] != ".":
+				draw_rect(Rect2(corner + Vector2i(x, y), Vector2i.ONE), lit if line[x] == "+" else colour)
 
 
-## The pixel `along` the mouth's long side and `across` its middle line.
-static func _point(area: Rect2i, wide: bool, along: int, across: int) -> Vector2:
+## One art pixel `along` the mouth's long side (art pixels from its start) and `across` its middle
+## line (art rows; 0 and 1 are the world pixel of its middle line), in `colour`.
+func _art_pixel(area: Rect2i, wide: bool, along: int, across: int, colour: Color) -> void:
+	draw_rect(Rect2(art_point(area, wide, along, across), Vector2.ONE), colour)
+
+
+## The art pixel (art coordinates) `along` the mouth `area`'s long side and `across` its middle line.
+static func art_point(area: Rect2i, wide: bool, along: int, across: int) -> Vector2:
 	if wide:
-		return Vector2(area.position.x + along, area.position.y + area.size.y / 2 + across)
-	return Vector2(area.position.x + area.size.x / 2 + across, area.position.y + along)
+		return Vector2(area.position.x * DETAIL + along, (area.position.y + area.size.y / 2) * DETAIL + across)
+	return Vector2((area.position.x + area.size.x / 2) * DETAIL + across, area.position.y * DETAIL + along)
 
 
 ## The world laid last (Feel's room hearing's count; 0 without it).

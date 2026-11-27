@@ -5,7 +5,7 @@ shader_type canvas_item;
 // rect over the room, under the bodies and over the floor, its cover, its marks and the bodies'
 // shadows, and under the spell light's apply rect, so the room's dark darkens it and the light's
 // bands light it as they light the floor. Soft and see-through: the owner's one exception to the
-// pixel rules (2026-11-18, docs/STYLE.md), worked out a world pixel at a time.
+// pixel rules (2026-11-18, docs/STYLE.md), worked out an art pixel at a time (ART3).
 //
 // - **Where it lies:** `mask` (MistMask: how far each place is from a wall and from a pit, and how
 //   deep in a wall it is) thickens it toward the walls within `edge_reach` and the pits within
@@ -39,7 +39,7 @@ void fragment() {
 	if (density < 0.004) {
 		discard;
 	}
-	vec3 shine = view_light(floor(world) + 0.5);
+	vec3 shine = view_light(art_centre(world));
 	float most = max(shine.r, max(shine.g, shine.b));
 	float bright = clamp(most / bright_from, 0.0, 1.0) * lit;
 	vec3 hue = most > 0.001 ? shine / most : vec3(1.0);

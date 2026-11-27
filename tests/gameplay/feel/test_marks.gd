@@ -162,17 +162,14 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 
 func test_a_stamp_waits_for_the_frame_and_draws_once() -> void:
 	var marks: MarksScript = _layer()
-	check(marks.viewport() != null and marks.sprite() != null and marks.batch() != null, "a layer once it has a room")
-	check_equal(marks.layer_size(), Vector2i(704, 448), "as big as the room's bounds, a texel a pixel")
+	check_equal(marks.layer_count(), 1, "a layer once it has a room")
+	check(marks.viewport() == null and marks.sprite() == null and marks.batch() == null, "made at its first mark, not before")
+	check_equal(marks.texture_bytes(), 0, "a room nobody marks holds no texels")
+	check_equal(marks.layer_size(), Vector2i(704, 448), "as big as the room's bounds, in world pixels")
 	check_equal(marks.origin(), BOUNDS.position, "from its corner")
-	check_equal(marks.sprite().position, BOUNDS.position, "shown there")
-	check_equal(marks.texture_bytes(), 704 * 448 * 4, "RGBA8: about 1.2 MB for the arena")
-	check_equal(marks.viewport().render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "a new room is wiped once")
 	marks.step()
 	marks.step()
-	check_equal(marks.viewport().render_target_update_mode, SubViewport.UPDATE_DISABLED, "after the wipe, nothing renders")
-	check_equal(marks.batch().multimesh.custom_aabb, BatchesScript.WORLD, "its batch is made by Batches (never culled)")
-	check(marks.batch().get_parent() == marks.viewport(), "and draws into the layer")
+	check(marks.viewport() == null, "frames with no mark make nothing")
 	var renders: int = marks.renders
 	marks.stamp(0, Vector2(100.4, 60.6), 20.0, 0.5, 2, Color("e0592f"))
 	check_equal(marks.pending(), 1, "a stamp waits for the frame")
@@ -185,6 +182,13 @@ func test_a_stamp_waits_for_the_frame_and_draws_once() -> void:
 	check_equal(roundi(row[9] * MarksScript.SOURCE_CODE), 2, "its spell's source")
 	check(Color(row[12], row[13], row[14]).is_equal_approx(Color("e0592f")), "and its core colour")
 	marks.step()
+	check(marks.viewport() != null and marks.sprite() != null and marks.batch() != null, "its first mark makes the layer")
+	check_equal(marks.sprite().position, BOUNDS.position, "shown at its corner")
+	check_equal(marks.sprite().z_index, marks.layer_z(), "at the layers' z")
+	check_equal(marks.texture_bytes(), 704 * 448 * 4 * 4, "RGBA8 at 2x detail: about 5 MB for the arena")
+	check_equal(marks.viewport().render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "a new layer is wiped at its first render")
+	check_equal(marks.batch().multimesh.custom_aabb, BatchesScript.WORLD, "its batch is made by Batches (never culled)")
+	check(marks.batch().get_parent() == marks.viewport(), "and draws into the layer")
 	check_equal(marks.pending(), 0, "the frame takes it")
 	check_equal(marks.drawn(), 1, "the batch draws it alone")
 	check_equal(marks.renders, renders + 1, "in one render")
@@ -262,11 +266,12 @@ func test_a_new_floor_flash_draws_over_the_marks_left_before() -> void:
 	# flashes and the mark layer share a z, so the later in the tree draws on top: the flashes.
 	var pair: Array = _feel()
 	var feel: FeelScript = pair[1]
-	check_equal(feel._floor_node.z_index, feel.marks().sprite().z_index, "one z")
-	check(feel._floor_node.is_greater_than(feel.marks().sprite()), "the floor flashes after the marks in the tree")
+	# The layers' sprites are the mark node's children, made at a room's first mark.
+	check_equal(feel._floor_node.z_index, feel.marks().layer_z(), "one z")
+	check(feel._floor_node.is_greater_than(feel.marks()), "the floor flashes after the marks in the tree")
 	feel.set_floor_marks(false)
 	feel.set_floor_marks(true)
-	check(feel._floor_node.is_greater_than(feel.marks().sprite()), "and after a mark layer made again (the setting turned back on)")
+	check(feel._floor_node.is_greater_than(feel.marks()), "and after a mark layer made again (the setting turned back on)")
 
 
 func test_a_cue_stamps_its_mark_as_big_as_its_reach() -> void:
@@ -480,7 +485,7 @@ func test_a_new_room_and_the_setting() -> void:
 func test_the_layer_lies_on_the_floor_under_every_body() -> void:
 	var pair: Array = _feel()
 	var feel: FeelScript = pair[1]
-	var z: int = feel.marks().sprite().z_index
+	var z: int = feel.marks().layer_z()
 	check_equal(z, FeelScript.MARK_Z, "at MARK_Z")
 	check(z > RoomBase.FLOOR_Z, "over the room's floor")
 	check(z < 0, "under the bodies (wizards and enemies at 0)")
@@ -502,12 +507,12 @@ func test_the_marks_lie_over_the_ground_cover() -> void:
 	var feel: FeelScript = pair[1]
 	var cover: Node2D = feel.cover()
 	check(cover != null, "Feel has its cover")
-	check_equal(cover.z_index, feel.marks().sprite().z_index, "the cover is at the marks' z")
+	check_equal(cover.z_index, feel.marks().layer_z(), "the cover is at the marks' z")
 	check(cover.z_index > RoomBase.FLOOR_Z and cover.z_index < 0, "over the room's floor and under the bodies")
-	check(feel.marks().sprite().is_greater_than(cover), "the marks' layer comes after the cover in the tree: drawn over it")
+	check(feel.marks().is_greater_than(cover), "the marks' layers come after the cover in the tree: drawn over it")
 	feel.set_floor_marks(false)
 	feel.set_floor_marks(true)
-	check(feel.marks().sprite().is_greater_than(cover), "and so does a layer made again by the setting")
+	check(feel.marks().is_greater_than(cover), "and so do layers made again by the setting")
 
 
 func test_a_rooms_floor_colours_can_be_set() -> void:
@@ -679,13 +684,22 @@ func test_a_biome_has_a_layer_a_room() -> void:
 	for k in 4:
 		check(marks.layer_rect(k).encloses(grid.place_rect(k)), "layer %d covers its place (%s)" % [k, marks.layer_rect(k)])
 		check(marks.layer_rect(k).size.x <= grid.place_rect(k).size.x + 8.0, "and no more than a square past it")
-		check_equal(marks.layer_sprite(k).position, marks.layer_rect(k).position, "shown at its corner")
-	check(marks.layer_rect(3).end.x > float(MarksScript.MAX_SIDE), "a room past 4,096 px has its marks")
-	check_equal(marks.texture_bytes(), (640 * 384 * 3 + 96 * 64) * 4, "the rooms' texels only, not the world's")
+	check(marks.layer_rect(3).end.x > float(MarksScript.MAX_SIDE), "a room past MAX_SIDE px has its marks")
+	check_equal(marks.layers_made(), 0, "no layer is made before its first mark")
+	check_equal(marks.texture_bytes(), 0, "so a biome nobody has marked holds no texels")
 	# A scorch on the mouth reaches both rooms and the bridge; one far off only its own room.
+	marks.stamp(0, Vector2(672.0, 192.0), 40.0, 0.0, 0, Color.WHITE)
+	marks.step()
+	check_equal(marks.layers_made(), 3, "the mouth's scorch makes the layers it reaches")
+	check(marks.layer_viewport(3) == null, "the far room's waits for a mark of its own")
+	check_equal(marks.texture_bytes(), (640 * 384 * 2 + 96 * 64) * 4 * 4, "the marked places' texels only")
+	marks.step()
 	marks.stamp(0, Vector2(672.0, 192.0), 40.0, 0.0, 0, Color.WHITE)
 	marks.stamp(0, Vector2(8300.0, 800.0), 10.0, 0.0, 0, Color.WHITE)
 	marks.step()
+	for k in 4:
+		check_equal(marks.layer_sprite(k).position, marks.layer_rect(k).position, "layer %d shown at its corner" % k)
+	check_equal(marks.texture_bytes(), (640 * 384 * 3 + 96 * 64) * 4 * 4, "the rooms' texels only, not the world's")
 	check_equal([marks.layer_drawn(0), marks.layer_drawn(1), marks.layer_drawn(2), marks.layer_drawn(3)], [1, 1, 1, 1], "the mouth's scorch in three layers, the far one in its own")
 	check_equal(marks.layer_viewport(3).render_target_update_mode, SubViewport.UPDATE_ONCE, "each layer with a stamp renders")
 	marks.step()
@@ -704,3 +718,43 @@ func test_a_biome_has_a_layer_a_room() -> void:
 	marks.enter(BOUNDS, null, 8.0)
 	check_equal(marks.layer_count(), 1, "a room of its own again: one layer")
 	check_equal(marks.layer_size(), Vector2i(704, 448), "its bounds'")
+
+
+## ART3: the layer is drawn at the art's detail: DETAIL texels a world pixel each way, its canvas
+## scaled so the stamps are placed in world pixels, shown at 1 / DETAIL over exactly the room, and
+## the shader works its shapes out at the middle of each art pixel.
+func test_the_layer_is_at_the_arts_detail() -> void:
+	var marks: MarksScript = _layer()
+	marks.stamp(0, Vector2(10.0, 10.0), 4.0, 0.0, 0, Color.WHITE)
+	marks.step()
+	check_equal(MarksScript.DETAIL, ArtDetail.DETAIL, "the art's detail")
+	check_equal(marks.viewport().size, Vector2i(704, 448) * ArtDetail.DETAIL, "DETAIL texels a world pixel")
+	check_equal(marks.viewport().canvas_transform, Transform2D.IDENTITY.scaled(Vector2(2.0, 2.0)), "its canvas in world pixels")
+	check_equal(marks.sprite().scale, Vector2(0.5, 0.5), "shown at half size")
+	check(MarksScript.MAX_SIDE * MarksScript.DETAIL <= 4096, "no layer past 4,096 texels (every renderer's textures)")
+	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mark.gdshader")
+	check(code.contains("vec2 art = floor(k_px * ART_DETAIL);"), "its pixels are art pixels")
+	check(not code.contains("floor(k_px);"), "never a world pixel")
+
+
+## The orchestrator's decision of 2026-11-27 (ART3 part 4): a layer is made at its place's first mark,
+## a layer hidden before it is made is made hidden, and a new biome frees the last one's layers.
+func test_layers_are_made_at_their_first_mark_and_freed_with_their_biome() -> void:
+	var marks: MarksScript = own(MarksScript.new(-1, [_kind(&"scorch")] as Array[MarkKind])) as MarksScript
+	root.add_child(marks)
+	var world := Rect2(-64.0, -64.0, 2000.0, 600.0)
+	var grid := RoomGrid.new()
+	grid.size_to(world)
+	grid.add_place(Rect2(0.0, 0.0, 640.0, 384.0))
+	grid.add_place(Rect2(800.0, 0.0, 640.0, 384.0))
+	marks.enter_places(world, grid.wall_image(true), 8.0, grid)
+	marks.set_layer_shown(1, false)
+	check(not marks.layer_shown(1) and marks.layer_shown(0), "a layer not made yet keeps its shown setting")
+	marks.stamp(0, Vector2(1000.0, 100.0), 10.0, 0.0, 0, Color.WHITE)
+	marks.step()
+	check(marks.layer_viewport(0) == null and marks.layer_viewport(1) != null, "only the marked room's layer is made")
+	check(not marks.layer_sprite(1).visible, "made hidden, as it was set")
+	check_equal(marks.layer_viewport(1).canvas_transform, Transform2D.IDENTITY.scaled(Vector2(2.0, 2.0)), "its canvas in world pixels")
+	marks.enter_places(world, grid.wall_image(true), 8.0, grid)
+	check_equal(marks.layers_made(), 0, "a new biome frees the last one's layers")
+	check(marks.layer_shown(1), "and shows every room again")

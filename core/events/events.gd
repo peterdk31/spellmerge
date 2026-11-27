@@ -544,8 +544,9 @@ signal room_entered(room_id: StringName, room: int)
 ## nothing. Heard at once, before the placements and zones are taken out: a listener works out what it
 ## needs from it then (`CoverLayout.of`) and keeps neither the node nor anything in it. It changes no
 ## state. Heard by the cover area and feel (GC3, GC5). One listener draws onto it: Feel's ground
-## (connected biomes CB4, gameplay/feel/ground/ground_layout.gd) puts the ground drawn from the room's
-## shape on its `Floor` (textures) and makes its rims' and drips' mote lines again; so no listener reads
+## (connected biomes CB4, gameplay/feel/ground/ground_layout.gd) puts the ground drawn from a mirrored
+## room's shape on its `Floor` (textures) and makes its rims' and drips' mote lines again (an unmirrored
+## room keeps its baked art, which is that drawing); so no listener reads
 ## the `Floor`'s art or its mote lines here (they read the walls, holes and places, which it leaves).
 ## In a biome the layout is placed where the piece stands (its `position`, and its mirroring's meta,
 ## `PieceShape.GROUND_MIRROR_META`), and one room's cover is played (Cover's, FIRST_ROOM's; CB3).

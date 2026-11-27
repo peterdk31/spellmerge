@@ -287,3 +287,23 @@ func _mirrored(data: PackedByteArray, w: int, h: int, mirror: Vector2i, stride: 
 			for k in stride:
 				out[(y * w + x) * stride + k] = data[from + k]
 	return out
+
+
+func test_the_2x_floor_is_put_on_a_floor_that_has_no_detail_yet() -> void:
+	# A floor with no `Detail` child (a ground scene from before ART3): `apply` makes one, the
+	# floor's first child, the 2x art at half its size over the 1x texture the floor keeps.
+	var spec: Dictionary = _spec(Hall.data, null)
+	var art: Dictionary = ShapeScript.draw(spec, false)
+	var ground := Sprite2D.new()
+	ground.centered = false
+	var glow := Sprite2D.new()
+	glow.name = "Glow"
+	ground.add_child(glow)
+	ShapeScript.apply(ground, art, spec)
+	var detail := ground.get_node_or_null(NodePath(ShapeScript.DETAIL)) as Sprite2D
+	check(detail != null and detail.get_index() == 0, "a Detail sprite, the floor's first child (under its glow)")
+	if detail != null:
+		check_equal(ArtDetail.of(detail.texture), 2, "its texture marked at 2x")
+		check(detail.scale.is_equal_approx(Vector2(0.5, 0.5)) and not detail.centered, "drawn at half its size from the floor's corner")
+		check_equal(Vector2i(detail.texture.get_size()), Vector2i(ground.texture.get_size()) * 2, "twice the floor's pixels each way")
+	ground.free()

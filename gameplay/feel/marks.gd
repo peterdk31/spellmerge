@@ -10,9 +10,15 @@ extends Node2D
 ## shown by its sprite at 1 / DETAIL), with `CLEAR_MODE_NEVER` and `UPDATE_DISABLED`; a frame
 ## with stamps sets `UPDATE_ONCE`, so the viewport renders that frame alone. Its texture is shown
 ## by one `Sprite2D` at the layer's corner, at `z` (Feel's MARK_Z: over the room's floor, which
-## is at `RoomBase.FLOOR_Z`, and under the bodies at 0). Nothing is allocated while playing: the
-## viewport, the sprite and the batch are made once a room (`enter`; again only when its size
-## changes).
+## is at `RoomBase.FLOOR_Z`, and under the bodies at 0).
+##
+## **A layer is made when its first mark lands** (ART3 part 4, the orchestrator's decision of
+## 2026-11-27: the 2x layers are four times the texels, so a room nobody marks holds none): `enter`
+## and `enter_places` only say where each layer lies and what masks it; the frame a stamp first
+## reaches a place, `step` makes its viewport, sprite and batch (`_make_layer`), cleared, and draws
+## into it. From then on nothing is allocated while playing; a single room's layer is kept for the
+## next room of its size, and a new biome frees the last one's layers (`enter_places`). A layer is
+## never dropped within a biome: a room left and come back to shows the marks it was left with.
 ##
 ## **A biome's layers, one a room** (the performance pass, the owner's decision of 2026-11-20;
 ## `enter_places`): a biome is laid out over a world far bigger than a room, so each of its places
@@ -93,7 +99,9 @@ var _layer_kinds: Array[PackedInt32Array] = []
 var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
 ## The layers: one over the room's bounds (`enter`), or one a place of a biome (`enter_places`).
 var _pieces: Array[Piece] = []
-## The first layer's (`viewport()` and the others, for tests and the single room).
+## Whether a room or biome has been entered (`enter`, `enter_places`): stamps are taken from then on.
+var _entered: bool = false
+## The first layer's (`viewport()` and the others, for tests and the single room; null until made).
 var _viewport: SubViewport = null
 var _sprite: Sprite2D = null
 var _batch: MultiMeshInstance2D = null
@@ -135,6 +143,8 @@ class Piece:
 	var count: int = 0
 	var asked: bool = false
 	var live: bool = false
+	## Drawn on the screen (`set_layer_shown`), kept while the layer is not made yet.
+	var shown: bool = true
 
 	## Its rect in the world.
 	func rect() -> Rect2:
@@ -200,17 +210,20 @@ func kinds_named_by_layer(layer: int) -> PackedInt32Array:
 
 ## Make the layer cover `bounds` (the room's, in world pixels; at most MAX_SIDE across and down)
 ## with the walls of `walls` (one pixel a `cell`-pixel square from the corner of `bounds`, white
-## for a wall; null for none), and wipe it. The viewport is made again only when its size changes.
+## for a wall; null for none), and wipe it. Its viewport is made at its first mark (`step`), and
+## kept for the next room of its size.
 func enter(bounds: Rect2, walls: Image, cell: float) -> void:
+	_entered = true
 	_origin = bounds.position.floor()
 	var size := Vector2i(clampi(ceili(bounds.size.x), 1, MAX_SIDE), clampi(ceili(bounds.size.y), 1, MAX_SIDE))
 	_fit_pieces(1)
 	var piece: Piece = _pieces[0]
-	if piece.viewport == null or size != piece.size:
-		_make_layer(piece, size)
+	if piece.viewport != null and size != piece.size:
+		_free_layer(piece)
 	piece.size = size
 	piece.origin = _origin
-	piece.sprite.position = _origin
+	if piece.sprite != null:
+		piece.sprite.position = _origin
 	_mask(piece, walls, cell, walls != null and not walls.is_empty())
 	_first_is(piece)
 	clear()
@@ -219,11 +232,12 @@ func enter(bounds: Rect2, walls: Image, cell: float) -> void:
 ## A biome (`enter_places`): a layer a place of `grid` (its rect, at most MAX_SIDE each way, its
 ## corner on the `cell` squares of `walls` from the corner of `bounds`), each masked by the walls and
 ## by the floor its place does not hold (`grid.place_at` of each square's middle), and wipe them all.
-## With no place it is `enter`. Layers of the sizes wanted are kept from the last biome.
+## With no place it is `enter`. The last biome's layers are freed; each is made at its first mark.
 func enter_places(bounds: Rect2, walls: Image, cell: float, grid: RoomGrid) -> void:
 	if grid == null or grid.places() == 0:
 		enter(bounds, walls, cell)
 		return
+	_entered = true
 	_origin = bounds.position.floor()
 	var count: int = grid.places()
 	_fit_pieces(count)
@@ -236,19 +250,27 @@ func enter_places(bounds: Rect2, walls: Image, cell: float, grid: RoomGrid) -> v
 		var corner: Vector2 = _origin + low * step
 		var size := Vector2i(clampi(ceili((high.x - low.x) * step), 1, MAX_SIDE), clampi(ceili((high.y - low.y) * step), 1, MAX_SIDE))
 		var piece: Piece = _pieces[place]
-		if piece.viewport == null or size != piece.size:
-			_make_layer(piece, size)
+		_free_layer(piece)
 		piece.size = size
 		piece.origin = corner
-		piece.sprite.position = corner
+		piece.shown = true
 		_mask(piece, _place_mask(walls, Vector2i(low), size, step, grid, place, corner), step, true)
 	_first_is(_pieces[0])
 	clear()
 
 
-## How many layers there are (1 for a room, one a place for a biome; 0 before a room).
+## How many layers there are (1 for a room, one a place for a biome; 0 before a room), made or not.
 func layer_count() -> int:
-	return _pieces.size() if _viewport != null else 0
+	return _pieces.size() if _entered else 0
+
+
+## How many layers are made (have had a mark since they were entered, or kept from the last room).
+func layers_made() -> int:
+	var made: int = 0
+	for piece in _pieces:
+		if piece.viewport != null:
+			made += 1
+	return made
 
 
 ## Layer `k`'s viewport and sprite (null for none; for tests).
@@ -270,15 +292,20 @@ func layer_drawn(k: int) -> int:
 	return _pieces[k].batch.multimesh.visible_instance_count if k >= 0 and k < _pieces.size() and _pieces[k].batch != null else 0
 
 
-## Whether layer `k` is drawn on the screen (`set_layer_shown`).
+## Whether layer `k` is drawn on the screen (`set_layer_shown`; a layer not made yet says what it
+## will be).
 func layer_shown(k: int) -> bool:
-	return k >= 0 and k < _pieces.size() and _pieces[k].sprite != null and _pieces[k].sprite.visible
+	return k >= 0 and k < _pieces.size() and _entered and _pieces[k].shown
 
 
 ## Layer `k` drawn on the screen (`shown`) or not (a room nobody has entered, under the void's dark:
-## unseen_rooms.gd). Its stamps are still drawn into it, so shown again it is as it stands.
+## unseen_rooms.gd). Its stamps are still drawn into it, so shown again it is as it stands; a layer
+## made later takes it.
 func set_layer_shown(k: int, shown: bool) -> void:
-	if k >= 0 and k < _pieces.size() and _pieces[k].sprite != null:
+	if k < 0 or k >= _pieces.size():
+		return
+	_pieces[k].shown = shown
+	if _pieces[k].sprite != null:
 		_pieces[k].sprite.visible = shown
 
 
@@ -290,10 +317,7 @@ func layer_material(k: int) -> ShaderMaterial:
 ## Exactly `count` layers: more made empty (their viewports at `_make_layer`), the rest freed.
 func _fit_pieces(count: int) -> void:
 	while _pieces.size() > count:
-		var gone: Piece = _pieces.pop_back()
-		if gone.viewport != null:
-			gone.viewport.queue_free()
-			gone.sprite.queue_free()
+		_free_layer(_pieces.pop_back())
 	while _pieces.size() < count:
 		var piece := Piece.new()
 		# The first layer draws with the material the kinds and colours are set on; the others with
@@ -407,7 +431,7 @@ func clear() -> void:
 ## colour `core` for the parts coloured from the spell, and of `surface` (a ramp table row; -1 for
 ## none) for those coloured from the surface. It is drawn at the next `step`.
 func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: Color, surface: int = -1) -> void:
-	if k < 0 or k >= _kinds.size() or not at.is_finite() or radius <= 0.0 or _viewport == null:
+	if k < 0 or k >= _kinds.size() or not at.is_finite() or radius <= 0.0 or not _entered:
 		return
 	if _pending_count >= PENDING_MAX:
 		left_out += 1
@@ -436,7 +460,7 @@ func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: C
 ## serial, `forget_settles_before`; -1 for one never forgotten). Nothing before the first `step`
 ## with a clock, or with no room.
 func settle(k: int, at: Vector2, when: float, source: int, core: Color, serial: int = -1) -> void:
-	if not _settle_started or _viewport == null or k < 0 or k >= _kinds.size() or not at.is_finite() or not is_finite(when):
+	if not _settle_started or not _entered or k < 0 or k >= _kinds.size() or not at.is_finite() or not is_finite(when):
 		return
 	var slot: int = clampi(floori(when / SETTLE_SLOT), _settle_done + 1, _settle_done + SETTLE_SLOTS)
 	var ring: int = slot % SETTLE_SLOTS
@@ -482,7 +506,7 @@ func step(now: float = -1.0) -> void:
 	# The clock is learnt even with no room yet, so a room's first frame can settle motes.
 	if now >= 0.0:
 		settle_due(now)
-	if _viewport == null:
+	if not _entered:
 		return
 	for piece in _pieces:
 		piece.count = 0
@@ -492,6 +516,11 @@ func step(now: float = -1.0) -> void:
 	_pending_head = (_pending_head + n) % PENDING_MAX
 	_pending_count -= n
 	for piece in _pieces:
+		if piece.viewport == null:
+			if piece.count == 0:
+				continue
+			# Its first mark: the layer is made now, cleared at its first render.
+			_make_layer(piece, piece.size)
 		var want: bool = piece.asked or piece.count > 0
 		if piece.live and not want:
 			piece.viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -603,6 +632,11 @@ func texture_bytes() -> int:
 	return bytes
 
 
+## The z every layer's sprite is shown at (Feel's MARK_Z).
+func layer_z() -> int:
+	return _z
+
+
 ## A shader parameter of the stamps' material (for tests).
 func shader_parameter(name: StringName) -> Variant:
 	return _material.get_shader_parameter(name)
@@ -642,16 +676,15 @@ func _take_kinds(kinds: Array[MarkKind]) -> void:
 ## `piece`'s viewport `size` texels big that holds its marks, the batch drawing into it and the
 ## sprite showing it (the old ones freed).
 func _make_layer(piece: Piece, size: Vector2i) -> void:
-	if piece.viewport != null:
-		piece.viewport.queue_free()
-		piece.sprite.queue_free()
+	_free_layer(piece)
 	var named: String = "" if _pieces.find(piece) <= 0 else str(_pieces.find(piece))
 	var viewport := SubViewport.new()
 	viewport.name = "Layer" + named
 	viewport.size = size * DETAIL
 	viewport.transparent_bg = true
 	viewport.disable_3d = true
-	viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
+	# Cleared at its first render (a new render target holds nothing known), then never.
+	viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 	var multimesh: MultiMesh = BatchesScript.multimesh()
@@ -665,14 +698,16 @@ func _make_layer(piece: Piece, size: Vector2i) -> void:
 	batch.multimesh = multimesh
 	batch.material = piece.material
 	viewport.add_child(batch)
+	# The stamps are placed in world pixels; the canvas makes each DETAIL texels (set whenever the
+	# viewport enters the tree, where its canvas is).
+	viewport.tree_entered.connect(_scale_canvas.bind(viewport))
 	add_child(viewport)
-	# The stamps are placed in world pixels; the canvas makes each DETAIL texels (set once the
-	# viewport is in the tree, where its canvas is).
-	viewport.canvas_transform = Transform2D.IDENTITY.scaled(Vector2(DETAIL, DETAIL))
 	var sprite := Sprite2D.new()
 	sprite.name = "Marks" + named
 	sprite.texture = viewport.get_texture()
 	sprite.centered = false
+	sprite.position = piece.origin
+	sprite.visible = piece.shown
 	sprite.scale = Vector2.ONE / float(DETAIL)
 	sprite.top_level = true
 	sprite.z_index = _z
@@ -683,6 +718,27 @@ func _make_layer(piece: Piece, size: Vector2i) -> void:
 	piece.batch = batch
 	piece.live = false
 	piece.asked = false
+	if piece == _pieces[0]:
+		_first_is(piece)
+
+
+## `viewport`'s canvas scaled to DETAIL texels a world pixel (once it is in the tree).
+static func _scale_canvas(viewport: SubViewport) -> void:
+	viewport.canvas_transform = Transform2D.IDENTITY.scaled(Vector2(DETAIL, DETAIL))
+
+
+## `piece`'s viewport, sprite and batch freed (none: nothing); its place and mask are kept.
+func _free_layer(piece: Piece) -> void:
+	if piece.viewport != null:
+		piece.viewport.queue_free()
+		piece.sprite.queue_free()
+	piece.viewport = null
+	piece.sprite = null
+	piece.batch = null
+	piece.live = false
+	piece.asked = false
+	if not _pieces.is_empty() and piece == _pieces[0]:
+		_first_is(piece)
 
 
 ## One quad: the shader places its corners (a vertex's UV is its corner).

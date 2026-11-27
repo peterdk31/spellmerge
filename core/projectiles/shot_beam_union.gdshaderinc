@@ -23,8 +23,8 @@
 // never swells); the beams are a soft union, -SOFT x log of the sum of exp(-e / SOFT) (a sum, the
 // same in any order and with a far beam left out, as the pools' merge): one distance, so one rim
 // round the merged shape, none inside it, and two beams close or crossing melt into one body while
-// beams apart keep their own rims, as a single beam's distance is its own. A fading beam weighs
-// its fade in the sum, so it thins away and lets go of the others smoothly. Only the piece nearest
+// beams apart keep their own rims, as a single beam's distance is its own. A beam nearly gone
+// (BeamUnion.FADE_GIVES) weighs what is left of it in the sum, so it lets go of the others smoothly. Only the piece nearest
 // the pixel draws it (of two as near, the first), so no pixel is drawn twice: no doubled light or
 // alpha where beams overlap.
 //
@@ -169,19 +169,19 @@ void vertex() {
 				float d = between_pieces(ends, seg_texel(j, S_ENDS));
 				if (d <= reach) {
 					// Kept if there is room, or in place of the furthest kept.
-					int at = found;
+					int put_at = found;
 					if (found >= NEAR_MOST) {
-						at = 0;
+						put_at = 0;
 						for (int k = 1; k < NEAR_MOST; k++) {
-							at = near_d[k] > near_d[at] ? k : at;
+							put_at = near_d[k] > near_d[put_at] ? k : put_at;
 						}
-						at = d < near_d[at] ? at : -1;
+						put_at = d < near_d[put_at] ? put_at : -1;
 					} else {
 						found++;
 					}
-					if (at >= 0) {
-						near_d[at] = d;
-						near_i[at] = j;
+					if (put_at >= 0) {
+						near_d[put_at] = d;
+						near_i[put_at] = j;
 					}
 				}
 			}
@@ -241,7 +241,7 @@ struct Piece {
 	vec2 b;
 };
 
-// A quick look at piece `s` at the pixel `P` (three texels, no look hooks): its order (`ord`) give
+// A quick look at piece `s` at the pixel `P` (four texels, no look hooks): its order (`ord`) give
 // or take its sway, or OUTSIDE where it is past its beam's ends or its quad does not reach.
 float quick_ord(int s, vec2 P) {
 	vec4 ends = seg_texel(s, S_ENDS);
@@ -255,8 +255,11 @@ float quick_ord(int s, vec2 P) {
 	float x = abs(dot(d, vec2(-way.y, way.x))) / max(cheb, 0.5);
 	float over = t < 0.0 ? -t : max(t - span, 0.0);
 	x = over > 0.0 ? length(vec2(x, over)) : x;
+	// Past its beam's ends it is outside; past a bend, round (as `piece_at`).
+	vec4 who = seg_texel(s, S_WHO);
+	bool cut = (t < 0.0 && flag_set(who.y, F_FIRST)) || (t > span && flag_set(who.y, F_LAST));
 	bool reaches = x <= wide.x * 0.5 + UNION_ROOM + beam_lead + 2.0;
-	return reaches && over <= 0.0 ? x - look_bands(shape.z, wide.x) + shape.w : OUTSIDE;
+	return reaches && !cut ? x - look_bands(shape.z, wide.x) + shape.w : OUTSIDE;
 }
 
 Piece piece_at(int s, vec2 P, bool own_piece) {
@@ -308,7 +311,8 @@ Piece piece_at(int s, vec2 P, bool own_piece) {
 	p.edge = p.bands + p.ripple;
 	bool cut = (first && t < 0.0) || (last && t > span);
 	p.e = cut ? OUTSIDE + p.x : p.x - p.bands;
-	// A fading beam gives way: its share of the union is its fade (`shape.w`, -SOFT x log(fade)).
+	// A fading beam gives way (`shape.w`, BeamUnion's `give_of`): only once it is nearly gone, so a
+	// lone beam keeps its own shape while it dissolves into pixels, and lets go of the others smoothly.
 	p.ord = cut ? p.e : p.e + shape.w;
 	return p;
 }
@@ -445,8 +449,11 @@ Union union_at(vec2 P, out Piece me) {
 	sums.w = 0.0;
 	sums.bands = 0.0;
 	sums.ripple = 0.0;
-	// The beam gathered now (its pieces come one after another): this quad's first.
-	Near g = near_of(me);
+	// This quad's beam (its other pieces only bring it nearer), and the other beam gathered now (a
+	// beam's pieces come one after another in the list).
+	Near mine_g = near_of(me);
+	Near g = mine_g;
+	bool gathering = false;
 	if (flag_set(me.flags, F_FIRST)) {
 		u.start_d = cell - floor(me.a);
 		u.start_beam = me.beam;
@@ -487,14 +494,21 @@ Union union_at(vec2 P, out Piece me) {
 				u.mine = false;
 				break;
 			}
-			// A beam is its nearest piece: a piece of the beam gathered only brings it nearer.
-			if (q.beam == g.beam) {
+			// A beam is its nearest piece: a piece of a beam gathered only brings it nearer.
+			if (q.beam == me.beam) {
+				if (q.ord < mine_g.ord) {
+					mine_g = near_of(q);
+				}
+			} else if (gathering && q.beam == g.beam) {
 				if (q.ord < g.ord) {
 					g = near_of(q);
 				}
 			} else {
-				count_beam(g, me.beam, sums, u);
+				if (gathering) {
+					count_beam(g, me.beam, sums, u);
+				}
 				g = near_of(q);
+				gathering = true;
 			}
 			// The nearest beam start and end round the pixel (their flares and lights).
 			vec2 ds = cell - floor(q.a);
@@ -519,7 +533,10 @@ Union union_at(vec2 P, out Piece me) {
 	if (!u.mine) {
 		return u;
 	}
-	count_beam(g, me.beam, sums, u);
+	count_beam(mine_g, me.beam, sums, u);
+	if (gathering) {
+		count_beam(g, me.beam, sums, u);
+	}
 	// The soft union of the beams (each weighed by its fade), less the beams' ripples by their shares.
 	float union_e = sums.soft > 0.0 ? -SOFT * log(sums.soft) : OUTSIDE;
 	u.bands = sums.w > 0.0 ? sums.bands / sums.w : me.bands;

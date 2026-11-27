@@ -54,6 +54,8 @@ const S_WHO: int = 2
 const S_WIDTH: int = 3
 ## How soft the union is (the shader's SOFT, pixels).
 const SOFT: float = 3.0
+## How whole a fading beam is when it starts giving way in the union (its swell's floor, Feel's 0.35).
+const FADE_GIVES: float = 0.35
 ## The longest piece a path is cut into (pixels): a piece's quad is this long and a beam's width wide.
 const PIECE_MOST: float = 64.0
 ## A piece's flags: its beam's first piece (its start's flare), its last (its end's), and a cut of a
@@ -75,6 +77,8 @@ const L_EMBERS: int = 1
 const L_GUSTS: int = 3
 const L_PULL: int = 4
 const L_SPARKS: int = 5
+## The kinds a shown beam's look is searched for, in order (`first_kind_of`).
+const SWAYING_KINDS: PackedInt32Array = [L_PULL, L_SPARKS, L_GUSTS, L_EMBERS]
 ## The look's flags (shot_palette.gdshaderinc's ENEMY_RAMP and EXACT, kinds 29 and 30).
 const LOOK_ENEMY_RAMP: int = ManagerScript.LOOK_ENEMY_RAMP
 const LOOK_EXACT: int = ManagerScript.LOOK_ENEMY_RAMP << 1
@@ -209,9 +213,7 @@ func add(path: PackedVector3Array, points: int, start: Vector2, end_at: Vector2,
 		_image.set_pixel(B_INFUSIONS + n, b, beam_infusions[n])
 	var first: int = segments
 	var last: int = segments + pieces - 1
-	# How far a fading beam gives way in the union (the shader's SOFT x -log(fade)): its share of the
-	# union is its fade, so it thins away and lets go of the beams it meets smoothly.
-	var give: float = -SOFT * log(maxf(fade, 0.001))
+	var give: float = give_of(fade)
 	for n in points - 1:
 		var from: Vector3 = path[n]
 		var to: Vector3 = path[n + 1]
@@ -229,6 +231,13 @@ func add(path: PackedVector3Array, points: int, start: Vector2, end_at: Vector2,
 			_image.set_pixel(x + S_WHO, y, Color(float(b), float(flags), float(ramp), float(kind)))
 			_image.set_pixel(x + S_WIDTH, y, Color(width, glow, fade, 0.0))
 	return b
+
+
+## How far a beam `fade` whole gives way in the union (pixels; the shader's `shape.w`): nothing while
+## it is more than FADE_GIVES whole (a lone beam keeps its own shape as it dissolves into pixels),
+## then SOFT x -log of what is left of it, so it lets go of the beams it meets smoothly to nothing.
+static func give_of(fade: float) -> float:
+	return -SOFT * log(clampf(fade / FADE_GIVES, 0.001, 1.0))
 
 
 ## How many pieces the path's piece from `from` to `to` is cut into: none longer than PIECE_MOST.
@@ -296,7 +305,7 @@ static func first_kind_of(core: Color, look: int, beam_infusions: PackedColorArr
 		return roundi(beam_infusions[0].a * 255.0)
 	if core.r > 0.99 and core.g > 0.99 and core.b > 0.99:
 		return 0
-	for kind: int in [L_PULL, L_SPARKS, L_GUSTS, L_EMBERS]:
+	for kind: int in SWAYING_KINDS:
 		if look & (1 << (kind - 1)) != 0:
 			return kind
 	return 0

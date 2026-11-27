@@ -31,6 +31,7 @@ func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetim
 	carrier_card.lifetime = lifetime
 	carrier_card.wind_down = 0.05
 	carrier_card.staff_pose = keys
+	arena.registry.call("get_ids", &"spells")  # the spells loaded (a folder loads when first asked for)
 	(arena.registry.get("_resources")[&"spells"] as Dictionary)[id] = carrier_card
 	return carrier_card
 

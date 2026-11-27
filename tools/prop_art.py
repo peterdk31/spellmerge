@@ -325,7 +325,9 @@ LODESTONE_ARCS: list[list[Point]] = [
 def _lodestone(vein: str | None, arc: str | None, hot: bool) -> list[Part]:
     rock = [(9.0, 7.6), (14.8, 7.6), (16.4, 9.6), (16.4, 22.8), (17.6, 24.2), (17.6, 30.0), (16.4, 30.6), (7.6, 30.6), (6.4, 30.0), (6.4, 24.2), (7.4, 22.8), (7.4, 9.6)]
     cracks = [[(13.6, 26.0), (14.4, 27.6), (14.0, 29.0)]] if vein is not None else [[(11.4, 12.4), (12.4, 14.4), (11.0, 17.4), (11.2, 20.4), (13.4, 22.4), (13.0, 24.4)], [(13.6, 26.0), (14.4, 27.6), (14.0, 29.0)]]
-    parts: list[Part] = [poly(rock, bevel=1.6, surface="pores", cracks=cracks, seed=41, **STONE)]  # type: ignore[arg-type]
+    parts: list[Part] = [poly(rock, bevel=1.6, surface="pores", seed=41, **STONE)]  # type: ignore[arg-type]
+    for crack in cracks:
+        parts += line(crack, OUTLINE, 0.34)
     if vein is not None:
         parts += line(LODESTONE_VEIN, vein, 0.42)
         nodes = (LODESTONE_VEIN[0], LODESTONE_VEIN[4], LODESTONE_VEIN[7])
@@ -447,12 +449,18 @@ CRACK_DOWN: list[Point] = [(12.6, 7.6), (11.4, 10.6), (13.0, 13.4), (11.6, 16.6)
 
 
 def _square_pillar(cracks: list[list[Point]]) -> list[Part]:
-    joints = [[(4.8, y), (19.2, y)] for y in (14.0, 22.0, 30.0, 38.0)]
-    return [
-        box(4.4, 7.0, 19.6, 41.6, bevel=1.6, surface="pores", cracks=joints + cracks, seed=71, **STONE),  # type: ignore[arg-type]
+    """Stacked blocks with dark joints between them, its cracks dark lines that read in a fight."""
+    parts: list[Part] = [box(4.4, 7.0, 19.6, 41.6, bevel=1.6, surface="pores", seed=71, **STONE)]  # type: ignore[arg-type]
+    for y in (14.0, 22.0, 30.0, 38.0):
+        parts += line([(5.0, y), (19.0, y)], OUTLINE, 0.32)
+        parts.append(box(5.0, y + 0.35, 19.0, y + 0.85, bevel=0.0, material="Stone", colour=PALETTE["Stone"][2], seam=False))
+    parts += [
         box(2.4, 41.4, 21.6, 46.4, bevel=1.0, surface="pores", seed=72, **STONE),  # type: ignore[arg-type]
-        tilted(box(1.4, 1.4, 22.6, 7.4, bevel=1.0, surface="pores", cracks=[c for c in cracks if c[0][1] < 7.0], seed=73, **STONE), 0.0, -0.3),  # type: ignore[arg-type]
+        tilted(box(1.4, 1.4, 22.6, 7.4, bevel=1.0, surface="pores", seed=73, **STONE), 0.0, -0.3),  # type: ignore[arg-type]
     ]
+    for crack in cracks:
+        parts += line(crack, OUTLINE, 0.36)
+    return parts
 
 
 def pillar_intact() -> list[Part]:
@@ -484,10 +492,19 @@ CRYPT_CRACK_2: list[Point] = [(20.6, 14.6), (21.8, 19.0), (20.2, 23.6), (22.0, 2
 
 
 def _shaft(top: float, cracks: list[list[Point]], jagged: bool = False) -> list[Part]:
-    """The fluted column from `top` down to its base: drum joints and flutes cut a shade down."""
-    flutes = [[(x, top + 0.6), (x, SHAFT_Y1 - 0.6)] for x in (17.4, 21.4, 26.6, 30.6)]
-    joints = [[(SHAFT_X0 + 0.4, y), (SHAFT_X1 - 0.4, y)] for y in (27.4, 41.4) if y > top + 1.0]
-    parts: list[Part] = [column(SHAFT_X0, SHAFT_X1, top, SHAFT_Y1, surface="pores", cracks=flutes + joints + cracks, seed=81, **STONE)]  # type: ignore[arg-type]
+    """The fluted column from `top` down to its base: flutes and drum joints in its shadow shade (a
+    lit ridge beside each flute on its lit side), its cracks dark lines that read in a fight."""
+    parts: list[Part] = [column(SHAFT_X0, SHAFT_X1, top, SHAFT_Y1, surface="pores", seed=81, **STONE)]  # type: ignore[arg-type]
+    for x in (17.4, 21.4, 26.6, 30.6):
+        parts += line([(x, top + 0.8), (x, SHAFT_Y1 - 0.8)], PALETTE["Stone"][0], 0.3)
+        if x < 24.0:
+            parts += line([(x + 0.8, top + 0.8), (x + 0.8, SHAFT_Y1 - 0.8)], PALETTE["Stone"][2], 0.25)
+    for y in (27.4, 41.4):
+        if y > top + 1.0:
+            parts += line([(SHAFT_X0 + 0.6, y), (SHAFT_X1 - 0.6, y)], PALETTE["Stone"][0], 0.32)
+    for crack in cracks:
+        # Only what is left of the shaft keeps its crack.
+        parts += line([point for point in crack if point[1] > top + 1.0], OUTLINE, 0.36)
     if jagged:
         # A broken top: a row of teeth knocked out of it, dark where the stone broke.
         for i, x in enumerate((14.6, 18.4, 22.2, 26.0, 29.8, 33.4)):

@@ -7,13 +7,13 @@ extends Resource
 ## never takes it for content.
 ##
 ## Its picture's bottom middle stands on the prop's feet, moved by `offset`; whole pixels. A
-## picture named `<name>@2x` is drawn at 2x detail, at half its pixels (`ArtDetail`), so it stands as
-## big as its 1x art did. Its
-## frames, when it has several, are side by side, played `fps` a second on the view's clock from
-## when its state's look is shown, and round again from `loop_from`: from the first (0, the
-## default) a loop; from a later one, the frames before it play once as the state is entered (the
-## frames between the last look and this one, docs/STYLE.md "Smooth") and the rest loop; from the
-## last, the strip plays once and holds its last frame (a crumble ending in rubble).
+## picture named `<name>@2x` is drawn at 2x detail, at half its pixels (`ArtDetail`), so it stands
+## as big as its 1x art did. Its frames, when it has several, are side by side, played `fps` a
+## second on the view's clock from when its state's look is shown, and round again from
+## `loop_from`: from the first (0, the default) a loop; from a later one, the frames before it play
+## once as the state is entered (the frames between the last look and this one, docs/STYLE.md
+## "Smooth") and the rest loop; from the last, the strip plays once and holds its last frame (a
+## crumble ending in rubble).
 
 ## The picture (`.svg` or `.png`, palette colours; `tools/prop_art.py` draws the props' at 2x, and
 ## `tools/pixel_grid.py` writes one from a grid, such as a mote mask).

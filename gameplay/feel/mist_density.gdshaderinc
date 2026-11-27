@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// A room's low floor mist, how thick it is at a world pixel (gameplay/feel/mist.gd; mist.gdshader, where it
+// A room's low floor mist, how thick it is at an art pixel (gameplay/feel/mist.gd; mist.gdshader, where it
 // is drawn, a pixel at a time). See
 // mist.gdshader for where it lies, its billows and what pushes it.
 
+#include "res://core/display/art_detail.gdshaderinc"
 #include "res://gameplay/feel/stir.gdshaderinc"
 
 uniform sampler2D mask : hint_default_black, filter_linear, repeat_disable;
@@ -59,10 +60,10 @@ float mist_parted(vec2 p) {
 	return textureLod(parted, (p - origin) / parted_size, 0.0).r;
 }
 
-// How thick the mist is at world point `world` (0: none drawn), a world pixel at a time.
+// How thick the mist is at world point `world` (0: none drawn), an art pixel at a time (ART3: its
+// edge against the walls, the pits and the void steps by the finer pixel).
 float mist_density(vec2 world) {
-	// A world pixel at a time.
-	vec2 p = floor(world) + 0.5;
+	vec2 p = art_centre(world);
 	// Where it lies first: past a wall's spill, or where even its thickest billow would not show, the
 	// rest is not worked out.
 	vec4 m = textureLod(mask, (p - origin) / mask_size, 0.0);

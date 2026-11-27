@@ -3,6 +3,8 @@
 // the picture by (light_apply.gdshader, where it is drawn, a pixel at a time). See light_apply.gdshader for the steps, the
 // ambient and the rooms' tints.
 
+#include "res://core/display/art_detail.gdshaderinc"
+
 // The room's light where no spell lights it (1.0: as it is), and the colour of its dark
 // (`RoomBase.shade`; white: an even dark), multiplied together.
 uniform float ambient = 1.0;
@@ -28,9 +30,9 @@ uniform vec4 tint_hues[MAX_TINTS];
 uniform int tint_count = 0;
 
 // The tint at world point `at`: the room's it is in, else the strongest edge band of a room it is
-// near (a: 0 for none). Worked out a world pixel at a time (whole-pixel bands).
+// near (a: 0 for none). Worked out an art pixel at a time (whole-pixel bands; ART3).
 vec4 room_tint(vec2 at) {
-	vec2 p = floor(at) + 0.5;
+	vec2 p = art_centre(at);
 	vec4 edge = vec4(1.0, 1.0, 1.0, 0.0);
 	vec4 inside = vec4(0.0);
 	bool found = false;

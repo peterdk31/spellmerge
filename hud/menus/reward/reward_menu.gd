@@ -54,6 +54,8 @@ const GOLD: Color = Color("#f2c230")
 const ARROW: Color = Color("#d4d0e0")
 ## The title's outline, in layout pixels (as the Labels' theme outline).
 const TITLE_OUTLINE: int = 2
+## How far outside the cards' top-left corner the player's corner mark starts.
+const MARK_OUT: float = 3.0
 
 ## The seat it belongs to (0-3), set before it enters the tree.
 var index: int = 0
@@ -443,9 +445,9 @@ func _focus_on(at: int) -> void:
 
 func _draw() -> void:
 	# No box and no background (ART4, the owner, 2026-11-27): the cards keep their own outlines, the
-	# title its outline, and the player's small corner L at the menu's top left says whose it is.
+	# title its outline, and the player's small corner L just outside the cards' top left says whose it is.
 	var ramp: PackedColorArray = HudArt.player_ramp(index % HudArt.PLAYERS.size())
-	HudArt.corner_mark(self, Vector2.ZERO, ramp)
+	HudArt.corner_mark(self, _strip.position - Vector2(MARK_OUT, MARK_OUT), ramp)
 	var font: Font = get_theme_default_font()
 	var x: float = floorf((size.x - font.get_string_size(_title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x) * 0.5)
 	var baseline: Vector2 = Vector2(x, LayoutScript.EDGE + 1.0 + font.get_ascent(FONT_SIZE)).round()

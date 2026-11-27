@@ -136,7 +136,7 @@ const BARS_HEIGHT: float = 7.0
 ## How tall each of the two lines is, and how far outside their top-left corner the player's corner
 ## mark starts.
 const LINE_HEIGHT: float = 3.0
-const MARK_OUT: float = 3.0
+const MARK_OUT: Vector2 = Vector2(3.0, 2.0)
 const TABS_FROM_TOP: float = 11.0
 const SLOTS_FROM_TOP: float = 26.0
 ## The bars' colours, the corner panel's lines' (`meter_line.gd`); each player's colour is
@@ -1513,7 +1513,8 @@ func _draw_slots() -> void:
 		var rect: Rect2 = _slot_rect(slot)
 		var id: StringName = cards[slot]
 		if id == NO_CARD or landing.has(slot):
-			draw_rect(HudArt.inside_cut(rect), EMPTY)
+			draw_rect(rect, EMPTY)
+			_thin(rect, LINE)
 		elif previewing and slot == _slot:
 			draw_rect(rect, EMPTY)
 			_draw_icon(id, rect, 0.55)
@@ -1623,7 +1624,7 @@ func _draw_bars() -> void:
 	var shares: Vector2 = bar_shares()
 	HudArt.meter(self, Rect2(_bars_at, Vector2(COLUMN_WIDTH, LINE_HEIGHT)), shares.x, HEALTH_COLOR, MeterLineScript.HEALTH_SHADE)
 	HudArt.meter(self, Rect2(_bars_at + Vector2(0.0, BARS_HEIGHT - LINE_HEIGHT), Vector2(COLUMN_WIDTH, LINE_HEIGHT)), shares.y, MANA_COLOR, MeterLineScript.MANA_SHADE)
-	HudArt.corner_mark(self, _bars_at - Vector2(MARK_OUT, MARK_OUT), HudArt.player_ramp(index))
+	HudArt.corner_mark(self, _bars_at - MARK_OUT, HudArt.player_ramp(index))
 
 
 ## The card info panel: the card under the slot marker (`card_info`), and a refusal's note over its top.

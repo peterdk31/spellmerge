@@ -109,7 +109,7 @@ const EDGE: float = 4.0
 const COLUMN_WIDTH: float = 112.0
 const BAR_HEIGHT: float = 4.0
 ## How far outside the HP line's top-left corner the player's corner mark starts.
-const MARK_OUT: float = 3.0
+const MARK_OUT: Vector2 = Vector2(3.0, 2.0)
 const HANDS_FROM_TOP: float = 8.0
 const HAND_ROW: float = 18.0
 const HEAD_SIZE: float = 16.0
@@ -931,12 +931,12 @@ func _draw() -> void:
 
 
 ## The HP line on top of the column in its trough, with no frame round it (ART4, the owner,
-## 2026-11-27: no HUD boxes); the player's small corner L just outside its top-left corner says
+## 2026-11-27: no HUD boxes); the player's small corner L just outside its top-left corner (inside the quarter) says
 ## whose inventory it is.
 func _draw_bar() -> void:
 	var share: float = clampf(_health / _max_health, 0.0, 1.0) if _health >= 0.0 else 1.0
 	HudArt.meter(self, Rect2(_column.position, Vector2(COLUMN_WIDTH, BAR_HEIGHT - 1.0)), share, HEALTH_COLOR, MeterLineScript.HEALTH_SHADE)
-	HudArt.corner_mark(self, _column.position - Vector2(MARK_OUT, MARK_OUT), HudArt.player_ramp(index))
+	HudArt.corner_mark(self, _column.position - MARK_OUT, HudArt.player_ramp(index))
 
 
 ## The four hands: the numbers' headers, then per hand its glyph, its staff's head and numbers,

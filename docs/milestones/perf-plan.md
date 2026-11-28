@@ -281,6 +281,12 @@ Per PR in the 4p fight that is roughly: change 1 0.6 to 0.8 ms, change 2 0.3, ch
 
 The order after F1 follows its profile.
 
+**F1's profile (2026-11-28, `play_frames.gd`, desktop settings, xvfb; ms a frame, 1 view and 4).**
+
+- **The per-view cost was the light's readers' copies** (`view_readers.gd`), 0.43 and 6.20 ms: each copy for the third and fourth views followed twice a frame (in Feel's step and at the pre-draw, the second outside Feel's timer), and every uniform of every reader's material read and copied to each view's material a frame. It is node and shader-parameter work, which the module may not do (`native/build_profile.json` holds no canvas class), so it stays GDScript. F2 made it follow once, and only what changed: 0.18 and 2.97 ms (Feel's "camera and split" 2.13 to 0.88 at 4 views).
+- What is left at 4 views: the light's grid at the pre-draw (2.65, already native), the readers' uniforms (1.9: 1,760 reads a frame, 120 changed), the cover's step (1.5 to 1.8 at any number of views), the bodies' looks (0.28 and 1.41), and in the spectacle the shadows (0.24, 0.75), the mists (0.17, 0.49), the stirs (0.09, 0.45), the source motes (0.23, 0.34), the motes' step (0.16, 0.40), the floor marks (0.05, 0.33) and the blockers (0.27).
+- **Next, by that profile:** (F3) the cover's look; (F2b) the readers' uniforms set where they are set (the light's numbers handed to each view's material by the light itself, not read back a frame); (F4) the bodies' looks in one call; (F5) on the workers.
+
 ### 2. The crowd's per-tick work in C++, on a body table
 
 **Evidence.**

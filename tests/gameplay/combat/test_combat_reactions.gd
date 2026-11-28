@@ -129,6 +129,24 @@ func test_every_pair_of_the_four_first_elements_reacts_both_ways_under_one_of_si
 	check_equal(names.size(), 6, "six reactions in all")
 
 
+## The reaction lookup reads the body's statuses before the table (perf plan H3b): a body with
+## none of them reacts to no element, and a body with one reacts as the table says, for each
+## element and each reacting status.
+func test_the_reaction_is_the_tables_for_the_status_on_the_body() -> void:
+	var table: ReactionTable = load("res://content/spells/reactions.tres") as ReactionTable
+	var clean: int = _combat.actor_of(_enemy())
+	for element in ELEMENTS + [&"lightning"]:
+		check_equal(_combat._reaction_for(clean, element), null, "%s on a body with no status" % element)
+	for status in CombatScript.REACTING_STATUSES:
+		var row: int = _combat.actor_of(_enemy())
+		_combat.apply_status(0, row, status, 10.0, 1.0)
+		var at: int = CombatScript.REACTING_STATUSES.find(status)
+		for element in ELEMENTS + [&"lightning"]:
+			var in_order: Array[ReactionRow] = table.in_order(element, CombatScript.REACTING_STATUSES)
+			var wanted: ReactionRow = in_order[at] if at < in_order.size() else null
+			check_equal(_combat._reaction_for(row, element), wanted, "%s on a body with %s" % [element, status])
+
+
 # --- Shatter: frost and storm, consume ---
 
 

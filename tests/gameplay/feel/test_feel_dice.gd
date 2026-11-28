@@ -3,6 +3,7 @@ extends "res://tests/support/suite.gd"
 ## comes out the same every time a run is played, so two runs' screenshots are the same picture. A
 ## new generator starts at a random seed; each of these starts at its script's `DICE_SEED` and its
 ## count (`FeelDice.made`), so several of one kind at once never roll in step.
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SEEDED: Array[Script] = [
 	preload("res://gameplay/feel/air_motes.gd"),
 	preload("res://gameplay/feel/cover_motes.gd"),
@@ -38,8 +39,9 @@ func test_two_of_a_kind_never_roll_in_step() -> void:
 	check_equal(second.seed, hash(Vector2i(0x7E57, count + 1)), "the next, the seed with the count after")
 
 
-## Each seeded part of Feel takes its dice from `FeelDice.made` with a seed of its own, and none
-## draws a random seed (the debris did when it entered the tree).
+## Each seeded part of Feel has a seed of its own and takes its dice from `FeelDice.made` (its seed
+## and a count): a new one's dice are seeded so, never at random (the debris drew a random seed when
+## it entered the tree).
 func test_each_part_takes_seeded_dice_of_its_own() -> void:
 	var seeds: Array[int] = []
 	for script in SEEDED:
@@ -48,17 +50,17 @@ func test_each_part_takes_seeded_dice_of_its_own() -> void:
 		if value is int:
 			check(not seeds.has(value), "%s's seed is its own" % script.resource_path)
 			seeds.append(value)
-		var source: String = script.source_code
-		check(source.contains("FeelDice.made(DICE_SEED)"), "%s takes its dice from FeelDice.made" % script.resource_path)
-		check(not source.contains("RandomNumberGenerator.new()") and not source.contains(".randomize()"), "%s makes no unseeded dice" % script.resource_path)
-	var debris: Script = SEEDED[3]
-	var remnants: Node = own(debris.new()) as Node
-	root.add_child(remnants)
-	var dice: RandomNumberGenerator = remnants.get(&"_rng")
-	var seed_value: int = int(debris.get_script_constant_map()["DICE_SEED"])
-	var found: bool = false
-	for k in 1000:
-		if dice.seed == hash(Vector2i(seed_value, k)):
-			found = true
-			break
-	check(found, "the debris keeps its seeded dice in the tree")
+	var table: RefCounted = RampTableScript.new()
+	var made: Array[Object] = [SEEDED[0].new(table), SEEDED[1].new(), SEEDED[2].new(table), own(SEEDED[3].new()), own(SEEDED[4].new())]
+	# The debris and the spectacle in the tree, where the debris used to draw a random seed.
+	root.add_child(made[3] as Node)
+	root.add_child(made[4] as Node)
+	for i in made.size():
+		var dice: RandomNumberGenerator = made[i].get(&"_rng")
+		var seed_value: int = int(SEEDED[i].get_script_constant_map()["DICE_SEED"])
+		var found: bool = false
+		for k in 1000:
+			if dice != null and dice.seed == hash(Vector2i(seed_value, k)):
+				found = true
+				break
+		check(found, "%s's dice are its seed and a count" % SEEDED[i].resource_path)

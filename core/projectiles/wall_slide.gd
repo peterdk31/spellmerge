@@ -55,6 +55,13 @@ static func native_on() -> bool:
 	return _kernel != null
 
 
+## The native module's `BodyKernel`, or null while `native_on()` is false: for a caller on the bodies'
+## hot path that calls it straight (`RoomGrid.walk_place`, `Actor.gather_rows`, perf plan C2), a
+## level of call fewer than a wrapper here.
+static func kernel() -> Object:
+	return _kernel
+
+
 ## Run the native module's kernel (when it is loaded) or `gd_slide`.
 static func use_native(on: bool) -> void:
 	_kernel = _native_kernel() if on else null
@@ -64,7 +71,7 @@ static func _native_kernel() -> Object:
 	var kernel: Object = NativeScript.body_kernel()
 	# Its methods all there (a library built before one was added runs the GDScript), and the room
 	# grid's place marks the kernel writes the same as the GDScript's.
-	if kernel == null or not kernel.has_method(&"walk") or not kernel.has_method(&"places") or not kernel.has_method(&"way_hit") or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE, "NO_PLACE": RoomGrid.NO_PLACE, "ASK_GDSCRIPT": RoomGrid.ASK_GDSCRIPT}):
+	if kernel == null or not kernel.has_method(&"walk") or not kernel.has_method(&"places") or not kernel.has_method(&"way_hit") or not kernel.has_method(&"walk_place") or not kernel.has_method(&"gather") or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE, "NO_PLACE": RoomGrid.NO_PLACE, "ASK_GDSCRIPT": RoomGrid.ASK_GDSCRIPT}):
 		return null
 	return kernel
 

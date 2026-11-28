@@ -12,6 +12,8 @@ extends RefCounted
 ## Only the cells that are not closed are walked (`_live`); every array is sized when a room is laid
 ## (`lay`), never a frame. View only, Feel's clock.
 
+const NativeScript := preload("res://core/native/native.gd")
+
 ## A cell (px) and the most cells a side.
 const CELL: float = 8.0
 const MOST_CELLS: int = 256
@@ -47,6 +49,34 @@ var _live: PackedInt32Array = PackedInt32Array()
 var _is_live: PackedByteArray = PackedByteArray()
 var _live_count: int = 0
 var _dirty: bool = false
+## The native kernel (`MoteKernel.part_work`, native/src/feel_loops.cpp) that parts and eases the cells, the
+## same to the bit, or null to do it here (`work`'s own loops: the reference and the fallback).
+## `native` switches it. The cells whose parting it changed (`_changed`) are written into the image
+## here.
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
+var _changed: PackedInt32Array = PackedInt32Array()
+
+
+func _init() -> void:
+	set_native(native)
+
+
+## Part and ease the cells with the native kernel when `on` and the module is loaded. The kernel is
+## handed the numbers it needs and checks the members it reads.
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = NativeScript.mote_kernel() if on else null
+	if _kernel == null:
+		return
+	var numbers: Dictionary = {"REACH": REACH, "REACH_DOWN": REACH_DOWN, "FEET_DROP": FEET_DROP, "OPEN_RATE": OPEN_RATE, "CLOSE_RATE": CLOSE_RATE, "CLOSED": CLOSED}
+	var wrong: PackedStringArray = _kernel.call(&"check_parting_fields", self)
+	if not _kernel.call(&"configure_parting", numbers):
+		wrong.append("its numbers")
+	if not wrong.is_empty():
+		push_error("MistParting: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		_kernel = null
 
 
 ## The grid for a room of `size` px from `at` (world px, its place): every cell closed.
@@ -61,6 +91,7 @@ func lay(size: Vector2, at: Vector2 = Vector2.ZERO) -> void:
 	_shown.resize(cells)
 	_shown.fill(0.0)
 	_live.resize(cells)
+	_changed.resize(cells)
 	_is_live.resize(cells)
 	_is_live.fill(0)
 	_live_count = 0
@@ -86,6 +117,14 @@ func step(delta: float, feet: PackedVector2Array, count: int) -> void:
 ## (`feel_jobs.gd`): it touches no texture, no node and nothing another grid holds.
 func work(delta: float, feet: PackedVector2Array, count: int) -> void:
 	if _image == null:
+		return
+	if _kernel != null:
+		var changed: int = int(_kernel.call(&"part_work", self, delta, feet, count))
+		for k in changed:
+			var at: int = _changed[k]
+			_image.set_pixel(at % width, at / width, Color(_shown[at], 0.0, 0.0, 1.0))
+		if changed > 0:
+			_dirty = true
 		return
 	delta = clampf(delta, 0.0, 0.25)
 	for n in _live_count:

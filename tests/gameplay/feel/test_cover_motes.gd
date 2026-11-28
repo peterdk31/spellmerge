@@ -264,7 +264,7 @@ func test_walking_only_the_live_streams_gives_off_the_same() -> void:
 	check_equal(live._live.size(), 2, "the one burning cell's two streams walked")
 	# A fire moving on between two frames (one cell out, the next catching): its streams' lists empty
 	# and fill again, and they keep what they owed (the walk saw no frame without a cell).
-	var owed := PackedFloat32Array()
+	var owed := PackedFloat64Array()
 	for stream in live._streams:
 		owed.append(stream.owed)
 	check(owed[0] > 0.0 or owed[1] > 0.0, "a part of a mote owed before the fire moves (%s)" % owed)

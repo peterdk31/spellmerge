@@ -345,3 +345,35 @@ func test_a_told_windup_is_shown_once_then_the_controller_is_asked() -> void:
 	check_equal(face.brows_frame().x, int(Face.Mood.ANGRY), "told it is not, it is not")
 	face.step(1.0 / 60.0)
 	check_equal(face.brows_frame().x, int(Face.Mood.FURIOUS), "then it asks, and it is")
+
+
+## A face's habits are seeded by its body's key (`Actors.key_of`), never its instance id: the same
+## body in another world (a run played again) blinks at the same moments, and the body beside it at
+## others, so face screenshots are the same every run.
+func _blink_steps(world: ActorFixture) -> Array:
+	var made: Array[Actor] = []
+	for i in 2:
+		var body := Actor.new()
+		body.add_child(ActorFixture.Scripted.new())
+		var face := Face.new()
+		face.name = "Face"
+		face.style = Face.Style.EAGER
+		body.add_child(face)
+		made.append(world.add(body, Vector2(100.0 + 40.0 * i, 100.0)))
+	var shut: Array = [[], []]
+	for n in roundi(12.0 / ActorFixture.STEP):
+		world.run(1)
+		for i in 2:
+			if _face(made[i]).is_shut():
+				shut[i].append(n)
+	return shut
+
+
+func test_a_face_blinks_by_its_bodys_key_the_same_every_run() -> void:
+	var first: Array = _blink_steps(_world)
+	_world.free_all()
+	_world = ActorFixture.new(root)
+	var again: Array = _blink_steps(_world)
+	check(not (first[0] as Array).is_empty(), "it blinks")
+	check_equal(again, first, "the same bodies blink at the same steps in a world made again")
+	check(first[0] != first[1], "two bodies blink apart")

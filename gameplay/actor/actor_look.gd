@@ -46,7 +46,8 @@ var _poses: StaffPoses = null
 var _glow_colour_set: Color = Color(NAN, NAN, NAN, NAN)
 var _glow_set: float = NAN
 ## Where the staff animation as `pose_dir` last read it starts in its poses' table
-## (`StaffPoses.look_row`: `look_rows`, in `StaffPoses.Look`'s order).
+## (`StaffPoses.look_row`: `look_rows`, in `StaffPoses.Look`'s order). Read only after this step's
+## `pose_dir()` was not zero: `dir` handed to the getters below is always that.
 var _pose_row: int = 0
 
 
@@ -91,6 +92,7 @@ func pose_dir() -> Vector2:
 ## The turn (radians) of the animation `dir` (this step's `pose_dir()`, not zero) plays now: its
 ## `StaffPoses.staff_pose` x.
 func pose_turn() -> float:
+	assert(_poses != null, "pose_turn: asked before this step's pose_dir()")
 	return _poses.look_rows[_pose_row + StaffPoses.Look.TURN]
 
 

@@ -11,7 +11,8 @@ const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const STEP: float = 1.0 / 60.0
 
 var _world: Fixture
-var _layer: CanvasLayer = null
+## The canvas layers `_bodies` made (each world's layered body), freed after.
+var _layers: Array[CanvasLayer] = []
 
 
 ## A look that counts its steps and the seconds they were given.
@@ -33,9 +34,14 @@ func after_each() -> void:
 	ScreenViews.withdraw(root.get_viewport())
 	Actor.looks_native = true
 	_world.free_all()
-	if _layer != null:
-		_layer.free()
-		_layer = null
+	_free_layers()
+
+
+func _free_layers() -> void:
+	for layer in _layers:
+		if is_instance_valid(layer):
+			layer.free()
+	_layers.clear()
 
 
 ## Bodies on and off the screen and round its edge, each with a counting look; the last drawn on a
@@ -48,10 +54,11 @@ func _bodies() -> Array[Actor]:
 		var body: Actor = _world.actor(at, [&"health"] as Array[StringName], Fixture.Scripted.new())
 		body.add_look(CountingLook.new())
 		out.append(body)
-	_layer = CanvasLayer.new()
-	root.add_child(_layer)
+	var layer := CanvasLayer.new()
+	_layers.append(layer)
+	root.add_child(layer)
 	var layered: Actor = _world.actor(Vector2(30.0, 30.0), [&"health"] as Array[StringName], Fixture.Scripted.new())
-	layered.reparent(_layer)
+	layered.reparent(layer)
 	layered.add_look(CountingLook.new())
 	out.append(layered)
 	return out
@@ -141,9 +148,7 @@ func _check_pass_as_asking(split: bool) -> void:
 		check(stepped > 300 and waited >= 3, "looks stepped (%d) and some waited off screen (%d)" % [stepped, waited])
 		ScreenViews.withdraw(view)
 		_world.free_all()
-		if _layer != null:
-			_layer.free()
-			_layer = null
+		_free_layers()
 		_world = Fixture.new(root)
 
 
@@ -161,6 +166,7 @@ func test_the_kernel_finds_the_due_looks_as_its_twin() -> void:
 	if not WallSlide.native_on() and OS.get_environment("SPELLMERGE_NATIVE") == "required":
 		check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
 	if not WallSlide.native_on():
+		print("SKIP: the native module is not loaded; the twin alone is checked by the pass's tests")
 		return
 	var bodies: Array[Actor] = _bodies()
 	var ids := PackedInt32Array()

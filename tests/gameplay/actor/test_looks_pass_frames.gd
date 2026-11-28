@@ -4,7 +4,9 @@ extends "res://tests/support/suite.gd"
 ## walking, winding up, hurt), one drawn as the Tick drew it before (each body asks the screen and
 ## each look reads its staff animation alone), one by the pass, every drawn node of every body
 ## compared after every frame: its place, turn, size, offset, frame, texture, colour, material and
-## glow. The looks are view only, and Smooth (docs/STYLE.md) holds through them, so none may differ.
+## glow. The "before" side is each body's `step_looks_due` with each look reading its animation
+## alone (`StaffPoses.look_row` outside a pass: `may_play` and `read_look`, which
+## tests/core/test_staff_poses.gd checks against the getters). The looks are view only, and Smooth (docs/STYLE.md) holds through them, so none may differ.
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const BROOM: EnemyBase = preload("res://content/bosses/old_broom/old_broom.tres")
 const STRAYS: Array[EnemyBase] = [

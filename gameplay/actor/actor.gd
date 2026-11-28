@@ -148,7 +148,7 @@ signal touched(by: int)
 ## The touch areas it overlapped after its last move (`_touch`), scratch.
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen", &"step_all_looks", &"looks_due", &"gd_looks_due", &"_due_ids", &"_due_seconds", &"looks_native"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen", &"step_all_looks", &"looks_due", &"gd_looks_due", &"_due_ids", &"_due_seconds", &"looks_native", &"_NO_CELL_POINTS", &"_NO_CELL_COUNTS"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
@@ -162,6 +162,8 @@ static var _due_ids: PackedInt32Array = PackedInt32Array()
 static var _due_seconds: PackedFloat64Array = PackedFloat64Array()
 static var looks_native: bool = true
 const NO_VIEWS: Array[Transform2D] = []
+static var _NO_CELL_POINTS: PackedVector2Array = PackedVector2Array()
+static var _NO_CELL_COUNTS: PackedInt32Array = PackedInt32Array()
 ## The run's chance's purpose for how many coins an enemy carries when its data gives a range
 ## (`EnemyBase.coins_most`), keyed by its actor key: one roll a body.
 const COINS_PURPOSE: StringName = &"coins_carried"
@@ -487,10 +489,12 @@ static func step_all_looks(table: ActorsScript, ids: PackedInt32Array, count: in
 ## reference it mirrors to the bit (tests/gameplay/actor/test_looks_kernel.gd).
 static func looks_due(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, view: Viewport, views: ScreenViews, split: bool, screen: Rect2, due: PackedInt32Array, seconds: PackedFloat64Array) -> int:
 	var kernel: Object = WallSlide.kernel() if looks_native else null
-	var canvas: RID = view.find_world_2d().canvas if view != null and view.find_world_2d() != null else RID()
+	var world: World2D = view.find_world_2d() if view != null else null
+	var canvas: RID = world.canvas if world != null else RID()
 	if kernel != null and kernel.has_method(&"looks_due"):
-		var listed: int = kernel.call(&"looks_due", nodes, ids, count, canvas, split, screen, views.to_screen if split else NO_VIEWS, views.count if split else 0, views.cell_points if split else PackedVector2Array(), views.cell_counts if split else PackedInt32Array(), ScreenViews.CORNERS_MOST, ON_SCREEN_MARGIN, LOOK_TIME_MOST, due, seconds)
-		if listed >= 0:
+		# Nil from a library whose `looks_due` takes other arguments: the twin runs.
+		var listed: Variant = kernel.call(&"looks_due", nodes, ids, count, canvas, split, screen, views.to_screen if split else NO_VIEWS, views.count if split else 0, views.cell_points if split else _NO_CELL_POINTS, views.cell_counts if split else _NO_CELL_COUNTS, ScreenViews.CORNERS_MOST, ON_SCREEN_MARGIN, LOOK_TIME_MOST, due, seconds)
+		if listed is int and int(listed) >= 0:
 			return listed
 	return gd_looks_due(nodes, ids, count, canvas, views if split else null, screen, due, seconds)
 

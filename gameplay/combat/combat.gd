@@ -961,8 +961,16 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 	var left: float = _take(row, by, amount, quiet)
 	# Nobody hears a quiet hit that does not kill (a wizard's went to it directly, `_take`).
 	if events != null and not (quiet and left != 0.0):
-		events.hit_landed.emit(by, node, amount, where, kind, _slot, profile.card if profile != null else &"")
+		var card: StringName = profile.card if profile != null else &""
+		# Its row first, for the drawing (`HitTable.ROW_DAMAGE`, perf plan H2), named while it is told.
+		var rows: HitTable = _view_rows()
+		var outer: int = rows.told if rows != null else -1
+		if rows != null:
+			rows.told = rows.write_damage(by, node, _actor_of(node), where, amount, kind, _slot, card, _own_colour(node))
+		events.hit_landed.emit(by, node, amount, where, kind, _slot, card)
 		events.damage_dealt.emit(by, node, amount, where)
+		if rows != null:
+			rows.told = outer
 		# Its stop (online-ready N4): the attacker, this body (its row is its actor id) and the shot.
 		hit_stop.hit(by, row, kind, _slot)
 		if node is Actor:
@@ -1015,7 +1023,15 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 		# possession, so `team` (read before the hit) is the driver's. A prop is nobody's foe.
 		var own_team: int = kit.own_team() if kit != null else team
 		if ActorsScript.is_foe(ActorsScript.TEAM_WIZARDS, own_team):
+			var rows: HitTable = _view_rows()
+			var outer: int = rows.told if rows != null else -1
+			if rows != null:
+				var shot_look: int = projectiles.get_look_of(_slot) if _slot >= 0 else 0
+				var shot_core: Color = projectiles.get_core_of(_slot) if _slot >= 0 else Color.WHITE
+				rows.told = rows.write_death(by, node, where, _slot, shot_core, shot_look, _own_colour(node))
 			events.enemy_died.emit(by, node, where, _slot)
+			if rows != null:
+				rows.told = outer
 			hit_stop.killed(by, node, _slot)
 	if kit != null:
 		kit.die(by)
@@ -1105,8 +1121,14 @@ func take_fall(target: Variant) -> void:
 	kit.health.lose(amount, EventsScript.NO_PLAYER)
 	var left: float = kit.health.health
 	if events != null:
+		var rows: HitTable = _view_rows()
+		var outer: int = rows.told if rows != null else -1
+		if rows != null:
+			rows.told = rows.write_damage(EventsScript.NO_PLAYER, kit, kit.id, where, amount, KIND_FALL, -1, &"", _own_colour(kit))
 		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1, &"")
 		events.damage_dealt.emit(EventsScript.NO_PLAYER, kit, amount, where)
+		if rows != null:
+			rows.told = outer
 		kit.damaged.emit(EventsScript.NO_PLAYER, amount, &"")
 	if left == 0.0 and _same(row, kit):
 		_die(row, EventsScript.NO_PLAYER, where, team)
@@ -1179,6 +1201,25 @@ func _heal(by: int, row: int, amount: float) -> bool:
 		events.hit_landed.emit(by, node, amount, where, KIND_HEAL, _slot, &"")
 		events.heal_dealt.emit(by, node, amount, where)
 	return true
+
+
+## The table the drawing reads this bus's hits, damages and deaths from (the projectile manager's
+## `hit_table`, perf plan H2: Feel's looks after the tick), or null for a manager on another bus.
+func _view_rows() -> HitTable:
+	return projectiles.hit_table if projectiles != null and projectiles.events == events else null
+
+
+## The actor id of a hit body (a kit Actor's `id`), or Actors.NONE for any other body.
+static func _actor_of(node: Node) -> int:
+	return (node as Actor).id if node is Actor else ActorsScript.NONE
+
+
+## A body's own colour, for its hit's and death's look (its enemy data's `hit_color`; the default
+## for a body with none), read while it is there.
+static func _own_colour(node: Node) -> Color:
+	if node is Actor and (node as Actor).data != null:
+		return (node as Actor).data.hit_color
+	return EnemyBase.DEFAULT_HIT_COLOR
 
 
 ## A hit sent on the bus by hand (a test's): applied as a row of the hit table would be, as

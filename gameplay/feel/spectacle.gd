@@ -618,16 +618,13 @@ func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, sha
 		pool.close_hit()
 
 
-## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
-## projectile manager's `impact_look`, `impact_core` and `impact_tag` while the impact is sent) and
-## the wall's surface motes (the room's, `surface_kinds`) in the room's colours, thrown along
-## `away` (back off the wall).
-func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
+## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (its
+## `look`, `core` and `tag`: the projectile manager's `impact_look`, `impact_core` and `impact_tag`
+## as the impact was sent) and the wall's surface motes (the room's, `surface_kinds`) in the room's
+## colours, thrown along `away` (back off the wall).
+func shed_on_wall(ramp: int, at: Vector2, away: Vector2, look: int, core: Color, tag: int) -> void:
 	if pool == null or not particles_enabled:
 		return
-	var look: int = projectiles.impact_look if projectiles != null else 0
-	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
-	var tag: int = projectiles.impact_tag if projectiles != null else 0
 	if not (_hit_on if _hit_held else _open_hit(ActorsScript.NONE, tag)):
 		return
 	pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)

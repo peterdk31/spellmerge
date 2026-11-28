@@ -118,3 +118,13 @@ func test_with_no_applier_the_hits_are_still_sent() -> void:
 	var a: Node2D = _target(Vector2(100.0, 100.0))
 	check(mgr.strike(1, a, Vector2(100.0, 100.0), Vector2.RIGHT, 7, &"swing"), "sent")
 	check_equal(order, ["hit 0"] as Array[String], "heard, nothing applied")
+
+
+func test_a_ray_hit_is_a_row_of_one_hit() -> void:
+	var a: Node2D = _target(Vector2(200.0, 100.0))
+	mgr.ray(2, Vector2(50.0, 100.0), Vector2.RIGHT, 300.0, 0, ManagerScript.LAYER_ENEMY, 6)
+	check_equal(order, ["hit 0", "apply 0"] as Array[String], "the ray's hit heard, then its row applied")
+	var table: HitTable = mgr.hit_table
+	check_equal(table.rows, 1, "one row")
+	if table.rows == 1:
+		check(table.target[0] == a and table.count[0] == 1 and table.shot[0] == -1 and table.card[0] == &"beam", "one hit of a beam on the body, no shot")

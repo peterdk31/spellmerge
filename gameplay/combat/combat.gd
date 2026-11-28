@@ -1192,8 +1192,11 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 ## The row `row` of the projectile manager's hit table (perf plan H1): a hit the manager sent,
 ## applied once its `projectile_hit` listeners have heard it (Spells' first, which may change what
 ## the hit's profile is), in the order the manager sends them. Every hit Combat applies comes here,
-## but for one sent by hand (`_on_projectile_hit`).
+## but for one sent by hand (`_on_projectile_hit`). A manager sending on another bus than Combat's
+## is not heard (as its `projectile_hit` would not be).
 func apply_hit_row(table: HitTable, row: int) -> void:
+	if projectiles == null or projectiles.events != events:
+		return
 	_apply_hit(table.caster[row], table.target[row], table.at[row], table.tag[row], table.shot[row], table.count[row])
 
 

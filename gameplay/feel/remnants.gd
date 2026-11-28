@@ -44,13 +44,15 @@ var _bounces: PackedInt32Array = PackedInt32Array()
 var _lying: PackedFloat32Array = PackedFloat32Array()
 var _born: PackedInt64Array = PackedInt64Array()
 var _count: int = 0
-var _rng := RandomNumberGenerator.new()
+## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte).
+const DICE_SEED: int = 0x4E77
+var _rng := FeelDice.seeded(DICE_SEED)
 ## Pieces left, all told (for tests).
 var left: int = 0
 
 
 func _ready() -> void:
-	_rng.randomize()
 	_ground.resize(MOST)
 	_velocity.resize(MOST)
 	_height.resize(MOST)

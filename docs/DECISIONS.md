@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-27: what D3 waits for (owner)
+
+- **AI10 moves to M3:** the enemies' skill follows a difficulty setting, which M3 builds; until then nothing sends `difficulty_changed`. In docs/BACKLOG.md.
+- **L7, strays with roles:** the plan's four second staffs (the Splinter a dash and a swing, the Rime Crook a pull bolt beside its frost bolt, the Bone Scepter a rain and a dash away, the Storm Fork a triple bolt and a wall); the bot builds it before D3.
+- **The netcode spike's S5** (the owner's measured runs and the write-up) runs beside D3, as shot scale does; D3 does not wait for it.
+
+## 2026-11-27: a blast's hits do not pull; card rules R4 closed (owner)
+
+- **The owner** (2026-11-27, asked with a recommendation): a blast's hits keep moving nothing, so `blast · pull · bolt` pulls its caster only to what the bolt itself hits, never to the bodies its blast catches. Pull keeps one clear target, and one blast catching six bodies does not pull six ways at once. This makes F1's guard (`_blasting`) the rule; no code changes. It was the last open question of R4, so R4 is closed (#467), and D3 (stress and C2) no longer waits for it.
+
 ## 2026-11-26: the field catches every shot and lets them go in one burst (owner decisions; foundations Part 2)
 
 - **The owner** (2026-11-26): build the field (docs/milestones/foundations.md, "fields"; builds 5 to 8), with its design: "A circular field (vibrating edge) that sucks in every shot to its center, which then grows and grows based on how many shots are in. Then when it ends, it fires every shot out in one big burst in the opposite direction a shot has come in. No need to keep track of each shot's position, just the angles (rough)." Any shot, anyone's (open point 4, 2026-11-25: one rule); what leaves takes the field's cards; Growth grows the field; Blast and Split work on it; its own payloads are not caught.
@@ -1276,7 +1286,7 @@ Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), worked out over moc
 - **A request carries its way:** `caster_move_requested` sends the move itself (way × distance) instead of a point measured from the staff tip or the feet, so a dash cast by a point goes to the point with no special case.
 - **A dash the wizard casts itself goes the way it walks** (owner, option (b) on #492: staffs A6a kept), else along the aim. The caster passes its walk with the cast (`cast_staff`'s `walk`, from the actor's intent: no new event), and `_move_caster` turns the wizard's own dash by the walk's angle off the aim (one branch). A dash cast by a point, and a payload dash moving a shot, go along their aim. Walking stops while a dash runs (the actor's own legs); a pull, swap or recoil adds to the walk.
 - **Mirror has no exceptions** (owner, 2026-10-30): the carrier fired again with its way reversed, whatever that way is. A wizard's `mirror · dash` dashes the walk's way and back: both run, both strike along their way and show their look, and they add up to nothing (give or take walking). `mirror · teleport` blinks out and back, both cues. The skip of a move's mirrored firing in `_fire_spell` and the waste row "a move and its mirror cancel" (R4g, and its merge with R4b) are gone.
-- **Hook is the Pull modifier:** whatever its carrier hits, its caster is pulled to; several hits, several pulls. A blast's hits move nothing (F2's guard against a pull at every arrival, kept for Pull until the owner decides: `_blasting` marks a blast's strike, so a swing's, beam's or dash's own hits still pull), and the waste table says so. Checked where hits land (as possess and siphon), wasted through `hits()`. R4a's "a hook's on expire happens once" is now Pull's: a shot its hit spent ends where the caster arrives. The Rime Crook casts `frost · pull · bolt`. `Motion.HOOK`'s number stays as an unused slot so stored motions keep their meaning.
+- **Hook is the Pull modifier:** whatever its carrier hits, its caster is pulled to; several hits, several pulls. A blast's hits move nothing (F2's guard against a pull at every arrival, kept for Pull by the owner's decision of 2026-11-27: `_blasting` marks a blast's strike, so a swing's, beam's or dash's own hits still pull), and the waste table says so. Checked where hits land (as possess and siphon), wasted through `hits()`. R4a's "a hook's on expire happens once" is now Pull's: a shot its hit spent ends where the caster arrives. The Rime Crook casts `frost · pull · bolt`. `Motion.HOOK`'s number stays as an unused slot so stored motions keep their meaning.
 ## 2026-10-30: Card rules R4 F3, placing (owner)
 
 - **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.

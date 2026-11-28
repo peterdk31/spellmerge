@@ -71,10 +71,11 @@ func _initialize() -> void:
 	await process_frame
 	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
 	# The view does not step while the shaders warm up (that takes as many frames as the machine
-	# needs): it starts on the game's clock with the shots, the same every run.
+	# needs, and Feel steps every frame it processes, on whatever clock): it starts with the shots,
+	# on the game's clock, from the same moment every run.
 	var still_feel: Node = root.get_node_or_null("Feel")
 	if still_feel != null:
-		still_feel.set(&"drive_engine", false)
+		still_feel.set_process(false)
 	if warm_first and not await WarmUp.run(root):
 		fail("the shaders were not compiled before the shots (Flow's play tasks through Loading)")
 		return
@@ -95,7 +96,7 @@ func _initialize() -> void:
 	# software renderer takes a tenth of a second a frame, nor stand still while a frame is not drawn.
 	if feel != null:
 		feel.set(&"fixed_view_delta", _SHOT_TICK.DT)
-		feel.set(&"drive_engine", true)
+		feel.set_process(true)
 	# The same run every time: a run with no replay takes a fresh seed from the engine's generator
 	# (`SimSeed.fresh`), so each shot script's run would deal its foes, their moves and every roll
 	# anew and its pictures would differ run to run.

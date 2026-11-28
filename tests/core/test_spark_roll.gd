@@ -25,6 +25,7 @@ var _imp: int = -1
 func before_each() -> void:
 	super.before_each()
 	_mgrs.clear()
+	_most = 0
 
 
 func _manager(native: bool) -> ManagerScript:
@@ -35,7 +36,7 @@ func _manager(native: bool) -> ManagerScript:
 	mgr.actors = table
 	mgr.events = own(EventsScript.new()) as EventsScript
 	mgr.set_bounds(Rect2(0.0, 0.0, 960.0, 540.0))
-	mgr.set_cap(800)
+	mgr.set_cap(2000)
 	root.add_child(mgr)
 	mgr.spark_motes = true
 	mgr._spark_rng.seed = 5
@@ -77,6 +78,10 @@ func _fire(count: int, seed_value: int) -> void:
 				mgr.set_orbit(slot, rng.randf_range(10.0, 40.0), rng.randf_range(0.0, TAU), rng.randf_range(-4.0, 4.0))
 
 
+## The most births a frame `_step_and_compare` stepped took.
+var _most: int = 0
+
+
 func _step_and_compare(frames: int, label: String) -> int:
 	var births: int = 0
 	for frame in frames:
@@ -87,6 +92,7 @@ func _step_and_compare(frames: int, label: String) -> int:
 		var a: ManagerScript = _mgrs[0]
 		var b: ManagerScript = _mgrs[1]
 		births += a.spark_birth_count
+		_most = maxi(_most, a.spark_birth_count)
 		if a.spark_birth_count != b.spark_birth_count:
 			check(false, "%s frame %d: as many births (GDScript %d, native %d)" % [label, frame, a.spark_birth_count, b.spark_birth_count])
 			return births
@@ -122,6 +128,16 @@ func test_the_native_sparks_are_the_gdscripts() -> void:
 	births = _step_and_compare(FRAMES, "thinned")
 	check(births > 500, "thinned births compared: %d" % births)
 	check(_mgrs[0].particle_share < 1.0, "the pool thinned them: %.2f" % _mgrs[0].particle_share)
+	# More than a frame's most (SPARK_BIRTHS_MAX): every hop is kept (its rate is 1), so the frame's
+	# births fill up and the roll stops on the try that fills them, on both sides.
+	for mgr in _mgrs:
+		mgr.tailless_particle_cap = 1000000
+		for i in 1200:
+			var slot: int = mgr.spawn(i % 4, Vector2(100.0 + float(i % 40) * 18.0, 100.0 + float(i / 40) * 10.0), Vector2(30.0, 0.0), 3.0)
+			mgr.set_look(slot, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_HOPS])))
+	_most = 0
+	_step_and_compare(20, "full")
+	check_equal(_most, ManagerScript.SPARK_BIRTHS_MAX, "a frame's births filled up")
 
 
 func test_the_native_sparks_after_the_tails_are_the_gdscripts() -> void:

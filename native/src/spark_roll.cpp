@@ -129,7 +129,7 @@ bool SparkRoll::configure(const Dictionary &config) {
 int64_t SparkRoll::give_off(const Array &arrays, const PackedFloat32Array &births_array, int64_t count, int64_t state, int64_t moments,
 		double fraction, double span, double sim_time, int64_t live) {
 	_state = (uint64_t)state;
-	ERR_FAIL_COND_V(!_ready || arrays.size() != 17, count);
+	ERR_FAIL_COND_V(!_ready || arrays.size() != 17 || count < 0, count);
 	// The order of `ProjectileDraw.SPARK_ARRAYS`.
 	const PackedInt32Array groups = arrays[0];
 	const PackedInt32Array group_start = arrays[1];

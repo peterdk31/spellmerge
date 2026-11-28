@@ -82,18 +82,35 @@ func test_the_manager_frees_its_jobs() -> void:
 func _check_linked(manager: Node, when: String) -> void:
 	for name: StringName in JOBS:
 		var job: Object = manager.get(name)
-		var listed: Array = (JOBS[name] as Script).get_script_constant_map()["DERIVED"]
+		var constants: Dictionary = (JOBS[name] as Script).get_script_constant_map()
+		var listed: Array = constants["DERIVED"]
+		# A job's own members (`OWN`, beside its pm) are not the manager's: none to compare.
+		var kept: Array = constants.get("OWN", [])
 		for member: StringName in listed:
 			if member == &"pm":
 				check(job.get(member) == manager, "%s: %s's pm is the manager" % [when, name])
 				continue
-			var own: Variant = manager.get(member)
-			var alias: Variant = job.get(member)
-			if own is Object or own is Dictionary or own is Array:
-				check(is_same(own, alias), "%s: %s.%s is the manager's own" % [when, name, member])
+			if kept.has(member):
 				continue
-			# A packed array: one more element through the alias, seen by the manager, then taken back.
-			var size: int = own.size()
-			alias.resize(size + 1)
-			check(manager.get(member).size() == size + 1, "%s: %s.%s is the manager's own array, not a copy" % [when, name, member])
-			alias.resize(size)
+			_check_alias(manager, member, job.get(member), "%s: %s.%s" % [when, name, member])
+		# The draw job's arrays for the native sparks (`SPARK_ARRAYS`, gathered by `link`) follow too.
+		if constants.has("SPARK_ARRAYS"):
+			var arrays: Array = job.get(&"_spark_arrays")
+			var names: Array = constants["SPARK_ARRAYS"]
+			check_equal(arrays.size(), names.size(), "%s: %s gathered every spark array" % [when, name])
+			for n in mini(arrays.size(), names.size()):
+				_check_alias(manager, names[n], arrays[n], "%s: %s's spark array %s" % [when, name, names[n]])
+
+
+## `alias` is the manager's own `member`: the same object, or a packed array whose growth through
+## the alias the manager sees (a packed array's write through a copy would not be).
+func _check_alias(manager: Node, member: StringName, alias: Variant, label: String) -> void:
+	var own: Variant = manager.get(member)
+	if own is Object or own is Dictionary or own is Array:
+		check(is_same(own, alias), "%s is the manager's own" % label)
+		return
+	# A packed array: one more element through the alias, seen by the manager, then taken back.
+	var size: int = own.size()
+	alias.resize(size + 1)
+	check(manager.get(member).size() == size + 1, "%s is the manager's own array, not a copy" % label)
+	alias.resize(size)

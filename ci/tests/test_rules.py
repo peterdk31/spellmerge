@@ -168,6 +168,9 @@ class BannedApiTest(unittest.TestCase):
             return [f.message for f in rules.check_native_source("native/src/k.cpp", text)]
         good = ('#include "k.h"\n#include <cmath>\n#include <godot_cpp/variant/vector2.hpp>\n'
                 '#include <godot_cpp/classes/node2d.hpp>\n#include <godot_cpp/core/class_db.hpp>\n'
+                '#include <godot_cpp/classes/sprite2d.hpp>\n#include <godot_cpp/classes/canvas_item.hpp>\n'
+                '#include <godot_cpp/classes/image.hpp>\nsprite->set_frame(f); image->set_data(w, h, false, fmt, bytes);\n'
+                'rows.load(object, k.rows);\n'
                 'Object *o = (Object *)::godot::gdextension_interface::object_get_instance_from_id(id);\n'
                 'node->set_position(p); double far = std::sqrt(x);\n')
         self.assertEqual(native(good), [])
@@ -176,7 +179,9 @@ class BannedApiTest(unittest.TestCase):
                     'void *h = dlopen("x", 0);', 'obj->call("execute", args);', 'Engine::get_singleton();',
                     'std::thread t(f);', '#include <thread>', '#include <mutex>', 'std::atomic<int> n;',
                     'pthread_create(&t, 0, f, 0);', 'std::async(f);', 'thread_local int n;',
-                    'asm("nop");', '::godot::gdextension_interface::classdb_construct_object(n);']:
+                    'asm("nop");', '::godot::gdextension_interface::classdb_construct_object(n);',
+                    'image->save_png("res://x.png");', 'image->save_jpg_to_buffer();', 'image->load("/etc/passwd");',
+                    'Image::load_from_file(p);', 'image->load_png_from_buffer(b);', 'node->set_script(s);']:
             with self.subTest(bad=bad):
                 self.assertTrue(native(good + bad + "\n"), f"not flagged: {bad}")
 

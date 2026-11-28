@@ -387,6 +387,7 @@ Vector4 BodyKernel::walk_place(const PackedByteArray &walls, const PackedByteArr
 		int64_t w, int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
 		const Vector2 &crossed, double radius, double reach, const Array &rects, const PackedByteArray &cells, const PackedByteArray &over,
 		const PackedByteArray &mixed, const PackedByteArray &touched, int64_t pw, int64_t ph, double place_cell) const {
+	ERR_FAIL_COND_V_MSG(!_ready, Vector4(from.x, from.y, 0.0, (real_t)NO_PLACE), "BodyKernel: configure it first");
 	// `RoomGrid.gd_walk_place`: the walk where the grid has something laid, else the whole way.
 	Vector2 to = from + motion;
 	real_t found = 0.0;

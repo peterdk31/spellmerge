@@ -62,9 +62,10 @@ func test_the_native_walk_and_place_give_the_twins_bits() -> void:
 	rng.seed = 20261128
 	var cases: int = 0
 	var ways: Dictionary = {}
-	for room in 36:
+	for room in 48:
 		var origin := Vector2(rng.randf_range(-60.0, 60.0), rng.randf_range(-60.0, 60.0))
-		var grid: RoomGrid = _room(rng, room % 6, [0, 1, 3, 5][room % 4], origin)
+		# The kind and the count of places apart (every kind with none, one, three and five places).
+		var grid: RoomGrid = _room(rng, room % 6, [0, 1, 3, 5][room / 6 % 4], origin)
 		var moves: Array[Array] = []
 		for n in 200:
 			var from: Vector2 = origin + Vector2(rng.randf_range(-48.0, W * CELL + 48.0), rng.randf_range(-48.0, H * CELL + 48.0))
@@ -101,7 +102,7 @@ func test_the_native_walk_and_place_give_the_twins_bits() -> void:
 					check(false, "room %d case %d: GDScript %s, native %s (from %s by %s, crossing %s, radius %s, past mouths %s)" % [room, n, twins[n], got, m[0], m[1], m[2], m[3], m[4]])
 					return
 			cases += 1
-	check(cases == 7200, "every case compared: %d" % cases)
+	check(cases == 9600, "every case compared: %d" % cases)
 	for way in ["no places", "no place", "a place"]:
 		check(int(ways.get(way, 0)) >= 50, "the place lookup's '%s' is reached: %s" % [way, ways])
 

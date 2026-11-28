@@ -826,7 +826,7 @@ func walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, 
 ## `Actor.move`'s grid work and its room in one call (perf plan C2): `walk_body`, then the place its
 ## end is in (`place_at`). The answer's x, y and z are `walk_body`'s, its w the place (NO_PLACE for
 ## none). Runs the native module's `BodyKernel.walk_place` when it is loaded (`WallSlide.native_on`),
-## straight, else `gd_walk_place`, the reference it mirrors (tests/core/test_body_walk.gd compares
+## straight, else `gd_walk_place`, the reference it mirrors (tests/core/test_body_move.gd compares
 ## them to the bit).
 func walk_place(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector4:
 	var kernel: Object = WallSlide.kernel()

@@ -57,7 +57,8 @@ extends "res://tests/support/suite.gd"
 ## know (as for every carrier a point casts), still open with the owner (2026-11-12).
 ##
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
-## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
+## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is checked by hand-written
+## probes on the bolt: tests/core/test_card_rule_legs.gd.
 ##
 ## The runner plays it in six processes side by side (tests/support/suite.gd, "shards"):
 # unit-test-shards: 6

@@ -65,3 +65,22 @@ func test_the_one_walk_lists_what_the_two_walks_did() -> void:
 		check(fresh._unloaded[folder] == before, "the scan lists %s's .tres files as `_find_files` does" % folder)
 	walked.sort()
 	check(not sounds.is_empty() and walked == sounds, "the walk finds the content's sound files as `_collect_sounds` does (%d, %d)" % [walked.size(), sounds.size()])
+
+
+## A small tree with each case the walk tells apart, made empty under user://, and what it lists.
+const WALK_ROOT: String = "user://registry_walk_test"
+const WALK_FILES: Array[String] = ["spells/a.tres", "spells/.hidden.tres", "spells/b/c.tres.remap", "spells/b/sounds/zap.ogg", "spells/b/sounds/zap_set.tres", "spells/b/sounds/zap_set/variants/1.ogg", "spells/variants/d.tres", "spells/variants/sounds/no.ogg", "spells/e.ogg", "variants/f.tres", "variants/sounds/no.ogg", "sounds/g.tres", "sounds/hum.ogg"]
+
+
+func test_the_walk_tells_sounds_and_variants_apart() -> void:
+	for file_name: String in WALK_FILES:
+		DirAccess.make_dir_recursive_absolute(WALK_ROOT.path_join(file_name.get_base_dir()))
+		FileAccess.open(WALK_ROOT.path_join(file_name), FileAccess.WRITE).close()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(WALK_ROOT, WALK_ROOT + "/missing")
+	check(fresh._unloaded[&"spells"] == PackedStringArray([WALK_ROOT + "/spells/a.tres", WALK_ROOT + "/spells/b/c.tres", WALK_ROOT + "/spells/variants/d.tres"]), "a folder lists its .tres files but those in sounds/ (%s)" % [fresh._unloaded[&"spells"]])
+	check(fresh._unloaded[&"variants"] == PackedStringArray([WALK_ROOT + "/variants/f.tres"]), "a top-level variants/ folder lists its .tres files")
+	check(fresh._unloaded[&"sounds"] == PackedStringArray([WALK_ROOT + "/sounds/g.tres"]), "a top-level sounds/ folder lists its own .tres files")
+	check(fresh.sound_ids() == ([&"g", &"hum", &"zap", &"zap_set"] as Array[StringName]), "sounds are found in sounds/ folders only, never below variants/ (%s)" % [fresh.sound_ids()])
+	for file_name: String in WALK_FILES:
+		DirAccess.remove_absolute(WALK_ROOT.path_join(file_name))

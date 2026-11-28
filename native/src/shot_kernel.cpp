@@ -1403,7 +1403,7 @@ ShotKernel::~ShotKernel() {
 }
 
 void ShotKernel::set_threads(int64_t threads) {
-	_width = threads <= 0 ? jobs::default_width() : (int)clampi(threads, 1, jobs::available() ? jobs::MAX_WIDTH : 1);
+	_width = threads <= 0 ? jobs::default_width() : (int)clampi(threads, 1, jobs::available() ? jobs::WIDTH_LIMIT : 1);
 }
 
 int64_t ShotKernel::get_threads() const {

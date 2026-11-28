@@ -108,3 +108,35 @@ func test_a_test_preset_matches_its_shipped_one_in_every_option() -> void:
 	var pairs: Dictionary[String, String] = _pairs()
 	for shipped: String in pairs:
 		_check_same_but_different(shipped + ".options", pairs[shipped] + ".options")
+
+
+## The web build is threaded (the owner's decision of 2026-11-28): the threaded templates, and the
+## cross-origin isolation a browser asks before it gives a page shared memory, from Godot's service
+## worker where the host sets no headers (GitHub Pages).
+func test_the_web_build_is_threaded_and_cross_origin_isolated() -> void:
+	var web: String = _section_of("Web") + ".options"
+	check(config.get_value(web, "variant/thread_support", false) == true, "the Web preset exports the threaded templates")
+	check(config.get_value(web, "progressive_web_app/enabled", false) == true, "the Web preset has Godot's service worker")
+	check(config.get_value(web, "progressive_web_app/ensure_cross_origin_isolation_headers", false) == true, "and it adds the cross-origin isolation headers")
+
+
+## A browser's threads are workers made before the game starts (`threads/emscripten_pool_size`); the
+## engine's pool takes `threads/godot_pool_size` of them and its audio and loading threads a few
+## more, and the native module's loops at most WEB_MAX_WIDTH - 1 (native/src/jobs.h). A thread asked
+## for past the pool would never start while the main thread waits for it, so the pool holds them all.
+const ENGINE_OTHER_THREADS: int = 2
+const JOBS_HEADER: String = "res://native/src/jobs.h"
+
+
+func test_the_web_pool_holds_the_native_modules_threads() -> void:
+	var web: String = _section_of("Web") + ".options"
+	var header: String = FileAccess.get_file_as_string(JOBS_HEADER)
+	var found: RegExMatch = RegEx.create_from_string("constexpr int WEB_MAX_WIDTH = (\\d+);").search(header)
+	check(found != null, "jobs.h names WEB_MAX_WIDTH")
+	if found == null:
+		return
+	var native_workers: int = int(found.get_string(1)) - 1
+	var pool: int = config.get_value(web, "threads/emscripten_pool_size", 0)
+	var engine: int = config.get_value(web, "threads/godot_pool_size", 0)
+	check(engine >= 1, "the engine's pool is set (%d)" % engine)
+	check(pool >= engine + ENGINE_OTHER_THREADS + native_workers, "the pool of %d holds the engine's %d, %d more of its own and the module's %d" % [pool, engine, ENGINE_OTHER_THREADS, native_workers])

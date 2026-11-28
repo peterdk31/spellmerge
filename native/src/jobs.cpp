@@ -165,11 +165,11 @@ bool available() { return true; }
 int default_width() {
 	const int cores = (int)std::thread::hardware_concurrency();
 	const int width = cores - 1;
-	return width < 1 ? 1 : (width > MAX_WIDTH ? MAX_WIDTH : width);
+	return width < 1 ? 1 : (width > WIDTH_LIMIT ? WIDTH_LIMIT : width);
 }
 
 void run(int64_t chunks, int width, void (*body)(void *, int64_t), void *context) {
-	width = width > MAX_WIDTH ? MAX_WIDTH : width;
+	width = width > WIDTH_LIMIT ? WIDTH_LIMIT : width;
 	if (width > chunks) {
 		width = (int)chunks;
 	}

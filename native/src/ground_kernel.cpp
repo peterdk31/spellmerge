@@ -1184,7 +1184,7 @@ struct Drawing {
 	void run(const Dictionary &spec) {
 		// How many threads the per-pixel loops run on: the spec's `threads`, else the machine's (jobs.h).
 		const int64_t asked = spec.has("threads") ? (int64_t)spec["threads"] : 0;
-		threads = asked > 0 ? (int)mini(asked, jobs::MAX_WIDTH) : jobs::default_width();
+		threads = asked > 0 ? (int)mini(asked, jobs::WIDTH_LIMIT) : jobs::default_width();
 		shape = spec["shape"];
 		palette = spec["palette"];
 		const Array given = spec["styles"];

@@ -42,7 +42,7 @@ Threads never change a result: the bits are the same on one thread or sixteen.
 - **Where else.** Any kernel's loop may run on `jobs::for_spans` where measured faster.
 - **A loop wakes the workers only past its kernel's threshold** (`jobs::width_from`; below it the loop runs on the calling thread and no worker wakes): a worker's wake-up costs tens of microseconds, more than a cheap loop's whole share of it. Each kernel measures its own (`tests/benchmark/shot_scale.gd`'s storm, `--threads=1` against the default). The drawing (`count_draw`, `draw_shots`) from 32,768 slots (`DRAW_THREADS_FROM` in `src/shot_kernel.cpp`: `update_draw` 0.95 ms alone against 1.18 threaded at 24,000, 2.68 against 1.88 at 50,000); the step's common pass and a behaviour's members from 65,536 (`STEP_THREADS_FROM`: 0.008 ms alone against 0.030 at 1,000 shots, 0.087 against 0.103 at 24,000, even between 50,000 and 100,000), so a game's shots step on one thread. Tested past both on four threads and one: `tests/core/test_draw_threads.gd`, `tests/core/test_step_threads.gd` (the performance pass, 2026-11-28, four cores).
 - **Feel's threads are the engine's.** `gameplay/feel/feel_jobs.gd` runs `LightKernel.light_grid_rows`/`light_grid_beam` a view a thread (`first_view`, `views`) with `WorkerThreadPool`; the kernel starts no thread for it and keeps nothing between calls; `check_light_grid` runs on the main thread first.
-- **How many.** `ShotKernel.threads` (the manager's `native_threads`; 0 = cores less one, at most 16); 1 on the web (`threads=no`). A machine setting, never a run's.
+- **How many.** `ShotKernel.threads` (the manager's `native_threads`; 0 = cores less one, at most 16: `jobs::WIDTH_LIMIT`); at most 4 on the threaded web build (`WEB_MAX_WIDTH`, the owner's decision of 2026-11-28), whatever is asked, as a browser's threads are workers made before the game starts and one asked for past them would never start while the main thread waits for it: the Web preset's `threads/emscripten_pool_size` holds the engine's `threads/godot_pool_size`, its own few and the module's 3 (`tests/smoke/test_export_presets.gd`). 1 in a build without threads (`threads=no`). A machine setting, never a run's.
 - **Platforms.** Linux `-pthread`; Windows links MinGW's thread runtime statically (`native.sh` checks: no `libwinpthread` import).
 
 ## The same on every platform (online-ready N7)
@@ -60,7 +60,7 @@ ci/build/native.sh linux web windows     # the libraries and the .gdextension (b
 ```
 
 - Pinned tools in `ci/build/godot.env` (godot-cpp, SCons's hash-checked wheel, Emscripten 4.0.20).
-- Platforms: `linux.x86_64`, `web.wasm32` (no threads), `windows.x86_64` (MinGW-w64; `native.sh` refuses a DLL that imports MinGW's runtime DLLs). macOS is not a target.
+- Platforms: `linux.x86_64`, `web.wasm32.threads` (`threads=yes`, for the threaded Web preset; `web.wasm32.nothreads`, `threads=no`, for a build without threads), `windows.x86_64` (MinGW-w64; `native.sh` refuses a DLL that imports MinGW's runtime DLLs). macOS is not a target.
 - Every build has the module; a platform that doesn't build fails the run. `SPELLMERGE_NATIVE=required` makes comparing tests fail if the module did not load. `NATIVE=0` is local only; CI refuses it. `native = false` on the manager (or `stress.gd -- --no-native`) runs the GDScript with the module loaded.
 
 ## Adding a kernel

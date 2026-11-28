@@ -169,3 +169,73 @@ func test_read_look_reads_what_the_getters_read() -> void:
 			check_equal(read[i], want, "part %d at step %d" % [i, n])
 	check(played > 10, "it played for its after keys (%d steps)" % played)
 	check(not poses.read_look(0, out) and not poses.may_play(0), "and is known over after")
+
+
+## The looks' pass (perf plan F4): `begin_looks` reads every listed actor's animation into its row of
+## `look_rows` as `read_look` reads it, and the native module's `BodyKernel.pose_looks` writes the
+## bits `gd_read_looks` writes (the rows, which play, which are known over), at every step of
+## animations in every phase (wind keys with a blow, a hold run round and round, after keys, each
+## ease), on actors whose copies start at other times, turn to another side, lock their aim or not.
+func test_the_looks_pass_reads_what_read_look_reads_native_and_twin_alike() -> void:
+	var native_on: bool = WallSlide.kernel() != null and WallSlide.kernel().has_method(&"pose_looks")
+	if not native_on and OS.get_environment("SPELLMERGE_NATIVE") == "required":
+		check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
+	_card(&"wound", &"atom", [{"phase": "wind", "at": 0.3, "turn": 20, "lift": 1}, {"phase": "wind", "at": 1.0, "turn": 60, "lift": 3, "ease": "slam"}, {"phase": "after", "at": 0.1, "turn": -40, "push": -3, "glow": 0.5, "ease": "in", "mood": "angry"}, {"phase": "after", "at": 0.3, "stretch": 0.2, "ease": "out"}] as Array[Dictionary])
+	_card(&"held", &"beam", [{"phase": "hold", "at": 0.1, "glow": 1.0, "shake": 0.5, "mood": "furious"}, {"phase": "hold", "at": 0.2, "glow": 0.0, "ease": "in"}, {"phase": "after", "at": 0.1}] as Array[Dictionary], 0.6)
+	var poses: StaffPoses = arena.spells.poses()
+	var ids := PackedInt32Array()
+	for actor in 8:
+		ids.append(actor)
+	ids.append(-1)
+	ids.append(SpellRuntime.ACTORS + 3)
+	var one := PackedFloat32Array()
+	one.resize(StaffPoses.Look.SIZE)
+	var compared: int = 0
+	var playing_seen: int = 0
+	for card: StringName in [&"wound", &"held"]:
+		_cast(card)
+		for n in 70:
+			# The live aim turning (an animation that turns with it reads it).
+			arena.spells.set_aim(0, Vector2.ZERO, Vector2.from_angle(0.13 * n))
+			arena.run(1.0 / 60.0)
+			# Copies of actor 0's animation on actors 1-7, each started later, some turned the other way
+			# and some locked to their cast's aim.
+			for k in range(1, 8):
+				poses._pose_start[k] = poses._pose_start[0] + 0.04 * k if is_finite(poses._pose_start[0]) else INF
+				for name: String in ["_pose_wind", "_pose_strike", "_pose_lead", "_pose_blow", "_pose_dir", "_pose_tint", "_pose_turned", "_pose_tag"]:
+					var column: Variant = poses.get(name)
+					column[k] = column[0]
+					poses.set(name, column)
+				poses._pose_keys[k] = poses._pose_keys[0]
+				poses._pose_spell[k] = poses._pose_spell[0]
+				poses._pose_side[k] = -1 if k % 2 == 1 else 1
+				poses._pose_lock[k] = 1 if k % 3 == 0 else 0
+				for c in StaffPoses.POSE_CHANNELS:
+					poses._pose_from[k * StaffPoses.POSE_CHANNELS + c] = poses._pose_from[c] + 0.5 * k
+				poses._pose_ended[k] = 0
+			var ended_before: PackedByteArray = poses._pose_ended.duplicate()
+			var runs: Array[Array] = []
+			for native: bool in ([true, false] if native_on else [false]):
+				poses._pose_ended = ended_before.duplicate()
+				poses.look_rows.fill(0.0)
+				StaffPoses.looks_native = native
+				poses.begin_looks(ids, ids.size())
+				var rows: Array = []
+				for actor in 8:
+					var at: int = poses.look_row(actor)
+					rows.append(var_to_bytes(poses.look_rows.slice(actor * StaffPoses.Look.SIZE, (actor + 1) * StaffPoses.Look.SIZE)) if at >= 0 else PackedByteArray())
+				poses.end_looks()
+				runs.append([rows, poses._pose_ended.duplicate()])
+			StaffPoses.looks_native = true
+			if native_on:
+				check_equal(runs[0], runs[1], "%s step %d: the kernel's rows are the twin's" % [card, n])
+			# The reference: each actor read alone, as a look outside a pass reads it.
+			poses._pose_ended = ended_before.duplicate()
+			for actor in 8:
+				var playing: bool = poses.may_play(actor) and poses.read_look(actor, one)
+				var want: PackedByteArray = var_to_bytes(one) if playing else PackedByteArray()
+				check_equal(runs[0][0][actor], want, "%s step %d actor %d: the pass's row is read_look's" % [card, n, actor])
+				compared += 1
+				if playing:
+					playing_seen += 1
+	check(compared > 1000 and playing_seen > 200, "compared %d rows, %d playing" % [compared, playing_seen])

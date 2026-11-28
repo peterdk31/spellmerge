@@ -8,7 +8,7 @@ extends RefCounted
 ## Not state: memos of what the state says (the pose worked out last, `_pose_out*`, and which
 ## animations are over, `_pose_ended`), cleared wherever the state they follow is written and after a
 ## restore (`rebuild_derived`).
-const DERIVED: Array[StringName] = [&"_pose_out", &"_pose_out_mood", &"_pose_out_actor", &"_pose_out_clock", &"_pose_ended"]
+const DERIVED: Array[StringName] = [&"_pose_out", &"_pose_out_mood", &"_pose_out_actor", &"_pose_out_clock", &"_pose_ended", &"look_rows", &"_look_state", &"_looks_open", &"_one_look", &"looks_native"]
 
 ## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
 ## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
@@ -52,6 +52,15 @@ var _pose_out_clock: float = -1.0
 ## pose by its looks every step, and each answer walked the keys. Cleared when a new one starts or
 ## its strike is cut, and after a snapshot (the clock may be earlier).
 var _pose_ended: PackedByteArray = PackedByteArray()
+## The looks' table (perf plan F4: `begin_looks` fills it for a drawn frame's bodies in one call):
+## `Look.SIZE` numbers an actor, as `read_look` writes them, at `actor * Look.SIZE`; which actors'
+## rows the open pass read (0 not read, 1 playing none, 2 playing), and whether a pass is open (a look
+## reads its row then, `look_row`); and one look's numbers read outside a pass. View: what the state
+## says, never state.
+var look_rows: PackedFloat32Array = PackedFloat32Array()
+var _look_state: PackedByteArray = PackedByteArray()
+var _looks_open: bool = false
+var _one_look: PackedFloat32Array = PackedFloat32Array()
 ## Numbers a pose has: CarrierCard.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
 const POSE_CHANNELS: int = 8
 ## What `staff_infusions` answers with no spell (never written).
@@ -85,6 +94,9 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_from.resize(SpellRuntime.ACTORS * POSE_CHANNELS)
 	_pose_out.resize(POSE_CHANNELS)
 	_pose_ended.resize(SpellRuntime.ACTORS)
+	look_rows.resize(SpellRuntime.ACTORS * Look.SIZE)
+	_look_state.resize(SpellRuntime.ACTORS)
+	_one_look.resize(Look.SIZE)
 	clear()
 
 
@@ -338,6 +350,11 @@ enum Look { DIR_X, DIR_Y, TURN, LIFT, PUSH, GLOW, STRETCH, SHAKE, MOOD, TINT_R, 
 ## the same number its getter answers, as 32-bit floats). False, and `out` left as it was, when it
 ## plays none. Allocation-free.
 func read_look(actor: int, out: PackedFloat32Array) -> bool:
+	return _read_look_into(actor, out, 0)
+
+
+## `read_look` into `out` from `at` on (`look_rows` takes an actor's at its row).
+func _read_look_into(actor: int, out: PackedFloat32Array, at: int) -> bool:
 	if not _pose_now(actor):
 		return false
 	# `staff_pose_dir`, written out (its calls were most of this one's cost).
@@ -346,21 +363,83 @@ func read_look(actor: int, out: PackedFloat32Array) -> bool:
 		var live: Vector2 = kit.aim_dir(actor)
 		if live.is_finite() and not live.is_zero_approx():
 			dir = live
-	out[Look.DIR_X] = dir.x
-	out[Look.DIR_Y] = dir.y
-	out[Look.TURN] = deg_to_rad(_pose_out[0]) * _pose_side[actor] + _pose_turned[actor]
-	out[Look.LIFT] = _pose_out[1]
-	out[Look.PUSH] = _pose_out[2]
-	out[Look.GLOW] = _pose_out[3]
-	out[Look.STRETCH] = _pose_out[4]
-	out[Look.SHAKE] = _pose_out[5]
-	out[Look.MOOD] = float(maxi(_pose_out_mood, 0))
+	out[at + Look.DIR_X] = dir.x
+	out[at + Look.DIR_Y] = dir.y
+	out[at + Look.TURN] = deg_to_rad(_pose_out[0]) * _pose_side[actor] + _pose_turned[actor]
+	out[at + Look.LIFT] = _pose_out[1]
+	out[at + Look.PUSH] = _pose_out[2]
+	out[at + Look.GLOW] = _pose_out[3]
+	out[at + Look.STRETCH] = _pose_out[4]
+	out[at + Look.SHAKE] = _pose_out[5]
+	out[at + Look.MOOD] = float(maxi(_pose_out_mood, 0))
 	var tint: Color = _pose_tint[actor]
-	out[Look.TINT_R] = tint.r
-	out[Look.TINT_G] = tint.g
-	out[Look.TINT_B] = tint.b
-	out[Look.TINT_A] = tint.a
+	out[at + Look.TINT_R] = tint.r
+	out[at + Look.TINT_G] = tint.g
+	out[at + Look.TINT_B] = tint.b
+	out[at + Look.TINT_A] = tint.a
 	return true
+
+
+## What `BodyKernel.pose_looks` is handed with the keys: their layout and the look's size, in its
+## order (native/src/body_looks.cpp, `Layout`).
+const LOOKS_LAYOUT: PackedInt32Array = [CarrierCard.POSE_STRIDE, CarrierCard.PK_PHASE, CarrierCard.PK_AT, CarrierCard.PK_CHANNELS, CarrierCard.PK_EASE, CarrierCard.PK_MOOD, POSE_CHANNELS, HOLD_PHASE, Look.SIZE]
+
+## Whether `begin_looks` runs the native module's kernel when it is loaded (tests compare the two).
+static var looks_native: bool = true
+
+
+## Opens a drawn frame's pass (perf plan F4): the staff animation of each of the first `count` of
+## `ids` read at once into `look_rows` (`read_look`'s numbers at the actor's row), which `look_row`
+## answers from until `end_looks`. One native call (`BodyKernel.pose_looks`, the live aim put in
+## after) when the module is loaded, else `gd_read_looks`, the reference it mirrors to the bit
+## (tests/gameplay/actor/test_looks_kernel.gd). Nothing changes the state between the two: the looks
+## only read it. Allocation-free.
+func begin_looks(ids: PackedInt32Array, count: int) -> void:
+	_look_state.fill(0)
+	var kernel: Object = WallSlide.kernel() if looks_native else null
+	if kernel == null or not kernel.has_method(&"pose_looks") or not kernel.call(&"pose_looks", ids, count, kit.clock(), LOOKS_LAYOUT, _pose_keys, _pose_start, _pose_wind, _pose_strike, _pose_lead, _pose_blow, _pose_from, _pose_side, _pose_turned, _pose_dir, _pose_tint, _pose_ended, look_rows, _look_state):
+		gd_read_looks(ids, count)
+	else:
+		# The live aim of an animation that turns with it, as `_read_look_into` reads it.
+		for i in count:
+			var actor: int = ids[i]
+			if actor >= 0 and actor < SpellRuntime.ACTORS and _look_state[actor] == 2 and _pose_lock[actor] == 0:
+				var live: Vector2 = kit.aim_dir(actor)
+				if live.is_finite() and not live.is_zero_approx():
+					look_rows[actor * Look.SIZE + Look.DIR_X] = live.x
+					look_rows[actor * Look.SIZE + Look.DIR_Y] = live.y
+	_looks_open = true
+
+
+## `begin_looks` in GDScript: each actor's `read_look` at its row of `look_rows`.
+func gd_read_looks(ids: PackedInt32Array, count: int) -> void:
+	for i in count:
+		var actor: int = ids[i]
+		if actor >= 0 and actor < SpellRuntime.ACTORS:
+			_look_state[actor] = 2 if _read_look_into(actor, look_rows, actor * Look.SIZE) else 1
+
+
+## Closes the frame's pass: `look_row` reads the animation again when asked.
+func end_looks() -> void:
+	_looks_open = false
+
+
+## Where `actor`'s look numbers (`read_look`'s, `Look`'s order) start in `look_rows`, or -1 while it
+## plays none: the open pass's row (`begin_looks`), else read now (`may_play`, `read_look`).
+func look_row(actor: int) -> int:
+	if actor < 0 or actor >= SpellRuntime.ACTORS:
+		return -1
+	if _looks_open:
+		var known: int = _look_state[actor]
+		if known != 0:
+			return actor * Look.SIZE if known == 2 else -1
+	if not may_play(actor) or not read_look(actor, _one_look):
+		return -1
+	var at: int = actor * Look.SIZE
+	for i in Look.SIZE:
+		look_rows[at + i] = _one_look[i]
+	return at
+
 
 
 ## The aim `actor`'s staff animation turns from, or zero when it plays none: the aim of the cast

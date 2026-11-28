@@ -155,6 +155,10 @@ class SetPoses:
 		out[Look.TINT_A] = tint.a
 		return true
 
+	## No frame's pass: every look reads its pose when it asks (`look_row`, through `read_look`).
+	func begin_looks(_ids: PackedInt32Array, _count: int) -> void:
+		pass
+
 	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint,
 	## land, land point, hammer, how much its cards grew its spell, its spell's infusions]), or `none`.
 	func _part(actor: int, n: int, none: Variant) -> Variant:

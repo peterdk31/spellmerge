@@ -459,4 +459,10 @@ void BodyKernel::_bind_methods() {
 								 "crossed", "radius", "reach", "rects", "cells", "over", "mixed", "touched", "pw", "ph", "place_cell"),
 			&BodyKernel::walk_place);
 	ClassDB::bind_method(D_METHOD("gather", "nodes", "ids", "count", "places", "velocities"), &BodyKernel::gather);
+	ClassDB::bind_method(D_METHOD("looks_due", "nodes", "ids", "count", "canvas", "split", "screen", "to_screen", "view_count", "cell_points", "cell_counts",
+								 "corners_most", "margin", "most", "due", "seconds"),
+			&BodyKernel::looks_due);
+	ClassDB::bind_method(D_METHOD("pose_looks", "ids", "count", "clock", "layout", "keys", "start", "wind", "strike", "lead", "blow", "from", "side",
+								 "turned", "dir", "tint", "ended", "rows", "state"),
+			&BodyKernel::pose_looks);
 }

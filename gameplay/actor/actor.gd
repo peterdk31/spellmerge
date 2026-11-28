@@ -148,7 +148,7 @@ signal touched(by: int)
 ## The touch areas it overlapped after its last move (`_touch`), scratch.
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen", &"step_all_looks", &"looks_due", &"gd_looks_due", &"_due_ids", &"_due_seconds", &"looks_native"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
@@ -156,6 +156,12 @@ const REFS: Array[StringName] = [&"controller"]
 ## The most seconds of ticks its looks catch up at once (`step_looks_due`): a body back on screen
 ## after a long while off it plays a moment, not all of it.
 const LOOK_TIME_MOST: float = 0.25
+## The frame's looks pass's lists (`step_all_looks`: grown, never shrunk), no views (not split), and
+## whether `looks_due` runs the native module's kernel when it is loaded (tests compare the two).
+static var _due_ids: PackedInt32Array = PackedInt32Array()
+static var _due_seconds: PackedFloat64Array = PackedFloat64Array()
+static var looks_native: bool = true
+const NO_VIEWS: Array[Transform2D] = []
 ## The run's chance's purpose for how many coins an enemy carries when its data gives a range
 ## (`EnemyBase.coins_most`), keyed by its actor key: one roll a body.
 const COINS_PURPOSE: StringName = &"coins_carried"
@@ -427,6 +433,95 @@ func step_looks_due(view: Viewport = null, screen: Rect2 = Rect2()) -> void:
 	_look_time = 0.0
 	for look in _looks:
 		look.step(seconds)
+
+
+## The frame's looks in one pass (perf plan F4; the Tick's `_process`, after the frame's ticks): of
+## the first `count` of `ids` (the actor table's open ids), the bodies in the tree whose looks are due
+## are found in one call (`looks_due`), their staff animations read in one more (their Spells'
+## `StaffPoses.begin_looks`), and each due body's looks stepped once for its ticks since: as
+## `step_looks_due` steps them, with `view` the Tick's viewport (null: each body asks the screen).
+static func step_all_looks(table: ActorsScript, ids: PackedInt32Array, count: int, view: Viewport) -> void:
+	if _due_ids.size() < count:
+		_due_ids.resize(count)
+		_due_seconds.resize(count)
+	var views: ScreenViews = ScreenViews.on(view)
+	var split: bool = views != null and views.is_split()
+	var screen: Rect2 = view.get_visible_rect().grow(ON_SCREEN_MARGIN) if view != null else Rect2()
+	var nodes: PackedInt64Array = table.nodes()
+	var listed: int = looks_due(nodes, ids, count, view, views, split, screen, _due_ids, _due_seconds)
+	if listed <= 0:
+		return
+	# Their staff animations, read for all of them at once: the Spells of the first that has one (the
+	# game's; a body of another, a test's, reads its own when its look asks).
+	var poses: StaffPoses = null
+	for i in listed:
+		var first: Actor = instance_from_id(nodes[_due_ids[i]]) as Actor
+		if first != null and first.spells != null:
+			poses = first.spells.poses()
+			break
+	if poses != null:
+		poses.begin_looks(_due_ids, listed)
+	# A body asking the screen itself is handed what the Tick handed it before (none while split).
+	var asked_view: Viewport = null if split else view
+	for i in listed:
+		var body: Actor = instance_from_id(nodes[_due_ids[i]]) as Actor
+		if body == null:
+			continue
+		var seconds: float = _due_seconds[i]
+		if seconds < 0.0:
+			body.step_looks_due(asked_view, screen)
+			continue
+		for look in body._looks:
+			look.step(seconds)
+	if poses != null:
+		poses.end_looks()
+
+
+## Which of the first `count` of `ids` have looks due this frame (`step_all_looks`), into `due` (their
+## ids, in order) and `seconds` (how long each steps them: its ticks' seconds since, LOOK_TIME_MOST at
+## most; -1 for a body drawn on another canvas, which asks the screen itself, `step_looks_due`);
+## returns how many. A body with no ticks since is left out; one on screen (its feet within
+## ON_SCREEN_MARGIN of `screen`, `view`'s visible rect grown by it, or while `split` of a view's cell
+## of `views`) has its looks' time taken (`_look_time` 0); one off it keeps them waiting (LOOK_TIME_MOST
+## of them at most). The native module's `BodyKernel.looks_due` when loaded, else `gd_looks_due`, the
+## reference it mirrors to the bit (tests/gameplay/actor/test_looks_kernel.gd).
+static func looks_due(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, view: Viewport, views: ScreenViews, split: bool, screen: Rect2, due: PackedInt32Array, seconds: PackedFloat64Array) -> int:
+	var kernel: Object = WallSlide.kernel() if looks_native else null
+	var canvas: RID = view.find_world_2d().canvas if view != null and view.find_world_2d() != null else RID()
+	if kernel != null and kernel.has_method(&"looks_due"):
+		var listed: int = kernel.call(&"looks_due", nodes, ids, count, canvas, split, screen, views.to_screen if split else NO_VIEWS, views.count if split else 0, views.cell_points if split else PackedVector2Array(), views.cell_counts if split else PackedInt32Array(), ScreenViews.CORNERS_MOST, ON_SCREEN_MARGIN, LOOK_TIME_MOST, due, seconds)
+		if listed >= 0:
+			return listed
+	return gd_looks_due(nodes, ids, count, canvas, views if split else null, screen, due, seconds)
+
+
+## `looks_due` in GDScript (`views` null: not split): the reference `BodyKernel.looks_due` mirrors,
+## and the fallback.
+static func gd_looks_due(nodes: PackedInt64Array, ids: PackedInt32Array, count: int, canvas: RID, views: ScreenViews, screen: Rect2, due: PackedInt32Array, seconds: PackedFloat64Array) -> int:
+	var listed: int = 0
+	for i in count:
+		var at: int = ids[i]
+		var body: Actor = instance_from_id(nodes[at]) as Actor if at >= 0 and at < nodes.size() and nodes[at] != 0 else null
+		if body == null or not body.is_inside_tree() or body._look_time <= 0.0:
+			continue
+		due[listed] = at
+		if body.get_canvas() != canvas:
+			seconds[listed] = -1.0
+			listed += 1
+			continue
+		var held: float = minf(body._look_time, LOOK_TIME_MOST)
+		var on: bool = false
+		if views != null:
+			on = views.view_showing(body.global_position, ON_SCREEN_MARGIN) >= 0
+		else:
+			on = screen.has_point(body.get_global_transform_with_canvas().origin)
+		if on:
+			body._look_time = 0.0
+			seconds[listed] = held
+			listed += 1
+		else:
+			body._look_time = held
+	return listed
 
 
 ## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it (in a view's cell

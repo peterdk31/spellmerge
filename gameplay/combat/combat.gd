@@ -1292,8 +1292,10 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 ## its own hit).
 func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
 	var node: Node2D = _nodes[row]
+	# The actor table, found once for the caster's power and the target's team (perf plan H3b).
+	var table: ActorsScript = _table()
 	# The caster's power (boss plan OB7), read now from its body: its hit, its slam and its burn.
-	var power: float = _power_of(_tag)
+	var power: float = _power_in(table, _tag) if _caster_open(_tag) else 1.0
 	var damage: float = profile.damage * power
 	var strength: float = profile.knockback
 	# Away from the hit, measured to the hurt circle's centre (shots, beams and swings strike it at
@@ -1310,7 +1312,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	if gust > 0.0:
 		strength *= 1.0 + gust / 100.0
 	# (Read now: a body the hit kills has no row, and so no team, after it.)
-	var team: int = _team(row)
+	var team: int = table.team_of(row) if table != null else ActorsScript.NONE
 	# The reaction is chosen from the statuses the target had when the hit arrived.
 	var reaction: ReactionRow = null
 	if profile.element_id != &"" and _react_wait[row] <= 0.0:
@@ -1393,9 +1395,18 @@ static func _slam_of(profile: HitProfile, damage: float, gust: float, power: flo
 ## caster is gone or its id is another body's now (`Spells.cast_by_open`), when it has no stats, or
 ## for no spell (a plain hit).
 func _power_of(tag: int) -> float:
-	if tag == 0 or spells == null or not spells.cast_by_open(tag):
-		return 1.0
-	var table: ActorsScript = _table()
+	return _power_in(_table(), tag) if _caster_open(tag) else 1.0
+
+
+## Whether the spell `tag`'s caster is still the one that cast it (`Spells.cast_by_open`): false for
+## no spell, so its power is 1.
+func _caster_open(tag: int) -> bool:
+	return tag != 0 and spells != null and spells.cast_by_open(tag)
+
+
+## `_power_of` with the actor table already found (`_table()`), for a spell whose caster is open
+## (`_caster_open`).
+func _power_in(table: ActorsScript, tag: int) -> float:
 	var body: Actor = table.node_of(SpellTag.caster_of(tag)) as Actor if table != null else null
 	return body.stats.power if body != null and body.stats != null else 1.0
 
@@ -1472,13 +1483,14 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: fl
 ## REACTING_STATUSES the target has that has one for that element; null when none does.
 ## Allocation-free: the element's rows come lined up with REACTING_STATUSES from the table, and the
 ## target's statuses as one mask (shot scale H3: a lookup by status cost more than the rest of an
-## elemental hit's own work).
+## elemental hit's own work). The mask first: a body with none of them reacts to nothing, and the
+## table is not asked (perf plan H3b).
 func _reaction_for(row: int, element_id: StringName) -> ReactionRow:
+	var on: int = _status_bits(row)
+	if on == 0:
+		return null
 	var table: ReactionTable = reactions if reactions != null else REACTIONS
 	var in_order: Array[ReactionRow] = table.in_order(element_id, REACTING_STATUSES)
-	if in_order.is_empty():
-		return null
-	var on: int = _status_bits(row)
 	for at in in_order.size():
 		if (on >> at) & 1 != 0 and in_order[at] != null:
 			return in_order[at]

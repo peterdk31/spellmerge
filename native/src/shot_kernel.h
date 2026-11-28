@@ -53,7 +53,7 @@ public:
 	void pass_common(Object *manager, int64_t top, double delta);
 	// Pass 3 of the step (`_pass_hits`), from its `n`-th shot on, as long as a shot needs nothing
 	// of GDScript; see the .cpp.
-	int64_t hits(Object *manager, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta);
+	int64_t hits(Object *manager, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta, bool merge_first);
 	// The behaviour passes that need nothing of GDScript (homing among them: the hit pass catches up
 	// a homing shot that waited for its search); false for one it doesn't run.
 	bool run_pass(Object *manager, int64_t kind, int64_t first, int64_t count, double delta);

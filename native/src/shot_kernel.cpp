@@ -174,9 +174,17 @@ constexpr int64_t RAY_WALK_KEEP = 64;
 // The slots one task of a loop over every shot takes (jobs.h: fixed, whatever the threads).
 constexpr int64_t SLOT_SPAN = 512;
 
-// What `hits` hands back to GDScript for the shot it stopped at (its n x 2 plus one of these).
+// What `hits` hands back to GDScript for the shot it stopped at (its n x 4 plus one of these).
 constexpr int64_t YIELD_WHOLE = 0; // the whole shot: its end, the bounds, a wall
 constexpr int64_t YIELD_FOUND = 1; // its hits (`_cand_*`, `_cand_found` of them), then what it left
+// Only Combat's answers its hits' new entries need (hit batch A5): the hit batch's `ask_target`,
+// `ask_n` of them, asked by GDScript; then `hits` again from the same shot with `merge_first`.
+constexpr int64_t YIELD_ASK = 2;
+constexpr int64_t YIELD_SHIFT = 4;
+// What `HitPass::merge_hits` says of a shot's hits.
+constexpr int MERGE_REFUSED = 0; // GDScript's to hit (nothing changed)
+constexpr int MERGE_DONE = 1; // hit here
+constexpr int MERGE_ASK = 2; // hit here once GDScript asked what `ask_target` lists (nothing changed)
 // What `hits` returns on an error (bad sizes) at its n-th shot: HANDED_ERROR - n. The manager then
 // takes every shot from n on itself.
 constexpr int64_t HANDED_ERROR = -2;
@@ -402,7 +410,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(spell_key, "_spell_key", PACKED_INT64_ARRAY) \
 	X(spell_pass, "_spell_pass", PACKED_INT32_ARRAY) \
 	X(spell_at, "_spell_at", PACKED_INT64_ARRAY) \
-	X(spell_damage, "_spell_damage", PACKED_FLOAT64_ARRAY)
+	X(spell_damage, "_spell_damage", PACKED_FLOAT64_ARRAY) \
+	X(ask_target, "ask_target", PACKED_INT32_ARRAY) \
+	X(ask_n, "ask_n", INT)
 
 // Every member of the manager's draw regions (`DrawRegions`, `_draw_regions`; the performance pass,
 // 2026-11-20) the hand-out reads and writes: its place squares, how many across and down and their
@@ -590,12 +600,12 @@ struct HitPass {
 	// What opening an entry reads and writes (hit batch A4): the entries' other fields, the shots'
 	// way and sequence, the bodies' rooms and the spells' damage as the pass was told them, and the
 	// manager's count of events (a room or a damage told before the count moved is asked again).
-	Arr<PackedInt32Array> mh_target, room_pass, room_charges, spell_pass;
+	Arr<PackedInt32Array> mh_target, room_pass, room_charges, spell_pass, ask_target;
 	Arr<PackedInt64Array> mh_seq, room_at, room_spares, spell_key, spell_at, shot_seq;
 	Arr<PackedVector2Array> mh_at, mh_heading, shot_vel;
 	Arr<PackedByteArray> room_known, room_hexed;
 	Arr<PackedFloat64Array> room_health, room_hex, spell_damage;
-	int64_t mh_entries = 0, sent = 0, merged_opens = 0;
+	int64_t mh_entries = 0, sent = 0, merged_opens = 0, ask_n = 0;
 	bool opened = false;
 	// The manager's hit batch, whose arrays the merge reads (`load_merge`).
 	Object *batch = nullptr;
@@ -825,6 +835,7 @@ struct HitPass {
 		spell_pass.load(b, k.spell_pass);
 		spell_at.load(b, k.spell_at);
 		spell_damage.load(b, k.spell_damage);
+		ask_target.load(b, k.ask_target);
 		shot_vel.load(m, k.vel);
 		shot_seq.load(m, k.seq);
 		sent = m->get(k.sent);
@@ -871,16 +882,16 @@ struct HitPass {
 	}
 
 	// Whether the kernel may open the entry `_merge_hit` would open for the shot in `slot`'s hit on
-	// `t` (hit batch A4): the body's room and the spell's damage told in this pass with no event
-	// since, so `add` would ask nothing; never for a shot alone (it asks for itself).
-	bool can_open(int64_t slot, int64_t t) {
+	// `t` (hit batch A4): never for a shot alone (it asks for itself) nor a target past the batch's
+	// tables (one a handler added). `asks` is then whether `add` would ask Combat anything first
+	// (the body's room or the spell's damage not told in this pass since its last event): GDScript
+	// asks it, then the kernel opens it (hit batch A5).
+	bool can_open(int64_t slot, int64_t t, bool &asks) {
 		if ((flags[slot] & F_ALONE) != 0 || t >= room_pass.n || t >= mh_target_pass.n) {
 			return false;
 		}
-		if (room_pass[t] != mh_pass || room_at[t] != sent || mh_target_pass[t] != mh_pass) {
-			return false;
-		}
-		return kept_damage(tag[slot]) >= 0;
+		asks = room_pass[t] != mh_pass || room_at[t] != sent || kept_damage(tag[slot]) < 0;
+		return true;
 	}
 
 	// `_merge_hit`'s new entry for an opening `can_open` allowed, at `point`, as `HitBatch.add` and
@@ -898,11 +909,20 @@ struct HitPass {
 		mh_entries += 1;
 		opened = true;
 		merged_opens += 1;
-		int64_t last = mh_head[t];
-		while (mh_next[last] >= 0) {
-			last = mh_next[last];
+		if (mh_target_pass[t] == mh_pass) {
+			int64_t last = mh_head[t];
+			while (mh_next[last] >= 0) {
+				last = mh_next[last];
+			}
+			mh_next[last] = (int32_t)entry;
+		} else {
+			// The target's first entry of the pass: its tally starts (`HitBatch.add`).
+			mh_target_pass[t] = (int32_t)mh_pass;
+			mh_head[t] = (int32_t)entry;
+			mh_spent[t] = 0.0;
+			mh_charges[t] = 0;
+			mh_charges_used[t] = 0;
 		}
-		mh_next[last] = (int32_t)entry;
 		mh_next[entry] = -1;
 		mh_caster[entry] = actor[slot];
 		mh_target[entry] = (int32_t)t;
@@ -952,17 +972,20 @@ struct HitPass {
 	// `_hit_found` of a shot whose `found` hits, as `_hit_candidates` takes them, each add to a merged
 	// hit the pass already has or open one `can_open` allows (no event, nothing GDScript must do): the
 	// budget, the pierce, the hit memory, the spent mark, the merged counts, the new entries and the
-	// bodies' tallies, exactly as GDScript writes them. False, changing nothing, for any other (an
-	// entry that would ask Combat, a stick, a shot alone, no memory or entry left without growing):
-	// GDScript takes it.
-	bool merge_hits(int64_t slot, int64_t found) {
+	// bodies' tallies, exactly as GDScript writes them (MERGE_DONE). MERGE_ASK, changing nothing but
+	// the batch's `ask_target` (the targets of the entries it would open, in turn), when only
+	// Combat's answers for those are missing: GDScript asks, as `_merge_hit` would, and calls again.
+	// MERGE_REFUSED, changing nothing, for any other (a stick, a shot alone, no memory or entry left
+	// without growing): GDScript takes it.
+	int merge_hits(int64_t slot, int64_t found) {
 		if (stick[slot] > 0.0f) {
-			return false;
+			return MERGE_REFUSED;
 		}
 		// The dry run: the same turns of the loop, written nowhere.
 		int64_t left = pierce[slot];
 		int64_t remembers = 0;
 		int64_t opens = 0;
+		bool asks = false;
 		bool spent = false;
 		for (int64_t c = 0; c < found; c++) {
 			if (spent) {
@@ -973,9 +996,16 @@ struct HitPass {
 				continue;
 			}
 			if (merged_entry(slot, t) < 0) {
-				if (!can_open(slot, t)) {
-					return false;
+				bool ask = false;
+				if (!can_open(slot, t, ask)) {
+					return MERGE_REFUSED;
 				}
+				// Every target opened on is listed, whatever it asks: GDScript asks what `add` would.
+				if (opens >= ask_target.n) {
+					return MERGE_REFUSED;
+				}
+				ask_target[opens] = (int32_t)t;
+				asks = asks || ask;
 				opens += 1;
 			}
 			if (left > 0) {
@@ -986,19 +1016,23 @@ struct HitPass {
 			}
 		}
 		if (spent && mh_used_n >= mh_used.n) {
-			return false;
+			return MERGE_REFUSED;
 		}
 		// The batch never grows here: an entry the arrays have no room for is GDScript's to open.
 		if (mh_entries + opens > mh_caster.n) {
-			return false;
+			return MERGE_REFUSED;
 		}
 		// `_remember` grows the memory when its free list runs out: GDScript's to do.
 		int64_t free_at = mem_free;
 		for (int64_t r = 0; r < remembers; r++) {
 			if (free_at < 0) {
-				return false;
+				return MERGE_REFUSED;
 			}
 			free_at = mem_next[free_at];
+		}
+		if (asks) {
+			ask_n = opens;
+			return MERGE_ASK;
 		}
 		// The turns again, written.
 		for (int64_t c = 0; c < found; c++) {
@@ -1039,7 +1073,7 @@ struct HitPass {
 			forget_left(slot);
 		}
 		merged_turns += 1;
-		return true;
+		return MERGE_DONE;
 	}
 
 	// The counters back to the manager (only what this call could have changed).
@@ -1053,6 +1087,9 @@ struct HitPass {
 				batch->set(k.mh_used_n, mh_used_n);
 				if (opened) {
 					batch->set(k.mh_entries, mh_entries);
+				}
+				if (ask_n > 0) {
+					batch->set(k.ask_n, ask_n);
 				}
 			}
 			m->set(k.merged_turns, merged_turns);
@@ -1590,16 +1627,34 @@ void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 // `_pass_hits` from its `n`-th shot on (slot n + resume, wrapped at `top`): every shot that needs
 // no GDScript is done here (its state set to S_DONE, its hits looked for, what it left forgotten,
 // the hit work charged). The first that needs GDScript stops the walk and is returned as
-// n x 2 + YIELD_WHOLE (GDScript does all of that shot: its end, the bounds, a wall) or
-// n x 2 + YIELD_FOUND (it found `_cand_found` targets in `_cand_*`: GDScript hits them). -1 when
-// every shot is done, HANDED_ERROR - n on an error (the manager does the rest). The manager calls
-// again from n + 1. Not for a pass with solid shots.
-int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta) {
+// n x 4 + YIELD_WHOLE (GDScript does all of that shot: its end, the bounds, a wall),
+// n x 4 + YIELD_FOUND (it found `_cand_found` targets in `_cand_*`: GDScript hits them) or
+// n x 4 + YIELD_ASK (its hits wait only for Combat's answers, hit batch A5: GDScript asks for the
+// batch's `ask_target` and calls again from n with `merge_first`, which takes up that shot's hits
+// where they waited). -1 when every shot is done, HANDED_ERROR - n on an error (the manager does
+// the rest). The manager calls again from n + 1 otherwise. Not for a pass with solid shots.
+int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta, bool merge_first) {
 	HitPass h;
 	h.load(m);
 	ERR_FAIL_COND_V(top > h.state.n || top > h.pos.n, HANDED_ERROR - n);
 	const int64_t starved_before = h.starved_at;
 	const bool any_targets = h.target_id.n > 0;
+	if (merge_first && n < top) {
+		// The shot handed back for its asks: its scan is done (`_cand_*`, `_cand_found`), its hits now.
+		int64_t slot = n + resume;
+		if (slot >= top) {
+			slot -= top;
+		}
+		h.load_targets(m);
+		ERR_FAIL_COND_V(h.cand_target.n < h.target_id.n || h.target_mark.n < h.target_id.n, HANDED_ERROR - n);
+		h.load_merge(m);
+		const int64_t found = m->get(names->cand_found);
+		if (h.merge_hits(slot, found) != MERGE_DONE) {
+			h.save(m, found, starved_before);
+			return n * YIELD_SHIFT + YIELD_FOUND;
+		}
+		n += 1;
+	}
 	for (; n < top; n++) {
 		int64_t slot = n + resume;
 		if (slot >= top) {
@@ -1617,7 +1672,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			}
 			if (h.wait_from[slot] != B_HOMING || (h.kinds[slot] & AFTER_HOMING_MASK) != 0) {
 				h.save(m, 0, starved_before);
-				return n * 2 + YIELD_WHOLE;
+				return n * YIELD_SHIFT + YIELD_WHOLE;
 			}
 			if (!h.targets_loaded) {
 				h.load_targets(m);
@@ -1632,12 +1687,12 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 		// A falling shot (Skyfall, `set_floor`) takes its turn in GDScript (`_hit_slot`, `_fall`).
 		if (st >= S_STUCK || !limit.has_point(h.pos[slot]) || (h.flags[slot] & F_FALLING) != 0) {
 			h.save(m, 0, starved_before);
-			return n * 2 + YIELD_WHOLE;
+			return n * YIELD_SHIFT + YIELD_WHOLE;
 		}
 		if (h.has_walls && (h.flags[slot] & F_GHOST) == 0 &&
 				h.wall_hit(h.prev[slot], h.pos[slot]) >= 0.0) {
 			h.save(m, 0, starved_before);
-			return n * 2 + YIELD_WHOLE;
+			return n * YIELD_SHIFT + YIELD_WHOLE;
 		}
 		h.state[slot] = S_DONE;
 		if (h.layers[slot] != 0 && any_targets) {
@@ -1658,11 +1713,12 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 				if (!h.merge_loaded) {
 					h.load_merge(m);
 				}
-				if (h.merge_hits(slot, found)) {
+				const int merged = h.merge_hits(slot, found);
+				if (merged == MERGE_DONE) {
 					continue;
 				}
 				h.save(m, found, starved_before);
-				return n * 2 + YIELD_FOUND;
+				return n * YIELD_SHIFT + (merged == MERGE_ASK ? YIELD_ASK : YIELD_FOUND);
 			}
 			h.forget_left(slot);
 		}
@@ -3260,7 +3316,7 @@ void ShotKernel::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "threads"), "set_threads", "get_threads");
 	ClassDB::bind_method(D_METHOD("check_fields", "manager"), &ShotKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("pass_common", "manager", "top", "delta"), &ShotKernel::pass_common);
-	ClassDB::bind_method(D_METHOD("hits", "manager", "n", "top", "resume", "limit", "delta"), &ShotKernel::hits);
+	ClassDB::bind_method(D_METHOD("hits", "manager", "n", "top", "resume", "limit", "delta", "merge_first"), &ShotKernel::hits);
 	ClassDB::bind_method(D_METHOD("run_pass", "manager", "kind", "first", "count", "delta"), &ShotKernel::run_pass);
 	ClassDB::bind_method(D_METHOD("count_draw", "manager"), &ShotKernel::count_draw);
 	ClassDB::bind_method(D_METHOD("draw_shots", "manager", "fraction"), &ShotKernel::draw_shots);

@@ -60,7 +60,11 @@ var _sources: Array[Source] = []
 var _pending: PackedInt64Array = PackedInt64Array()
 var _table: RampTableScript = null
 var _tree: SceneTree = null
-var _rng := RandomNumberGenerator.new()
+## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte); each
+## one made takes it with its count (`FeelDice.made`).
+const DICE_SEED: int = 0x50CE
+var _rng := FeelDice.made(DICE_SEED)
 var _last: float = -1.0
 ## `give_off`'s one box, as views (kept: nothing is made a frame).
 var _one: ViewBoxesScript = ViewBoxesScript.new()

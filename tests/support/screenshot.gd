@@ -31,6 +31,9 @@ extends SceneTree
 ## drawn every frame (one that times frames, or is watched) sets `draw_between = true` in its
 ## `_init()`; one that reads a view of its own (a SubViewport) awaits `frame_drawn()` first.
 ##
+## **The game is the same every run**: the engine's generator is seeded (`SHOT_SEED`) before
+## `take()`, so the run a shot starts takes the same seed (`SimSeed.fresh`) and plays the same.
+##
 ## **The view is on the game's clock** (`Feel.fixed_view_delta`, a tick's time a frame, as the
 ## benchmark's): the camera's easing, the motes, the mist and the reveals move as far a frame as the
 ## game does, however long the frame takes to draw or whether it is drawn, so a shot shows the same
@@ -58,6 +61,8 @@ var warm_first: bool = true
 var pin_room: bool = true
 var _failed: bool = false
 var _drawn_frames: DrawnFramesScript = null
+## The engine generator's seed before `take()`: the seed of the run a shot starts.
+const SHOT_SEED: int = 11
 
 
 func _initialize() -> void:
@@ -83,6 +88,10 @@ func _initialize() -> void:
 	# software renderer takes a tenth of a second a frame, nor stand still while a frame is not drawn.
 	if feel != null:
 		feel.set(&"fixed_view_delta", _SHOT_TICK.DT)
+	# The same run every time: a run with no replay takes a fresh seed from the engine's generator
+	# (`SimSeed.fresh`), so each shot script's run would deal its foes, their moves and every roll
+	# anew and its pictures would differ run to run.
+	seed(SHOT_SEED)
 	await take()
 	if not _failed:
 		quit(0)

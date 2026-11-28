@@ -406,6 +406,9 @@ func _step_bodies(delta: float) -> void:
 	if actors == null:
 		return
 	var n: int = actors.open_ids(_ids)
+	# The body table follows the nodes (perf plan C1): every open body's place and velocity as the
+	# step starts, so where the steps before it and the last tick's after it put the bodies is in it.
+	Actor.gather_rows(actors, _ids, n)
 	var still: PackedByteArray = actors.still
 	var asleep: PackedByteArray = actors.asleep
 	for i in n:

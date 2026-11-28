@@ -18,7 +18,11 @@
 // is not a pure function (no Variant of a packed array or an Object, no printing, no ERR_ macros),
 // and runs no `for_spans` of its own (one nested would run on the calling thread alone).
 //
-// A build without threads (the web's, `threads=no`) runs every span on the calling thread.
+// A library built `threads=no` (none is shipped) runs every span on the calling thread. The web's
+// build, threaded only (the owner's decision of 2026-11-28), runs on at most WEB_MAX_WIDTH: a
+// browser's threads are workers made before the game starts (the Web preset's `threads/emscripten_pool_size`, of which the
+// engine's own pool takes `threads/godot_pool_size`), and one asked for past them could only start
+// once the page's main thread, which waits for it, gave its turn back: it would never start.
 
 #pragma once
 
@@ -28,14 +32,22 @@ namespace jobs {
 
 // The most threads one loop runs on.
 constexpr int MAX_WIDTH = 16;
+// The most on the web, the caller's among them: WEB_MAX_WIDTH - 1 of the browser's pre-made workers
+// (tests/smoke/test_export_presets.gd checks the Web preset leaves them free beside the engine's).
+constexpr int WEB_MAX_WIDTH = 4;
+#ifdef __EMSCRIPTEN__
+constexpr int WIDTH_LIMIT = WEB_MAX_WIDTH;
+#else
+constexpr int WIDTH_LIMIT = MAX_WIDTH;
+#endif
 
 // Whether this build can run a loop on more than one thread.
 bool available();
 // The width a kernel takes unless told another: the machine's cores, less one for the engine, at
-// least 1 and at most MAX_WIDTH; 1 without threads.
+// least 1 and at most WIDTH_LIMIT (MAX_WIDTH, WEB_MAX_WIDTH on the web); 1 without threads.
 int default_width();
 // Runs body(context, chunk) for every chunk in [0, chunks), on up to `width` threads (the caller's
-// among them), and returns once all are done.
+// among them; at most WIDTH_LIMIT, whatever is asked), and returns once all are done.
 void run(int64_t chunks, int width, void (*body)(void *, int64_t), void *context);
 // At the module's end: the workers stop and are joined.
 void shutdown();

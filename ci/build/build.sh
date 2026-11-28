@@ -144,7 +144,7 @@ setup_godot() {
 # NATIVE=0 builds without it, for a local look at the GDScript only; CI never sets it.
 declare -A NATIVE_LIBS=(
   [linux]=native/bin/libspellmerge.linux.template_release.x86_64.so
-  [web]=native/bin/libspellmerge.web.template_release.wasm32.nothreads.wasm
+  [web]=native/bin/libspellmerge.web.template_release.wasm32.wasm
   [windows]=native/bin/libspellmerge.windows.template_release.x86_64.dll
 )
 setup_native() { # setup_native <platform...>

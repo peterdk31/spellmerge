@@ -174,8 +174,8 @@ Nobody counted GDScript calls one by one. Tonight's performance PRs (#984 to #99
 | Spells | 0.82 | 1.99 | 2.41 |
 
 - With the render loop off, the web frame is 79 ms at 3 ticks a frame; process scripts take 11.1 ms of it.
-- **The web pays about 1.6 times the desktop for the same simulation on the same machine, and it has no threads,** so nothing that moves work to a thread helps it.
-- The web build does have the native module (`wasm32`, no threads).
+- **The web pays about 1.6 times the desktop for the same simulation on the same machine, and it had no threads** (threaded since the owner's decision of 2026-11-28, Q5 below), so nothing that moves work to a thread helps it.
+- The web build does have the native module (`wasm32`, no threads then; threaded since 2026-11-28).
 - Drawn with SwiftShader, its frames say nothing about a real browser's GPU.
 - The web was not run in the benchmark's fights.
 
@@ -458,3 +458,5 @@ H1 starts with the listeners' profile in the 4p fight, which this report lacks.
 - **Q3. The tick on its own thread (change 4):** is it worth its size, 8+ PRs touching every simulation area, for the desktop only? It is the one change here that gives the desktop about 1.8x on its own.
 - **Q4. May the game change for speed?** For example, foes perceiving and deciding less often, or fewer looks for each hit in a crowd. Each would be a measured trade, recorded as a new baseline, never a silent change.
 - **Q5. The web:** should it stay on one thread, or should we try a threaded web build? A threaded build needs cross-origin isolation headers from the host, which itch.io offers as a setting. Or should its caps (100 foes, 1,000 shots) be lowered to fit the 1.6x it pays?
+  - **Answered (the owner, 2026-11-28): a threaded web build, and only it** (no single-threaded fallback; a browser without cross-origin isolation does not run the game). Done in Claude's files: the Web presets export the threaded templates, Godot's service worker adds the isolation headers where the host sends none, and the native pool runs a loop on at most 4 threads on the web (`native/README.md`, "Threads"). The build scripts and the hosts are the owner's (the PR's open questions).
+  - **Measured (headless Chromium, 4 cores, the stress run with the render loop off, three runs each):** the tick is 15.4, 15.0 and 17.6 ms on one thread and 16.4, 16.0 and 16.2 threaded; the frame is 65, 63 and 76 ms against 70, 70 and 69. No difference beyond the noise: the tick is GDScript on the main thread, and the native pool goes wide only past 32,768 shots (the web's cap is 1,000). Threads pay on the web only once the tick, or Feel's effects (`feel_jobs.gd`, still one thread on the web), run off the main thread.

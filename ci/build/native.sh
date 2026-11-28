@@ -105,7 +105,9 @@ for platform in "${platforms[@]}"; do
     web)
       setup_emsdk
       # shellcheck disable=SC1091
-      (source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 && scons platform=web target=template_release threads=no) ;;
+      # Threaded, the web's only build (the owner's decision of 2026-11-28; godot-cpp adds
+      # -sUSE_PTHREADS=1). It loads only into the threaded templates (the Web preset's thread_support).
+      (source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 && scons platform=web target=template_release threads=yes) ;;
     windows)
       command -v x86_64-w64-mingw32-g++ >/dev/null || {
         echo "windows needs MinGW-w64 (x86_64-w64-mingw32-g++; Ubuntu: apt-get install g++-mingw-w64-x86-64-posix)" >&2
@@ -138,8 +140,8 @@ done
   echo
   [[ -f native/bin/libspellmerge.linux.template_release.x86_64.so ]] \
     && echo 'linux.x86_64 = "res://native/bin/libspellmerge.linux.template_release.x86_64.so"'
-  [[ -f native/bin/libspellmerge.web.template_release.wasm32.nothreads.wasm ]] \
-    && echo 'web.wasm32 = "res://native/bin/libspellmerge.web.template_release.wasm32.nothreads.wasm"'
+  [[ -f native/bin/libspellmerge.web.template_release.wasm32.wasm ]] \
+    && echo 'web.wasm32 = "res://native/bin/libspellmerge.web.template_release.wasm32.wasm"'
   [[ -f native/bin/libspellmerge.windows.template_release.x86_64.dll ]] \
     && echo 'windows.x86_64 = "res://native/bin/libspellmerge.windows.template_release.x86_64.dll"'
   true

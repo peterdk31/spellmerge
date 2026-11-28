@@ -235,7 +235,8 @@ func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	var x1: int = x0 + sight.columns - 1
 	var y0: int = sight.origin.y
 	var y1: int = y0 + sight.rows - 1
-	# The bits y0 to y1 of `_row_bits` (at most SIDE apart: a word or two), shifted down to bit 0;
+	# The bits y0 to y1 of `_row_bits` (at most CoverSight.SIDE apart, which must stay below BITS: a
+	# word or two), shifted down to bit 0;
 	# then x0 to x1 of `_column_bits`.
 	var word: int = y0 / BITS
 	var shift: int = y0 % BITS

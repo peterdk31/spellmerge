@@ -441,7 +441,6 @@ func _affect_bodies(delta: float) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
 	var placed: bool = grid != null and grid.places() > 0
 	var rooms: int = _rooms.size()
-	var nodes: PackedInt64Array = actors.nodes() if actors != null else PackedInt64Array()
 	for n in count:
 		var id: int = _ids[n]
 		while old < _harm_ids.size() and _harm_ids[old] < id:
@@ -451,8 +450,8 @@ func _affect_bodies(delta: float) -> void:
 			# Asleep and not being harmed: nothing to keep and nothing to ask (looked at first, the
 			# performance pass, 2026-11-21: most bodies of a biome sleep).
 			continue
-		# `Actors.node_of` (the id is open), read from the table's array.
-		var body: Node2D = instance_from_id(nodes[id]) as Node2D if nodes[id] != 0 else null
+		# Asked of the table each time: a status or strike asked of an earlier body may close this one.
+		var body := actors.node_of(id) as Node2D
 		if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 			continue
 		# Its key, asked only for a body kept or given something (most are neither).

@@ -10,7 +10,7 @@ extends RefCounted
 ## **State:** each cell's state and seconds in it, the active cells and who lit each (its lighter: the
 ## actor and the spell's tag of the touch that moved it, the floor's first slice, docs/milestones/floor.md),
 ## the rolls made. **Derived:** the layout and its kinds' move tables (`bind`, from `room_built`; again
-## after a restore), what is worked out from the state with them (`_harming`, `_danger`), and what this
+## after a restore), what is worked out from the state with them (`_harming`, `_gives`, `_danger`, `_danger_bits`), and what this
 ## machine's view was told (`_said`).
 
 const CoverMoves := preload("res://gameplay/cover/cover_moves.gd")
@@ -24,11 +24,16 @@ const NEIGHBOURS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0
 ## shifted past them, so two rooms' rolls never repeat each other (the first room's are its number
 ## 0's: a row run's rolls are as they were). Rooms below 512, cells below a million.
 const ROOM_KEY_SHIFT: int = 22
+## The cells a word of `_danger_bits` holds (a row's columns, low bit first): 32, so a word is never negative.
+const BITS: int = 32
+## `giving_cell` of a point off the room's cover (another room may hold it).
+const OFF: int = -2
 
 ## Not state: the layout and its tables (bound from `room_built`), what is worked out from the state
 ## with them, what this machine's view was told, and scratch emptied within a step.
 const DERIVED: Array[StringName] = [
-	&"layout", &"_moves", &"_rest_harms", &"_harming", &"_danger", &"_danger_rows", &"_said",
+	&"layout", &"_moves", &"_rest_harms", &"_harming", &"_gives", &"_danger", &"_danger_bits", &"_words", &"_danger_rows", &"_danger_columns",
+	&"_row_bits", &"_column_bits", &"_said",
 	&"_changed_cells", &"_changed_states", &"_spread_cells", &"_spread_by", &"_spread_actor", &"_spread_tag",
 ]
 
@@ -37,11 +42,21 @@ var layout: CoverLayout = null
 var _moves: CoverMoves = null
 ## True when a kind with cells in the room gives a status at rest (cobwebs).
 var _rest_harms: bool = false
-## How many cells are in a state that gives a status or strikes now (whether bodies are looked at).
+## How many cells are in a state that gives a status or strikes now (whether bodies are looked at),
+## and by cell, 1 where it does (`CoverMoves.harms_table` of its state: `giving_cell`).
 var _harming: int = 0
-## How many are in a state that is danger now, and the same count a row (GC7: the AI's look).
+var _gives: PackedByteArray = PackedByteArray()
+## How many are in a state that is danger now (GC7: the AI's look), and where, a bit a cell: each row
+## `_words` words of BITS columns, low bit first (`look` reads a window's rows as a few words).
 var _danger: int = 0
+var _danger_bits: PackedInt64Array = PackedInt64Array()
+var _words: int = 0
+## The same counted a row and a column, and which rows and columns hold any, a bit each (BITS a
+## word): a look whose window crosses no such row or column is answered from a word or two.
 var _danger_rows: PackedInt32Array = PackedInt32Array()
+var _danger_columns: PackedInt32Array = PackedInt32Array()
+var _row_bits: PackedInt64Array = PackedInt64Array()
+var _column_bits: PackedInt64Array = PackedInt64Array()
 ## Each cell's state as this machine's view was last told (`cover_changed`).
 var _said: PackedByteArray = PackedByteArray()
 ## This tick's changes, sent once (`flush`).
@@ -182,26 +197,85 @@ func _active_index(cell: int) -> int:
 	return at if at < _active.size() and _active[at] == cell else -1
 
 
+## The cell under `at` (world pixels) when its state gives a status or strikes now (the cells the
+## cover area asks a status for); -1 for a cell of the room that gives nothing (or a room that harms
+## nobody, `harms_nobody`), OFF for a point off the room's cover (`holds` is false). Allocates nothing.
+func giving_cell(at: Vector2) -> int:
+	if layout == null or _state.is_empty() or _state.size() != layout.cells.size():
+		return OFF
+	var x: int = floori((at.x - layout.origin.x) / float(CoverLayout.CELL))
+	var y: int = floori((at.y - layout.origin.y) / float(CoverLayout.CELL))
+	if x < 0 or y < 0 or x >= layout.columns or y >= layout.rows:
+		return OFF
+	if _harming == 0:
+		return -1
+	var cell: int = y * layout.columns + x
+	return cell if _gives[cell] != 0 else -1
+
+
 ## Fill `sight` (cleared by the caller) with where the room's floor within `reach` of `at` would harm a
-## body (the cover area's `look`). Allocates nothing.
+## body (the cover area's `look`), for `at` on the room's cover (`holds`; nothing for a point off it).
+## The window's rows and columns that hold danger are found first (`_row_bits`, `_column_bits`): with
+## none, nothing is read but those; else each such row is read from `_danger_bits`, a word or two
+## each. Inlined: a look is asked by every walking body every think. Allocates nothing.
 func look(at: Vector2, reach: float, sight: CoverSight) -> void:
-	if not plays() or _danger == 0:
+	if _danger == 0 or layout == null or _state.size() != layout.cells.size():
 		return
-	if not sight.open(at, reach, layout.columns, layout.rows, layout.origin):
+	var columns: int = layout.columns
+	var rows: int = layout.rows
+	var origin: Vector2 = layout.origin
+	# `holds(at)`, as `CoverLayout.cell_of` works it out.
+	var cx: int = floori((at.x - origin.x) / float(CoverLayout.CELL))
+	var cy: int = floori((at.y - origin.y) / float(CoverLayout.CELL))
+	if cx < 0 or cy < 0 or cx >= columns or cy >= rows:
 		return
-	var cells: PackedByteArray = layout.cells
-	var harms_table: PackedByteArray = _moves.danger_table
-	var width: int = _moves.width
-	for y in range(sight.origin.y, sight.origin.y + sight.rows):
-		if _danger_rows[y] == 0:
+	if not sight.open(at, reach, columns, rows, origin):
+		return
+	var x0: int = sight.origin.x
+	var x1: int = x0 + sight.columns - 1
+	var y0: int = sight.origin.y
+	var y1: int = y0 + sight.rows - 1
+	# The bits y0 to y1 of `_row_bits` (at most CoverSight.SIDE apart, which must stay below BITS: a
+	# word or two), shifted down to bit 0;
+	# then x0 to x1 of `_column_bits`.
+	var word: int = y0 / BITS
+	var shift: int = y0 % BITS
+	var rows_seen: int = _row_bits[word] >> shift
+	if y1 / BITS != word:
+		rows_seen |= _row_bits[word + 1] << (BITS - shift)
+	rows_seen &= (1 << (y1 - y0 + 1)) - 1
+	if rows_seen == 0:
+		return
+	word = x0 / BITS
+	shift = x0 % BITS
+	var columns_seen: int = _column_bits[word] >> shift
+	if x1 / BITS != word:
+		columns_seen |= _column_bits[word + 1] << (BITS - shift)
+	if (columns_seen & ((1 << (x1 - x0 + 1)) - 1)) == 0:
+		return
+	var first_word: int = x0 / BITS
+	var last_word: int = x1 / BITS
+	var y: int = y0 - 1
+	while rows_seen != 0:
+		y += 1
+		var seen: bool = (rows_seen & 1) != 0
+		rows_seen >>= 1
+		if not seen:
 			continue
-		for x in range(sight.origin.x, sight.origin.x + sight.columns):
-			var cell: int = y * layout.columns + x
-			var kind: int = cells[cell] - 1
-			if kind < 0:
+		var base: int = y * _words
+		for at_word in range(first_word, last_word + 1):
+			var bits: int = _danger_bits[base + at_word]
+			if bits == 0:
 				continue
-			if harms_table[kind * width + _state[cell]] != 0:
-				sight.mark(x, y)
+			var low: int = maxi(x0 - at_word * BITS, 0)
+			var high: int = mini(x1 - at_word * BITS, BITS - 1)
+			bits = (bits >> low) & ((1 << (high - low + 1)) - 1)
+			var x: int = at_word * BITS + low
+			while bits != 0:
+				if (bits & 1) != 0:
+					sight.mark(x, y)
+				bits >>= 1
+				x += 1
 
 
 # --- The step --------------------------------------------------------------------------
@@ -354,10 +428,21 @@ func step_cells(delta: float, game: Sim, number: int) -> void:
 func _enter(cell: int, to: int, actor: int, tag: int) -> void:
 	var was: int = _state[cell]
 	var row: int = (layout.cells[cell] - 1) * _moves.width
-	_harming += int(_moves.harms_table[row + to]) - int(_moves.harms_table[row + was])
+	var gives: int = _moves.harms_table[row + to]
+	_harming += gives - int(_moves.harms_table[row + was])
+	_gives[cell] = gives
 	var danger: int = int(_moves.danger_table[row + to]) - int(_moves.danger_table[row + was])
-	_danger += danger
-	_danger_rows[cell / layout.columns] += danger
+	if danger != 0:
+		_danger += danger
+		var column: int = cell % layout.columns
+		var word: int = (cell / layout.columns) * _words + column / BITS
+		var bit: int = 1 << (column % BITS)
+		_danger_bits[word] = (_danger_bits[word] | bit) if danger > 0 else (_danger_bits[word] & ~bit)
+		var line: int = cell / layout.columns
+		_danger_rows[line] += danger
+		_set_bit(_row_bits, line, _danger_rows[line] > 0)
+		_danger_columns[column] += danger
+		_set_bit(_column_bits, column, _danger_columns[column] > 0)
 	_state[cell] = to
 	_age[cell] = 0.0
 	if was == 0 and to != 0:
@@ -398,16 +483,35 @@ func _size_at_rest() -> void:
 	_age.fill(0.0)
 
 
-## How many cells are in a state that gives something (`_harming`) and that is danger (`_danger`,
-## and a row), from the state.
+## How many cells are in a state that gives something (`_harming`, and where: `_gives`) and that is
+## danger (`_danger`, and where: `_danger_bits`), from the state.
 func _count_harming() -> void:
 	_harming = 0
 	_danger = 0
+	_gives.resize(0)
+	_danger_bits.resize(0)
+	_words = 0
 	_danger_rows.resize(0)
+	_danger_columns.resize(0)
+	_row_bits.resize(0)
+	_column_bits.resize(0)
 	if layout == null or _moves == null or _state.size() != layout.cells.size():
 		return
+	var columns: int = layout.columns
+	_words = (columns + BITS - 1) / BITS
+	_gives.resize(_state.size())
+	_gives.fill(0)
+	_danger_bits.resize(layout.rows * _words)
+	_danger_bits.fill(0)
 	_danger_rows.resize(layout.rows)
 	_danger_rows.fill(0)
+	_danger_columns.resize(columns)
+	_danger_columns.fill(0)
+	# A word more than the rows and columns need, so `look` may read the one after a last word.
+	_row_bits.resize((layout.rows + BITS - 1) / BITS + 1)
+	_row_bits.fill(0)
+	_column_bits.resize(_words + 1)
+	_column_bits.fill(0)
 	var cells: PackedByteArray = layout.cells
 	var harms_table: PackedByteArray = _moves.harms_table
 	var danger_table: PackedByteArray = _moves.danger_table
@@ -418,9 +522,25 @@ func _count_harming() -> void:
 		var row: int = (cells[cell] - 1) * width + _state[cell]
 		if harms_table[row] != 0:
 			_harming += 1
+			_gives[cell] = 1
 		if danger_table[row] != 0:
 			_danger += 1
-			_danger_rows[cell / layout.columns] += 1
+			var column: int = cell % columns
+			var word: int = (cell / columns) * _words + column / BITS
+			_danger_bits[word] |= 1 << (column % BITS)
+			_danger_rows[cell / columns] += 1
+			_danger_columns[column] += 1
+	for row in layout.rows:
+		_set_bit(_row_bits, row, _danger_rows[row] > 0)
+	for column in columns:
+		_set_bit(_column_bits, column, _danger_columns[column] > 0)
+
+
+## Bit `at` of `bits` (BITS a word) set when `on`, else cleared.
+static func _set_bit(bits: PackedInt64Array, at: int, on: bool) -> void:
+	var word: int = at / BITS
+	var bit: int = 1 << (at % BITS)
+	bits[word] = (bits[word] | bit) if on else (bits[word] & ~bit)
 
 
 ## Cell `cell` shows `state` from now on: told at the next `flush` unless the view already shows it.

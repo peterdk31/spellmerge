@@ -174,8 +174,8 @@ Nobody counted GDScript calls one by one. Tonight's performance PRs (#984 to #99
 | Spells | 0.82 | 1.99 | 2.41 |
 
 - With the render loop off, the web frame is 79 ms at 3 ticks a frame; process scripts take 11.1 ms of it.
-- **The web pays about 1.6 times the desktop for the same simulation on the same machine, and it has no threads,** so nothing that moves work to a thread helps it.
-- The web build does have the native module (`wasm32`, no threads).
+- **The web pays about 1.6 times the desktop for the same simulation on the same machine, and it had no threads** (threaded since the owner's decision of 2026-11-28, Q5 below), so nothing that moves work to a thread helps it.
+- The web build does have the native module (`wasm32`, no threads then; threaded since 2026-11-28).
 - Drawn with SwiftShader, its frames say nothing about a real browser's GPU.
 - The web was not run in the benchmark's fights.
 

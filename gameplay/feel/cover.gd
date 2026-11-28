@@ -413,6 +413,7 @@ func find(table: ActorsScript = null, focus: Vector2 = Vector2.INF) -> void:
 
 func draw(now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
 	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+	_let_walk_go()
 
 
 ## The bodies the last `find` found (`found_count` of them, at most BODIES), in the order found.
@@ -452,11 +453,13 @@ func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScr
 		_due_count = count
 		_bodies_due = true
 		_draw_idle(now, pool, view, stirs_version, hand_stirs)
+		_let_walk_go()
 		return
 	_bodies_due = false
 	_due_found = PackedVector2Array()
 	_take_found(found, count)
 	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+	_let_walk_go()
 
 
 ## The bodies found by the last `step` (`step_with`'s, its own), at most BODIES.
@@ -629,6 +632,12 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 func _walk_given(now: float) -> void:
 	if layout != null:
 		_walk_bodies(_walk_list, _walk_start, _walk_count, now)
+	_let_walk_go()
+
+
+## The list `walk_only` gave let go, walked or not, so its owner writes it in place next frame and no
+## later frame walks it.
+func _let_walk_go() -> void:
 	_walk_list = PackedVector2Array()
 	_walk_count = -1
 

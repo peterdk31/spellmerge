@@ -16,6 +16,8 @@ const CoverScript := preload("res://gameplay/feel/cover.gd")
 
 ## A bucket's side (px): a room is a few of them.
 const BUCKET: float = 512.0
+## A bucket no view's box shares.
+const NONE: PackedInt32Array = []
 
 ## The bodies each view walks: view `v`'s from `v * CoverScript.BODIES`, `counts[v]` of them.
 var bodies: PackedVector2Array = PackedVector2Array()
@@ -59,7 +61,7 @@ func sort(found: PackedVector2Array, count: int) -> void:
 	counts.fill(0)
 	for at in mini(count, found.size()):
 		var body: Vector2 = found[at]
-		var list: PackedInt32Array = _buckets.get(_key(body), PackedInt32Array())
+		var list: PackedInt32Array = _buckets.get(_key(body), NONE)
 		for v in list:
 			var low: Vector2 = _lows[v]
 			var high: Vector2 = _highs[v]

@@ -262,3 +262,23 @@ func test_walking_only_the_live_streams_gives_off_the_same() -> void:
 			check_equal(live._streams[s].owed, every._streams[s].owed, "stream %d owes the same" % s)
 	check(every.given > 10, "while they gave off (%d)" % every.given)
 	check_equal(live._live.size(), 2, "the one burning cell's two streams walked")
+	# A fire moving on between two frames (one cell out, the next catching): its streams' lists empty
+	# and fill again, and they keep what they owed (the walk saw no frame without a cell).
+	var owed := PackedFloat32Array()
+	for stream in live._streams:
+		owed.append(stream.owed)
+	check(owed[0] > 0.0 or owed[1] > 0.0, "a part of a mote owed before the fire moves (%s)" % owed)
+	for motes in both:
+		motes.show(_cell(15, 15), 0)
+		motes.show(_cell(14, 14), BURNING)
+	for s in live._streams.size():
+		check_equal(live._streams[s].owed, owed[s], "stream %d keeps what it owed as the fire moves" % s)
+	for frame in 30:
+		at += STEP
+		_walk_every_stream(every)
+		for k in both.size():
+			both[k].give_off(at, pools[k], Rect2())
+	check_equal(live.given, every.given, "after it moved: the same motes given off (%d)" % every.given)
+	check_equal(live._rng.state, every._rng.state, "and the same dice rolled")
+	for s in live._streams.size():
+		check_equal(live._streams[s].owed, every._streams[s].owed, "stream %d owes the same" % s)

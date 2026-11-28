@@ -105,8 +105,19 @@ func test_each_room_walks_the_cells_every_body_found_walked() -> void:
 			var shown: bool = (number + frame) % 3 != 0
 			views[number].visible = shown
 			twins[number].visible = shown
+		# A room laid again mid-run, at another place (as a new world lays its pieces): the reach is
+		# worked out again (`flats_version`).
+		if frame == 6:
+			var moved: CoverLayout = _layout(kind, 3)
+			moved.origin += Vector2(256.0, 40.0)
+			views[3].lay(moved)
+			var twin_moved: CoverLayout = _layout(kind, 3)
+			twin_moved.origin += Vector2(256.0, 40.0)
+			twins[3].lay(twin_moved)
 		var now: float = 1.0 + 0.1 * float(frame)
 		rooms.step(now, table, Vector2.INF)
+		for number in ROOMS:
+			check_equal(views[number]._walk_count, -1, "frame %d: room %d let its bodies go" % [frame, number])
 		var lead: CoverScript = twins[0]
 		lead.step(now, table, Vector2.INF)
 		for number in range(1, ROOMS):

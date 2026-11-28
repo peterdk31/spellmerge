@@ -140,9 +140,9 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool, dir: Vector2 = U
 	if face != null and posing:
 		var mood: int = roundi(_pose_look[StaffPoses.Look.MOOD])
 		if mood > 0:
-			var name: StringName = CarrierCard.POSE_MOODS[mood - 1]
-			if POSE_MOODS.has(name):
-				face.show_mood(POSE_MOODS[name] as Face.Mood, POSE_MOOD_SECONDS)
+			var mood_name: StringName = CarrierCard.POSE_MOODS[mood - 1]
+			if POSE_MOODS.has(mood_name):
+				face.show_mood(POSE_MOODS[mood_name] as Face.Mood, POSE_MOOD_SECONDS)
 
 
 ## `apply_pose` then `pose_offset`, for a look that shows both every step: at once while no

@@ -340,6 +340,24 @@ Each is measured on `tick_hash.gd` (1 to 4 players) and both crowds.
   - **C6:** the nodes' places are written in about ten places outside the actor (Flow's placements, the map's teleport, room contents, Entities' decoys, the prop yard, the snapshot's restore of a node's position); each writes the column once the column is the state, and the node's `position` becomes the column's view, set after the tick.
   - **Change 4** needs every simulation read of a body's node off it: about 110 reads of `global_position` in the simulation folders (56 in the AI, 32 in the actor kit), besides the members C6 moves.
 
+**Built (C2, 2026-11-28): the move's grid work and its room in one native call a body, and the gather native.**
+
+- **One call a tick for every body changes the game.** A body's step reads other bodies' nodes (C1 counted about 110 reads of `global_position` in the simulation), so it sees the bodies before it in id order where their moves this tick left them. Moving every body after all the steps, tried in GDScript alone, changes the whole-game hash from tick 1 (4p seed 11). So C2 keeps the move in each body's own tick, and the batch is a question for the owner (below, and the PR's open questions).
+- **What C2 does instead, the game the same:**
+  - `Actor.move` asks the walk, the holes at its end and the place it ends in (`room`) in one native call, `RoomGrid.walk_place` / `BodyKernel.walk_place`. Before, it went through two GDScript calls to the native walk (1.3 of the walk's 1.9 us, measured), then found its place in GDScript (`place_at`, about 1.7 us). The twin is `RoomGrid.gd_walk_place`. `tests/core/test_body_move.gd` compares 9,600 moves over 48 rooms to the bit.
+  - The gather as the bodies' step starts is one native call, `BodyKernel.gather`, with the twin `Actor.gd_gather_rows`, compared in `tests/gameplay/actor/test_body_table.gd`.
+  - The nodes stay the state. The Mover is unchanged: it reads Combat's pace and push, Plow's carry, a homing dash's steering and the intent, all through GDScript calls.
+- **Measured** (this 4-core machine, main and branch alternating):
+  - The move a body (`Actor.move`, timed by a patch kept out of the tree, web stress, 80,000 moves): 8.0 and 8.5 us on main, 6.4 and 6.4 on the branch.
+  - The bodies' step, web stress: 6.15 / 6.38 / 5.61 ms a tick on main, 5.38 / 5.28 / 5.32 on the branch.
+  - The bodies' step, desktop stress: 10.52 / 12.10 / 11.62 on main, 10.29 / 11.26 / 10.89 on the branch.
+  - `--no-native` and `tick_hash` (about 25 bodies) are within the swing.
+  - The whole game's state hash every tick, seed 11, 1 to 4 players (11,987 / 13,315 / 11,495 / 12,423 ticks), is identical to main with native on and, at 4p, with it off.
+- **What it showed for the next steps:**
+  - **The batch (one call a tick).** It needs the owner's yes, because bodies would read each other's places as the tick started. With it, the rest of the move (6.4 us a body, its call, a held-up dash, holes, touches and the row among it) and the Mover (about 4 us) could go native together. That needs Combat's pace and push read from its own arrays by id. They already are arrays (`_status_left`, `_knock`), but they belong to the hit table session's area.
+  - **C3** (chase, steering, tracking) meets the same order: the native code would be one call a foe, or a batch with the owner's yes. Read in a batch, the rows of the bodies before a foe would be where those bodies stood as the step started, not after their moves this tick.
+  - **C6 and change 4** are unchanged by C2. A tick on its own thread keeps the bodies' order as it is, so it needs no batch.
+
 ### 3. Hits as one batch a tick, Feel's hit looks in its frame
 
 **Evidence.**

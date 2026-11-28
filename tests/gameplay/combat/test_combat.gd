@@ -413,6 +413,86 @@ func test_a_hit_on_an_enemy_a_listener_unregisters_counts_with_no_death() -> voi
 	check(deaths.is_empty(), "no death is sent for an enemy a listener removed")
 
 
+# --- The hit table (perf plan H1) -------------------------------------------------------------
+
+func test_a_hit_the_manager_sends_is_applied_once_from_its_row() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	_profile(1, 2)
+	var enemy: Node2D = _enemy(10, Vector2(100.0, 100.0))
+	var health_when_heard: Array[float] = []
+	# A listener connected after Combat still hears the hit before Combat applies it.
+	bus.projectile_hit.connect(func(_c: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		health_when_heard.append(combat.health_of(target)))
+	check(projectiles.strike(0, enemy, Vector2(100.0, 100.0), Vector2.RIGHT, 1, &"swing"), "the strike was sent")
+	check_equal(damage.size(), 1, "one hit, applied once (from its row, not also by the listener)")
+	check_equal(health_when_heard, [10.0] as Array[float], "every listener heard it before Combat applied it")
+	check(is_equal_approx(combat.health_of(enemy), 8.0), "its damage taken once")
+	var table: HitTable = projectiles.hit_table
+	check_equal(table.rows, 2, "two rows in the table: the hit, then the damage it dealt (perf plan H2)")
+	check_equal([table.kind[0], table.kind[1]], [HitTable.ROW_HIT, HitTable.ROW_DAMAGE], "in that order")
+
+
+## Perf plan H2: the damage and death Combat deals are rows of the manager's hit table, written
+## before their events, each named `told` while its events are sent, with what their look needs
+## from the body (its instance id, actor id and own colour), read after the tick.
+func test_damage_and_a_death_are_rows_told_while_their_events_are_sent() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	_profile(1, 3)
+	var enemy: Node2D = _enemy(3, Vector2(100.0, 100.0))
+	var told: Array[int] = []
+	bus.damage_dealt.connect(func(_c: int, _t: Node, _a: float, _p: Vector2) -> void: told.append(projectiles.hit_table.told))
+	bus.enemy_died.connect(func(_k: int, _e: Node, _p: Vector2, _s: int) -> void: told.append(projectiles.hit_table.told))
+	var id: int = enemy.get_instance_id()
+	check(projectiles.strike(0, enemy, Vector2(100.0, 100.0), Vector2.RIGHT, 1, &"swing"), "the strike was sent")
+	var table: HitTable = projectiles.hit_table
+	check_equal(table.rows, 3, "a hit, its damage and the death")
+	if table.rows != 3:
+		return
+	check_equal([table.kind[0], table.kind[1], table.kind[2]], [HitTable.ROW_HIT, HitTable.ROW_DAMAGE, HitTable.ROW_DEATH], "in the order sent")
+	check_equal(told, [1, 2] as Array[int], "each row named while its event is sent")
+	check_equal(table.told, -1, "and none after")
+	check_equal(table.target_id[1], id, "the damage names its body by instance id")
+	check(is_equal_approx(table.amount[1], 3.0), "with what it dealt")
+	check_equal(table.hit_kind[1], CombatScript.KIND_SHOT, "and its kind")
+	check_equal(table.colour[1], EnemyBase.DEFAULT_HIT_COLOR, "and the body's own colour")
+	check_equal(table.target_id[2], id, "the death names its body")
+	check(table.at[2].is_equal_approx(Vector2(100.0, 100.0)), "where it died")
+
+
+func test_a_manager_on_another_bus_has_no_damage_rows() -> void:
+	_setup(0, true)
+	_profile(1, 3)
+	var enemy: Node2D = _enemy(10)
+	check(combat.hit(0, enemy, 2.0), "the hit counted")
+	check_equal(projectiles.hit_table.rows, 0, "no row: the drawing reads only its own bus's")
+
+
+func test_a_hit_sent_by_hand_is_still_applied() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	_profile(1, 3)
+	var enemy: Node2D = _enemy(10)
+	bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 1, -1)
+	check(is_equal_approx(combat.health_of(enemy), 7.0), "a hit no row stands for is applied by the listener")
+
+
+func test_merged_hits_land_as_their_row_counts_them() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_profile(1, 2)
+	var enemy: Node2D = _enemy(50, Vector2(200.0, 100.0))
+	root.add_child(enemy)
+	for i in 3:
+		projectiles.spawn(0, Vector2(150.0, 100.0 + float(i)), Vector2(600.0, 0.0), 5.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, 1)
+	for _i in 10:
+		projectiles.step(1.0 / 60.0)
+	check_equal(damage.size(), 1, "three shots of one spell in one pass: one merged hit")
+	check(is_equal_approx(combat.health_of(enemy), 44.0), "the merged hit took three hits' damage (%s)" % combat.health_of(enemy))
+
+
 # --- Projectile targets ----------------------------------------------------------------------
 
 func test_a_registered_enemy_is_a_projectile_target() -> void:

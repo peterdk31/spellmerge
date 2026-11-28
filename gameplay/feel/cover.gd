@@ -408,7 +408,7 @@ func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScr
 	if not is_visible_in_tree():
 		# Switched off: the cells a body found reaches are walked straight from `found`, and the
 		# bodies are taken only when it is shown again (`_on_visibility_changed`).
-		if layout != null and _reached_by(box, found, count):
+		if layout != null and _box_reaches(box):
 			_walk_bodies(found, mini(count, found.size()), now)
 		# Held as it is (the finding view's newest, which it writes again only two frames on, by then
 		# held here no more: copy on write keeps the values either way).
@@ -435,21 +435,14 @@ func found_box() -> Rect2:
 	return _found_box
 
 
-## True when one of the bodies `found` (`count` of them, all inside `box`, `found_box`'s) could walk
-## one of the layout's cells (`_walk`'s test): the box first, then each body (the box of a biome's
-## 32 nearest bodies spans most of its rooms).
-func _reached_by(box: Rect2, found: PackedVector2Array, count: int) -> bool:
+## False when no body inside `box` (`found_box`'s) could walk one of the layout's cells (`_walk_bodies`'s
+## test, which then tests each body itself: testing them here first walked them twice, perf plan F3).
+func _box_reaches(box: Rect2) -> bool:
 	if layout == null:
 		return false
 	var low: Vector2 = _walk_low()
 	var high: Vector2 = _walk_high()
-	if box.end.x < low.x or box.end.y < low.y or box.position.x > high.x or box.position.y > high.y:
-		return false
-	for at in mini(count, found.size()):
-		var body: Vector2 = found[at]
-		if not (body.x < low.x or body.y < low.y or body.x > high.x or body.y > high.y):
-			return true
-	return false
+	return not (box.end.x < low.x or box.end.y < low.y or box.position.x > high.x or box.position.y > high.y)
 
 
 ## The corners of the box a body's position lies in when its footprint may touch the layout's cells.

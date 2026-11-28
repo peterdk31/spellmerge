@@ -832,12 +832,11 @@ var _dead_source: PackedInt32Array = PackedInt32Array()
 var _dead_boss: PackedByteArray = PackedByteArray()
 var _dead_sound: Array[StringName] = []
 var _dead_count: int = 0
-## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
-## wizard hit themselves. `damage_dealt` follows at once, or the record is stale.
+## The latest hit kind (a hand-sent `hit_landed`): the target it was for, the kind and the frame.
+## `damage_dealt` follows at once, or the record is stale.
 var _kind_target: int = 0
 var _kind: StringName = &"shot"
 var _kind_frame: int = -1
-var _kind_own: bool = false
 ## The shot whose hit `hit_landed` announced (its `shot`, -1 for none): the one a hit's stop holds.
 var _kind_shot: int = -1
 ## The carrier card whose hit `hit_landed` announced (its `card`, `&""` for none): its own hit sound
@@ -1203,7 +1202,7 @@ func _process(delta: float) -> void:
 	step(real_delta)
 
 
-## The parts of a step `step_profile` sums, in order.
+## The parts of a step `step_profile` sums, in order (but the last, the ticks' hits, timed first).
 const PROFILE_PARTS: PackedStringArray = ["camera and split", "markers, flashes and beams", "carriers, statuses, falls, spawns", "cover", "spectacle", "rooms and sound", "labels and numbers", "hits, damage and deaths"]
 
 

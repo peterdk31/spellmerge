@@ -34,7 +34,9 @@ extends RefCounted
 
 const FIRST_ROWS: int = 256
 ## The most rows kept for a reader that has not read them (see the class doc).
-const MOST_HELD: int = 65536
+const MOST_HELD: int = 8192
+## `write`'s `shown_tag` when the impact is drawn with the row's own spell tag.
+const SPELL_TAG: int = -1
 ## What a row is: a hit on a body (applied), an impact on no body, a body's damage, a death.
 const ROW_HIT: int = 0
 const ROW_WALL: int = 1
@@ -118,11 +120,11 @@ func read_done() -> void:
 ## A new row, returned: `count` hits of `who`'s spell `spell` on `node` at `point` going `way`, by
 ## the shot in `slot` (-1 for none), with that shot's look; its impact drawn with `shown_tag` (the
 ## manager's `impact_tag` as it sends it). `node` null is an impact on no body (ROW_WALL).
-func write(who: int, node: Node, point: Vector2, way: Vector2, spell: int, slot: int, hits: int, carrier_card: StringName, shot_body: int, colour: Color, look_bits: int, shown_tag: int = -1) -> int:
+func write(who: int, node: Node, point: Vector2, way: Vector2, spell: int, slot: int, hits: int, carrier_card: StringName, shot_body: int, colour: Color, look_bits: int, shown_tag: int = SPELL_TAG) -> int:
 	var row: int = _next(ROW_HIT if node != null else ROW_WALL, who, node, point)
 	heading[row] = way
 	tag[row] = spell
-	look_tag[row] = spell if shown_tag == -1 else shown_tag
+	look_tag[row] = spell if shown_tag == SPELL_TAG else shown_tag
 	shot[row] = slot
 	count[row] = hits
 	card[row] = carrier_card

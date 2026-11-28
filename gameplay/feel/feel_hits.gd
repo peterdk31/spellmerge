@@ -173,18 +173,28 @@ const ROW_FRAMES: int = 1 << 40
 ## the same frame's caps (`_body_looks`, the hit shares, the flashes and sounds) as when they were
 ## heard in the tick.
 func read_rows(table: HitTable) -> void:
+	# The columns once (a read through `table` is a lookup by name; the packed arrays are shared,
+	# never copied, as nothing writes them while they are read).
+	var kinds: PackedByteArray = table.kind
+	var ticks: PackedInt32Array = table.tick
+	var casters: PackedInt32Array = table.caster
+	var bodies: PackedInt64Array = table.target_id
+	var points: PackedVector2Array = table.at
+	var headings: PackedVector2Array = table.heading
+	var look_tags: PackedInt64Array = table.look_tag
+	var cards: Array[StringName] = table.card
+	var cores: PackedColorArray = table.core
+	var looks: PackedInt32Array = table.look
 	for row in table.rows:
-		var frame: int = ROW_FRAMES + table.tick[row]
-		match table.kind[row]:
-			HitTable.ROW_HIT:
-				_impact(table.caster[row], table.target_id[row], table.at[row], table.heading[row], table.look_tag[row], table.card[row], table.core[row], table.look[row], true, frame)
-			HitTable.ROW_WALL:
-				_impact(table.caster[row], 0, table.at[row], table.heading[row], table.look_tag[row], table.card[row], table.core[row], table.look[row], true, frame)
-			HitTable.ROW_DAMAGE:
-				var body: int = table.target_id[row]
-				_damage(table.caster[row], body, instance_from_id(body) as Node, table.actor[row], table.colour[row], table.amount[row], table.at[row], table.hit_kind[row], table.card[row], frame)
-			HitTable.ROW_DEATH:
-				_death_row(table, row)
+		var frame: int = ROW_FRAMES + ticks[row]
+		var what: int = kinds[row]
+		if what == HitTable.ROW_HIT or what == HitTable.ROW_WALL:
+			_impact(casters[row], bodies[row] if what == HitTable.ROW_HIT else 0, points[row], headings[row], look_tags[row], cards[row], cores[row], looks[row], true, frame)
+		elif what == HitTable.ROW_DAMAGE:
+			var body: int = bodies[row]
+			_damage(casters[row], body, instance_from_id(body) as Node, table.actor[row], table.colour[row], table.amount[row], points[row], table.hit_kind[row], cards[row], frame)
+		elif what == HitTable.ROW_DEATH:
+			_death_row(table, row)
 	table.read_done()
 	feel._dead_count = 0
 

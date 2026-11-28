@@ -32,7 +32,9 @@ extends SceneTree
 ## `_init()`; one that reads a view of its own (a SubViewport) awaits `frame_drawn()` first.
 ##
 ## **The game is the same every run**: the engine's generator is seeded (`SHOT_SEED`) before
-## `take()`, so the run a shot starts takes the same seed (`SimSeed.fresh`) and plays the same.
+## `take()`, so the run a shot starts takes the same seed (`SimSeed.fresh`) and plays the same; and
+## the view does not step while the shaders warm up (as many frames as the machine needs), so it
+## starts the shots from the same moment every run.
 ##
 ## **The view is on the game's clock** (`Feel.fixed_view_delta`, a tick's time a frame, as the
 ## benchmark's): the camera's easing, the motes, the mist and the reveals move as far a frame as the
@@ -68,6 +70,11 @@ const SHOT_SEED: int = 11
 func _initialize() -> void:
 	await process_frame
 	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
+	# The view does not step while the shaders warm up (that takes as many frames as the machine
+	# needs): it starts on the game's clock with the shots, the same every run.
+	var still_feel: Node = root.get_node_or_null("Feel")
+	if still_feel != null:
+		still_feel.set(&"drive_engine", false)
 	if warm_first and not await WarmUp.run(root):
 		fail("the shaders were not compiled before the shots (Flow's play tasks through Loading)")
 		return
@@ -88,6 +95,7 @@ func _initialize() -> void:
 	# software renderer takes a tenth of a second a frame, nor stand still while a frame is not drawn.
 	if feel != null:
 		feel.set(&"fixed_view_delta", _SHOT_TICK.DT)
+		feel.set(&"drive_engine", true)
 	# The same run every time: a run with no replay takes a fresh seed from the engine's generator
 	# (`SimSeed.fresh`), so each shot script's run would deal its foes, their moves and every roll
 	# anew and its pictures would differ run to run.

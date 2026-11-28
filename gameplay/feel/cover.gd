@@ -173,6 +173,11 @@ var _found_box: Rect2 = NOWHERE
 var _due_found: PackedVector2Array = PackedVector2Array()
 var _due_count: int = 0
 var _bodies_due: bool = false
+## The bodies this frame's walk walks when Feel's rooms sorted them (`walk_only`): `_walk_count` of
+## `_walk_list` from `_walk_start`; -1: every body found. Held for one walk, then let go.
+var _walk_list: PackedVector2Array = PackedVector2Array()
+var _walk_start: int = 0
+var _walk_count: int = -1
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -394,9 +399,38 @@ func body_count() -> int:
 ## ShaderMaterial; the spectacle's `Stirs.hand_to`; none: not handed) whenever their `stirs_version`
 ## is not the one handed last.
 func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+	find(table, focus)
+	draw(now, pool, view, stirs_version, hand_stirs)
+
+
+## `step` in two: the bodies found first (`find`, its `table` and `focus`; read by `found_bodies`),
+## then the frame drawn (`draw`, the rest of its arguments), so Feel's rooms can sort the bodies
+## found to the views between (`cover_reach.gd`, `walk_only`).
+func find(table: ActorsScript = null, focus: Vector2 = Vector2.INF) -> void:
 	_bodies_due = false
 	_find_bodies(table, focus)
+
+
+func draw(now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
 	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+
+
+## The bodies the last `find` found (`found_count` of them, at most BODIES), in the order found.
+func found_bodies() -> PackedVector2Array:
+	return _near_at
+
+
+func found_count() -> int:
+	return _near_count
+
+
+## This frame's walk walks only `count` of `list` from `start` (the bodies found that reach this
+## view's cells, by `walk_low` and `walk_high`: Feel's rooms' `cover_reach.gd`), not every body
+## found; the same cells walked. Held for the next `step`, `draw` or `step_with` only.
+func walk_only(list: PackedVector2Array, start: int, count: int) -> void:
+	_walk_list = list
+	_walk_start = start
+	_walk_count = count
 
 
 ## `step` with the bodies another view found this frame (`found`, `count` of them: Feel's first
@@ -408,8 +442,10 @@ func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScr
 	if not is_visible_in_tree():
 		# Switched off: the cells a body found reaches are walked straight from `found`, and the
 		# bodies are taken only when it is shown again (`_on_visibility_changed`).
-		if layout != null and _box_reaches(box):
-			_walk_bodies(found, mini(count, found.size()), now)
+		if _walk_count >= 0:
+			_walk_given(now)
+		elif layout != null and _box_reaches(box):
+			_walk_bodies(found, 0, mini(count, found.size()), now)
 		# Held as it is (the finding view's newest, which it writes again only two frames on, by then
 		# held here no more: copy on write keeps the values either way).
 		_due_found = found
@@ -440,17 +476,18 @@ func found_box() -> Rect2:
 func _box_reaches(box: Rect2) -> bool:
 	if layout == null:
 		return false
-	var low: Vector2 = _walk_low()
-	var high: Vector2 = _walk_high()
+	var low: Vector2 = walk_low()
+	var high: Vector2 = walk_high()
 	return not (box.end.x < low.x or box.end.y < low.y or box.position.x > high.x or box.position.y > high.y)
 
 
-## The corners of the box a body's position lies in when its footprint may touch the layout's cells.
-func _walk_low() -> Vector2:
+## The corners of the box a body's position lies in when its footprint may touch the layout's cells
+## (`_walk_bodies`'s test; Feel's rooms sort the bodies by it, `cover_reach.gd`).
+func walk_low() -> Vector2:
 	return layout.origin - FOOT_REACH_HIGH - Vector2.ONE
 
 
-func _walk_high() -> Vector2:
+func walk_high() -> Vector2:
 	return layout.origin + Vector2(float(layout.columns * CoverLayout.CELL), float(layout.rows * CoverLayout.CELL)) - FOOT_REACH_LOW + Vector2.ONE
 
 
@@ -472,8 +509,10 @@ func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int,
 	for flat in _flats:
 		if flat != null:
 			flat.hand(now)
-	if layout != null:
-		_walk_bodies(_near_at, _near_count, now)
+	if _walk_count >= 0:
+		_walk_given(now)
+	elif layout != null:
+		_walk_bodies(_near_at, 0, _near_count, now)
 	if _times_dirty:
 		_times_dirty = false
 		_times_texture = _times_upload.hand(_times)
@@ -586,15 +625,23 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 		_found_box = Rect2(low, high - low)
 
 
-## The covered cells under the first `count` of `bodies` (their `FOOTPRINT`), walked at `now`; the
+## The walk `walk_only` gave, at `now`, and the list let go (so its owner writes it in place).
+func _walk_given(now: float) -> void:
+	if layout != null:
+		_walk_bodies(_walk_list, _walk_start, _walk_count, now)
+	_walk_list = PackedVector2Array()
+	_walk_count = -1
+
+
+## The covered cells under `count` of `bodies` from `start` (their `FOOTPRINT`), walked at `now`; the
 ## grid marked to be handed over when one was.
-func _walk_bodies(bodies: PackedVector2Array, count: int, now: float) -> void:
+func _walk_bodies(bodies: PackedVector2Array, start: int, count: int, now: float) -> void:
 	# A body whose footprint lies wholly off this piece's cells walks none of them: passed by with
 	# one test (a biome's every piece hears every body found; the performance pass, 2026-11-20). The
 	# box is a pixel wider than FOOTPRINT's reach each way, so no foot on a cell is passed by.
-	var low: Vector2 = _walk_low()
-	var high: Vector2 = _walk_high()
-	for at in count:
+	var low: Vector2 = walk_low()
+	var high: Vector2 = walk_high()
+	for at in range(start, start + count):
 		var body: Vector2 = bodies[at]
 		if body.x < low.x or body.y < low.y or body.x > high.x or body.y > high.y:
 			continue

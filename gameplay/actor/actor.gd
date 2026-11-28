@@ -355,6 +355,49 @@ func tick_step(delta: float, looks_later: bool = false) -> void:
 	_looks_later = false
 	if spawn_left <= 0.0:
 		move(delta)
+	if id != ActorsScript.NONE and actors != null:
+		# Its place and velocity after its own tick, in its row (`write_row`).
+		actors.places[id] = global_position
+		actors.velocities[id] = velocity
+
+
+## Its row of the actor table's body table (perf plan C1, `Actors.write_row`): where it stands, its
+## velocity, its radius against the walls and its flags, as the node has them now. The body is the
+## row's one writer (core/actors/README.md, "The body table"): the whole row when its id opens, after
+## a restore (`rebuild_derived`) and wherever its flags or radius change (a spawn and its landing,
+## a down, a fall and its end, a death, a new size, a new room); its place and velocity after its own
+## tick (`tick_step`) and a swap (`Mover`), and every open body's as the bodies' step starts
+## (`gather_rows`). Nothing in the game reads the row yet; the nodes are the state.
+func write_row() -> void:
+	if id == ActorsScript.NONE or actors == null:
+		return
+	var flags: int = 0
+	if spawn_left > 0.0:
+		flags = ActorsScript.FLAG_DOWN | ActorsScript.FLAG_SPAWNING
+	if fall_left > 0.0:
+		flags |= ActorsScript.FLAG_DOWN | ActorsScript.FLAG_FALLING
+	if _down:
+		flags |= ActorsScript.FLAG_DOWN
+	if _dying:
+		flags |= ActorsScript.FLAG_DYING
+	actors.write_row(id, global_position, velocity, footprint.radius if footprint != null else 0.0, flags)
+
+
+## Every open body's place and velocity into its row (`write_row`), the first `count` of `ids` (the
+## Tick's, as the bodies' step starts): what was done to the bodies since their own ticks (Flow
+## placing them, a teleport, the steps before the bodies') is in the table. A node of an id that is
+## no Actor (a plain Combat body) has no row. One loop, no call a body (0.06 ms a tick at 112 bodies,
+## the web's stress fight).
+static func gather_rows(table: ActorsScript, ids: PackedInt32Array, count: int) -> void:
+	var nodes: PackedInt64Array = table.nodes()
+	var places: PackedVector2Array = table.places
+	var velocities: PackedVector2Array = table.velocities
+	for i in count:
+		var at: int = ids[i]
+		var body: Actor = instance_from_id(nodes[at]) as Actor if nodes[at] != 0 else null
+		if body != null:
+			places[at] = body.global_position
+			velocities[at] = body.velocity
 
 
 ## The looks' share of the drawn frame (the Tick's `_process`, after the frame's ticks): its looks
@@ -514,6 +557,7 @@ func _fall() -> void:
 	fall_left = HoleRules.FALL_SECONDS
 	velocity = Vector2.ZERO
 	mover.stop()
+	write_row()
 	if events != null:
 		events.body_fell.emit(id)
 
@@ -522,6 +566,7 @@ func _fall() -> void:
 ## wizard is back on its last ground, pays the fall and is protected; anything else dies of it.
 func _land() -> void:
 	fall_left = 0.0
+	write_row()
 	if hurtbox != null and hurtbox.registered == (_down or not hurtbox.enabled):
 		hurtbox.step()
 	if not returns_from_falls():
@@ -561,12 +606,14 @@ func spawn(seconds: float, style: StringName) -> void:
 		spawn_left = 0.0
 		spawn_seconds = 0.0
 		spawn_style = &""
+		write_row()
 		return
 	spawn_left = seconds
 	spawn_seconds = seconds
 	spawn_style = style
 	velocity = Vector2.ZERO
 	intent.clear()
+	write_row()
 	if actors != null and id != ActorsScript.NONE:
 		# Already in play: the Tick steps it until it lands, still or not.
 		actors.set_still(id, is_still())
@@ -606,6 +653,7 @@ func placed() -> void:
 	fell_by = ActorsScript.NONE
 	has_ground = false
 	ground = Vector2.ZERO
+	write_row()
 
 
 
@@ -671,6 +719,7 @@ func step(delta: float) -> void:
 		# Landed: it steps as a standing body from this tick on (its hurt shape registers below), and
 		# the actor table hears whether it is still now (it was not while it spawned in).
 		spawn_left = 0.0
+		write_row()
 		if actors != null and id != ActorsScript.NONE:
 			actors.set_still(id, is_still())
 	if fall_left > 0.0:
@@ -826,6 +875,7 @@ func is_down() -> bool:
 ## Down (`on`) or standing again. Called by the Downed component.
 func set_down(on: bool) -> void:
 	_down = on
+	write_row()
 
 
 ## True while a Downed component holds it down (G7), falling or not: what a revive asks (a fall alone
@@ -840,6 +890,7 @@ func die(killer: int) -> void:
 	if _dying:
 		return
 	_dying = true
+	write_row()
 	if possessed_by != null:
 		possessed_by.end()
 	var away: ActorController = home_controller
@@ -865,6 +916,7 @@ func is_leaving() -> bool:
 ## looks shows the body as it is now (`ActorLook.sync`), with no moment played; a still body's look
 ## is never stepped, so this is how it catches up.
 func rebuild_derived() -> void:
+	write_row()
 	for look in _looks:
 		if is_instance_valid(look):
 			look.sync()
@@ -1138,6 +1190,7 @@ func set_size(factor: float) -> void:
 		if hurtbox.registered and is_inside_tree():
 			hurtbox.detach()
 			hurtbox.attach()
+	write_row()
 
 
 func _open_id() -> void:
@@ -1149,6 +1202,7 @@ func _open_id() -> void:
 		return
 	actors.set_node(id, self)
 	actors.set_still(id, is_still())
+	write_row()
 	# The seat whose own body it is (a wizard): the HUD finds it there while it is away.
 	if home_controller != null:
 		actors.set_home(id, home_controller.seat)

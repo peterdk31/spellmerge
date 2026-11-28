@@ -377,3 +377,5 @@ func _on_target_move_requested(_player: int, moved: Node, to: Vector2) -> void:
 		if actor.projectiles != null and not actor.projectiles.grid().may_cross(actor.global_position, to):
 			return
 		actor.global_position = to
+		# The body table hears it now (`Actor.write_row`): another body's step moved it.
+		actor.write_row()

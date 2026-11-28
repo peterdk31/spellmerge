@@ -377,3 +377,39 @@ func test_touch_areas_name_the_circles_that_overlap_them() -> void:
 	check(_actors.touch_ids.size() == 1, "an id not open takes none")
 	_actors.clear()
 	check(_actors.touch_ids.is_empty(), "a cleared table has none")
+
+
+## The body table (perf plan C1): a row is written only for an open id, with FLAG_BODY added;
+## opening and closing an id empty its row, and so does `clear`.
+func test_a_body_row_is_written_for_an_open_id_and_emptied_by_its_close() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	check_equal(_actors.body_flags[id], 0, "opened with no body: an empty row")
+	_actors.write_row(id, Vector2(3.0, 4.0), Vector2(-1.0, 2.0), 5.5, ActorsScript.FLAG_DOWN)
+	check_equal(_actors.places[id], Vector2(3.0, 4.0), "its place")
+	check_equal(_actors.velocities[id], Vector2(-1.0, 2.0), "its velocity")
+	check_equal(_actors.radii[id], 5.5, "its radius")
+	check_equal(_actors.body_flags[id], ActorsScript.FLAG_BODY | ActorsScript.FLAG_DOWN, "its flags, a body's")
+	_actors.write_row(id + 1, Vector2.ONE, Vector2.ONE, 1.0, 0)
+	_actors.write_row(-1, Vector2.ONE, Vector2.ONE, 1.0, 0)
+	check_equal(_actors.body_flags[id + 1], 0, "an id not open has no row")
+	_actors.close(id)
+	check(_actors.places[id] == Vector2.ZERO and _actors.velocities[id] == Vector2.ZERO and _actors.radii[id] == 0.0 and _actors.body_flags[id] == 0, "closed: empty")
+	var again: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.write_row(again, Vector2.ONE, Vector2.ONE, 1.0, 0)
+	_actors.clear()
+	check_equal(_actors.body_flags[again], 0, "clear empties every row")
+
+
+## After a restore the rows of the ids not open are emptied (a body that opened after the snapshot
+## left one); the open ids' rows are their bodies' to write.
+func test_rebuild_derived_empties_the_rows_of_ids_not_open() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	var other: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.write_row(id, Vector2(7.0, 8.0), Vector2.ZERO, 2.0, 0)
+	_actors.write_row(other, Vector2(9.0, 9.0), Vector2.ZERO, 2.0, 0)
+	# As a restore writes the table's state back: `other` was not open in the snapshot.
+	_actors._open[other] = 0
+	_actors.rebuild_derived()
+	check_equal(_actors.body_flags[other], 0, "the id not open: empty")
+	check_equal(_actors.places[other], Vector2.ZERO, "no place")
+	check_equal(_actors.places[id], Vector2(7.0, 8.0), "the open id's row kept")

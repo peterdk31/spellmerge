@@ -27,6 +27,8 @@
 
 #include <vector>
 
+#include "spark_roll.h"
+
 namespace godot {
 
 class ShotKernel : public RefCounted {
@@ -53,7 +55,7 @@ public:
 	void pass_common(Object *manager, int64_t top, double delta);
 	// Pass 3 of the step (`_pass_hits`), from its `n`-th shot on, as long as a shot needs nothing
 	// of GDScript; see the .cpp.
-	int64_t hits(Object *manager, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta);
+	int64_t hits(Object *manager, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta, bool merge_first);
 	// The behaviour passes that need nothing of GDScript (homing among them: the hit pass catches up
 	// a homing shot that waited for its search); false for one it doesn't run.
 	bool run_pass(Object *manager, int64_t kind, int64_t first, int64_t count, double delta);
@@ -86,6 +88,14 @@ public:
 	void region_counts(Object *regions, const PackedFloat32Array &rows, int64_t count);
 	void region_rows(Object *regions, const PackedFloat32Array &rows, int64_t count);
 
+	// The sparks the drawn shots give off (`ProjectileDraw._give_off_sparks`; spark_roll.h).
+	bool spark_configure(const Dictionary &config) { return _sparks.configure(config); }
+	int64_t give_off_sparks(const Array &arrays, const PackedFloat32Array &births, int64_t count, int64_t state, int64_t moments, double fraction,
+			double span, double sim_time, int64_t live) {
+		return _sparks.give_off(arrays, births, count, state, moments, fraction, span, sim_time, live);
+	}
+	int64_t spark_state() const { return _sparks.state(); }
+
 protected:
 	static void _bind_methods();
 
@@ -100,6 +110,7 @@ private:
 	// The draw batches' instance data (BATCH_* of the manager, `_batch_total` of them, growing with
 	// its card bodies), handed to the MultiMeshes.
 	std::vector<PackedFloat32Array> _buffers;
+	SparkRoll _sparks;
 };
 
 } // namespace godot

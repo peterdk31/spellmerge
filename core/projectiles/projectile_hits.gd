@@ -7,6 +7,15 @@ extends Object
 
 const Manager := preload("res://core/projectiles/projectile_manager.gd")
 
+## What the native hit pass's hand-back says (`ShotKernel.hits`: the shot's n shifted up by
+## KERNEL_YIELD_BITS, plus one of these): the whole shot is GDScript's, its hits found are, or only
+## Combat's answers for its hits' new entries are (hit batch A5). The kernel checks its copies
+## (`native_constants`).
+const KERNEL_YIELD_BITS: int = 2
+const KERNEL_YIELD_MASK: int = (1 << KERNEL_YIELD_BITS) - 1
+const KERNEL_YIELD_FOUND: int = 1
+const KERNEL_YIELD_ASK: int = 2
+
 ## Not state (core/sim/README.md): the manager, the other jobs this one calls and the manager's
 ## arrays it works on, each the manager's own array (shared, never a copy), linked by `link`.
 const DERIVED: Array[StringName] = [&"pm", &"_job_draw", &"_job_guards", &"_job_moves", &"_job_walls", &"_pos", &"_prev", &"_untested", &"_vel", &"_life", &"_radius", &"_actor", &"_layers", &"_pierce", &"_tag", &"_motion", &"_carrier_card_ids", &"_seq", &"_flags", &"_floor", &"_stick", &"_stuck_to", &"_stuck_off", &"_kinds", &"_state", &"_wait_from", &"_mem_head", &"_mem_id", &"_mem_target", &"_mem_seen", &"_mem_next", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_alive", &"_free_slots", &"_targets", &"_target_radius", &"_target_half", &"_target_layer", &"_target_pos", &"_target_key", &"_cell_head", &"_cell_count", &"_cell_box", &"_cell_filled", &"_target_next", &"_solids", &"_room_grid", &"_core", &"_look", &"_skip_id", &"_skip_on", &"_skip_near"]
@@ -115,11 +124,13 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 	var _hit_batch: HitBatch = pm._hit_batch
 	var n: int = 0
 	var timing: bool = not pm.step_profile.is_empty()
+	var merge_first: bool = false
 	while n < top:
 		# The kernel's scratch holds every target (a hit handler may have added some).
 		_fit_hit_scratch()
 		var at: int = pm.profile_clock.call() if timing else 0
-		var handed: int = _kernel.call(&"hits", pm, n, top, resume, limit, delta)
+		var handed: int = _kernel.call(&"hits", pm, n, top, resume, limit, delta, merge_first)
+		merge_first = false
 		if timing:
 			pm.step_profile[Manager.PROF_KERNEL] += pm.profile_clock.call() - at
 			pm.step_profile[Manager.PROF_HANDBACKS] += 1
@@ -129,12 +140,19 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 			return top
 		if handed < -1:
 			return -2 - handed
-		n = handed >> 1
+		n = handed >> KERNEL_YIELD_BITS
 		var slot: int = Manager._wrapped(n + resume, top)
-		if handed & 1 == 0:
-			_hit_slot(slot, delta, limit)
-		else:
+		var kind: int = handed & KERNEL_YIELD_MASK
+		if kind == KERNEL_YIELD_ASK:
+			# Only Combat's answers were missing: asked here, the kernel takes up the shot's hits.
+			if _ask_kernel_openings(slot):
+				merge_first = true
+				continue
 			_hit_found(slot)
+		elif kind == KERNEL_YIELD_FOUND:
+			_hit_found(slot)
+		else:
+			_hit_slot(slot, delta, limit)
 		n += 1
 		# The shots after it that the kernel would hand straight back take their turns here, without
 		# a call each (a crowd of homing shots on their search step, say).
@@ -142,6 +160,37 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 			_hit_slot(Manager._wrapped(n + resume, top), delta, limit)
 			n += 1
 	return top
+
+
+## For the shot in `slot` the native hit pass handed back to ask (hit batch A5): what `_merge_hit`
+## would ask Combat for each entry its hits open (the batch's `ask_target`, in turn), asked and kept,
+## so the kernel opens them as `add` would have. Combat's answers only read its bodies and spells,
+## and nothing between here and the kernel's hits changes them or the count of events. False, asking
+## nothing, with no events to ask through: the shot's hits are then GDScript's (`_hit_found`).
+func _ask_kernel_openings(slot: int) -> bool:
+	var events: Manager.EventsScript = pm.events
+	var batch: HitBatch = pm._hit_batch
+	if events == null:
+		batch.ask_n = 0
+		return false
+	var spell: int = _tag[slot]
+	var sent: int = pm._sent
+	for i in batch.ask_n:
+		if pm._sent != sent:
+			# A handler sent an event (none does today): the answers kept may be stale, so the
+			# shot's hits are GDScript's, asking anew at each entry as `add` does.
+			batch.ask_n = 0
+			return false
+		var t: int = batch.ask_target[i]
+		batch.ask(t, spell, sent)
+		var asks: int = batch.asks
+		if (asks & Manager.ASK_ROOM) != 0:
+			events.hit_room_asked.emit(_targets[t], batch.room)
+		if (asks & Manager.ASK_DAMAGE) != 0:
+			events.hit_damage_asked.emit(spell, slot, batch.damage)
+		batch.keep_answers(t, spell)
+	batch.ask_n = 0
+	return true
 
 
 ## The look of each entry the native hit pass opened (hit batch A4: it keeps no `StringName`),

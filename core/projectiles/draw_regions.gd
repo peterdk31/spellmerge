@@ -58,6 +58,10 @@ var _rects: Array[Rect2] = []
 var _nodes: Array[Array] = []
 var _buffers: Array[Array] = []
 var _rooms: Array[PackedInt32Array] = []
+## By batch, by region: the rows it was last told to show (its `visible_instance_count`, kept here so
+## a region shown and still shown or hidden and still hidden is not touched), and each batch's sum of them.
+var _shown: Array[PackedInt32Array] = []
+var _shown_sum: PackedInt32Array = PackedInt32Array()
 ## The batch `draw` writes now (`region_rows` reads its buffers here), and each region's next row.
 var _current: Array = []
 var _fill: PackedInt32Array = PackedInt32Array()
@@ -87,6 +91,9 @@ func draw(batch: int, node: MultiMeshInstance2D, rows: PackedFloat32Array, count
 	_fit_batch(batch)
 	var regions: int = places + 1
 	counts.fill(0)
+	# A batch with no rows that showed none: nothing to hand out or hide.
+	if count == 0 and _shown_sum[batch] == 0:
+		return
 	if count > 0:
 		if kernel != null:
 			kernel.call(&"region_counts", self, rows, count)
@@ -113,17 +120,22 @@ func draw(batch: int, node: MultiMeshInstance2D, rows: PackedFloat32Array, count
 			kernel.call(&"region_rows", self, rows, count)
 		else:
 			_write(rows, count)
+	var told: PackedInt32Array = _shown[batch]
+	var sum: int = 0
 	for region in regions:
-		var shown := _nodes[batch][region] as MultiMeshInstance2D
-		if shown == null:
-			continue
 		var used: int = counts[region]
+		if used == 0 and told[region] == 0:
+			continue
+		var shown := _nodes[batch][region] as MultiMeshInstance2D
 		if used > 0:
 			shown.multimesh.buffer = _buffers[batch][region]
 			if shown.texture != node.texture:
 				shown.texture = node.texture
-		if shown.multimesh.visible_instance_count != used:
+		if told[region] != used:
 			shown.multimesh.visible_instance_count = used
+			told[region] = used
+		sum += used
+	_shown_sum[batch] = sum
 	_current = []
 
 
@@ -176,6 +188,8 @@ func _take(grid: RoomGrid, count: int) -> void:
 	_fill.resize(count + 1)
 	for batch in _nodes.size():
 		_fit_batch(batch)
+		_shown[batch].fill(0)
+		_shown_sum[batch] = 0
 		for region in _nodes[batch].size():
 			var shown := _nodes[batch][region] as MultiMeshInstance2D
 			if shown != null:
@@ -189,15 +203,19 @@ func _fit_batch(batch: int) -> void:
 		_nodes.append([])
 		_buffers.append([])
 		_rooms.append(PackedInt32Array())
+		_shown.append(PackedInt32Array())
+		_shown_sum.append(0)
 	var regions: int = places + 1
 	if _nodes[batch].size() < regions:
 		var from: int = _nodes[batch].size()
 		_nodes[batch].resize(regions)
 		_buffers[batch].resize(regions)
 		_rooms[batch].resize(regions)
+		_shown[batch].resize(regions)
 		for region in range(from, regions):
 			_buffers[batch][region] = PackedFloat32Array()
 			_rooms[batch][region] = 0
+			_shown[batch][region] = 0
 
 
 ## The box of region `region`: the world for the crossers, else its place's rect grown by REACH.

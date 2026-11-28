@@ -197,10 +197,11 @@ func step(delta: float) -> void:
 			actor.spells.clear_aim(number)
 		_placed_feet = Vector2.INF
 		return
+	# `holds` and `staff_of` written out: every body with a caster steps this every tick.
 	for at in staff_count:
-		if not holds(at):
+		if empty_hands & (1 << at) != 0:
 			continue
-		var base: StaffBase = staff_of(at)
+		var base: StaffBase = staffs[at] if at < staffs.size() and staffs[at] != null else _staff_or_plain()
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
@@ -321,20 +322,27 @@ static func _as_held(value: float) -> float:
 ## The step sends them only when the body moved, turned or showed another staff since the last
 ## time (every actor does this every step; performance pass, 2026-10-28).
 func _push_place() -> void:
+	# `actor.aim_pivot()` and `actor.muzzle_position()` written out, each read once: a moving body
+	# sends its place every step (the bodies' step, performance pass 2026-11-28); the same sums.
 	var feet: Vector2 = actor.global_position
 	var anchor: Vector2 = feet + actor.body_offset
-	var tip: Vector2 = actor.muzzle_position()
-	if actor.projectiles != null:
+	var aim: Vector2 = actor.aim
+	var pivot: Vector2 = feet + actor.hand_offset
+	var reach: float = tip()
+	var tip_at: Vector2 = pivot + aim * (reach if reach > 0.0 else actor.staff_reach)
+	var projectiles: ProjectilesScript = actor.projectiles
+	if projectiles != null:
 		# The anchor and the staff tip clipped to walls (`_origin`), in one call.
-		tip = actor.projectiles.place_caster(number, anchor, feet, tip)
-	if actor.spells != null:
-		actor.spells.set_aim(number, tip, actor.aim, actor.aim_pivot())
+		tip_at = projectiles.place_caster(number, anchor, feet, tip_at)
+	var spells: SpellsScript = actor.spells
+	if spells != null:
+		spells.set_aim(number, tip_at, aim, pivot)
 	_placed_feet = feet
-	_placed_aim = actor.aim
+	_placed_aim = aim
 	_placed_current = current
 	_placed_anchor = anchor
-	_placed_tip = tip
-	_placed_pivot = actor.aim_pivot()
+	_placed_tip = tip_at
+	_placed_pivot = pivot
 
 
 ## Send what `_push_place` sent last again, before a cast: a new run may have cleared the systems

@@ -442,8 +442,8 @@ var shake_enabled: bool = true:
 			_trauma = 0.0
 			_kick = Vector2.ZERO
 			_job_view._reset_camera()
-## The last hit `_on_damage_dealt` gave its flash, hold and sound, by the hit actor's id: the
-## physics frame and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
+## The last hit `FeelHits._damage` gave its flash, hold and sound, by the hit actor's id: the
+## frame (a physics frame, or a row's tick) and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
 ## Another hit with all of them the same (no time has passed for Feel or the game) would only do
 ## them again: the flash is restarted to the same time, the hold is refused for
 ## both bodies (each rests from the first), and the same sound would start on the next voice in the
@@ -811,7 +811,8 @@ var _label_id: Array[StringName] = []
 var _impact_target: int = 0
 ## The actor whose shot it was: a contact hit (another caster value) never takes it.
 var _impact_caster: int = 0
-## The physics frame it was sent in: the damage follows at once, or the record is stale.
+## The frame it was sent in (a physics frame; a row's tick, `FeelHits.ROW_FRAMES`): the damage
+## follows at once, or the record is stale.
 var _impact_frame: int = -1
 ## The shot's tag, and whether its hit sprays its motes (its staff's share, rolled once at the
 ## impact, `Spectacle.begin_hit`): the damage's spray follows the same roll.

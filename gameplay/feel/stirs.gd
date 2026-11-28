@@ -32,6 +32,7 @@ extends RefCounted
 ## where a cell changed, and handed over only when one did.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## A cell of the wake, in world px, and the window's cells (1,536 x 1,024 px: the widest view, the
 ## party camera zoomed out to its MIN_ZOOM 0.5, 1,280 x 720, and a margin round it, so a shot just off
@@ -113,6 +114,14 @@ var _sent: int = 0
 var _sent_version: int = -1
 ## Feel's clock at the last step.
 var _now: float = 0.0
+## The native kernel (`MoteKernel.stir_step`, native/src/feel_loops.cpp) that reads the births and eases the
+## cells, the same to the bit, or null to do it here (`_read`, `_ease`: the reference and the
+## fallback). `native` switches it. The cells whose picture it changed (`_changed`) are written into
+## the image here.
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
+var _changed: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -126,6 +135,7 @@ func _init() -> void:
 	_is_live.resize(cells)
 	_cell_first.resize(cells)
 	_cell_first.fill(-1)
+	_changed.resize(cells)
 	_point_at.resize(BIRTHS_READ)
 	_point_way.resize(BIRTHS_READ)
 	_point_next.resize(BIRTHS_READ)
@@ -143,6 +153,29 @@ func _init() -> void:
 	# WebGL 2 and GLES 3).
 	_image = Image.create_empty(FIELD_W, FIELD_H, false, Image.FORMAT_RGH)
 	texture = _upload.hand(_image)
+	set_native(native)
+
+
+## Read the births and ease the cells with the native kernel when `on` and the module is loaded.
+## The kernel is handed the numbers it needs and checks the members it reads.
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = NativeScript.mote_kernel() if on else null
+	if _kernel == null:
+		return
+	var numbers: Dictionary = {
+		"FIELD_W": FIELD_W, "FIELD_H": FIELD_H, "BIRTHS_READ": BIRTHS_READ, "CELL": CELL, "PASS_PUSH": PASS_PUSH,
+		"SHOWN_RATE": SHOWN_RATE, "WAKE_HALF": WAKE_HALF, "FADED": FADED,
+		"SPARK_BIRTH_STRIDE": ProjectilesScript.SPARK_BIRTH_STRIDE, "SPARK_X": ProjectilesScript.SPARK_X,
+		"SPARK_Y": ProjectilesScript.SPARK_Y, "SPARK_BACK_X": ProjectilesScript.SPARK_BACK_X,
+		"SPARK_BACK_Y": ProjectilesScript.SPARK_BACK_Y,
+	}
+	var wrong: PackedStringArray = _kernel.call(&"check_stir_fields", self)
+	if not _kernel.call(&"configure_stirs", numbers):
+		wrong.append("its numbers")
+	if not wrong.is_empty():
+		push_error("Stirs: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		_kernel = null
 
 
 ## A blast at `at` of `radius` px (an explosion's part; Feel's `show_flash`), at Feel's clock `now`:
@@ -221,8 +254,16 @@ func step(now: float, births: PackedFloat32Array, count: int, view: Rect2) -> vo
 	_now = now
 	if view.has_area():
 		_follow(view)
-	_read(births, count if enabled else 0)
-	_ease(delta)
+	if _kernel != null:
+		var changed: int = int(_kernel.call(&"stir_step", self, births, count if enabled else 0, delta))
+		for k in changed:
+			var cell: int = _changed[k]
+			_image.set_pixel(cell % FIELD_W, cell / FIELD_W, Color(_shown[cell].x, _shown[cell].y, 0.0, 0.0))
+		if changed > 0:
+			_image_dirty = true
+	else:
+		_read(births, count if enabled else 0)
+		_ease(delta)
 	for slot in BLASTS:
 		if _blast_strength[slot] > 0.0 and now - _blasts[slot].w >= blast_seconds(_blasts[slot].z):
 			_blast_strength[slot] = 0.0

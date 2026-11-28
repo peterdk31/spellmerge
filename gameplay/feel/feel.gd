@@ -759,6 +759,23 @@ var _flash_wind: PackedInt32Array = PackedInt32Array()
 ## seconds follow what the wind-up has left (`Spells.cooldown_left`), so a chill that stretches the
 ## wind-up, or a freeze that holds it, stretches or holds the ring too, as it does the lane.
 var _flash_lasts_wind: PackedByteArray = PackedByteArray()
+## Each flash's look as its instance colour (`ProjectileManager.look_color` of its ramp, zoom and
+## look, worked out once when it is shown, not every frame), whether it moves or ends by what the
+## game says (it follows a body, sits on a staff tip or lasts a wind-up: FeelFlashes'
+## `_step_special` asks the game), and whether that step aged it this frame.
+var _flash_look_color: PackedColorArray = PackedColorArray()
+var _flash_special: PackedByteArray = PackedByteArray()
+var _flash_aged: PackedByteArray = PackedByteArray()
+## This frame's special slots (FeelFlashes' `_find_special`), and the rows `_write_rows` wrote into
+## each batch (FeelFlashes' ROWS_*: flares, arcs, statuses, the floor's, explosions).
+var _flash_special_slots: PackedInt32Array = PackedInt32Array()
+var _flash_row_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
+## Whether the flashes' special slots are found and their rows written by the native kernel
+## (`MoteKernel`, native/feel_loops.cpp: the same to the bit), where the module is loaded;
+## `set_flash_native` switches it. The kernel, or null to write them in GDScript (the reference and
+## the fallback).
+var flash_native: bool = true
+var _flash_kernel: Object = null
 ## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE,
 ## and the staff winding up.
 var _cue_tip: int = ActorsScript.NONE
@@ -1478,6 +1495,13 @@ static func flash_mesh() -> ArrayMesh:
 ## small quads, told their kind and slot in their UV as `flash_mesh`'s. Made once.
 static func blast_mesh() -> ArrayMesh:
 	return FeelFlashes.blast_mesh()
+
+
+## Find the flashes' special slots and write their rows with the native kernel when `on` and the
+## module is loaded, else in GDScript (`flash_native`).
+func set_flash_native(on: bool) -> void:
+	flash_native = on
+	_job_flashes.use_native(on)
 
 
 ## The setting: how many flashes can show at once, snapped by `EffectSlots.snap`. Returns the

@@ -229,7 +229,11 @@ func harmed() -> PackedInt32Array:
 ## The room whose cover lies under `at` (world pixels), or -1: the grid's place there (a biome's), else
 ## the first room whose grid holds it (a world with no places: a row run's room).
 func room_at(at: Vector2) -> int:
-	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	return _room_at(at, projectiles.grid() if projectiles != null else null)
+
+
+## `room_at` on the grid `grid` (the projectile manager's, fetched once by a loop over many points).
+func _room_at(at: Vector2, grid: RoomGrid) -> int:
 	if grid != null and grid.places() > 0:
 		var place: int = grid.place_at(at)
 		return place if place >= 0 and place < _rooms.size() and _rooms[place].holds(at) else -1
@@ -248,8 +252,11 @@ func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	sight.clear()
 	if not at.is_finite():
 		return
-	var number: int = room_at(at)
-	if number >= 0:
+	# `room_at`'s room: where the world has places, the grid's place there, whose `look` answers
+	# nothing for a point off its cover (and asks no more of a room where nothing is danger).
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	var number: int = grid.place_at(at) if grid != null and grid.places() > 0 else _room_at(at, null)
+	if number >= 0 and number < _rooms.size():
 		_rooms[number].look(at, reach, sight)
 
 
@@ -431,19 +438,25 @@ func _affect_bodies(delta: float) -> void:
 	var old: int = 0
 	var harmed: int = 0
 	var asleep: PackedByteArray = actors.asleep if actors != null else PackedByteArray()
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	var placed: bool = grid != null and grid.places() > 0
+	var rooms: int = _rooms.size()
 	for n in count:
 		var id: int = _ids[n]
 		while old < _harm_ids.size() and _harm_ids[old] < id:
 			old += 1
-		if asleep[id] != 0 and (old >= _harm_ids.size() or _harm_ids[old] != id):
+		var listed: bool = old < _harm_ids.size() and _harm_ids[old] == id
+		if asleep[id] != 0 and not listed:
 			# Asleep and not being harmed: nothing to keep and nothing to ask (looked at first, the
 			# performance pass, 2026-11-21: most bodies of a biome sleep).
 			continue
+		# Asked of the table each time: a status or strike asked of an earlier body may close this one.
 		var body := actors.node_of(id) as Node2D
 		if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 			continue
-		var key: int = actors.key_of(id)
-		var kept: bool = old < _harm_ids.size() and _harm_ids[old] == id and _harm_keys[old] == key
+		# Its key, asked only for a body kept or given something (most are neither).
+		var key: int = actors.key_of(id) if listed else 0
+		var kept: bool = listed and _harm_keys[old] == key
 		if actors.asleep[id] != 0:
 			# Asleep with its place: its time waits as it is.
 			if kept:
@@ -454,11 +467,21 @@ func _affect_bodies(delta: float) -> void:
 			continue
 		var left: float = _harm_left[old] - delta if kept else 0.0
 		var at: Vector2 = body.global_position
-		var number: int = room_at(at)
-		# A room none of whose cells harms now gives nothing, whatever cell it stands in.
-		var cell: int = _rooms[number].layout.cell_of(at) if number >= 0 and not _rooms[number].harms_nobody() else -1
+		# The cell it stands in when that gives something (`room_at`'s room; a room none of whose cells
+		# harms now gives nothing, whatever cell it stands in), read from the room's `_gives`.
+		var number: int = -1
+		var cell: int = -1
+		if placed:
+			number = grid.place_at(at)
+			cell = _rooms[number].giving_cell(at) if number >= 0 and number < rooms else -1
+		else:
+			for other in rooms:
+				cell = _rooms[other].giving_cell(at)
+				if cell != CoverRoom.OFF:
+					number = other
+					break
 		var state: CoverState = _rooms[number].cover_state_at(cell) if cell >= 0 else null
-		if state == null or not state.gives():
+		if state == null:
 			# Out of harmful cover: its time runs on, and it is dropped once it is out.
 			if left > 0.0:
 				_next_ids[harmed] = id
@@ -466,6 +489,8 @@ func _affect_bodies(delta: float) -> void:
 				_next_left[harmed] = left
 				harmed += 1
 			continue
+		if not listed:
+			key = actors.key_of(id)
 		if left <= 0.0:
 			left = maxf(state.status_every, delta)
 			if events != null:

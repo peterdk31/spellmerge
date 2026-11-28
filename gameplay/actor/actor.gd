@@ -421,34 +421,43 @@ func move(delta: float) -> void:
 	if delta <= 0.0 or mover == null:
 		return
 	var from: Vector2 = global_position
-	var unhindered: Vector2 = from + velocity * delta
+	var motion: Vector2 = velocity * delta
+	var unhindered: Vector2 = from + motion
 	var to: Vector2 = unhindered
-	var holes: bool = projectiles != null and projectiles.grid().has_holes()
+	# The grid asked for once (the bodies' step, performance pass 2026-11-28): the manager keeps one.
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	var holes: bool = grid != null and grid.has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
 	var found: int = 0
-	if projectiles != null:
+	if grid != null:
 		# The slides and the holes at its end in one call (`RoomGrid.walk_body`, sim-native SN1).
+		# Whether it passes mouths is only asked where the room has some: the walk minds it only there.
 		var radius: float = wall_radius()
-		var walked: Vector3 = projectiles.grid().walk_body(from, velocity * delta, mover.crossing * delta, radius, passes_mouths(), radius + HoleRules.GROUND_MARGIN)
+		var walked: Vector3 = grid.walk_body(from, motion, mover.crossing * delta, radius, grid.has_mouths() and passes_mouths(), radius + HoleRules.GROUND_MARGIN)
 		to = Vector2(walked.x, walked.y)
 		found = int(walked.z)
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
 		# A dash held up head on by what it slides on ends there (`Mover.held_up`, boss plan OB10).
-		mover.held_up(velocity * delta, to - from)
+		mover.held_up(motion, to - from)
 		velocity = (to - from) / delta
 	if holes:
 		_check_ground(crossed, found)
-	find_room()
+	_find_room_in(grid)
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
 
 
 ## Which place it stands in now (`room`, see its doc): read from the grid's places.
 func find_room() -> void:
-	if projectiles != null and projectiles.grid().places() > 0:
-		room = projectiles.grid().place_at(global_position)
+	_find_room_in(projectiles.grid() if projectiles != null else null)
+
+
+## `find_room` with the grid already asked for (null: no projectile manager).
+func _find_room_in(grid: RoomGrid) -> void:
+	if grid != null and grid.places() > 0:
+		room = grid.place_at(global_position)
 	else:
 		room = RoomGrid.NO_PLACE
 

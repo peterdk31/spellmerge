@@ -298,7 +298,7 @@ The order after F1 follows its profile.
 | PR | Measured parts it replaces (ms a tick) |
 |---|---|
 | C2 | the move 0.82, the Mover 0.33 |
-| C3 | chase 0.15, steering off harm 0.29, tracking 0.12 |
+| C3 | chase 0.15, steering off harm 0.29, tracking 0.12 (built: the cover's look only, below) |
 | C4 | the caster's place sent: part of its 0.67, not timed apart (0.3 assumed) |
 | C5 | the line of fire's rays: part of their 0.42 |
 
@@ -357,6 +357,33 @@ Each is measured on `tick_hash.gd` (1 to 4 players) and both crowds.
   - **The batch (one call a tick).** It needs the owner's yes, because bodies would read each other's places as the tick started. With it, the rest of the move (6.4 us a body, its call, a held-up dash, holes, touches and the row among it) and the Mover (about 4 us) could go native together. That needs Combat's pace and push read from its own arrays by id. They already are arrays (`_status_left`, `_knock`), but they belong to the hit table session's area.
   - **C3** (chase, steering, tracking) meets the same order: the native code would be one call a foe, or a batch with the owner's yes. Read in a batch, the rows of the bodies before a foe would be where those bodies stood as the step started, not after their moves this tick.
   - **C6 and change 4** are unchanged by C2. A tick on its own thread keeps the bodies' order as it is, so it needs no batch.
+
+**Built (C3, 2026-11-28): the cover room's look in one native call; the AI's kernels dropped.**
+
+- **Measured first** (a timing patch kept out of the tree, 4p apart equal, 780 ticks, 16,000 thinks; ms a tick). What C3 was to cover is mostly calls into other areas, not computation in the AI:
+  - **Steering off harm, 0.18.** The floor look takes 0.17 of it: the cover room's look (`CoverRoom.look`) 0.11, the place lookup (`RoomGrid.place_at`) 0.035, and the signal and calls 0.02. The steering's own choice after the look (`harms_along`, the walls) takes 0.009.
+  - **Tracking, 0.077.** Half of it is the retarget, Projectiles' nearest target in up to three rings (core/projectiles). The rest is the down and dying checks, about 1.4 us a think.
+  - **Chase, 0.10.** The aim and the walk take 0.04, `Caster.cast_ready` 0.013, and an attack's start (rolls, the board, the aim's tuning, events) the rest.
+  - **The stress crowds split the same way.** The cover room's look is 143 of the floor look's 210 ms over the web run and 255 of 396 over the desktop run. The steering's choice is 27 and 24.
+- **The AI's kernels are dropped as not worth it.** A per-foe native call costs about 1 us (11 arguments, measured), against 1 to 2 us of work it would replace. The saving would be 0.02 to 0.04 ms a tick, inside the swing, for a kernel, a twin and a compare test to keep.
+- **What C3 does instead** (the orchestrator's choice, 2026-11-28). `CoverRoom.look` asks `BodyKernel.cover_look` (`native/src/cover_look.cpp`), called straight from the look with no wrapper. Its GDScript twin is `CoverRoom.gd_look`. `CoverSight` takes the answer back (`cells`, `window`, `take_window`). A sight with marks left in it, or a module without the method, goes to the GDScript. `tests/gameplay/cover/test_cover_look.gd` compares the two to the bit over 9,600 looks: one to three words a row, grid corners off the cells and below 0, sparse, dense and patchy danger, reaches from -8 to 100, cleared and dirty sights, and the window clipped to nothing at the cover's edge, where floats and doubles disagree.
+- **Measured** (this 4-core machine, main and branch alternating, two runs each):
+  - **The look a call, timed in place** (`Cover.look` around the room's look, a patch kept out of the tree):
+
+    | Run | main (us) | branch (us) |
+    |---|---|---|
+    | 4p apart equal, 12,000 looks | 7.8 / 8.2 | 7.0 / 7.5 |
+    | Web stress, about 24,000 looks | 5.6 / 5.6 | 4.3 / 4.2 |
+    | Desktop stress, about 49,000 looks | 4.8 / 4.5 | 4.1 / 4.0 |
+
+  - **Alone, on a 64 by 40 room:** the GDScript takes 1.9 us a look with danger in patches and 6.2 with dense danger; the native look takes 1.8 and 1.6. The bare native call is 1.0 us of that.
+  - **About 0.01 ms a tick in the 4p fight and 0.035 at the stress caps.** That is below the swing of the whole tick and the bodies' step, which `stress.gd` and `tick_hash.gd --profile-steps` showed within their noise in both directions over two rounds.
+  - **The whole game's state hash every tick** (seed 11, 1 to 4 players: 11,987 / 13,315 / 11,495 / 12,423 ticks) is identical to main with native on, and at 1 and 4 players with it off.
+- **What it showed for C4 to C6:**
+  - **A native call costs about 1 us from GDScript.** A kernel pays only where it replaces several us of GDScript a call: dense loops, or many calls folded into one. The look is cheap where the floor is quiet, so it gained little in these fights.
+  - **C4 (the caster's place sent, 0.3 assumed):** time it in place before building, as here. If it is a few property sets a cast, it is call overhead, not computation, and a kernel will not pay.
+  - **C5 (the line of fire's rays, 0.42):** the long rays are already native (SN4). What is left is the calls round them, so the gain is in folding a foe's rays into one call, not in faster rays.
+  - **C6:** unchanged. With the AI's kernels dropped, nothing in the AI reads the columns yet.
 
 ### 3. Hits as one batch a tick, Feel's hit looks in its frame
 

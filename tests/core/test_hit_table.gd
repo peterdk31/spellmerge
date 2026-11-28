@@ -2,8 +2,9 @@ extends "res://tests/support/suite.gd"
 ## The projectile manager's hit table (`HitTable`, perf plan H1): every `projectile_hit` it sends is
 ## a row of the table, written in the order the hits are sent, and handed to the table's applier
 ## after the event's listeners heard it (`sending` names the row meanwhile). A hit a listener sends
-## is a row of its own, applied inside. The table is emptied when a step begins and grows past its
-## first size keeping its rows. The manager is stepped by hand; the applier is the test's.
+## is a row of its own, applied inside. The table is emptied when a step begins (unless a reader
+## keeps it, perf plan H2) and grows past its first size keeping its rows. Impacts on no body are
+## rows too, never applied. The manager is stepped by hand; the applier is the test's.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -96,6 +97,55 @@ func test_a_step_empties_the_table() -> void:
 	check_equal(mgr.hit_table.rows, 1, "a row")
 	mgr.step(DT)
 	check_equal(mgr.hit_table.rows, 0, "the step began with an empty table")
+
+
+## Perf plan H2: a reader (Feel) keeps the rows over ticks until it has read them.
+func test_a_reader_keeps_every_tick_s_rows_until_it_reads_them() -> void:
+	var a: Node2D = _target(Vector2(100.0, 100.0))
+	var table: HitTable = mgr.hit_table
+	table.hold(true)
+	mgr.strike(1, a, Vector2(100.0, 100.0), Vector2.RIGHT, 7, &"swing")
+	mgr.step(DT)
+	mgr.strike(2, a, Vector2(100.0, 100.0), Vector2.LEFT, 9, &"swing")
+	check_equal(table.rows, 2, "both ticks' rows kept")
+	check(table.tick[1] == table.tick[0] + 1, "each stamped with its tick")
+	table.read_done()
+	check_equal(table.rows, 0, "forgotten once read")
+	table.hold(false)
+	mgr.strike(1, a, Vector2(100.0, 100.0), Vector2.RIGHT, 7, &"swing")
+	mgr.step(DT)
+	check_equal(table.rows, 0, "with no reader, a tick forgets them again")
+
+
+## Perf plan H2: an impact on no body is a row of its own (ROW_WALL), told while it is sent and
+## never applied; its look is the shot's, as the manager tells it.
+func test_a_wall_impact_is_a_row_told_and_never_applied() -> void:
+	var slot: int = mgr.spawn(3, Vector2(100.0, 100.0), Vector2(60.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	var told: Array[int] = []
+	var tags: Array[int] = []
+	bus.projectile_impact.connect(func(_c: int, _t: Node, _at: Vector2, _way: Vector2) -> void:
+		told.append(mgr.hit_table.told)
+		tags.append(mgr.impact_tag))
+	mgr._emit_wall_impact(slot, Vector2(60.0, 0.0))
+	var table: HitTable = mgr.hit_table
+	check_equal(table.rows, 1, "a row")
+	check_equal(table.kind[0], HitTable.ROW_WALL, "of no body")
+	check_equal(table.target_id[0], 0, "naming none")
+	check_equal(told, [0] as Array[int], "told while its impact is sent")
+	check_equal(table.told, -1, "and not after")
+	check_equal(table.look_tag[0], tags[0], "drawn with the tag the manager told")
+	check_equal(table.caster[0], 3, "its caster's")
+	check(table.heading[0].is_equal_approx(Vector2.RIGHT), "the way it flew")
+	check_equal(order, [] as Array[String], "never applied")
+
+
+## A ray's impact is drawn with no tag (the manager tells 0), whatever its spell's tag.
+func test_a_ray_s_impact_row_is_drawn_with_no_tag() -> void:
+	var a: Node2D = _target(Vector2(100.0, 100.0))
+	mgr.strike(1, a, Vector2(100.0, 100.0), Vector2.RIGHT, 7, &"swing")
+	check_equal(mgr.hit_table.tag[0], 7, "its spell's tag")
+	check_equal(mgr.hit_table.look_tag[0], 0, "drawn with none, as its impact was told")
+	check_equal(mgr.hit_table.target_id[0], a.get_instance_id(), "its body named by instance id")
 
 
 func test_the_table_grows_keeping_its_rows() -> void:

@@ -442,8 +442,8 @@ var shake_enabled: bool = true:
 			_trauma = 0.0
 			_kick = Vector2.ZERO
 			_job_view._reset_camera()
-## The last hit `_on_damage_dealt` gave its flash, hold and sound, by the hit actor's id: the
-## physics frame and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
+## The last hit `FeelHits._damage` gave its flash, hold and sound, by the hit actor's id: the
+## frame (a physics frame, or a row's tick) and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
 ## Another hit with all of them the same (no time has passed for Feel or the game) would only do
 ## them again: the flash is restarted to the same time, the hold is refused for
 ## both bodies (each rests from the first), and the same sound would start on the next voice in the
@@ -811,7 +811,8 @@ var _label_id: Array[StringName] = []
 var _impact_target: int = 0
 ## The actor whose shot it was: a contact hit (another caster value) never takes it.
 var _impact_caster: int = 0
-## The physics frame it was sent in: the damage follows at once, or the record is stale.
+## The frame it was sent in (a physics frame; a row's tick, `FeelHits.ROW_FRAMES`): the damage
+## follows at once, or the record is stale.
 var _impact_frame: int = -1
 ## The shot's tag, and whether its hit sprays its motes (its staff's share, rolled once at the
 ## impact, `Spectacle.begin_hit`): the damage's spray follows the same roll.
@@ -822,12 +823,20 @@ var _impact_shown: bool = false
 var _impact_looked: bool = true
 ## The hit looks each body showed this frame, per staff (`body_looks.gd`).
 var _body_looks: BodyLooksScript = BodyLooksScript.new()
-## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
-## wizard hit themselves. `damage_dealt` follows at once, or the record is stale.
+## What each death of the tick's rows took from its body while it was there, for its look when the
+## rows are read (`FeelHits._keep_dead`): its row and body's instance id, its art's colour source,
+## whether it was a boss and its own death sound; `_dead_count` of them. Sized once, grown only.
+var _dead_row: PackedInt32Array = PackedInt32Array()
+var _dead_body: PackedInt64Array = PackedInt64Array()
+var _dead_source: PackedInt32Array = PackedInt32Array()
+var _dead_boss: PackedByteArray = PackedByteArray()
+var _dead_sound: Array[StringName] = []
+var _dead_count: int = 0
+## The latest hit kind (a hand-sent `hit_landed`): the target it was for, the kind and the frame.
+## `damage_dealt` follows at once, or the record is stale.
 var _kind_target: int = 0
 var _kind: StringName = &"shot"
 var _kind_frame: int = -1
-var _kind_own: bool = false
 ## The shot whose hit `hit_landed` announced (its `shot`, -1 for none): the one a hit's stop holds.
 var _kind_shot: int = -1
 ## The carrier card whose hit `hit_landed` announced (its `card`, `&""` for none): its own hit sound
@@ -886,6 +895,9 @@ func _notification(what: int) -> void:
 ## Leaving the tree (a test's Feel freed, the game quitting): what it started on Audio stops, so
 ## nothing it held outlives it on a shared Audio.
 func _exit_tree() -> void:
+	# Nobody reads the hit table's rows any more: a tick forgets them again.
+	if projectiles != null and is_instance_valid(projectiles):
+		projectiles.hit_table.hold(false)
 	if audio != null and is_instance_valid(audio):
 		audio.silence()
 		if audio.ears.heard == Callable(_hearing, &"hears"):
@@ -1172,6 +1184,9 @@ func _ready() -> void:
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
 	_spectacle.attach(projectiles, spells)
+	# Feel reads the hit table's rows once a drawn frame (perf plan H2): kept for it from now on.
+	if projectiles != null and projectiles.events == events:
+		projectiles.hit_table.hold(true)
 
 
 func _process(delta: float) -> void:
@@ -1187,8 +1202,18 @@ func _process(delta: float) -> void:
 	step(real_delta)
 
 
-## The parts of a step `step_profile` sums, in order.
-const PROFILE_PARTS: PackedStringArray = ["camera and split", "markers, flashes and beams", "carriers, statuses, falls, spawns", "cover", "spectacle", "rooms and sound", "labels and numbers"]
+## The parts of a step `step_profile` sums, in order (but the last, the ticks' hits, timed first).
+const PROFILE_PARTS: PackedStringArray = ["camera and split", "markers, flashes and beams", "carriers, statuses, falls, spawns", "cover", "spectacle", "rooms and sound", "labels and numbers", "hits, damage and deaths"]
+
+
+## The projectile manager's hit table read (`FeelHits.read_rows`), kept for Feel from one read to
+## the next (`HitTable.hold`), if Feel has a manager on its own bus.
+func _read_hit_rows() -> void:
+	if projectiles == null or not is_instance_valid(projectiles) or projectiles.events != events:
+		return
+	var table: HitTable = projectiles.hit_table
+	table.hold(true)
+	_job_hits.read_rows(table)
 
 
 ## Time each part of every step from now, by `clock` (microseconds); `step_profile` sums them from 0.
@@ -1211,6 +1236,10 @@ func _profile_mark(part: int) -> void:
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
 	_profile_mark(-1)
+	# The ticks' hits, impacts, damage and deaths since the last step (perf plan H2), first: they
+	# count toward this frame's caps as when they were heard in the tick.
+	_read_hit_rows()
+	_profile_mark(PROFILE_PARTS.size() - 1)
 	# The world's camera now, for the party camera: looked for afresh every drawn frame (a new
 	# world's is there at once), before the step is counted, so the first hit after it still looks
 	# again (`_refresh_camera` looks once a step).

@@ -281,6 +281,12 @@ Per PR in the 4p fight that is roughly: change 1 0.6 to 0.8 ms, change 2 0.3, ch
 
 The order after F1 follows its profile.
 
+**F1's profile (2026-11-28, `play_frames.gd`, desktop settings, xvfb; ms a frame, 1 view and 4).**
+
+- **The per-view cost was the light's readers' copies** (`view_readers.gd`), 0.43 and 6.20 ms: each copy for the third and fourth views followed twice a frame (in Feel's step and at the pre-draw, the second outside Feel's timer), and every uniform of every reader's material read and copied to each view's material a frame. It is node and shader-parameter work, which the module may not do (`native/build_profile.json` holds no canvas class), so it stays GDScript. F2 made it follow once, and only what changed: 0.18 and 2.97 ms (Feel's "camera and split" 2.13 to 0.88 at 4 views).
+- What is left at 4 views: the light's grid at the pre-draw (2.65, already native), the readers' uniforms (1.9: 1,760 reads a frame, 120 changed), the cover's step (1.5 to 1.8 at any number of views), the bodies' looks (0.28 and 1.41), and in the spectacle the shadows (0.24, 0.75), the mists (0.17, 0.49), the stirs (0.09, 0.45), the source motes (0.23, 0.34), the motes' step (0.16, 0.40), the floor marks (0.05, 0.33) and the blockers (0.27).
+- **Next, by that profile:** (F3) the cover's look; (F2b) the readers' uniforms set where they are set (the light's numbers handed to each view's material by the light itself, not read back a frame); (F4) the bodies' looks in one call; (F5) on the workers.
+
 ### 2. The crowd's per-tick work in C++, on a body table
 
 **Evidence.**
@@ -322,6 +328,17 @@ That is about 2.0 to 2.3 ms covered. Neither the decisions (decide 0.34, the res
 - (C6) the columns become the state, and the nodes' members their views.
 
 Each is measured on `tick_hash.gd` (1 to 4 players) and both crowds.
+
+**Built (C1, 2026-11-28): the body table's columns, following the nodes.**
+
+- `Actors.places`, `velocities`, `radii`, `body_flags` (`FLAG_BODY`, `FLAG_DOWN`, `FLAG_DYING`, `FLAG_SPAWNING`, `FLAG_FALLING`) by actor id, beside `teams()`. DERIVED: the hash, the snapshots and the game are as they were (the whole game's state hash every tick, 4p seed 11, 12,423 ticks: identical to main).
+- The body is the one writer (core/actors/README.md, "The body table"): flags and radius where they change, so always current; place and velocity after its own tick, at a swap, and for every open body as the bodies' step starts (`Actor.gather_rows`, the Tick's).
+- Cost: the gather alone 0.064 ms a tick at 112 bodies (web stress), 0.083 at 144 (desktop stress), timed by a patch kept out of the tree; a call a body (the first try) cost 0.20 to 0.25. Main against branch, alternating: `tick_hash` bodies +0.01 to +0.04 ms (1p and 4p, two runs each); web stress tick within the swing (-0.27 to +0.31 ms over three runs); desktop stress bodies +0.25 ms on a 21 ms tick over four quiet runs (9.88 against 10.13, each run's spread ±0.4).
+- What it showed for the next steps:
+  - **C2** gathers the rows in its own native call (it reads the bodies anyway), and the GDScript gather goes.
+  - A kernel reads, for a body after it in id order, its row as the step started; the live node differs only where another body's step set its place or velocity mid-step other than by a swap (none known today). C3's chase and steering read other bodies: they keep that in mind.
+  - **C6:** the nodes' places are written in about ten places outside the actor (Flow's placements, the map's teleport, room contents, Entities' decoys, the prop yard, the snapshot's restore of a node's position); each writes the column once the column is the state, and the node's `position` becomes the column's view, set after the tick.
+  - **Change 4** needs every simulation read of a body's node off it: about 110 reads of `global_position` in the simulation folders (56 in the AI, 32 in the actor kit), besides the members C6 moves.
 
 ### 3. Hits as one batch a tick, Feel's hit looks in its frame
 

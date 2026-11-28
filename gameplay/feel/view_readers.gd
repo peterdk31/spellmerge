@@ -29,13 +29,20 @@ extends RefCounted
 ## The root viewport, drawing the one picture, keeps every layer: it draws the items themselves, and
 ## the copies are hidden while there are fewer than three views.
 ##
-## The copies follow their item every frame (`follow`: shown, placed, z), are made the first frame
-## a third view is drawn (`use`, from the light's `use_views`, while the game steps, so they draw that
-## frame) and kept; an item that appears while split in three (a motes chunk made in a fight) has its
+## The copies follow their item every frame (`follow`, once, just before the draw: shown, placed, z),
+## are made the first frame a third view is drawn (`use`, from the light's `use_views`, while the game
+## steps, so they draw that frame) and kept; an item that appears while split in three (a motes chunk made in a fight) has its
 ## copies from the next frame. Nothing is made a frame once every reader has its copies. A reader the
 ## light lets go (the light switched off, the item gone or drawn with another material) is drawn as
 ## any of the world's again. The equal split's void quarter is one more view (after the others: its
 ## own layer, and a light buffer that is none, black: the void has no light).
+##
+## **Only what changed is followed** (the perf plan's F2, 2026-11-28: a 4-view frame spent 5.7 ms here,
+## following each copy twice and copying every uniform of every material a view, nearly all of it
+## unchanged): what each item showed when its copies last followed it (`_seen_*`) and each watched
+## material's uniforms as last copied (`_seen_values`) are kept, and a copy, or a view's material, is
+## touched only when its item's or material's differ, when the views drawn changed, or when it is
+## new. Nothing but this script sets a copy or a view's material.
 
 ## The visibility layer of the world's canvas items (every canvas item's default), the one the root
 ## keeps for its canvas layers while split (the split screen's), and the first views' own.
@@ -63,7 +70,8 @@ var views: int = 0
 ## Copies made, all told (for tests).
 var made: int = 0
 ## By watched material: its copies' materials by view (from view SHARED; null until needed), and
-## the names of its uniforms copied to them each frame.
+## the names of its uniforms copied to them each frame (StringNames: a String name is looked up anew
+## at every read).
 var _materials: Dictionary = {}
 var _uniforms: Dictionary = {}
 ## The readers: each item and its copies (by view, from view SHARED; null until made).
@@ -73,6 +81,24 @@ var _copies: Array[Array] = []
 var _keys: PackedVector4Array = PackedVector4Array()
 var _sizes: PackedVector2Array = PackedVector2Array()
 var _shared_on: bool = false
+## Whether the shared views' keys changed since they were last handed to every watched material.
+var _keys_changed: bool = true
+## Copies followed, all told (for tests: nothing is followed while nothing changes).
+var followed: int = 0
+## What each item showed when its copies last followed it (by item, as `_items`): visible, top
+## level and its index among its siblings (bits), z, modulate and self modulate (2 a reader), transform (3 vectors a reader: its x, y
+## and origin; a control's position, size and zero), material, MultiMesh and texture (3 a reader).
+## `_seen_views`: the views drawn then (-1: not yet; a copy made since, or another count, follows all).
+var _seen_bits: PackedInt32Array = PackedInt32Array()
+var _seen_z: PackedInt32Array = PackedInt32Array()
+var _seen_colors: PackedColorArray = PackedColorArray()
+var _seen_vectors: PackedVector2Array = PackedVector2Array()
+var _seen_refs: Array[Object] = []
+var _seen_views: PackedInt32Array = PackedInt32Array()
+## By watched material: its uniforms' values as last copied to its views' materials (as `_uniforms`),
+## and the views drawn then (-1: none yet, or a view's material made since).
+var _seen_values: Dictionary = {}
+var _values_views: Dictionary = {}
 
 func _init() -> void:
 	_keys.resize(SHARED)
@@ -121,7 +147,7 @@ func watch(material: Material, tree: SceneTree) -> void:
 	var by_view: Array = []
 	by_view.resize(VIEWS_MOST - SHARED)
 	_materials[shading] = by_view
-	var names := PackedStringArray()
+	var names: Array[StringName] = []
 	var own: PackedStringArray = PackedStringArray([String(VIEW_ID), String(SHARED_ON)])
 	for k in SHARED:
 		own.append(String(SHARED_KEYS[k]))
@@ -130,8 +156,12 @@ func watch(material: Material, tree: SceneTree) -> void:
 		for uniform: Dictionary in shading.shader.get_shader_uniform_list(true):
 			var named: String = String(uniform.get("name", ""))
 			if int(uniform.get("type", TYPE_NIL)) != TYPE_NIL and named != "" and not own.has(named):
-				names.append(named)
+				names.append(StringName(named))
 	_uniforms[shading] = names
+	var values: Array = []
+	values.resize(names.size())
+	_seen_values[shading] = values
+	_values_views[shading] = -1
 	_hand_keys(shading)
 	if tree != null and tree.root != null:
 		_scan(tree.root, shading)
@@ -149,6 +179,8 @@ func forget(material: Material) -> void:
 	(material as ShaderMaterial).set_shader_parameter(SHARED_ON, false)
 	_materials.erase(material)
 	_uniforms.erase(material)
+	_seen_values.erase(material)
+	_values_views.erase(material)
 
 
 ## `node`, just come into the tree: a reader when it is drawn with a watched material.
@@ -161,6 +193,14 @@ func take(node: Node) -> void:
 	var copies: Array = []
 	copies.resize(VIEWS_MOST - SHARED)
 	_copies.append(copies)
+	_seen_bits.append(0)
+	_seen_z.append(0)
+	for k in 2:
+		_seen_colors.append(Color())
+	for k in 3:
+		_seen_vectors.append(Vector2.ZERO)
+		_seen_refs.append(null)
+	_seen_views.append(-1)
 
 
 ## `node`, leaving the tree: a reader's copies go with it.
@@ -174,7 +214,8 @@ func release(node: Node) -> void:
 
 
 ## `count` views are drawn from now on (0 or 1: the one picture): each reader gets its copies for
-## the views past SHARED (made now, while the game steps, so they draw this frame).
+## the views past SHARED (made now, while the game steps, so they draw this frame). The copies are
+## shown, hidden and placed by `follow`, which runs before every draw.
 func use(count: int) -> void:
 	views = clampi(count, 0, VIEWS_MOST)
 	for i in range(_items.size() - 1, -1, -1):
@@ -188,7 +229,7 @@ func use(count: int) -> void:
 		for view in range(SHARED, views):
 			if _copies[i][view - SHARED] == null:
 				_copies[i][view - SHARED] = _copy_of(_items[i], view)
-	_follow_copies()
+				_seen_views[i] = -1
 
 
 ## The copies set as their items are (shown only for the views drawn), and placed just after them;
@@ -197,31 +238,56 @@ func use(count: int) -> void:
 ## Run once every frame before drawing (the light's `follow`, after the game has set this frame's
 ## numbers).
 func follow(shown: Array[Viewport]) -> void:
-	_shared_on = views >= SHARED
+	var shared_on: bool = views >= SHARED
+	if shared_on != _shared_on:
+		_shared_on = shared_on
+		_keys_changed = true
 	for k in SHARED:
 		var view: Viewport = shown[k] if _shared_on and k < shown.size() else null
+		var key: Vector4 = Vector4.ZERO
+		var size: Vector2 = Vector2.ZERO
 		if view != null and is_instance_valid(view):
-			_keys[k] = key_of(view.global_canvas_transform * view.canvas_transform)
-			_sizes[k] = view.get_visible_rect().size
-		else:
-			_keys[k] = Vector4.ZERO
-			_sizes[k] = Vector2.ZERO
-	for material: ShaderMaterial in _materials:
-		_hand_keys(material)
+			key = key_of(view.global_canvas_transform * view.canvas_transform)
+			size = view.get_visible_rect().size
+		if key != _keys[k] or size != _sizes[k]:
+			_keys[k] = key
+			_sizes[k] = size
+			_keys_changed = true
+	if _keys_changed:
+		_keys_changed = false
+		for material: ShaderMaterial in _materials:
+			_hand_keys(material)
 	_follow_copies()
 	if views <= SHARED:
 		return
 	for material: ShaderMaterial in _materials:
-		var by_view: Array = _materials[material]
-		var names: PackedStringArray = _uniforms[material]
+		_follow_uniforms(material)
+
+
+## The uniforms of `material` that changed since they were last copied (all of them when the views
+## drawn changed or a view's material was made since) copied to its views' materials.
+func _follow_uniforms(material: ShaderMaterial) -> void:
+	var by_view: Array = _materials[material]
+	var copied: bool = false
+	for view in range(SHARED, views):
+		copied = copied or by_view[view - SHARED] != null
+	if not copied:
+		# No item drawn with it has a copy: nothing to copy to (a view's material made later is
+		# a duplicate of it then, and marks it to copy in full).
+		return
+	var names: Array[StringName] = _uniforms[material]
+	var seen: Array = _seen_values[material]
+	var all: bool = int(_values_views[material]) != views
+	_values_views[material] = views
+	for j in names.size():
+		var value: Variant = material.get_shader_parameter(names[j])
+		if not all and typeof(seen[j]) == typeof(value) and seen[j] == value:
+			continue
+		seen[j] = value
 		for view in range(SHARED, views):
 			var own := by_view[view - SHARED] as ShaderMaterial
-			if own == null:
-				continue
-			for named in names:
-				var value: Variant = material.get_shader_parameter(named)
-				if own.get_shader_parameter(named) != value:
-					own.set_shader_parameter(named, value)
+			if own != null and own.get_shader_parameter(names[j]) != value:
+				own.set_shader_parameter(names[j], value)
 
 
 ## The shared views' keys (`view_of`'s, as handed to the materials; for tests).
@@ -244,11 +310,18 @@ func _hand_keys(material: ShaderMaterial) -> void:
 			material.set_shader_parameter(SHARED_SIZES[k], _sizes[k])
 
 
-## The copies set as their items are (shown only for the views drawn), and placed just after them.
+## The copies set as their items are (shown only for the views drawn), and placed just after them:
+## only those of items that show something else than when their copies last followed them.
 func _follow_copies() -> void:
 	for i in _items.size():
 		var item: CanvasItem = _items[i]
 		if not is_instance_valid(item):
+			continue
+		# With no third view every copy is hidden once the views drawn last changed, whatever its item
+		# shows (a third view back follows them all, `_seen_changed`).
+		if views <= SHARED and _seen_views[i] == views:
+			continue
+		if not _seen_changed(i, item):
 			continue
 		var copies: Array = _copies[i]
 		for view in range(SHARED, VIEWS_MOST):
@@ -260,6 +333,61 @@ func _follow_copies() -> void:
 				copy.visible = shown
 			if shown:
 				_follow(copy, item, view)
+
+
+## Whether item `i` (`item`) shows anything else than when its copies last followed it, or the views
+## drawn changed, or a copy was made since; what it shows now is kept.
+func _seen_changed(i: int, item: CanvasItem) -> bool:
+	var changed: bool = _seen_views[i] != views
+	_seen_views[i] = views
+	# Its place among its siblings too: the copies are drawn just after it (`_follow`).
+	var bits: int = (1 if item.visible else 0) | (2 if item.top_level else 0) | (item.get_index() << 2)
+	if _seen_bits[i] != bits:
+		_seen_bits[i] = bits
+		changed = true
+	if _seen_z[i] != item.z_index:
+		_seen_z[i] = item.z_index
+		changed = true
+	if _seen_colors[i * 2] != item.modulate:
+		_seen_colors[i * 2] = item.modulate
+		changed = true
+	if _seen_colors[i * 2 + 1] != item.self_modulate:
+		_seen_colors[i * 2 + 1] = item.self_modulate
+		changed = true
+	var a: Vector2 = Vector2.ZERO
+	var b: Vector2 = Vector2.ZERO
+	var c: Vector2 = Vector2.ZERO
+	var mesh: Object = null
+	var texture: Object = null
+	var node := item as Node2D
+	if node != null:
+		var to: Transform2D = node.transform
+		a = to.x
+		b = to.y
+		c = to.origin
+		var batch := item as MultiMeshInstance2D
+		if batch != null:
+			mesh = batch.multimesh
+			texture = batch.texture
+		var sprite := item as Sprite2D
+		if sprite != null:
+			texture = sprite.texture
+	var control := item as Control
+	if control != null:
+		a = control.position
+		b = control.size
+	if _seen_vectors[i * 3] != a or _seen_vectors[i * 3 + 1] != b or _seen_vectors[i * 3 + 2] != c:
+		_seen_vectors[i * 3] = a
+		_seen_vectors[i * 3 + 1] = b
+		_seen_vectors[i * 3 + 2] = c
+		changed = true
+	var material: Object = item.material
+	if _seen_refs[i * 3] != material or _seen_refs[i * 3 + 1] != mesh or _seen_refs[i * 3 + 2] != texture:
+		_seen_refs[i * 3] = material
+		_seen_refs[i * 3 + 1] = mesh
+		_seen_refs[i * 3 + 2] = texture
+		changed = true
+	return changed
 
 
 ## The readers (for tests).
@@ -283,6 +411,8 @@ func clear() -> void:
 		material.set_shader_parameter(SHARED_ON, false)
 	_materials.clear()
 	_uniforms.clear()
+	_seen_values.clear()
+	_values_views.clear()
 
 
 ## View `view`'s material for items drawn with `material` (made the first time: a copy naming it).
@@ -293,6 +423,7 @@ func _material_of(material: ShaderMaterial, view: int) -> ShaderMaterial:
 		own.set_shader_parameter(VIEW_ID, view)
 		own.set_shader_parameter(SHARED_ON, false)
 		by_view[view - SHARED] = own
+		_values_views[material] = -1
 	return by_view[view - SHARED]
 
 
@@ -316,6 +447,14 @@ func _drop_at(at: int) -> void:
 		item.visibility_layer = WORLD_LAYER
 	_items.remove_at(at)
 	_copies.remove_at(at)
+	_seen_bits.remove_at(at)
+	_seen_z.remove_at(at)
+	_seen_views.remove_at(at)
+	for k in 2:
+		_seen_colors.remove_at(at * 2)
+	for k in 3:
+		_seen_vectors.remove_at(at * 3)
+		_seen_refs.remove_at(at * 3)
 
 
 func _is_copy(item: CanvasItem) -> bool:
@@ -344,6 +483,7 @@ func _copy_of(item: CanvasItem, view: int) -> CanvasItem:
 ## `copy` (view `view`'s) drawn as `item` is: the same place, z and look, just after it (and its
 ## copies for the views before).
 func _follow(copy: CanvasItem, item: CanvasItem, view: int) -> void:
+	followed += 1
 	var shading := item.material as ShaderMaterial
 	if shading != null and _materials.has(shading):
 		var own: ShaderMaterial = _material_of(shading, view)

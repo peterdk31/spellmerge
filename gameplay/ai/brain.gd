@@ -129,7 +129,7 @@ const GROUND_MARGIN: float = 12.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover", &"aim_tuning"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover", &"aim_tuning", &"_attack_lead"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor", &"_turn_to"]
 
@@ -225,6 +225,10 @@ var _last_intent: ActorIntent = null
 var _locked_aim: Vector2 = Vector2.DOWN
 ## The aim error of the attack under way (radians), drawn once as it starts winding up.
 var _aim_error: float = 0.0
+## How far the attack under way leads its target: `aim_lead()`, read once as it starts winding up
+## (its inputs, the profile, the tuning, the room's level and elite or not, hold through an attack),
+## and again after a snapshot (`rebuild_derived`).
+var _attack_lead: float = 0.0
 ## The attack under way stopped following its target (its profile's `aim_lock`).
 var _aim_locked: bool = false
 ## Turns: the keys of the foes it aimed at (0: a free row) and when (its `clock`), whether it turns
@@ -289,6 +293,11 @@ func setup(with_actor: Actor, with_profile: AIProfile, seed_value: int) -> void:
 	reset()
 
 
+## After a snapshot gave it its state back: the lead of the attack under way, read again.
+func rebuild_derived() -> void:
+	_attack_lead = aim_lead() if actor != null and profile != null else 0.0
+
+
 ## A fresh start: no target, no grudge, no attack, no plan; holds let go.
 func reset() -> void:
 	state = State.CHASE
@@ -351,7 +360,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 					actor.events.aim_locked.emit(actor.id, chosen)
 			var aimed: Node2D = _aim_node()
 			if aimed != null and not _aim_locked:
-				_locked_aim = _aim_for(_chosen_sense, aimed.global_position - actor.global_position, _aim_error)
+				_locked_aim = _aim_for(_chosen_sense, aimed.global_position - actor.global_position, _aim_error, _attack_lead)
 			intent.aim = _locked_aim
 			_press_on(intent)
 			# Its own clock only shows the telegraph's progress, slowed as the wind-up is (a chill,
@@ -427,7 +436,11 @@ func windup_for(at: int) -> float:
 
 ## The rest after a cast of staff `at` (seconds).
 func rest_for(at: int) -> float:
-	var sense: CastSense = _sense_of(at)
+	return _rest_of(_sense_of(at))
+
+
+## The rest after a cast of `sense` (seconds; null: none).
+func _rest_of(sense: CastSense) -> float:
 	var delay: float = sense.delay if sense != null else 0.0
 	return snappedf((REST_BASE + minf(delay, 1.0) * 0.5) * profile.rest_scale, TIME_GRAIN)
 
@@ -827,7 +840,8 @@ func _read_staffs() -> void:
 		var sense: CastSense = caster.next_cast_sense(at) if at < staff_count else null
 		senses[at] = sense
 		holding[at] = 1 if sense != null and caster.is_holding(at) else 0
-		ready[at] = 1 if sense != null and not sense.empty and caster.cast_ready(windup_for(at), at) else 0
+		# The sense just read is the one `windup_for` would read again.
+		ready[at] = 1 if sense != null and not sense.empty and caster.cast_ready(sense.wind_up, at) else 0
 		if sense == null or sense.empty or not sense.harms() or sense.moves_caster:
 			continue
 		var reach: float = sense.reach if sense.reach > 0.0 else sense.close_reach
@@ -937,29 +951,29 @@ func _chase(intent: ActorIntent) -> void:
 		_tapped = false
 	if plan_staff < 0 or actor.caster == null:
 		return
-	var windup: float = windup_for(plan_staff)
 	if not actor.caster.cast_ready(0.0, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
-	var moved: CastSense = _sense_of(plan_staff)
-	if moved != null and moved.moves_caster and not _lands_on_ground(plan_staff, intent.move if intent.move != Vector2.ZERO else aim_way):
+	# Read once: nothing between here and the press changes what the staff casts next.
+	var sense: CastSense = _sense_of(plan_staff)
+	var windup: float = sense.wind_up if sense != null else 0.0
+	if sense != null and sense.moves_caster and not _lands_on_ground(plan_staff, intent.move if intent.move != Vector2.ZERO else aim_way):
 		# Its own move would leave it over a hole (HR-H2): not cast; it walks as planned.
 		return
-	if _begin_call(windup, intent):
+	if _begin_call(sense, windup, intent):
 		return
-	_begin_windup(plan_staff, windup, aim_way, intent)
+	_begin_windup(plan_staff, sense, windup, aim_way, intent)
 
 
 ## Before an attack that winds up, with teamwork (as often as `teamwork`), its team not calling
 ## lately and a teammate within `TeamBoard.CALL_REACH` on the board: it calls (CALL). Returns
 ## whether it did.
-func _begin_call(windup: float, intent: ActorIntent) -> bool:
+func _begin_call(sense: CastSense, windup: float, intent: ActorIntent) -> bool:
 	if board == null or profile.teamwork <= 0.0 or windup <= 0.0 or plan_target != null:
 		return false
 	var team: int = actor.team()
 	if not board.can_call(team) or board.is_calling(team):
 		return false
-	var sense: CastSense = _sense_of(plan_staff)
 	if sense == null or not sense.harms():
 		return false
 	var mate: Vector2 = board.nearest_mate(team, actor.id, actor.global_position, TeamBoard.CALL_REACH)
@@ -986,26 +1000,28 @@ func _call(delta: float, intent: ActorIntent) -> void:
 	_state_left -= delta * _pace()
 	if _state_left > 0.0:
 		return
-	var windup: float = windup_for(plan_staff) if plan_staff >= 0 else 0.0
 	if plan_staff >= 0 and actor.caster != null and actor.caster.cast_ready(0.0, plan_staff):
-		_begin_windup(plan_staff, windup, now, intent)
+		var sense: CastSense = _sense_of(plan_staff)
+		_begin_windup(plan_staff, sense, sense.wind_up if sense != null else 0.0, now, intent)
 	else:
 		_to_chase()
 
 
 ## The attack starts: the staff is pressed now and its cast winds up in Spells for `windup`
-## seconds (docs/milestones/cast-timing.md); with none it leaves this step.
-func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:
+## seconds (docs/milestones/cast-timing.md); with none it leaves this step. `sense` is what staff `at`
+## casts next (`_sense_of`), read by the caller this step.
+func _begin_windup(at: int, sense: CastSense, windup: float, now: Vector2, intent: ActorIntent) -> void:
 	chosen = at
-	_chosen_sense = _sense_of(at)
+	_chosen_sense = sense
 	_aim_locked = false
 	_note_aimed()
 	windup_time = windup
-	recover_time = rest_for(at)
+	recover_time = _rest_of(sense)
 	state = State.WINDUP
 	_state_left = windup
 	_aim_error = (_roll() * 2.0 - 1.0) * aim_error_most()
-	_locked_aim = _aim_for(_chosen_sense, now, _aim_error)
+	_attack_lead = aim_lead()
+	_locked_aim = _aim_for(_chosen_sense, now, _aim_error, _attack_lead)
 	intent.aim = _locked_aim
 	intent.press(at)
 	_press_on(intent)
@@ -1091,12 +1107,13 @@ func _steer_off_harm(intent: ActorIntent) -> void:
 	var best: Vector2 = Vector2.ZERO
 	var best_score: float = -INF
 	for other: Vector2 in AISight.DIRECTIONS:
-		if not _clear_of_harm(sight, at, other):
-			continue
+		# The score first: a way that cannot beat the best so far is not probed (the same pick).
 		var score: float = other.dot(way)
 		if _steer_side != 0.0 and signf(way.cross(other)) == _steer_side:
 			score += HARM_SIDE_KEEP
-		if score > best_score and AISight.line_clear(actor.projectiles, at, at + other * HARM_PROBE):
+		if score <= best_score or not _clear_of_harm(sight, at, other):
+			continue
+		if AISight.line_clear(actor.projectiles, at, at + other * HARM_PROBE):
 			best_score = score
 			best = other
 	if best == Vector2.ZERO:
@@ -1197,14 +1214,13 @@ func _press_on(intent: ActorIntent) -> void:
 
 ## Where to aim a cast of `sense` at what the plan aims at (`_aim_node`), `now` away: ahead of a
 ## moving one by its flight (`lead`), then off by `error` radians (the profile's aim error, drawn
-## once an attack).
-func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
+## once an attack), leading by `lead` (`aim_lead()`, read once an attack: `_attack_lead`).
+func _aim_for(sense: CastSense, now: Vector2, error: float, lead: float) -> Vector2:
 	var point: Vector2 = now
 	var aimed: Node2D = _aim_node()
 	var aimed_actor: Actor = aimed as Actor
 	if aimed_actor != null:
 		point += aimed_actor.body_offset - actor.body_offset
-	var lead: float = aim_lead()
 	if sense != null and sense.speed > 0.0 and lead > 0.0:
 		if aimed_actor != null:
 			point += aimed_actor.velocity * (point.length() / sense.speed) * lead
@@ -1351,7 +1367,8 @@ func _walk_goal() -> Vector2:
 func _line_clear() -> bool:
 	if target == null:
 		return true
-	return AISight.fire_clear(actor.projectiles, actor.global_position + actor.body_offset, _target_body(), _fire_width(), _fire_short(target))
+	var width: float = _fire_width()
+	return AISight.fire_clear(actor.projectiles, actor.global_position + actor.body_offset, _target_body(), width, _fire_short(target, width))
 
 
 ## How wide its line of fire is either side: the widest hit width of its aimed staffs that hurt

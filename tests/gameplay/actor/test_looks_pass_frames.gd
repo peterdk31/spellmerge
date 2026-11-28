@@ -55,21 +55,6 @@ func _fight() -> Fixture:
 	return world
 
 
-## Every body's faces blink and glance from the same numbers in both fights (a face seeds its own
-## by its body's instance, which differs).
-func _same_faces(world: Fixture) -> void:
-	var n: int = 0
-	for body in world.players + world.enemies:
-		for child in body.get_children():
-			if child is Face:
-				var face: Face = child as Face
-				face._rng.seed = 7000 + n
-				face._blink_in = face._wait(Face.BLINK_EVERY)
-				face._glance_in = face._wait(Face.GLANCE_EVERY)
-				face._raise_in = face._wait(Face.RAISE_EVERY)
-				n += 1
-
-
 func _tick(world: Fixture, frame: int) -> void:
 	for index in world.players.size():
 		var wizard: Actor = world.players[index]
@@ -128,8 +113,6 @@ func _texture(texture: Texture2D) -> Variant:
 func test_the_pass_draws_every_body_as_each_asking_did() -> void:
 	var before: Fixture = _fight()
 	var after: Fixture = _fight()
-	_same_faces(before)
-	_same_faces(after)
 	var view: Viewport = root.get_viewport()
 	var ids := PackedInt32Array()
 	var posing: int = 0

@@ -69,6 +69,26 @@ func test_a_press_casts_from_the_staff_tip_along_the_aim_and_pays() -> void:
 	check_equal(wizard.caster.last_carrier_card(0), &"bolt", "the carrier is named")
 
 
+## The place a moving body sends each step (`Caster._push_place`, its sums written out) is the one
+## `Actor.muzzle_position` gives: the staff tip, its reach from the hand along the aim, sent again
+## whenever the body moves or turns.
+func test_the_place_sent_each_step_is_the_staff_tip_and_the_hand() -> void:
+	_world = Fixture.new(root)
+	var wizard: Actor = _seated(0, [[&"bolt"]], Vector2(40.0, 60.0))
+	wizard.hand_offset = Vector2(3.0, -11.0)
+	wizard.staff_reach = 13.5
+	(wizard.controller as Fixture.Scripted).aim = Vector2(0.6, 0.8)
+	wizard.step(Fixture.STEP)
+	check_equal(_world.spells.aim_origin_of(wizard.id), wizard.muzzle_position(), "the tip it sent is its muzzle")
+	check_equal(_world.spells.aim_of(wizard.id), wizard.aim.normalized(), "along its aim")
+	wizard.global_position = Vector2(70.5, 20.25)
+	(wizard.controller as Fixture.Scripted).aim = Vector2.LEFT
+	wizard.step(Fixture.STEP)
+	check_equal(_world.spells.aim_origin_of(wizard.id), wizard.muzzle_position(), "sent again where it moved and turned")
+	check_equal(_world.spells.aim_of(wizard.id), Vector2.LEFT, "with its new aim")
+	check_equal(wizard.muzzle_position(), Vector2(70.5, 20.25) + Vector2(3.0, -11.0) + Vector2.LEFT * 13.5, "its reach from the hand")
+
+
 func test_a_held_staff_casts_whenever_it_is_ready_and_a_free_one_does_not() -> void:
 	_world = Fixture.new(root)
 	var wizard: Actor = _seated(0, [[&"bolt"], [&"bolt"]])

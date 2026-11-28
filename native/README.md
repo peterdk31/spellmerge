@@ -6,7 +6,7 @@ Spellmerge's own C++, loaded by Godot as a GDExtension: faster versions of hot l
 
 | Class | What it runs | GDScript it stands for |
 |---|---|---|
-| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's passes, the hit pass's eventless shots, draw batches, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows`, `ray_walks` (beams' rays between their hits, #972) | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`, `projectile_rays.gd`) |
+| `ShotKernel` (`src/shot_kernel.cpp`) | the projectile step's passes, the hit pass's eventless shots, draw batches, `nearest_target`, `trail_pass`, `field_pass`, `shot_places`, `region_counts`/`region_rows`, `ray_walks` (beams' rays between their hits, #972), the sparks shots give off (`give_off_sparks`, `src/spark_roll.cpp`: the manager's dice, PCG32 as the engine rolls it) | `core/projectiles/projectile_manager.gd` (and `draw_regions.gd`, `projectile_rays.gd`, `projectile_draw.gd`) |
 | `MoteKernel` (`src/mote_kernel.cpp`) | the motes' trail births, settling marks, `region_rows` | `gameplay/feel/mote.gd` (`give_off`, `burst`), `gameplay/feel/mote_regions.gd` |
 | `LightKernel` (`src/light_grid.cpp`) | grid lighting: `light_grid_rows`, `light_grid_beam`, `light_grid_bake`, checked by `check_light_grid` | `gameplay/feel/light_grid.gd` |
 | `GroundKernel` (`src/ground_kernel.cpp`) | a room's ground drawn from `GroundShape.spec` (`draw`) | `gameplay/feel/ground/ground_drawing.gd` (twin of `tools/ground_shape.py`) |
@@ -30,7 +30,7 @@ This folder is Claude's and the owner's only (the owner's decision of 2026-11-02
 - **One loader.** `core/native/native.gd` is the only GDScript that asks whether the module is loaded and makes its classes, by literal name (`NATIVE_FILE` in the rules).
 - **Nothing built is committed** (hard rule 2). `ci/build/native.sh` builds into `native/bin/` and writes `native/spellmerge.gdextension`; both are git-ignored, as are SCons' object files.
 
-Tests, side by side, byte for byte: `tests/core/test_native_kernel.gd` (one thread and four), `tests/gameplay/feel/test_native_motes.gd`, `tests/core/test_wall_slide.gd`, `tests/core/test_grid_rays.gd`, `tests/core/test_ray_walks.gd`, `tests/core/test_body_walk.gd`, `tests/gameplay/feel/test_light_grid.gd`, `tests/gameplay/feel/test_ground_drawing.gd`, `tests/gameplay/flow/test_room_life.gd`, `tests/core/test_draw_regions.gd`, `tests/gameplay/feel/test_mote_regions.gd`, `tests/core/test_dmath.gd`; the recording `test_projectiles_step_exact.gd`; `test_determinism.gd`.
+Tests, side by side, byte for byte: `tests/core/test_native_kernel.gd` (one thread and four), `tests/gameplay/feel/test_native_motes.gd`, `tests/core/test_wall_slide.gd`, `tests/core/test_grid_rays.gd`, `tests/core/test_ray_walks.gd`, `tests/core/test_body_walk.gd`, `tests/gameplay/feel/test_light_grid.gd`, `tests/gameplay/feel/test_ground_drawing.gd`, `tests/gameplay/flow/test_room_life.gd`, `tests/core/test_draw_regions.gd`, `tests/core/test_spark_roll.gd`, `tests/core/test_draw_threads.gd` (the drawing past its one-thread threshold, four threads and one), `tests/gameplay/feel/test_mote_regions.gd`, `tests/core/test_dmath.gd`; the recording `test_projectiles_step_exact.gd`; `test_determinism.gd`.
 
 ## Threads (shot scale H5)
 
@@ -40,6 +40,7 @@ Threads never change a result: the bits are the same on one thread or sixteen.
 - **What a span may do.** A span writes only its own slots or row. What spans share is combined after, in span order, on the calling thread. A span calls no engine API but pure functions (`wrapf`): no Variant of an array or Object, no printing, no `ERR_` macro, no nested loop of its own.
 - **The hit pass stays on one thread.**
 - **Where else.** Any kernel's loop may run on `jobs::for_spans` where measured faster.
+- **The drawing stays on one thread below 16,384 slots** (`DRAW_THREADS_FROM` in `src/shot_kernel.cpp`; the performance pass, 2026-11-28): at 1,000 and 6,000 shots on four cores `count_draw` and `draw_shots` were slower spread over the threads than alone (`count_draw` 0.15 ms against 0.02 ms at 1,000): waking the workers cost more than their share of the loop.
 - **Feel's threads are the engine's.** `gameplay/feel/feel_jobs.gd` runs `LightKernel.light_grid_rows`/`light_grid_beam` a view a thread (`first_view`, `views`) with `WorkerThreadPool`; the kernel starts no thread for it and keeps nothing between calls; `check_light_grid` runs on the main thread first.
 - **How many.** `ShotKernel.threads` (the manager's `native_threads`; 0 = cores less one, at most 16); 1 on the web (`threads=no`). A machine setting, never a run's.
 - **Platforms.** Linux `-pthread`; Windows links MinGW's thread runtime statically (`native.sh` checks: no `libwinpthread` import).

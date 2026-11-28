@@ -113,11 +113,17 @@ func test_a_test_preset_matches_its_shipped_one_in_every_option() -> void:
 ## The web build is threaded (the owner's decision of 2026-11-28): the threaded templates, and the
 ## cross-origin isolation a browser asks before it gives a page shared memory, from Godot's service
 ## worker where the host sets no headers (GitHub Pages).
+const WEB_SHELL: String = "res://ci/build/web_shell.html"
+
+
 func test_the_web_build_is_threaded_and_cross_origin_isolated() -> void:
 	var web: String = _section_of("Web") + ".options"
 	check(config.get_value(web, "variant/thread_support", false) == true, "the Web preset exports the threaded templates")
 	check(config.get_value(web, "progressive_web_app/enabled", false) == true, "the Web preset has Godot's service worker")
 	check(config.get_value(web, "progressive_web_app/ensure_cross_origin_isolation_headers", false) == true, "and it adds the cross-origin isolation headers")
+	# The owner's shell (ci/build/web_shell.html, the owner's answer of 2026-11-28) reloads a first
+	# visit once the worker is ready: Godot's own page reloads before it is active.
+	check_equal(config.get_value(web, "html/custom_html_shell", ""), WEB_SHELL, "the Web preset's page is the owner's shell")
 
 
 ## A browser's threads are workers made before the game starts (`threads/emscripten_pool_size`); the

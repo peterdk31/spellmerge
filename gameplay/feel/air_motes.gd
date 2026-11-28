@@ -43,9 +43,10 @@ var _ramps: Array[PackedColorArray] = []
 var _written: int = -1
 var _table: RampTableScript = null
 ## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
-## played (a new generator starts at a random seed; screenshots compare runs byte for byte).
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte); each
+## one made takes it with its count (`FeelDice.made`).
 const DICE_SEED: int = 0xA1E5
-var _rng := FeelDice.seeded(DICE_SEED)
+var _rng := FeelDice.made(DICE_SEED)
 var _last: float = -1.0
 ## Whether the kind the pool lacks was warned of (once a room).
 var _warned: bool = false

@@ -74,9 +74,10 @@ var _live: PackedInt32Array = PackedInt32Array()
 ## The streams that left `_live` since the last frame (`_settle_dropped`), each once.
 var _dropped: PackedInt32Array = PackedInt32Array()
 ## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
-## played (a new generator starts at a random seed; screenshots compare runs byte for byte).
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte); each
+## one made takes it with its count (`FeelDice.made`).
 const DICE_SEED: int = 0xC0E1
-var _rng := FeelDice.seeded(DICE_SEED)
+var _rng := FeelDice.made(DICE_SEED)
 var _last: float = -1.0
 
 

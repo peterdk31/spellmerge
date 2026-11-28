@@ -302,9 +302,10 @@ var _world_walls: Array[Rect2] = []
 ## Feel's clock at the last step.
 var _clock: float = 0.0
 ## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
-## played (a new generator starts at a random seed; screenshots compare runs byte for byte).
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte); each
+## one made takes it with its count (`FeelDice.made`).
 const DICE_SEED: int = 0x5EC7
-var _rng: RandomNumberGenerator = FeelDice.seeded(DICE_SEED)
+var _rng: RandomNumberGenerator = FeelDice.made(DICE_SEED)
 ## A hit framed by Feel (`begin_hit` to `end_hit`; false: none), and whether it sprays: every
 ## write of the hits' class inside it follows that one roll, so a hit sprays whole or not at all.
 var _hit_held: bool = false

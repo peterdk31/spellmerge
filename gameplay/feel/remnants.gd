@@ -45,9 +45,10 @@ var _lying: PackedFloat32Array = PackedFloat32Array()
 var _born: PackedInt64Array = PackedInt64Array()
 var _count: int = 0
 ## Its dice's seed: the same every run, so what it draws is the same picture every time a run is
-## played (a new generator starts at a random seed; screenshots compare runs byte for byte).
+## played (a new generator starts at a random seed; screenshots compare runs byte for byte); each
+## one made takes it with its count (`FeelDice.made`).
 const DICE_SEED: int = 0x4E77
-var _rng := FeelDice.seeded(DICE_SEED)
+var _rng := FeelDice.made(DICE_SEED)
 ## Pieces left, all told (for tests).
 var left: int = 0
 

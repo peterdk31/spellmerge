@@ -30,9 +30,12 @@ const CASTS: Array = [
 	[[&"hold", &"lightning", &"beam"], Vector2(610.0, 245.0), Vector2(520.0, 300.0), 3],
 ]
 ## Where the check's fan of six beams starts, and the most of its pixels by the hand that may be
-## white-hot, in percent.
+## white-hot, in percent. Measured in the gallery's renderer (Compatibility, OpenGL, on llvmpipe, as
+## `build.sh --screenshots` draws it): 68% with the stack's cap (`STACK_DEEPEST`), 92% without it,
+## so the bar sits between and fails if the cap goes. (The 38% the cap's commit gave did not
+## reproduce there, at that commit or since: the fan's six cores overlap by the hand.)
 const FAN_HAND := Vector2(100.0, 320.0)
-const WHITE_MOST: int = 50
+const WHITE_MOST: int = 80
 ## The crops: name, the world point they are round, and their half size.
 const CROPS: Array = [
 	["plus_two", Vector2(90.0, 60.0), Vector2i(50, 30)],

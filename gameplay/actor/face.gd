@@ -22,7 +22,8 @@ extends ActorLook
 ## more than SNAP pixels (a teleport) is not trailed. A cast pops the eyes up POP_EYES pixels and
 ## the brows POP_BROWS more for POP_TIME seconds.
 ##
-## Idle habits, from a generator seeded per actor so no two faces fidget together: blinks
+## Idle habits, from a generator seeded per actor (by its key, so a run's faces blink the same every
+## time it is played) so no two faces fidget together: blinks
 ## always; glances and raised brows only while the actor stands and has not cast for IDLE_AFTER
 ## seconds. How often each comes is the style's (BLINK_EVERY and the rest): the Dozer blinks slowly and never
 ## raises a brow, the Show-off fidgets, a stray only blinks.
@@ -104,6 +105,8 @@ var winding_told: int = -1
 var _eyes: Sprite2D = null
 var _brows: Sprite2D = null
 var _rng: RandomNumberGenerator = null
+## True once the generator is seeded from its body's key (`_seed`, at its first step).
+var _seeded: bool = false
 ## True when the layers draw its own `art` (set up once, with the layers).
 var _own_art: bool = false
 ## The shared sheets' copies on another page it wears (`wear_sheets`; empty: the shared page's).
@@ -154,11 +157,9 @@ func setup(owner_actor: Actor) -> void:
 		_scene_style = style
 		_scene_glow = glow
 		_scene_row = art_row
-	_rng.seed = hash(owner_actor.get_instance_id())
 	_eyes.modulate = glow
-	_blink_in = _wait(BLINK_EVERY)
-	_glance_in = _wait(GLANCE_EVERY)
-	_raise_in = _wait(RAISE_EVERY)
+	# Seeded at its first step, once its body has an id (`_seed`).
+	_seeded = false
 	if actor.caster != null and not actor.caster.cast_done.is_connected(_on_cast_done):
 		actor.caster.cast_done.connect(_on_cast_done)
 	# Connected once, on its own actor (not the bus, where a listener per actor was called for every
@@ -283,6 +284,8 @@ func brow_offset() -> Vector2:
 
 
 func step(delta: float) -> void:
+	if not _seeded:
+		_seed()
 	_pop_left = maxf(_pop_left - delta, 0.0)
 	_shown_left = maxf(_shown_left - delta, 0.0)
 	_call_left = maxf(_call_left - delta, 0.0)
@@ -382,6 +385,18 @@ func _step_habits(delta: float) -> void:
 	if _raise_in <= 0.0:
 		_raise_left = RAISE_TIME
 		_raise_in = _wait(RAISE_EVERY)
+
+
+## Its habits' generator seeded from its body's key (`Actors.key_of`: the same body the same
+## numbers, every run and every machine; its name's path for a body with no id), and its first
+## waits rolled. At its first step: the body opens its id after its looks are set up.
+func _seed() -> void:
+	_seeded = true
+	var key: int = actor.actors.key_of(actor.id) if actor.actors != null and actor.id >= 0 else 0
+	_rng.seed = hash(key) if key > 0 else hash(String(actor.get_path()))
+	_blink_in = _wait(BLINK_EVERY)
+	_glance_in = _wait(GLANCE_EVERY)
+	_raise_in = _wait(RAISE_EVERY)
 
 
 ## The next wait for a habit (`every`, per style); forever for a habit the style lacks.

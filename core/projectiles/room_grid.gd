@@ -823,6 +823,31 @@ func walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, 
 	return gd_walk_body(from, motion, crossed, radius, through_mouths, reach)
 
 
+## `Actor.move`'s grid work and its room in one call (perf plan C2): `walk_body`, then the place its
+## end is in (`place_at`). The answer's x, y and z are `walk_body`'s, its w the place (NO_PLACE for
+## none). Runs the native module's `BodyKernel.walk_place` when it is loaded (`WallSlide.native_on`),
+## straight, else `gd_walk_place`, the reference it mirrors (tests/core/test_body_walk.gd compares
+## them to the bit).
+func walk_place(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector4:
+	var kernel: Object = WallSlide.kernel()
+	if kernel == null or (not _has_walls and _footprints_laid == 0 and not _has_holes and _place_rects.is_empty()):
+		# Nothing laid and no places (`gd_walk_place` goes the whole way, at no place): no call made.
+		return gd_walk_place(from, motion, crossed, radius, through_mouths, reach)
+	var flags: int = (WALK_WALLS if _has_walls else 0) | (WALK_FOOTPRINTS if _footprints_laid != 0 else 0) | (WALK_HOLES if _has_holes else 0)
+	var minded: int = PAST_MOUTHS if through_mouths and _has_mouths else 255
+	return kernel.call(&"walk_place", _wall_cells, _walk_cells, _ground_cells, _hole_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, flags, minded, from, motion, crossed, radius, reach, _place_rects, _place_cells, _place_over, _place_mixed, _place_touched, _place_w, _place_h, PLACE_CELL)
+
+
+## `walk_place` in GDScript: `gd_walk_body` (the whole way with nothing laid, as `walk_body`), then
+## `place_at`. The reference `BodyKernel.walk_place` mirrors, and the fallback.
+func gd_walk_place(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector4:
+	var whole: Vector2 = from + motion
+	var walked: Vector3 = Vector3(whole.x, whole.y, 0.0)
+	if _has_walls or _footprints_laid != 0 or _has_holes:
+		walked = gd_walk_body(from, motion, crossed, radius, through_mouths, reach)
+	return Vector4(walked.x, walked.y, walked.z, float(place_at(Vector2(walked.x, walked.y))))
+
+
 ## `walk_body` in GDScript: the reference `BodyKernel.walk` mirrors line by line, and the fallback.
 func gd_walk_body(from: Vector2, motion: Vector2, crossed: Vector2, radius: float, through_mouths: bool, reach: float) -> Vector3:
 	if not _has_holes:

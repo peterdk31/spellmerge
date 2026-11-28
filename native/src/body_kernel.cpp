@@ -121,10 +121,11 @@ bool touches_hole(const uint8_t *holes, const uint8_t *walls, int64_t w, int64_t
 // `configure` against the GDScript's.
 constexpr int64_t NO_PLACE = -1, ASK_GDSCRIPT = -2;
 
-// `RoomGrid.place_at`, the places' rectangles handed over as `Rect2`s (single precision, as theirs).
-int64_t place_at(const std::vector<Rect2> &rects, const uint8_t *cells, const uint8_t *over, const uint8_t *mixed, const uint8_t *touched, int64_t w,
+// `RoomGrid.place_at`, the places' rectangles read through `rect(i)` (single precision `Rect2`s, as
+// theirs): `places` hands a copy of them all, `walk_place` the grid's own array, read only where asked.
+template <typename Rects>
+int64_t place_at(const Rects &rect, int64_t n, const uint8_t *cells, const uint8_t *over, const uint8_t *mixed, const uint8_t *touched, int64_t w,
 		int64_t h, double cell, const Vector2 &origin, const Vector2 &point) {
-	const int64_t n = (int64_t)rects.size();
 	if (n == 0) {
 		return NO_PLACE;
 	}
@@ -134,13 +135,13 @@ int64_t place_at(const std::vector<Rect2> &rects, const uint8_t *cells, const ui
 		const int64_t at = y * w + x;
 		if (mixed[at] != 0) {
 			for (int64_t place = 0; place < n; place++) {
-				if (over[place] != 0 && rects[place].has_point(point)) {
+				if (over[place] != 0 && rect(place).has_point(point)) {
 					return place;
 				}
 			}
 		}
 		const int64_t guess = (int64_t)cells[at] - 1;
-		if (guess >= 0 && rects[guess].has_point(point)) {
+		if (guess >= 0 && rect(guess).has_point(point)) {
 			return guess;
 		}
 		if (touched[at] == 0) {
@@ -148,12 +149,12 @@ int64_t place_at(const std::vector<Rect2> &rects, const uint8_t *cells, const ui
 		}
 	}
 	for (int64_t place = 0; place < n; place++) {
-		if (over[place] != 0 && rects[place].has_point(point)) {
+		if (over[place] != 0 && rect(place).has_point(point)) {
 			return place;
 		}
 	}
 	for (int64_t place = 0; place < n; place++) {
-		if (rects[place].has_point(point)) {
+		if (rect(place).has_point(point)) {
 			return place;
 		}
 	}
@@ -372,11 +373,58 @@ bool BodyKernel::places(const PackedInt64Array &nodes, const PackedInt32Array &i
 			out[n] = (int32_t)ASK_GDSCRIPT;
 			continue;
 		}
-		const int64_t place = (!none && n_rects > 0) ? place_at(boxes, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), w, h, cell, origin, body->get_global_position()) : NO_PLACE;
+		const auto box = [&boxes](int64_t i) -> const Rect2 & { return boxes[(size_t)i]; };
+		const int64_t place = (!none && n_rects > 0) ? place_at(box, n_rects, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), w, h, cell, origin, body->get_global_position()) : NO_PLACE;
 		if (place != (int64_t)room) {
 			body->set(ROOM, place);
 		}
 		out[n] = (int32_t)place;
+	}
+	return true;
+}
+
+Vector4 BodyKernel::walk_place(const PackedByteArray &walls, const PackedByteArray &walk_cells, const PackedByteArray &ground, const PackedByteArray &holes,
+		int64_t w, int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
+		const Vector2 &crossed, double radius, double reach, const Array &rects, const PackedByteArray &cells, const PackedByteArray &over,
+		const PackedByteArray &mixed, const PackedByteArray &touched, int64_t pw, int64_t ph, double place_cell) const {
+	// `RoomGrid.gd_walk_place`: the walk where the grid has something laid, else the whole way.
+	Vector2 to = from + motion;
+	real_t found = 0.0;
+	if ((flags & (WALK_WALLS | WALK_FOOTPRINTS | WALK_HOLES)) != 0) {
+		const Vector3 walked = walk(walls, walk_cells, ground, holes, w, h, cell, origin, flags, mask, from, motion, crossed, radius, reach);
+		to = Vector2(walked.x, walked.y);
+		found = walked.z;
+	}
+	const int64_t n_rects = rects.size();
+	ERR_FAIL_COND_V_MSG(n_rects > 0 && (over.size() < n_rects || cells.size() < pw * ph || mixed.size() < pw * ph || touched.size() < pw * ph),
+			Vector4(to.x, to.y, found, (real_t)NO_PLACE), "BodyKernel.walk_place: the places' grids are smaller than they say");
+	// Each rectangle read from the grid's array only where `place_at` asks for it (most bodies ask one).
+	const auto rect = [&rects](int64_t i) -> Rect2 { return rects[i]; };
+	const int64_t place = place_at(rect, n_rects, cells.ptr(), over.ptr(), mixed.ptr(), touched.ptr(), pw, ph, place_cell, origin, to);
+	return Vector4(to.x, to.y, found, (real_t)place);
+}
+
+bool BodyKernel::gather(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, const PackedVector2Array &places,
+		const PackedVector2Array &velocities) const {
+	ERR_FAIL_COND_V_MSG(count > ids.size(), false, "BodyKernel.gather: the ids are fewer than count");
+	static const StringName ROOM("room");
+	static const StringName VELOCITY("velocity");
+	// The caller's arrays, written through their buffers (native/README.md, "The object's arrays").
+	Vector2 *place = const_cast<Vector2 *>(places.ptr());
+	Vector2 *velocity = const_cast<Vector2 *>(velocities.ptr());
+	const int64_t rows = places.size() < velocities.size() ? places.size() : velocities.size();
+	const int32_t *id = ids.ptr();
+	for (int64_t n = 0; n < count; n++) {
+		const int64_t at = id[n];
+		ERR_FAIL_COND_V_MSG(at < 0 || at >= rows || at >= nodes.size(), false, "BodyKernel.gather: an id past the table's rows");
+		Object *object = nodes[at] != 0 ? ObjectDB::get_instance((uint64_t)nodes[at]) : nullptr;
+		Node2D *body = Object::cast_to<Node2D>(object);
+		// An actor's body only (`as Actor`, as `places` tells one: its `room` is an int).
+		if (body == nullptr || body->get(ROOM).get_type() != Variant::INT) {
+			continue;
+		}
+		place[at] = body->get_global_position();
+		velocity[at] = body->get(VELOCITY);
 	}
 	return true;
 }
@@ -406,4 +454,8 @@ void BodyKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("places", "nodes", "ids", "count", "projectiles", "rects", "cells", "over", "mixed", "touched", "w", "h", "cell", "origin",
 								 "places"),
 			&BodyKernel::places);
+	ClassDB::bind_method(D_METHOD("walk_place", "walls", "walk", "ground", "holes", "w", "h", "cell", "origin", "flags", "mask", "from", "motion",
+								 "crossed", "radius", "reach", "rects", "cells", "over", "mixed", "touched", "pw", "ph", "place_cell"),
+			&BodyKernel::walk_place);
+	ClassDB::bind_method(D_METHOD("gather", "nodes", "ids", "count", "places", "velocities"), &BodyKernel::gather);
 }

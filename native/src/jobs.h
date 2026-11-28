@@ -18,9 +18,9 @@
 // is not a pure function (no Variant of a packed array or an Object, no printing, no ERR_ macros),
 // and runs no `for_spans` of its own (one nested would run on the calling thread alone).
 //
-// A build without threads (`threads=no`) runs every span on the calling thread. The web's threaded
-// build (the owner's decision of 2026-11-28) runs on at most WEB_MAX_WIDTH: a browser's threads are
-// workers made before the game starts (the Web preset's `threads/emscripten_pool_size`, of which the
+// A library built `threads=no` (none is shipped) runs every span on the calling thread. The web's
+// build, threaded only (the owner's decision of 2026-11-28), runs on at most WEB_MAX_WIDTH: a
+// browser's threads are workers made before the game starts (the Web preset's `threads/emscripten_pool_size`, of which the
 // engine's own pool takes `threads/godot_pool_size`), and one asked for past them could only start
 // once the page's main thread, which waits for it, gave its turn back: it would never start.
 

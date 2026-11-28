@@ -180,7 +180,9 @@ constexpr int64_t YIELD_FOUND = 1; // its hits (`_cand_*`, `_cand_found` of them
 // Only Combat's answers its hits' new entries need (hit batch A5): the hit batch's `ask_target`,
 // `ask_n` of them, asked by GDScript; then `hits` again from the same shot with `merge_first`.
 constexpr int64_t YIELD_ASK = 2;
-constexpr int64_t YIELD_SHIFT = 4;
+// The bits of the kind below the shot's n (`ProjectileHits.KERNEL_YIELD_BITS`).
+constexpr int64_t YIELD_BITS = 2;
+constexpr int64_t YIELD_SHIFT = int64_t(1) << YIELD_BITS;
 // What `HitPass::merge_hits` says of a shot's hits.
 constexpr int MERGE_REFUSED = 0; // GDScript's to hit (nothing changed)
 constexpr int MERGE_DONE = 1; // hit here
@@ -1088,6 +1090,7 @@ struct HitPass {
 				if (opened) {
 					batch->set(k.mh_entries, mh_entries);
 				}
+				// Listed only for a hand-back to ask (GDScript empties it once asked).
 				if (ask_n > 0) {
 					batch->set(k.ask_n, ask_n);
 				}
@@ -1519,7 +1522,10 @@ const Constant CONSTANTS[] = {
 	{ "RAMP_ENEMY", (double)RAMP_ENEMY },
 	{ "TEAM_NONE", (double)TEAM_NONE },
 	{ "TEAM_WORLD", (double)TEAM_WORLD },
-	{ "THREAT_SPAN_MAX", (double)THREAT_SPAN_MAX }
+	{ "THREAT_SPAN_MAX", (double)THREAT_SPAN_MAX },
+	{ "KERNEL_YIELD_BITS", (double)YIELD_BITS },
+	{ "KERNEL_YIELD_FOUND", (double)YIELD_FOUND },
+	{ "KERNEL_YIELD_ASK", (double)YIELD_ASK }
 };
 
 PackedStringArray ShotKernel::check(const Dictionary &constants) const {
@@ -1650,6 +1656,8 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 		h.load_merge(m);
 		const int64_t found = m->get(names->cand_found);
 		if (h.merge_hits(slot, found) != MERGE_DONE) {
+			// GDScript takes the shot's hits whole: no asks are left listed for it.
+			h.ask_n = 0;
 			h.save(m, found, starved_before);
 			return n * YIELD_SHIFT + YIELD_FOUND;
 		}

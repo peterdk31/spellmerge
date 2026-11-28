@@ -9,9 +9,10 @@ const Manager := preload("res://core/projectiles/projectile_manager.gd")
 
 ## What the native hit pass's hand-back says (`ShotKernel.hits`: the shot's n shifted up by
 ## KERNEL_YIELD_BITS, plus one of these): the whole shot is GDScript's, its hits found are, or only
-## Combat's answers for its hits' new entries are (hit batch A5).
+## Combat's answers for its hits' new entries are (hit batch A5). The kernel checks its copies
+## (`native_constants`).
 const KERNEL_YIELD_BITS: int = 2
-const KERNEL_YIELD_MASK: int = 3
+const KERNEL_YIELD_MASK: int = (1 << KERNEL_YIELD_BITS) - 1
 const KERNEL_YIELD_FOUND: int = 1
 const KERNEL_YIELD_ASK: int = 2
 
@@ -175,6 +176,11 @@ func _ask_kernel_openings(slot: int) -> bool:
 	var spell: int = _tag[slot]
 	var sent: int = pm._sent
 	for i in batch.ask_n:
+		if pm._sent != sent:
+			# A handler sent an event (none does today): the answers kept may be stale, so the
+			# shot's hits are GDScript's, asking anew at each entry as `add` does.
+			batch.ask_n = 0
+			return false
 		var t: int = batch.ask_target[i]
 		batch.ask(t, spell, sent)
 		var asks: int = batch.asks

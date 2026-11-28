@@ -1471,7 +1471,9 @@ func native_constants() -> Dictionary:
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
 			"SPELL_MIX_HIGH": (mix >> 32) & 0xFFFFFFFF, "SPELL_MIX_LOW": mix & 0xFFFFFFFF,
 			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD,
-			"REGION_SPAN_MOST": DrawRegionsScript.SPAN_MOST, "REGION_MOST": DrawRegionsScript.MOST})
+			"REGION_SPAN_MOST": DrawRegionsScript.SPAN_MOST, "REGION_MOST": DrawRegionsScript.MOST,
+			"KERNEL_YIELD_BITS": ProjectileHits.KERNEL_YIELD_BITS, "KERNEL_YIELD_FOUND": ProjectileHits.KERNEL_YIELD_FOUND,
+			"KERNEL_YIELD_ASK": ProjectileHits.KERNEL_YIELD_ASK})
 	return constants
 
 

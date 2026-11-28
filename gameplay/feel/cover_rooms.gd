@@ -12,7 +12,8 @@ extends Node2D
 ## cover area does (an earlier autoload), so a room is laid at rest before it is told what burns.
 ##
 ## **A frame** (`step`): the first view finds the bodies (the nearest the camera's middle, as ever);
-## every other view with cover takes the same ones (`step_with`), so they are gathered once. Every
+## every other view with cover takes the same ones (`step_with`), so they are gathered once, and each
+## walks only those that reach its cells (`cover_reach.gd`, sorted once a frame). Every
 ## view steps, wherever its room lies: the wind and a trample are look only, and cheap at rest. A
 ## view switched off that no body found reaches (`found_box`) walks none of them and takes them only
 ## when shown again, and a room far out of the picture rolls no motes (`CoverMotes.give_off`).
@@ -26,6 +27,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const CoverLightsScript := preload("res://gameplay/feel/cover_lights.gd")
+const CoverReachScript := preload("res://gameplay/feel/cover_reach.gd")
 
 ## The bus and the registry (Feel's).
 var events: EventsScript = null
@@ -43,6 +45,10 @@ var lights: CoverLightsScript = CoverLightsScript.new()
 ## The effects' row for the flat kinds (`set_floor_quality`), for every view, a new one too.
 var _floor_motes: float = 1.0
 var _floor_shimmer: bool = true
+## Which views each body found walks (`cover_reach.gd`), worked out again when a view is laid
+## (`flats_version`).
+var _reach: CoverReachScript = CoverReachScript.new()
+var _reach_version: int = -1
 
 
 ## Views drawn at `z` (Feel's MARK_Z).
@@ -107,10 +113,18 @@ func _on_cover_changed(room: int, cells: PackedInt32Array, states: PackedInt32Ar
 ## every other view with cover draws with them.
 func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
 	var lead: CoverScript = first()
-	lead.step(now, table, focus, pool, view, stirs_version, hand_stirs)
+	lead.find(table, focus)
+	# The bodies found sorted to the views whose cells they can walk, once for all (perf plan F3).
+	if flats_version() != _reach_version:
+		_reach_version = flats_version()
+		_reach.lay(_views)
+	_reach.sort(lead.found_bodies(), lead.found_count())
+	lead.walk_only(_reach.bodies, 0, _reach.counts[EventsScript.FIRST_ROOM])
+	lead.draw(now, pool, view, stirs_version, hand_stirs)
 	for number in range(1, _views.size()):
 		var other: CoverScript = _views[number]
 		if other.layout != null and not other.batches().is_empty():
+			other.walk_only(_reach.bodies, number * CoverScript.BODIES, _reach.counts[number])
 			other.step_with(lead.bodies(), lead.body_count(), now, pool, view, stirs_version, hand_stirs, lead.found_box())
 	lights.begin()
 	for each in _views:

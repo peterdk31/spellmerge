@@ -31,6 +31,10 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/packed_color_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector4.hpp>
 
@@ -93,6 +97,19 @@ public:
 	bool places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
 			const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
 			int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const;
+
+	// The bodies' looks a drawn frame (perf plan F4; src/body_looks.cpp): which bodies' looks are due
+	// and for how long (`Actor.gd_looks_due`), and every listed body's staff animation read into the
+	// looks' table (`StaffPoses.gd_read_looks`).
+	int64_t looks_due(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, const RID &canvas, bool split, const Rect2 &screen,
+			const Array &to_screen, int64_t view_count, const PackedVector2Array &cell_points, const PackedInt32Array &cell_counts, int64_t corners_most,
+			double margin,
+			double most, const PackedInt32Array &due, const PackedFloat64Array &seconds) const;
+	bool pose_looks(const PackedInt32Array &ids, int64_t count, double clock, const PackedInt32Array &layout, const Array &keys,
+			const PackedFloat64Array &start, const PackedFloat32Array &wind, const PackedFloat32Array &strike, const PackedFloat32Array &lead,
+			const PackedInt32Array &blow, const PackedFloat32Array &from, const PackedInt32Array &side, const PackedFloat32Array &turned,
+			const PackedVector2Array &dir, const PackedColorArray &tint, const PackedByteArray &ended, const PackedFloat32Array &rows,
+			const PackedByteArray &state) const;
 
 protected:
 	static void _bind_methods();

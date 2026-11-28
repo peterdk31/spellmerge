@@ -15,6 +15,7 @@ The shared body kit: one kind of body for players and enemies ([docs/milestones/
 - **Bosses and elites:** `Phases` (from `data.phases`; `begin`, `adds_key`, never starts while possessed), `BossPresence` (`boss_shown`, `boss_health_changed`, `boss_hidden`), `EliteLook`.
 - **Props:** `PropBody.make(data)`/`fill`, `PropStateTriggers` (`states`, `state`, `enter(state_id)`, `keeps_time()`, `MAX_DEPTH`), `PropLook`.
 - **Looks** (VIEW_ONLY): `ActorLook` (`setup`, `step`, `sync`, `pose_offset`, `pose_scale`, `apply_pose`), `BodyPose`, `BodyPart` (`parts_of`), `Face` (`style`, `resting_mood`, `glow`, `glance`, `show_mood`, `restyle`, `unstyle`, `wear_sheets`).
+- **The frame's looks** (perf plan F4): the Tick's `_process` calls `Actor.step_all_looks(table, ids, count, view)` once a drawn frame: which bodies' looks are due and on screen in one call (`Actor.looks_due`: `BodyKernel.looks_due`, its twin `gd_looks_due`; a body drawn on another canvas asks the screen itself, `step_looks_due`), every due body's staff animation read in one more (`StaffPoses.begin_looks`/`end_looks`: `BodyKernel.pose_looks`, its twin `gd_read_looks`, into `look_rows`), then each due body's looks stepped. A look reads its staff animation through `StaffPoses.look_row` (its row of the table in the pass, read alone outside it); a test's stand-in poses that answer `read_look` themselves give `begin_looks` nothing to do.
 - **Services:** `events`, `combat`, `projectiles`, `spells`, `actors` on the actor; tests set them before adding it.
 - **Events** (defined in `core/events/events.gd`; matches [gameplay/README.md](../README.md)):
   - Sends: `adds_requested`, `boss_shown`, `boss_health_changed`, `boss_hidden`, `caster_move_finished`, `staff_shown`, `prop_state_changed`, `cue_shown`.
@@ -46,7 +47,7 @@ Follow the steps and test layout in [gameplay/README.md](../README.md). A new ki
 
 ## Tests
 
-`tests/gameplay/actor/` (`test_spawn.gd`, `test_actor_stats.gd`, `test_prop_state_triggers.gd`, `test_prop_look.gd`, `test_damage_numbers.gd`, `test_inventory.gd`, `test_inventory_hands.gd`, `test_possess.gd`), `tests/gameplay/ai/test_ai_phases.gd`, `tests/gameplay/ai/test_ai_poses.gd`, `tests/gameplay/feel/test_remnants.gd`, `tests/screenshots/shot_possess.gd`, `tests/screenshots/shot_damage_numbers.gd`, `tests/core/test_body_walk.gd`.
+`tests/gameplay/actor/` (`test_spawn.gd`, `test_actor_stats.gd`, `test_prop_state_triggers.gd`, `test_prop_look.gd`, `test_damage_numbers.gd`, `test_inventory.gd`, `test_inventory_hands.gd`, `test_possess.gd`), `tests/gameplay/ai/test_ai_phases.gd`, `tests/gameplay/ai/test_ai_poses.gd`, `tests/gameplay/feel/test_remnants.gd`, `tests/screenshots/shot_possess.gd`, `tests/screenshots/shot_damage_numbers.gd`, `tests/core/test_body_walk.gd`, `test_looks_per_frame.gd`, `test_looks_kernel.gd` (the pass as each body asking, the kernel as its twin), `test_looks_pass_frames.gd` (two identical fights drawn the old way and by the pass, every drawn node frame for frame), `tests/benchmark/looks_cost.gd` (the pass's time).
 
 ## Validate
 

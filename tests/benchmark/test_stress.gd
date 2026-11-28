@@ -37,19 +37,32 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the web run should skip only the desktop scenario, got %s" % [web])
 		quit(1)
 		return
-	# The costliest staffs the warning names (staffs D3): by hits plus mean live shots, ties by seat
-	# then staff; a staff with only shots is ranked too.
-	var hits: Dictionary = {Vector2i(1, 1): 220, Vector2i(2, 1): 186, Vector2i(0, 0): 10}
-	var shots: Dictionary = {Vector2i(2, 1): 98, Vector2i(3, 2): 30}
-	var ranked: Array[Dictionary] = RunnerScript.staffs_by_cost(hits, shots, 10)
+	# The costliest staffs the warning names (staffs D3): hits a tick (over the window's ticks) plus
+	# live shots a tick (over the samples), ties by seat then staff; a staff with only shots ranks too.
+	var hits: Dictionary[Vector2i, int] = {Vector2i(1, 1): 600, Vector2i(2, 1): 300, Vector2i(0, 0): 60}
+	var shots: Dictionary[Vector2i, int] = {Vector2i(2, 1): 98, Vector2i(3, 2): 5}
+	var ranked: Array[Dictionary] = RunnerScript.staffs_by_cost(hits, shots, 10, 600)
 	var order: Array[Vector2i] = []
 	for row: Dictionary in ranked:
 		order.append(Vector2i(int(row["seat"]), int(row["staff"])))
-	if order != ([Vector2i(1, 1), Vector2i(2, 1), Vector2i(0, 0), Vector2i(3, 2)] as Array[Vector2i]) or not is_equal_approx(float(ranked[1]["shots"]), 9.8):
+	# (2, 1): 0.5 + 9.8; (1, 1): 1.0; (3, 2): 0.5; (0, 0): 0.1.
+	if order != ([Vector2i(2, 1), Vector2i(1, 1), Vector2i(3, 2), Vector2i(0, 0)] as Array[Vector2i]) or not is_equal_approx(float(ranked[0]["cost"]), 10.3):
 		printerr("TEST FAILED: the staffs by cost are out of order or miscounted: %s" % [ranked])
 		quit(1)
 		return
-	if not RunnerScript.staffs_by_cost({}, {}, 0).is_empty():
+	# The same counts over a window twice as long rank the same: both parts are a tick.
+	var longer: Dictionary[Vector2i, int] = {}
+	for key: Vector2i in hits:
+		longer[key] = hits[key] * 2
+	var doubled: Array[Dictionary] = RunnerScript.staffs_by_cost(longer, shots, 10, 1200)
+	for n in ranked.size():
+		if int(doubled[n]["seat"]) != int(ranked[n]["seat"]) or not is_equal_approx(float(doubled[n]["cost"]), float(ranked[n]["cost"])):
+			printerr("TEST FAILED: a longer window changed the staffs by cost: %s / %s" % [ranked, doubled])
+			quit(1)
+			return
+	var none_hits: Dictionary[Vector2i, int] = {}
+	var none_shots: Dictionary[Vector2i, int] = {}
+	if not RunnerScript.staffs_by_cost(none_hits, none_shots, 0, 0).is_empty():
 		printerr("TEST FAILED: no staff measured should rank none")
 		quit(1)
 		return

@@ -30,8 +30,11 @@ extends Node
 ## error. The fillers are load only; the hit and reaction paths are exercised by the
 ## bots' real spells. Frame time never fails the run: past 16.7 ms it prints a `BENCH WARNING:`
 ## with likely fixes and the costliest staffs (docs/PLAN.md, "Gates are sparse"; staffs D3, done-when
-## 4 of docs/milestones/M2-staffs.md: a staff's cost is the hits its spells landed and the shots it
-## kept in the air over the measured window, `BENCH: stress <label>: staffs by cost`). `BENCH:` lines carry the numbers: the
+## 4 of docs/milestones/M2-staffs.md; `BENCH: stress <label>: staffs by cost`). A staff's cost is a
+## proxy, both parts a tick over the measured window: the hits its spells landed (`impact_count`,
+## each hit a merged shot hit stands for) and its shots alive in the projectile manager (each a step
+## a tick). Carriers with no shot slot (beams, rays, sweeps, zones, decoys and familiars) show only
+## by their hits. `BENCH:` lines carry the numbers: the
 ## frame (probe.gd, with its parts: physics steps per frame, physics and process time, renderer
 ## time) and, timed here in the measured window, one pass over the crowd of the enemy step, of
 ## the combat lookups it makes and of Feel's step.
@@ -196,13 +199,17 @@ var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
 ## Over the measured window, by wizard staff (`_staff_key`): the hits its spells landed, and the
-## sum of its live shots at each STAFF_SAMPLE_EVERY-th tick (with `_staff_samples`, their mean).
-var _staff_hits: Dictionary = {}
-var _staff_shots: Dictionary = {}
+## sum of its live shots at each STAFF_SAMPLE_EVERY-th tick (with `_staff_samples`, their mean);
+## `_staff_ticks`, the ticks the window ran.
+var _staff_hits: Dictionary[Vector2i, int] = {}
+var _staff_shots: Dictionary[Vector2i, int] = {}
 var _staff_samples: int = 0
-## Ticks between two counts of each staff's live shots: one pass over the shot slots, so seldom
-## enough not to move the frame numbers.
+var _staff_ticks: int = 0
+## Ticks between two counts of each staff's live shots: one pass over the shot slots in one tick,
+## at most a frame in 60 (it can set a scenario's max frame, never its p95). Offset by half from
+## the frames `_time_parts` times (PARTS_EVERY), so the two never land on one tick of the fixed clock.
 const STAFF_SAMPLE_EVERY: int = 60
+const STAFF_SAMPLE_AT: int = 15
 ## Staffs the warning names.
 const COSTLIEST: int = 3
 ## Since the scenario's start (the ticks its tick parts count): every shot hit's merged hits (the
@@ -496,6 +503,7 @@ func _process(delta: float) -> void:
 		_staff_hits.clear()
 		_staff_shots.clear()
 		_staff_samples = 0
+		_staff_ticks = 0
 		_dropped_at = int(_projectiles.get("dropped"))
 		_waited_at = _fires_waited()
 		_probe = ProbeScript.new()
@@ -565,7 +573,8 @@ func _tick_work() -> void:
 	if _measuring:
 		_shot_sum += count
 		_shot_samples += 1
-		if _shot_samples % STAFF_SAMPLE_EVERY == 0:
+		_staff_ticks += 1
+		if _staff_ticks % STAFF_SAMPLE_EVERY == STAFF_SAMPLE_AT:
 			_count_staff_shots()
 
 
@@ -647,7 +656,7 @@ func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: in
 		if _measuring:
 			var key: Vector2i = _staff_key(tag)
 			if key.x >= 0:
-				_staff_hits[key] = int(_staff_hits.get(key, 0)) + 1
+				_staff_hits[key] = _staff_hits.get(key, 0) + maxi(1, int(_projectiles.get(&"impact_count")))
 	_merged_hits += 1
 	_hits_counted += int(_projectiles.get(&"impact_count"))
 
@@ -873,11 +882,11 @@ func _frame_hash() -> int:
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget; it names
 ## the costliest staffs. Every run prints each staff's cost too.
 func _warn_when_slow(label: String) -> void:
-	var ranked: Array[Dictionary] = staffs_by_cost(_staff_hits, _staff_shots, _staff_samples)
+	var ranked: Array[Dictionary] = staffs_by_cost(_staff_hits, _staff_shots, _staff_samples, _staff_ticks)
 	var lines: PackedStringArray = PackedStringArray()
 	for row: Dictionary in ranked:
 		lines.append(_staff_words(row))
-	print("BENCH: stress %s: staffs by cost (hits landed, mean live shots; measured window): %s" % [label, "; ".join(lines) if not lines.is_empty() else "none"])
+	print("BENCH: stress %s: staffs by cost (hits a tick + live shots a tick, measured window): %s" % [label, "; ".join(lines) if not lines.is_empty() else "none"])
 	var p95: float = _probe.call("percentile_95")
 	if p95 > FRAME_BUDGET_MS:
 		var costliest: PackedStringArray = lines.slice(0, COSTLIEST)
@@ -899,29 +908,31 @@ func _staff_key(tag: int) -> Vector2i:
 ## One pass over the shot slots: each wizard staff's live shots, added to `_staff_shots`.
 func _count_staff_shots() -> void:
 	_staff_samples += 1
-	var high: int = int(_projectiles.get(&"_high"))
-	for slot in high:
+	var high: int = int(_projectiles.call(&"get_high"))
+	for slot: int in high:
 		if not bool(_projectiles.call(&"is_alive", slot)):
 			continue
 		var key: Vector2i = _staff_key(int(_projectiles.call(&"get_tag_of", slot)))
 		if key.x >= 0:
-			_staff_shots[key] = int(_staff_shots.get(key, 0)) + 1
+			_staff_shots[key] = _staff_shots.get(key, 0) + 1
 
 
-## Each staff with its hits and mean live shots, costliest first: by hits plus mean shots (a hit
-## is a hit's work in Combat and Feel, a live shot a shot's step), ties by seat then staff.
-static func staffs_by_cost(hits: Dictionary, shots: Dictionary, samples: int) -> Array[Dictionary]:
+## Each staff with its hits and live shots a tick, costliest first: by their sum (a hit a tick is
+## a hit's work in Combat and Feel, a live shot a shot's step; unweighted, a proxy), ties by seat
+## then staff. `hits` are over `ticks`; `shots` summed over `samples` counts.
+static func staffs_by_cost(hits: Dictionary[Vector2i, int], shots: Dictionary[Vector2i, int], samples: int, ticks: int) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
-	var keys: Dictionary = {}
+	var keys: Dictionary[Vector2i, bool] = {}
 	for key: Vector2i in hits:
 		keys[key] = true
 	for key: Vector2i in shots:
 		keys[key] = true
 	for key: Vector2i in keys:
-		var mean_shots: float = float(shots.get(key, 0)) / float(maxi(samples, 1))
-		rows.append({"seat": key.x, "staff": key.y, "hits": int(hits.get(key, 0)), "shots": mean_shots, "cost": float(hits.get(key, 0)) + mean_shots})
+		var hits_a_tick: float = float(hits.get(key, 0)) / float(maxi(ticks, 1))
+		var shots_a_tick: float = float(shots.get(key, 0)) / float(maxi(samples, 1))
+		rows.append({"seat": key.x, "staff": key.y, "hits": hits_a_tick, "shots": shots_a_tick, "cost": hits_a_tick + shots_a_tick})
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		if not is_equal_approx(float(a["cost"]), float(b["cost"])):
+		if float(a["cost"]) != float(b["cost"]):
 			return float(a["cost"]) > float(b["cost"])
 		if int(a["seat"]) != int(b["seat"]):
 			return int(a["seat"]) < int(b["seat"])
@@ -929,18 +940,19 @@ static func staffs_by_cost(hits: Dictionary, shots: Dictionary, samples: int) ->
 	return rows
 
 
-## "P2 staff 3 (cards) 120 hits, 14.5 shots" for a row of `staffs_by_cost`.
+## "P2 staff 3 (cards) 0.31 hits, 14.5 shots a tick" for a row of `staffs_by_cost` ("?" for a
+## staff no longer held).
 func _staff_words(row: Dictionary) -> String:
 	var seat: int = int(row["seat"])
 	var at: int = int(row["staff"])
-	var cards: String = "?"
+	var cards: String = ""
 	if seat < _wizards.size() and is_instance_valid(_wizards[seat]):
 		var named: PackedStringArray = PackedStringArray()
 		for card: StringName in _wizards[seat].caster.cards_of(at):
 			if card != &"":
 				named.append(String(card))
 		cards = " · ".join(named)
-	return "P%d staff %d (%s) %d hits, %.1f shots" % [seat + 1, at + 1, cards, int(row["hits"]), float(row["shots"])]
+	return "P%d staff %d (%s) %.2f hits, %.1f shots a tick" % [seat + 1, at + 1, cards if cards != "" else "?", float(row["hits"]), float(row["shots"])]
 
 
 func _teardown_scenario() -> void:

@@ -11,7 +11,7 @@
 1. Every task in "Parts" below is merged, and `ci/build/build.sh --quick --tests` is green.
 2. Every card has a test, a lore line, an icon, a look, a sound id, and appears in at least two combo files that pass.
 3. The 4-bot smoke test passes with bots that build random staffs, and the fuzz run (random staffs, part D1) has no error line.
-4. The stress benchmark runs with built staffs; over budget it warns (never fails), and the warning names the costliest staffs. (Built 2026-11-28: by hits landed plus mean live shots over the measured window, `bench/stress_runner.gd` `staffs_by_cost`.)
+4. The stress benchmark runs with built staffs; over budget it warns (never fails), and the warning names the costliest staffs. (Built 2026-11-28, `bench/stress_runner.gd` `staffs_by_cost`: a proxy, each staff's hits a tick plus its live shots a tick over the measured window; carriers with no shot slot show only by their hits.)
 5. The owner has played the sandbox on `/preview/`, and C2 has a verdict.
 
 ## Summary of the rules

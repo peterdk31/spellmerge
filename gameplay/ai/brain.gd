@@ -692,7 +692,8 @@ func reposition() -> void:
 	plan_move = Move.WAY
 	plan_way = Vector2.ZERO
 	if target != null:
-		plan_way = AISight.flank(actor.projectiles, actor.global_position, _walk_goal(), _target_body(), actor.body_offset, DETOUR_PROBE, _fire_width(), _fire_short(target))
+		var width: float = _fire_width()
+		plan_way = AISight.flank(actor.projectiles, actor.global_position, _walk_goal(), _target_body(), actor.body_offset, DETOUR_PROBE, width, _fire_short(target, width))
 	if plan_way == Vector2.ZERO:
 		plan_way = AISight.detour(actor.projectiles, actor.global_position, _walk_goal(), DETOUR_PROBE)
 	state = State.REPOSITION

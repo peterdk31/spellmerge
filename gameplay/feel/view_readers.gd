@@ -85,8 +85,8 @@ var _shared_on: bool = false
 var _keys_changed: bool = true
 ## Copies followed, all told (for tests: nothing is followed while nothing changes).
 var followed: int = 0
-## What each item showed when its copies last followed it (by item, as `_items`): visible and top
-## level (bits), z, modulate and self modulate (2 a reader), transform (3 vectors a reader: its x, y
+## What each item showed when its copies last followed it (by item, as `_items`): visible, top
+## level and its index among its siblings (bits), z, modulate and self modulate (2 a reader), transform (3 vectors a reader: its x, y
 ## and origin; a control's position, size and zero), material, MultiMesh and texture (3 a reader).
 ## `_seen_views`: the views drawn then (-1: not yet; a copy made since, or another count, follows all).
 var _seen_bits: PackedInt32Array = PackedInt32Array()
@@ -340,7 +340,8 @@ func _follow_copies() -> void:
 func _seen_changed(i: int, item: CanvasItem) -> bool:
 	var changed: bool = _seen_views[i] != views
 	_seen_views[i] = views
-	var bits: int = (1 if item.visible else 0) | (2 if item.top_level else 0)
+	# Its place among its siblings too: the copies are drawn just after it (`_follow`).
+	var bits: int = (1 if item.visible else 0) | (2 if item.top_level else 0) | (item.get_index() << 2)
 	if _seen_bits[i] != bits:
 		_seen_bits[i] = bits
 		changed = true

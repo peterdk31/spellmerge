@@ -290,3 +290,32 @@ func test_random_changes_leave_what_the_full_follow_leaves() -> void:
 		if wrong > 0:
 			break
 	check_equal(wrong, 0, "400 frames of random changes: the copies and their materials as the full follow leaves them")
+
+
+func test_a_reader_moved_among_its_siblings_takes_its_copies_along() -> void:
+	var first: MultiMeshInstance2D = _item()
+	var second: MultiMeshInstance2D = _item()
+	_follow(4)
+	_holder.move_child(second, 0)
+	_follow(4)
+	check_equal((_readers.copy_of(second, 2) as Node).get_index(), second.get_index() + 1, "the third view's copy just after its moved reader")
+	check_equal((_readers.copy_of(second, 3) as Node).get_index(), second.get_index() + 2, "the fourth's after it")
+	check_equal((_readers.copy_of(first, 2) as Node).get_index(), first.get_index() + 1, "the other reader's copies still just after it")
+
+
+func test_a_control_reader_s_copies_follow_its_place_and_size() -> void:
+	var rect := ColorRect.new()
+	rect.material = _material
+	_holder.add_child(rect)
+	_readers.take(rect)
+	_follow(4)
+	rect.position = Vector2(5.0, 6.0)
+	rect.size = Vector2(40.0, 30.0)
+	_follow(4)
+	for view in [2, 3]:
+		var copy := _readers.copy_of(rect, view) as Control
+		check_equal(copy.position, Vector2(5.0, 6.0), "view %d's copy at the rect's place" % view)
+		check_equal(copy.size, Vector2(40.0, 30.0), "and its size")
+	var followed: int = _readers.followed
+	_follow(4)
+	check_equal(_readers.followed, followed, "then rests")

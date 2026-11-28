@@ -2725,7 +2725,8 @@ func step(delta: float) -> void:
 	sim_time += delta
 	_mem_step += 1
 	_last_delta = delta
-	hit_table.empty()
+	# The tick's first step: its rows begin (a reader keeps the last ticks' until it reads them).
+	hit_table.begin_tick()
 	_job_targets._refresh_targets()
 	at = _profiled(PROF_REFRESH, at)
 	var top: int = _high
@@ -3718,7 +3719,13 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_look = _look[slot]
 		impact_tag = _tag[slot]
 		_sent += 1
-		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
+		var heading: Vector2 = velocity.normalized()
+		# Its row, for the drawing: an impact on no body (`HitTable.ROW_WALL`), never applied.
+		var row: int = hit_table.write(_actor[slot], null, _pos[slot], heading, _tag[slot], slot, 0, impact_carrier_card, impact_body, impact_core, impact_look)
+		var outer: int = hit_table.told
+		hit_table.told = row
+		events.projectile_impact.emit(_actor[slot], null, _pos[slot], heading)
+		hit_table.told = outer
 		impact_carrier_card = &""
 		impact_body = 0
 		impact_core = Color.WHITE
@@ -3743,7 +3750,10 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_tag = tag
 	impact_count = count
 	_sent += 1
+	var outer: int = hit_table.told
+	hit_table.told = row
 	events.projectile_impact.emit(caster, node, at, heading)
+	hit_table.told = outer
 	impact_carrier_card = &""
 	impact_body = 0
 	impact_core = Color.WHITE

@@ -162,19 +162,69 @@ func _grow_reactions(size: int) -> void:
 	_react_amount.resize(size)
 
 
+## The tick's rows are told apart from the frames of hand-sent events by this: a row's frame is
+## ROW_FRAMES plus its tick (`HitTable.tick`), a hand-sent event's the physics frame it came in.
+const ROW_FRAMES: int = 1 << 40
+
+
+## Every hit, impact, damage and death of the ticks since the last drawn frame (the projectile
+## manager's `hit_table`, perf plan H2), shown in the order they were sent, as their events were
+## before, then forgotten (`HitTable.read_done`). Feel's step calls it first, so they count toward
+## the same frame's caps (`_body_looks`, the hit shares, the flashes and sounds) as when they were
+## heard in the tick.
+func read_rows(table: HitTable) -> void:
+	for row in table.rows:
+		var frame: int = ROW_FRAMES + table.tick[row]
+		match table.kind[row]:
+			HitTable.ROW_HIT:
+				_impact(table.caster[row], table.target_id[row], table.at[row], table.heading[row], table.look_tag[row], table.card[row], table.core[row], table.look[row], true, frame)
+			HitTable.ROW_WALL:
+				_impact(table.caster[row], 0, table.at[row], table.heading[row], table.look_tag[row], table.card[row], table.core[row], table.look[row], true, frame)
+			HitTable.ROW_DAMAGE:
+				var body: int = table.target_id[row]
+				_damage(table.caster[row], body, instance_from_id(body) as Node, table.actor[row], table.colour[row], table.amount[row], table.at[row], table.hit_kind[row], table.card[row], frame)
+			HitTable.ROW_DEATH:
+				_death_row(table, row)
+	table.read_done()
+	feel._dead_count = 0
+
+
+## Whether the event being heard is a row's (`HitTable.told`): it is shown when the rows are read,
+## so its listener leaves it. A hand-sent event (a test's) is shown at once, as it is heard.
+func _told() -> bool:
+	var projectiles: ProjectileManagerScript = feel.projectiles
+	return projectiles != null and projectiles.hit_table.told >= 0 and projectiles.events == feel.events
+
+
 func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector2) -> void:
+	if _told():
+		return
+	var there: bool = target != null and is_instance_valid(target)
+	var body: int = target.get_instance_id() if there else 0
+	var frame: int = Engine.get_physics_frames()
+	# The kind of the hit came just before (`hit_landed`).
+	var kind: StringName = feel._kind if target != null and body == feel._kind_target and frame == feel._kind_frame else &""
+	var card: StringName = feel._kind_card if kind != &"" else &""
+	feel._kind_target = 0
+	_damage(caster, body, target if there else null, FeelScript._actor_of(target) if there else ActorsScript.NONE, _hit_color_of(target) if there else Color.WHITE, amount, position, kind, card, frame)
+
+
+## A hit's damage look: its flash and squash, its spray (along its shot's impact, when that came just
+## before), its shake and its sound. `caster` dealt `amount` at `position` to the body of instance id
+## `body` (0 for none; `node`, while it is still there; actor `hit_id`, own colour `own`), a hit of
+## kind `kind` (`&""`: none told) by the carrier card `card`, in `frame` (a physics frame, or a row's
+## tick, ROW_FRAMES).
+func _damage(caster: int, body: int, node: Node, hit_id: int, own: Color, amount: float, position: Vector2, kind: StringName, card: StringName, frame: int) -> void:
 	# Feel's numbers and services this reads, once (a read through `feel` is a lookup by name).
 	var preset: FeelPresetScript = feel.preset
 	var spectacle: SpectacleScript = feel._spectacle
-	if not _damage_look_shown(target, caster):
+	if not _damage_look_shown(body, caster, frame):
 		# Past its body's looks this frame for its staff: no spray, squash, shake or sound.
 		feel._impact_target = 0
-		feel._kind_target = 0
 		return
-	var hit_id: int = FeelScript._actor_of(target)
-	var repeat: bool = _repeat_hit(hit_id, target, caster)
+	var repeat: bool = _repeat_hit(hit_id, body, caster, kind, frame)
 	if not repeat:
-		_react(target)
+		_react(node)
 	var aim: Vector2 = Vector2.ZERO
 	var at: Vector2 = position
 	var tint: Color = Color.WHITE
@@ -182,33 +232,32 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	var colours: int = 0
 	# The spray's motes are a hit's: the shot's impact's roll when it did this hit, else one of its own.
 	var held: bool = false
-	if target != null and is_instance_valid(target):
+	if body != 0:
 		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in their own
 		# colour (`EnemyBase.hit_color`).
 		var ramp: int = feel._hat_ramp_of_id(hit_id)
 		if ramp >= 0:
 			colours = ramp
 		else:
-			tint = _hit_color_of(target)
+			tint = own
 		# The shot that did this hit told us where it struck and which way it flew.
-		if target.get_instance_id() == feel._impact_target and caster == feel._impact_caster and Engine.get_physics_frames() == feel._impact_frame:
+		if body == feel._impact_target and caster == feel._impact_caster and frame == feel._impact_frame:
 			aim = feel._impact_aim
 			at = feel._impact_at
 			held = true
 			spectacle.hold_hit(caster, feel._impact_tag, feel._impact_shown)
 			size = clampf(1.0 + float(amount - FeelScript.SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, FeelScript.SPRAY_MIN_SIZE, FeelScript.SPRAY_MAX_SIZE)
 	feel._impact_target = 0
-	# The kind of the hit came just before (`hit_landed`): its shake and sound (its stop is the
-	# game's, `HitStop`).
+	# The kind's shake and sound (its stop is the game's, `HitStop`).
 	# A hit of part of a point (an atom's speck) shakes as much as its share, so a stream of them
 	# is not a quake.
 	var shake: float = preset.hit_shake * minf(amount, 1.0)
 	var sound: StringName = preset.hit_sound
-	var own: bool = false
-	if target != null and target.get_instance_id() == feel._kind_target and Engine.get_physics_frames() == feel._kind_frame:
+	var own_hit: bool = false
+	if kind != &"":
 		# Its kind's look, else a shot's, else none (one read of the table each).
 		var looks: Dictionary = preset.kind_looks
-		var found: Variant = looks.get(feel._kind)
+		var found: Variant = looks.get(kind)
 		if found == null:
 			found = looks.get(&"shot", FeelScript.NO_LOOK)
 		var look: Dictionary = found as Dictionary
@@ -216,12 +265,12 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 		sound = look.get("sound", preset.hit_sound) as StringName
 		# A carrier's own hit (a shot, a ray, a sweep, a slam's wave) sounds as its card says; a
 		# reaction, a status and a heal keep their kind's.
-		if feel._kind_card != &"" and FeelScript.CARD_SOUND_KINDS.has(feel._kind):
-			var card_sound: StringName = _card_sounds.sound_of(feel._kind_card, CardSoundsScript.Use.HIT)
+		if card != &"" and FeelScript.CARD_SOUND_KINDS.has(kind):
+			var card_sound: StringName = _card_sounds.sound_of(card, CardSoundsScript.Use.HIT)
 			if card_sound != &"":
 				sound = card_sound
-		own = feel._kind_own
-	feel._kind_target = 0
+		# An actor that hit itself.
+		own_hit = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and hit_id == caster
 	var voice: int = feel._hit_voice
 	if not held:
 		spectacle.begin_hit(caster, 0)
@@ -230,21 +279,18 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	if repeat:
 		# The sound of the hit it repeats is still this hit's (a kill stops it, `_on_enemy_died`).
 		feel._hit_voice = voice
-	if own:
+	if own_hit:
 		# Their own spell: the cue `self_hit` (a ring in its own colour) on this frame, so it is
 		# never taken for an enemy's hit.
 		_job_cues.play_cue(&"self_hit", caster, position)
 
 
-## True when the hit on `target` (the actor `id`) by `caster` repeats the last one this physics
-## frame and Feel step that was flashed, held and heard (same body, attacker and kind: `_juiced_*`); else it
-## becomes that hit. Only an actor's hits are told apart.
-func _repeat_hit(id: int, target: Node, caster: int) -> bool:
-	if id < 0 or id >= _juiced_frame.size() or target == null:
+## True when the hit on the body `body` (the actor `id`) by `caster` of kind `kind` repeats the last
+## one in `frame` and this Feel step that was flashed, held and heard (same body, attacker and kind:
+## `_juiced_*`); else it becomes that hit. Only an actor's hits are told apart.
+func _repeat_hit(id: int, body: int, caster: int, kind: StringName, frame: int) -> bool:
+	if id < 0 or id >= _juiced_frame.size() or body == 0:
 		return false
-	var frame: int = Engine.get_physics_frames()
-	var body: int = target.get_instance_id()
-	var kind: StringName = feel._kind if body == feel._kind_target and frame == feel._kind_frame else &""
 	if _juiced_frame[id] == frame and _juiced_step[id] == feel._steps and _juiced_body[id] == body and _juiced_by[id] == caster and _juiced_kind[id] == kind:
 		return true
 	_juiced_frame[id] = frame
@@ -255,45 +301,53 @@ func _repeat_hit(id: int, target: Node, caster: int) -> bool:
 	return false
 
 
-## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
-func _on_hit_landed(caster: int, target: Node, _amount: float, _position: Vector2, kind: StringName, shot: int, card: StringName) -> void:
-	if target == null:
+## The kind of the hit that `damage_dealt` announces next (a hand-sent one's; a row carries its own).
+func _on_hit_landed(_caster: int, target: Node, _amount: float, _position: Vector2, kind: StringName, shot: int, card: StringName) -> void:
+	if target == null or _told():
 		return
 	feel._kind_target = target.get_instance_id()
 	feel._kind = kind
 	feel._kind_shot = shot
 	feel._kind_card = card
 	feel._kind_frame = Engine.get_physics_frames()
-	feel._kind_own = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and FeelScript._actor_of(target) == caster
 
 
-## Whether the hit on `target` by `caster` that `damage_dealt` announces shows its look: as its shot's
-## impact decided (`_impact_looked`), else counted now (`_body_looks`, by the caster's first staff). A
-## hit of no body always shows.
-func _damage_look_shown(target: Node, caster: int) -> bool:
-	if target == null or not is_instance_valid(target):
+## Whether the hit on the body `body` (0 for none) by `caster` in `frame` shows its look: as its
+## shot's impact decided (`_impact_looked`), else counted now (`_body_looks`, by the caster's first
+## staff). A hit of no body always shows.
+func _damage_look_shown(body: int, caster: int, frame: int) -> bool:
+	if body == 0:
 		return true
-	var body: int = target.get_instance_id()
-	if body == feel._impact_target and caster == feel._impact_caster and Engine.get_physics_frames() == feel._impact_frame:
+	if body == feel._impact_target and caster == feel._impact_caster and frame == feel._impact_frame:
 		return feel._impact_looked
 	return _body_looks.take(body, SpectacleScript.hit_group(caster, 0))
 
 
-## A shot struck. On a character, remember how, for the damage event that follows at once; a hit
-## past its body's looks this frame for its staff (`_body_looks`) shows nothing, nor does its damage.
-## On a wall or pillar (`target` is null), show the impact.
+## A shot struck (a hand-sent impact; a row's is read with the rows): see `_impact`, with the look
+## the projectile manager tells while it is sent.
 func _on_projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
-	# Feel's numbers and services this reads, once (a read through `feel` is a lookup by name).
-	var projectiles: ProjectileManagerScript = feel.projectiles
-	var spectacle: SpectacleScript = feel._spectacle
-	var tag: int = projectiles.impact_tag if projectiles != null else 0
-	if target == null:
-		_wall_impact(caster, tag, position, direction)
+	if _told():
 		return
-	feel._impact_target = target.get_instance_id()
+	var projectiles: ProjectileManagerScript = feel.projectiles
+	var there: bool = projectiles != null
+	_impact(caster, target.get_instance_id() if target != null else 0, position, direction, projectiles.impact_tag if there else 0, projectiles.impact_carrier_card if there else &"", projectiles.impact_core if there else Color.WHITE, projectiles.impact_look if there else 0, there, Engine.get_physics_frames())
+
+
+## A shot of `caster`'s struck at `position` flying `direction`, drawn with the tag `tag`, as the
+## carrier card `card` in `core` and `look` (its cards' motes shed only when `sheds`), in `frame`. On
+## a character (`body`, its instance id), remember how, for the damage that follows at once; a hit
+## past its body's looks this frame for its staff (`_body_looks`) shows nothing, nor does its damage.
+## On a wall or pillar (`body` 0), show the impact.
+func _impact(caster: int, body: int, position: Vector2, direction: Vector2, tag: int, card: StringName, core: Color, look: int, sheds: bool, frame: int) -> void:
+	if body == 0:
+		_wall_impact(caster, tag, position, direction, card, core, look)
+		return
+	# Feel's services this reads, once (a read through `feel` is a lookup by name).
+	var spectacle: SpectacleScript = feel._spectacle
+	feel._impact_target = body
 	feel._impact_caster = caster
-	feel._impact_frame = Engine.get_physics_frames()
-	feel._impact_looked = _body_looks.take(feel._impact_target, SpectacleScript.hit_group(caster, tag))
+	feel._impact_frame = frame
+	feel._impact_looked = _body_looks.take(body, SpectacleScript.hit_group(caster, tag))
 	if not feel._impact_looked:
 		feel._impact_shown = false
 		return
@@ -304,28 +358,29 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 	feel._impact_aim = direction
 	feel._impact_tag = tag
 	# Its cards' motes back along the way it came, in its own ramp.
-	if projectiles != null:
-		spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, feel.preset.hit_mote_share, tag)
+	if sheds:
+		spectacle.shed_hit(position, -direction, core, ramp, look, feel.preset.hit_mote_share, tag)
 	feel._hit_flash = true
-	_show_impact(caster, ramp, position, direction)
+	_show_impact(caster, ramp, position, direction, card, core, look, tag)
 	feel._hit_flash = false
 	spectacle.end_hit()
 
 
-## A shot of `caster`'s (tagged `tag`) ended on a wall or pillar at `position`, flying `direction`:
+## A shot of `caster`'s (tagged `tag`, as `card` in `core` and `look`) ended on a wall or pillar at
+## `position`, flying `direction`:
 ## knocked back off the surface, the shot's own motes and the wall's, and its impact. As on a body,
 ## only a staff's first shot to end on a spot of the wall (WALL_SPOT pixels a side) shows its look
 ## in a frame (`_body_looks`, by the spot): a volley into one wall reads as one burst a spot, not
 ## dozens stacked (performance, 2026-11-17: wall impacts were Feel's costliest, uncapped).
-func _wall_impact(caster: int, tag: int, position: Vector2, direction: Vector2) -> void:
+func _wall_impact(caster: int, tag: int, position: Vector2, direction: Vector2, card: StringName, core: Color, look: int) -> void:
 	# Feel's numbers and services this reads, once (a read through `feel` is a lookup by name).
 	var spectacle: SpectacleScript = feel._spectacle
 	if not _body_looks.take(_wall_spot(position), SpectacleScript.hit_group(caster, tag)):
 		return
 	var ramp: int = feel._ramp_of(caster)
 	spectacle.begin_hit(caster, tag)
-	spectacle.shed_on_wall(ramp, position, -direction)
-	_show_impact(caster, ramp, position, direction)
+	spectacle.shed_on_wall(ramp, position, -direction, look, core, tag)
+	_show_impact(caster, ramp, position, direction, card, core, look, tag)
 	spectacle.end_hit()
 
 
@@ -386,24 +441,13 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> v
 	_job_cues.play_cue(CueBase.PARRY_CUE, caster, position)
 
 
-## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (the
-## projectile manager's `impact_carrier_card` while the impact is sent; `impact`, a flare, for none), in the
-## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's `ramp`:
+## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (`card`, the
+## projectile manager's `impact_carrier_card` while the impact was sent; `impact`, a flare, for none), in the
+## shot's colour and cards (`core`, `bits` and `tag`) and its caster's `ramp`:
 ## an enemy's lands the same way, in the enemy ramp (staffs F7: one look for every spell). As big as
 ## the card's radius: a rune goes off in `rune_burst`, a wall's adds a ring (`impact_ring`).
-func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2) -> void:
-	# Feel's numbers and services this reads, once (a read through `feel` is a lookup by name).
-	var projectiles: ProjectileManagerScript = feel.projectiles
-	var carrier_card: StringName = &""
-	var core: Color = Color.WHITE
-	var bits: int = 0
-	var tag: int = 0
-	if projectiles != null:
-		carrier_card = projectiles.impact_carrier_card
-		core = projectiles.impact_core
-		bits = projectiles.impact_look
-		tag = projectiles.impact_tag
-	var cues: Array = _job_cues._carrier_card_cues_of(carrier_card)
+func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, card: StringName, core: Color, bits: int, tag: int) -> void:
+	var cues: Array = _job_cues._carrier_card_cues_of(card)
 	_job_cues.play_cue(cues[FeelScript.CUE_IMPACT] as StringName, caster, position, direction, cues[FeelScript.CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, FeelScript.NO_BODY, ramp)
 
 
@@ -415,32 +459,88 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 ## motes (a share of each, `REMNANT_MOTE_SHARE`) and leaves its parts as a remnant flying apart
 ## (`remnants.gd`).
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
-	# Feel's numbers and services this reads, once (a read through `feel` is a lookup by name).
-	var preset: FeelPresetScript = feel.preset
+	# The body breaks now, while it is there (the tick frees it): the rest of the death is a row's
+	# when it is one (`_death_row`), shown with the rows after the hit that killed it.
+	var source: int = _break_dead(enemy)
+	var boss: bool = _is_boss(enemy)
+	# A body whose data names its own death sound sounds it in place of the cue's (boss plan OB15).
+	var sound: StringName = (enemy as Actor).data.death_sound if enemy is Actor and (enemy as Actor).data != null else &""
 	var projectiles: ProjectileManagerScript = feel.projectiles
-	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
+	var row: int = projectiles.hit_table.told if projectiles != null else -1
+	if row >= 0 and projectiles.hit_table.kind[row] == HitTable.ROW_DEATH:
+		_keep_dead(row, enemy.get_instance_id(), source, boss, sound)
+		return
+	# Its motes: the killing shot's cards' kinds (read while the event is sent).
+	var look: int = 0
+	var core: Color = Color.WHITE
+	if projectiles != null and shot >= 0:
+		look = projectiles.get_look_of(shot)
+		core = projectiles.get_core_of(shot)
+	_death(killer, position, shot, core, look, source, boss, sound, _hit_color_of(enemy))
+
+
+## The body `enemy` breaks into motes of its own art (S3), from where it stood at its rest scale, or
+## leaves its parts as a remnant (a layered body). Returns the source of its art's colours for its
+## death's motes (`Spectacle.body_source`; -1 for none).
+func _break_dead(enemy: Node) -> int:
+	# Feel's numbers this reads, once (a read through `feel` is a lookup by name).
+	var preset: FeelPresetScript = feel.preset
 	var body: Sprite2D = _body_sprite(enemy)
 	var art: Sprite2D = _body_art(body)
 	if body != null and art != body:
 		_leave_remnant(body, enemy)
 	elif body != null:
 		feel._spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
+	return feel._spectacle.body_source(art)
+
+
+## What the death row `row` (of the body of instance id `body`) takes from its body while it was
+## there (`_break_dead`), until the rows are read: its art's colour source, whether it was a boss, and
+## its own death sound.
+func _keep_dead(row: int, body: int, source: int, boss: bool, sound: StringName) -> void:
+	var at: int = feel._dead_count
+	if at == feel._dead_row.size():
+		var size: int = maxi(at * 2, 8)
+		feel._dead_row.resize(size)
+		feel._dead_body.resize(size)
+		feel._dead_source.resize(size)
+		feel._dead_boss.resize(size)
+		feel._dead_sound.resize(size)
+	feel._dead_row[at] = row
+	feel._dead_body[at] = body
+	feel._dead_source[at] = source
+	feel._dead_boss[at] = 1 if boss else 0
+	feel._dead_sound[at] = sound
+	feel._dead_count = at + 1
+
+
+## The death row `row` of `table`: its look (`_death`), with what its body gave while it was there
+## (`_keep_dead`; none if its body was never heard of).
+func _death_row(table: HitTable, row: int) -> void:
+	var source: int = -1
+	var boss: bool = false
+	var sound: StringName = &""
+	for at in feel._dead_count:
+		if feel._dead_row[at] == row and feel._dead_body[at] == table.target_id[row]:
+			source = feel._dead_source[at]
+			boss = feel._dead_boss[at] != 0
+			sound = feel._dead_sound[at]
+			break
+	_death(table.caster[row], table.at[row], table.shot[row], table.core[row], table.look[row], source, boss, sound, table.colour[row])
+
+
+## A death's look at `position` (its body already broken, `_break_dead`): the cue `enemy_death` (a
+## white-hot ring, its motes and mark, and a puff in the body's own colour `own`; the killer and the
+## shot `shot` hold for the kill) or, for a `boss`, `boss_death`. Its motes are the killing shot's
+## cards' kinds (`core`, `look`) and the surface kinds in the colours of the body's art (`source`).
+## The killing blow's sound gives way to the death's (`sound`: the body's own, `&""` for the cue's).
+func _death(killer: int, position: Vector2, shot: int, core: Color, look: int, source: int, boss: bool, sound: StringName, own: Color) -> void:
 	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
 	if feel._hit_voice >= 0 and feel._hit_slot >= 0 and feel._hit_position == position and _flash_seconds[feel._hit_slot] > 0.0:
 		if feel.audio != null:
 			feel.audio.stop(feel._hit_voice)
-	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
-	# kinds in the colours of the body's own art.
-	var look: int = 0
-	var core: Color = Color.WHITE
-	if projectiles != null and shot >= 0:
-		look = projectiles.get_look_of(shot)
-		core = projectiles.get_core_of(shot)
-	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
-	# its own colour.
-	# A body whose data names its own death sound sounds it in place of the cue's (boss plan OB15).
-	feel._sound_instead = (enemy as Actor).data.death_sound if enemy is Actor and (enemy as Actor).data != null else &""
-	_job_cues.play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, feel._spectacle.body_source(art), 0, true, _hit_color_of(enemy))
+	feel._sound_instead = sound
+	_job_cues.play_cue(CueBase.BOSS_DEATH_CUE if boss else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, source, 0, true, own)
 
 
 ## A dead layered body: each part breaks into a share of its motes, and the parts fly apart as a

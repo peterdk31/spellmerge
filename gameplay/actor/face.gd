@@ -96,6 +96,10 @@ const RAISE_EVERY: PackedFloat32Array = [7.0, 4.0, 0.0, 0.0, 0.0, 0.0]
 
 ## Where the body is drawn this step relative to rest (the bob, the hop), set by the body's look.
 var body_offset: Vector2 = Vector2.ZERO
+## Whether the controller winds up a cast (`ActorController.is_telegraphing`), told by the body's
+## look that asked it this frame, just before this face steps (`CreatureLook`: an AI's); the step
+## uses it once and forgets it. -1: not told, the step asks (performance, 2026-11-28).
+var winding_told: int = -1
 
 var _eyes: Sprite2D = null
 var _brows: Sprite2D = null
@@ -289,26 +293,38 @@ func step(delta: float) -> void:
 	var down: bool = actor.is_downed()
 	var column: int = BLINK_COLUMN
 	if _blink_left <= 0.0 and not down:
-		var looking: Vector2i = Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))
 		if _call_left > 0.0:
-			looking = _call_look
+			column = (_call_look.y + 1) * 3 + _call_look.x + 1
 		elif _glance_left > 0.0:
-			looking = _glance
-		column = (looking.y + 1) * 3 + looking.x + 1
-	var eyes: Vector2i = Vector2i(column, _eye_row())
+			column = (_glance.y + 1) * 3 + _glance.x + 1
+		else:
+			# `_lean` of the aim, written out (two calls a face a frame).
+			var aim: Vector2 = actor.aim
+			var x: int = 1 if aim.x > LOOK_LEAN else (-1 if aim.x < -LOOK_LEAN else 0)
+			var y: int = 1 if aim.y > LOOK_LEAN else (-1 if aim.y < -LOOK_LEAN else 0)
+			column = (y + 1) * 3 + x + 1
+	# `_eye_row` and `_brow_row` written out too.
+	var eyes: Vector2i = Vector2i(column, clampi(art_row, 0, _eyes.vframes - 1) if _own_art else style)
 	if eyes != _eyes_frame:
 		_eyes_frame = eyes
 		_eyes.frame_coords = eyes
+	var told: int = winding_told
+	winding_told = -1
 	var feeling: Mood = resting_mood
 	if down:
 		feeling = Mood.WORRIED
-	elif actor.controller != null and actor.controller.is_telegraphing():
+	elif told == 1 if told >= 0 else (actor.controller != null and actor.controller.is_telegraphing()):
 		feeling = Mood.FURIOUS
 	elif _shown_left > 0.0:
 		feeling = _shown_mood
 	elif _raise_left > 0.0:
 		feeling = Mood.RAISED
-	var brows: Vector2i = Vector2i(feeling, _brow_row())
+	var brow_row: int = 0
+	if _own_art:
+		brow_row = clampi(art_row, 0, _brows.vframes - 1)
+	elif style == Style.STRAY_ONE:
+		brow_row = 1
+	var brows: Vector2i = Vector2i(feeling, brow_row)
 	if brows != _brows_frame:
 		_brows_frame = brows
 		_brows.frame_coords = brows

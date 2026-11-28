@@ -63,3 +63,25 @@ func test_a_body_off_screen_keeps_its_looks_waiting_then_catches_up_a_moment() -
 	body.step_looks_due()
 	check_equal(look.steps, 1, "back on screen they step")
 	check(look.seconds <= Actor.LOOK_TIME_MOST + 0.0001, "a moment of them at most (%f)" % look.seconds)
+
+
+## The Tick hands each body the screen it worked out once for the frame (`step_looks_due(view,
+## screen)`): a body on it steps its looks, one off it waits, as when it asks itself; a body in
+## another view asks itself.
+func test_the_frames_screen_steps_and_holds_the_looks_as_the_body_asking() -> void:
+	var on: Array = _body_with_look(Vector2(10.0, 10.0))
+	var off: Array = _body_with_look(Vector2(-5000.0, -5000.0))
+	var view: Viewport = root.get_viewport()
+	var screen: Rect2 = view.get_visible_rect().grow(Actor.ON_SCREEN_MARGIN)
+	for made: Array in [on, off]:
+		(made[0] as Actor).tick_step(STEP, true)
+		(made[0] as Actor).step_looks_due(view, screen)
+	check_equal((on[1] as CountingLook).steps, 1, "on screen, its looks step")
+	check_equal((off[1] as CountingLook).steps, 0, "off screen, they wait")
+	# A screen of another view is not this body's: it asks itself (on screen).
+	var other := SubViewport.new()
+	root.add_child(other)
+	(on[0] as Actor).tick_step(STEP, true)
+	(on[0] as Actor).step_looks_due(other, Rect2())
+	check_equal((on[1] as CountingLook).steps, 2, "another view's empty screen: it asks itself")
+	other.free()

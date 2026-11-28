@@ -111,6 +111,11 @@ var _sprite_position: Vector2 = Vector2.ZERO
 ## node giving off the phase's motes (null for none).
 var _part_art: Dictionary = {}
 var _phase_motes: Node2D = null
+## True for a layered body (`_parts` not empty, set at setup), and the texture whose detail
+## (`ArtDetail.of`) the hop's offset was last scaled by, and that detail.
+var _layered: bool = false
+var _detail_of: Texture2D = null
+var _detail: float = 1.0
 
 
 func setup(owner_actor: Actor) -> void:
@@ -139,6 +144,7 @@ func setup(owner_actor: Actor) -> void:
 		_part_art[part] = part.texture
 		if part.carries_face and _face_part == null:
 			_face_part = part
+	_layered = not _parts.is_empty()
 	if _face_part != null:
 		_face_rest = _in_actor(_face_part).affine_inverse()
 	_put_on_page()
@@ -176,22 +182,28 @@ func step(delta: float) -> void:
 		_driver = actor.controller
 		_ai = _driver as AIController
 	var ai: AIController = _ai
-	var telegraphing: bool = ai != null and ai.is_telegraphing()
+	# Only a brain winding up telegraphs (`AIBrain.is_telegraphing`): the rest are answered by one read.
+	var telegraphing: bool = ai != null and ai.brain.state == AIBrain.State.WINDUP and ai.is_telegraphing()
+	# How far the windup is, read once for the step (the flash and the windup's frame show it).
+	var progress: float = ai.telegraph_progress() if telegraphing else 0.0
+	if _face != null and ai != null:
+		# The face, stepped next, shows it too: told, not asked again.
+		_face.winding_told = 1 if telegraphing else 0
 	if telegraphing != _showing:
-		_show_telegraph(telegraphing, ai)
+		_show_telegraph(telegraphing, progress)
 	elif telegraphing:
-		_update_telegraph(ai.telegraph_progress())
+		_update_telegraph(progress)
 	if _hurt_left > 0.0:
 		_hurt_left = maxf(_hurt_left - delta, 0.0)
 		# A hurt pose that goes on changes nothing on the sprite.
 		if _hurt_left <= 0.0 or _pose != Pose.HURT:
-			_update_sprite()
+			_update_sprite(progress)
 	elif _pose != Pose.IDLE or _showing:
 		# Idle with nothing showing changes nothing either.
-		_update_sprite()
+		_update_sprite(progress)
 	# The staff animation's aim, read once for the step (each read walks its table).
 	var dir: Vector2 = pose_dir()
-	if not _parts.is_empty():
+	if _layered:
 		# Only a layered body draws its pose (a body of one sprite has its strips above).
 		var transition: bool = ai != null and ai.brain.state == AIBrain.State.TRANSITION
 		_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), dir)
@@ -252,17 +264,25 @@ func _hop(delta: float, dir: Vector2) -> void:
 		up = roundf(absf(sin(_hop_time * HOP_RATE * PI)) * HOP_HEIGHT)
 	else:
 		up = roundf((sin(_hop_time * HOP_RATE) * 0.5 + 0.5) * HOP_IDLE)
-	# The staff animation of its cast (ActorLook's pose: lift, push, shake) on top.
-	var at: Vector2 = Vector2(0.0, -up) + show_pose(sprite, _face, false, _hop_time, dir)
+	var at: Vector2 = Vector2(0.0, -up)
+	# The staff animation of its cast (ActorLook's pose: lift, push, shake) on top: none to show
+	# while it plays none and left nothing to put back (`show_pose`'s own test, without its call).
+	if not dir.is_zero_approx() or _pose_stretched or _glow_material != null:
+		at += show_pose(sprite, _face, false, _hop_time, dir)
 	if at != _lift:
 		# Whole pixels: most steps the body is where it was.
 		_lift = at
-		if sprite != null and not _parts.is_empty():
+		if sprite != null and _layered:
 			# A layered body lifts as a whole: its parts ride its sprite.
 			sprite.position = _sprite_position + _lift
 		elif sprite != null:
-			# The offset is in the sprite's art pixels (twice the world's at 2x detail: ArtDetail).
-			sprite.offset = _sprite_offset + ArtDetail.to_art(sprite.texture, _lift)
+			# The offset is in the sprite's art pixels (twice the world's at 2x detail: ArtDetail),
+			# its texture's detail asked once a texture.
+			var texture: Texture2D = sprite.texture
+			if texture != _detail_of:
+				_detail_of = texture
+				_detail = float(ArtDetail.of(texture))
+			sprite.offset = _sprite_offset + _lift * _detail
 		if _face != null and _face_part == null:
 			_face.body_offset = _lift
 	if _face != null and _face_part != null:
@@ -284,23 +304,27 @@ func is_hurt() -> bool:
 	return _hurt_left > 0.0
 
 
-func _show_telegraph(on: bool, ai: AIController) -> void:
+func _show_telegraph(on: bool, progress: float) -> void:
 	_showing = on
 	if on:
-		_update_telegraph(ai.telegraph_progress())
+		_update_telegraph(progress)
 	elif sprite != null:
 		sprite.modulate = Color.WHITE
 
 
-## Make the sprite brighter as the cast gets closer (the lane is Feel's: the card's `wind_cue`).
+## Make the sprite brighter as the cast gets closer (the lane is Feel's: the card's `wind_cue`). Set
+## only when it is not that already (each set a call to the renderer, every frame of a windup).
 func _update_telegraph(progress: float) -> void:
 	if sprite != null:
-		sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
+		var colour: Color = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
+		if sprite.modulate != colour:
+			sprite.modulate = colour
 
 
 ## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose
-## without its texture is skipped.
-func _update_sprite() -> void:
+## without its texture is skipped. `progress` is the windup's this step (`AIController.
+## telegraph_progress`; negative: read here).
+func _update_sprite(progress: float = -1.0) -> void:
 	# A layered body's sprite shows no art: its parts have the poses' frames.
 	if sprite == null or not _parts.is_empty():
 		return
@@ -322,12 +346,15 @@ func _update_sprite() -> void:
 				if animation != null and animation.is_inside_tree():
 					animation.play()
 	if pose == Pose.WINDUP:
-		var ai: AIController = actor.controller as AIController
-		var progress: float = ai.telegraph_progress() if ai != null else 0.0
-		if progress >= TELEGRAPH_LAST_FROM:
-			sprite.frame = sprite.hframes - 1
-		else:
-			sprite.frame = int(progress * progress * WINDUP_FLASHES) % sprite.hframes
+		if progress < 0.0:
+			var ai: AIController = actor.controller as AIController
+			progress = ai.telegraph_progress() if ai != null else 0.0
+		var frame: int = sprite.hframes - 1
+		if progress < TELEGRAPH_LAST_FROM:
+			frame = int(progress * progress * WINDUP_FLASHES) % sprite.hframes
+		# Set only when it changes (each set redraws it and tells its listeners).
+		if sprite.frame != frame:
+			sprite.frame = frame
 
 
 ## Show a strip of square frames on the sprite and stop the idle animation.

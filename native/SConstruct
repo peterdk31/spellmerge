@@ -44,8 +44,7 @@ if env["platform"] in ("linux", "windows") and env["arch"] == "x86_64":
     env.Append(CCFLAGS=["-march=" + cpu], LINKFLAGS=["-march=" + cpu])
 # The module's own threads (src/jobs.cpp, shot scale H5): std::thread wants -pthread on Linux.
 # MinGW links its thread runtime in with the C++ one (godot-cpp's use_static_cpp: -static), and the
-# web is built without threads (ci/build/native.sh: threads=no, so jobs.cpp runs every loop on the
-# calling thread).
+# web is built with threads (ci/build/native.sh: threads=yes; godot-cpp adds -sUSE_PTHREADS=1).
 if env["platform"] == "linux":
     env.Append(CCFLAGS=["-pthread"], LINKFLAGS=["-pthread"])
 sources = Glob("src/*.cpp")

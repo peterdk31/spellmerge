@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 ## a uniform set, a view coming back with a uniform set while it was away, a reader gone between
 ## others.
 const ViewReadersScript := preload("res://gameplay/feel/view_readers.gd")
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 
 var _readers: ViewReadersScript
 var _material: ShaderMaterial
@@ -67,7 +68,7 @@ func test_what_an_item_shows_reaches_its_copies() -> void:
 	item.position = Vector2(3.0, 4.0)
 	item.modulate = Color(0.5, 0.25, 1.0, 1.0)
 	item.self_modulate = Color(1.0, 0.0, 0.0, 0.5)
-	item.multimesh = MultiMesh.new()
+	item.multimesh = BatchesScript.multimesh()
 	item.texture = PlaceholderTexture2D.new()
 	_follow(4)
 	check_equal(_readers.followed - followed, 2, "only the changed item's two copies followed")
@@ -241,7 +242,7 @@ func _check_followed(count: int, step: int) -> int:
 func test_random_changes_leave_what_the_full_follow_leaves() -> void:
 	var dice := RandomNumberGenerator.new()
 	dice.seed = 20261128
-	var meshes: Array[MultiMesh] = [MultiMesh.new(), MultiMesh.new()]
+	var meshes: Array[MultiMesh] = [BatchesScript.multimesh(), BatchesScript.multimesh()]
 	var items: Array[MultiMeshInstance2D] = []
 	for k in 6:
 		items.append(_item(k))

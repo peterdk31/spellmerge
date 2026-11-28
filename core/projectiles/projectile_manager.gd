@@ -698,7 +698,7 @@ signal still_shots_drawn(view: StillShotView)
 ## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
 ## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
 ## 190 KB for a full one), linked again by `rebuild_derived`.
-const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_kernel_rays", &"_walk_skips", &"_trail_out", &"_trail_count", &"_field_out", &"_field_out_field", &"_job_rows", &"_job_targets", &"_job_moves", &"_job_hits", &"_job_walls", &"_job_guards", &"_job_places", &"_job_rays", &"_job_batches", &"_job_draw"]
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"hit_table", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent", &"_places_found", &"_one", &"_kernel_nearest", &"_kernel_rays", &"_walk_skips", &"_trail_out", &"_trail_count", &"_field_out", &"_field_out_field", &"_job_rows", &"_job_targets", &"_job_moves", &"_job_hits", &"_job_walls", &"_job_guards", &"_job_places", &"_job_rays", &"_job_batches", &"_job_draw"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -756,6 +756,10 @@ var _finding: bool = false
 ## (`HitBatch`, hit batch A1): emptied within the step (`_send_merged`). The native hit pass reads
 ## and writes its arrays (`BATCH_FIELDS`).
 var _hit_batch: HitBatch = HitBatch.new()
+## The hits sent since the step began, one row each in the order sent (`HitTable`, perf plan H1):
+## every `projectile_hit` the manager sends is a row's, and the table's applier (Combat) applies
+## the row once its listeners have heard it (`_send_hit_row`).
+var hit_table: HitTable = HitTable.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
 ## pass already had or opening one it may (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
@@ -2721,6 +2725,7 @@ func step(delta: float) -> void:
 	sim_time += delta
 	_mem_step += 1
 	_last_delta = delta
+	hit_table.empty()
 	_job_targets._refresh_targets()
 	at = _profiled(PROF_REFRESH, at)
 	var top: int = _high
@@ -3726,9 +3731,11 @@ func _carrier_card_of(slot: int) -> StringName:
 	return _job_hits._carrier_card_of(slot)
 
 
-## A merged hit (`count` hits of one spell's shots on one body) on `node`: its `projectile_impact` with the
-## shot's look, then its `projectile_hit`.
+## A merged hit (`count` hits of one spell's shots on one body) on `node`: its row of the hit
+## table, its `projectile_impact` with the shot's look, then its `projectile_hit` and the row applied
+## (`_send_hit_row`).
 func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: int, slot: int, card: StringName, body: int, core: Color, look: int, count: int) -> void:
+	var row: int = hit_table.write(caster, node, at, heading, tag, slot, count, card, body, core, look)
 	impact_carrier_card = card
 	impact_body = body
 	impact_core = core
@@ -3743,10 +3750,23 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_look = 0
 	impact_tag = 0
 	_event_slot = slot
-	_sent += 1
-	events.projectile_hit.emit(caster, node, at, tag, slot)
+	_send_hit_row(row)
 	_event_slot = -1
 	impact_count = 1
+
+
+## The row `row` of the hit table sent: its `projectile_hit` (the row named `sending` meanwhile, so
+## the applier's own listener leaves it), then the row handed to the table's applier (Combat), after
+## every listener, with the sender's `impact_count` and `_event_slot` still set as they heard it.
+## A handler's hit sent meanwhile is a row of its own, applied inside.
+func _send_hit_row(row: int) -> void:
+	var table: HitTable = hit_table
+	var outer: int = table.sending
+	table.sending = row
+	_sent += 1
+	events.projectile_hit.emit(table.caster[row], table.target[row], table.at[row], table.tag[row], table.shot[row])
+	table.sending = outer
+	table.apply(row)
 
 
 ## See `ProjectileHits._end_spent`.

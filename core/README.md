@@ -32,7 +32,7 @@ The shared services every other area stands on.
 - `save/`: `SaveFile`, `user://save.cfg` only. `story/`: `StoryValidator`.
 - `base/`: data resources and shared readers: the card kinds (`CarrierCard`, `ElementBase`, `ModifierBase`, `TriggerBase`, `MulticastBase`), `StaffBase`, `EnemyBase`, `PropBase`, `RoomBase`, `RunDefinition`, `MoteKind`, `Palette`, ...; each has `problems()` for the content checks.
 - `spells/`: `Spells` autoload (`SpellRuntime`): `compile_staff`, `staff_view`, `install_staff`, `cast_staff`, `cast_ready`, `next_cast_sense`, `component_*`, `hit_profile(tag)`, `look_of`. Carriers live in `spells/carriers/` and answer `traits()`; they reach the runtime only through `CarrierKit`, and `spells.gd` names no carrier (docs/CARRIERS.md; `tests/core/test_card_rules.gd`). `SpellValidator` (`tests/content/spells/test_validators.gd`), `SpellTag`, `SpellLimits` (pacing only), `CastSense`.
-- `projectiles/`: `Projectiles` autoload (below) and its jobs, `RoomGrid` (`grid()`: walls, holes, footprints; `walk_body`), `HitBatch`, `Batches`, `ShaderWarmup`.
+- `projectiles/`: `Projectiles` autoload (below) and its jobs, `RoomGrid` (`grid()`: walls, holes, footprints; `walk_body`), `HitBatch`, `HitTable`, `Batches`, `ShaderWarmup`.
 - `pools/`: `pool.gd`, fixed size, never grows; for nodes and effects only.
 
 ## The spell runtime
@@ -55,7 +55,7 @@ A job reads the runtime's arrays and dictionaries through members of its own of 
 
 ## The projectile manager
 
-Rows in packed arrays, stepped by the Tick (`step`). `spawn`, `add_target`, `ray`, `sweep`, `strike`, `threat`, `nearest_target`, `targets_in`, `set_cap`. Events (`projectile_hit`, `projectile_expired`, `shot_ended`, ...) name the shot's slot last. The hit-work budget is work units, never time. Tests: `tests/core/test_projectiles_kit.gd`, `test_hit_budget.gd`, `test_draw_regions.gd`, `test_body_walk.gd`.
+Rows in packed arrays, stepped by the Tick (`step`). `spawn`, `add_target`, `ray`, `sweep`, `strike`, `threat`, `nearest_target`, `targets_in`, `set_cap`. Events (`projectile_hit`, `projectile_expired`, `shot_ended`, ...) name the shot's slot last. Every hit it sends on a body is a row of its hit table (`hit_table`, `HitTable`: the hits since its step began, in the order sent; perf plan H1): `projectile_hit` goes out from the row, then the table's applier (Combat's `apply_hit_row`) applies it, after every listener. The hit-work budget is work units, never time. Tests: `tests/core/test_projectiles_kit.gd`, `test_hit_budget.gd`, `test_draw_regions.gd`, `test_body_walk.gd`.
 
 Its code is split by job; its state is not. `projectile_manager.gd` holds every member (the state, DERIVED, REFS, VIEW, in their order), every constant the native kernels check, the public API (a moved function keeps a one-line wrapper there, so no caller changes), the lifecycle (`set_cap`, `clear`, `begin_run`, `rebuild_derived`), `step`, and a shot's end and its events (`_kill`, `_expire`, `_send_hit`). Each job is a script of its own, an `Object` the manager makes and frees (`_job_<name>`, DERIVED):
 
@@ -64,7 +64,7 @@ Its code is split by job; its state is not. `projectile_manager.gd` holds every 
 | rows | `projectile_rows.gd` | a shot's row written at spawn, the batch spawn, the cap's drop |
 | targets | `projectile_targets.gd` | registered bodies, their grid, `nearest_target`, `targets_in` |
 | moves | `projectile_moves.gd` | the common and trail passes, behaviour lists and passes, orbits, homing |
-| hits | `projectile_hits.gd` | the hit pass, the hit test, the targets a shot remembers, the merged hits |
+| hits | `projectile_hits.gd` | the hit pass, the hit test, the targets a shot remembers, the merged hits (sent as rows of the hit table) |
 | walls | `projectile_walls.gd` | wall bodies, solid shots, what a shot does at a wall |
 | guards | `projectile_guards.gd` | deflect, block, shots in a wedge, `threat`, shields |
 | places | `projectile_places.gd` | portal gates, fields, `shot_places`, `pass_shot` |

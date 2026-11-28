@@ -31,6 +31,12 @@ extends Node
 ##   `touching(centre, radius, out)` names the actors whose box a body's circle overlaps, lowest id
 ##   first (the walking body asks after its move, `Actor.move`). Closing an id takes its box away.
 ##
+## - The body table (perf plan change 2, C1, docs/milestones/perf-plan.md): columns by actor id of
+##   what the bodies' kernels will read, `places`, `velocities`, `radii` and `body_flags` (`FLAG_*`),
+##   beside `teams()`. In this step they follow the nodes (DERIVED): the body is their one writer
+##   (`write_row`, `Actor.write_row`), the nodes stay the state, and nothing in the game reads them
+##   yet. When they are current: see "The body table" in core/actors/README.md.
+##
 ## Packed arrays sized ACTORS, nothing allocated after start. An id outside the table or not
 ## open is safe everywhere: the questions answer NONE (`budget_of` SHARED, `node_of` null) and
 ## the changes do nothing. The bodies open their own ids (wizards, enemies that cast, the actor
@@ -57,10 +63,23 @@ const TEAM_WORLD: int = 2
 ## The enemy ramp (Blight); 0-3 are the four hat colours.
 const RAMP_ENEMY: int = 4
 
+## The body table's flags (`body_flags`): bits of one byte a row. FLAG_BODY: a body wrote the row
+## (an open id with no body has none, so a kernel skips it); FLAG_DOWN: out of play to everything
+## that asks (`Actor.is_down`: downed, falling or spawning in); FLAG_DYING: it died this tick
+## (`Actor.is_dying`); FLAG_SPAWNING and FLAG_FALLING: the two downs a kernel tells apart (it does
+## not walk while it spawns in; it is out of the move while it falls).
+const FLAG_BODY: int = 1
+const FLAG_DOWN: int = 2
+const FLAG_DYING: int = 4
+const FLAG_SPAWNING: int = 8
+const FLAG_FALLING: int = 16
+
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the node of each id,
 ## kept by its instance id: a lookup from the id (`node_of`), set again by each body as it opens
-## (equality only, never an identity: N5).
-const DERIVED: Array[StringName] = [&"_node"]
+## (equality only, never an identity: N5). The body table's columns follow the bodies (C1): written
+## by them, set again by each body after a restore (`Actor.rebuild_derived`), the rows of the ids
+## not open emptied here (`rebuild_derived`).
+const DERIVED: Array[StringName] = [&"_node", &"places", &"velocities", &"radii", &"body_flags"]
 
 var _open: PackedByteArray = PackedByteArray()
 var _team: PackedInt32Array = PackedInt32Array()
@@ -106,6 +125,16 @@ var _high: int = 0
 var _touch_low: PackedVector2Array = PackedVector2Array()
 var _touch_high: PackedVector2Array = PackedVector2Array()
 var touch_ids: PackedInt32Array = PackedInt32Array()
+## The body table (C1; see the class doc): per actor id, where its body stands (its global
+## position, room pixels), its velocity, its radius against the walls (`Actor.wall_radius`) and its
+## `FLAG_*` bits. An id not open, or open with no body yet, has an empty row (zeros). The table's own
+## arrays, for a kernel to read in place: read only. Written by the body's script alone
+## (gameplay/actor/actor.gd): through `write_row`, or, for its place and velocity in the tick's hot
+## paths (after its own tick, and `Actor.gather_rows`), straight into these arrays, an open id's only.
+var places: PackedVector2Array = PackedVector2Array()
+var velocities: PackedVector2Array = PackedVector2Array()
+var radii: PackedFloat32Array = PackedFloat32Array()
+var body_flags: PackedByteArray = PackedByteArray()
 
 
 func _init() -> void:
@@ -124,6 +153,10 @@ func _init() -> void:
 	_seat_home.resize(SEATS)
 	_touch_low.resize(ACTORS)
 	_touch_high.resize(ACTORS)
+	places.resize(ACTORS)
+	velocities.resize(ACTORS)
+	radii.resize(ACTORS)
+	body_flags.resize(ACTORS)
 	clear()
 
 
@@ -145,6 +178,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_node[id] = 0
 	still[id] = 0
 	asleep[id] = 0
+	_empty_row(id)
 	_births += 1
 	_birth[id] = _births
 	_release_hold(id)
@@ -172,6 +206,7 @@ func close(id: int) -> void:
 	_birth[id] = 0
 	_release_hold(id)
 	set_touch_area(id, Rect2())
+	_empty_row(id)
 	_count -= 1
 	if id < _lowest_free:
 		_lowest_free = id
@@ -503,6 +538,38 @@ func clear() -> void:
 	_touch_low.fill(Vector2.ZERO)
 	_touch_high.fill(Vector2.ZERO)
 	touch_ids.clear()
+	places.fill(Vector2.ZERO)
+	velocities.fill(Vector2.ZERO)
+	radii.fill(0.0)
+	body_flags.fill(0)
+
+
+## The body table's row of the open actor `id` (C1): its body's place, velocity, radius against the
+## walls and `FLAG_*` bits (FLAG_BODY is added here). Only the body writes its row (`Actor.write_row`);
+## an id not open is left empty.
+func write_row(id: int, place: Vector2, velocity: Vector2, radius: float, flags: int) -> void:
+	if not is_open(id):
+		return
+	places[id] = place
+	velocities[id] = velocity
+	radii[id] = radius
+	body_flags[id] = flags | FLAG_BODY
+
+
+## After a snapshot gave the table its state back (core/sim/README.md, "Snapshots"): the rows of
+## the ids not open are emptied (the bodies of the open ones write theirs, `Actor.rebuild_derived`,
+## in whichever order the restore calls them).
+func rebuild_derived() -> void:
+	for id in ACTORS:
+		if _open[id] == 0 and body_flags[id] != 0:
+			_empty_row(id)
+
+
+func _empty_row(id: int) -> void:
+	places[id] = Vector2.ZERO
+	velocities[id] = Vector2.ZERO
+	radii[id] = 0.0
+	body_flags[id] = 0
 
 
 ## Seats `id` at `seat` (NONE, or anything outside 0-3, unseats it); whoever held that seat

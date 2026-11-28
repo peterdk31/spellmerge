@@ -12,6 +12,12 @@ extends RefCounted
 ## `VIEW_MARGIN` from the view: a whole room burning costs what a screen of motes does. A frame
 ## allocates nothing; a cell's change may grow its state's list (a change, not a frame).
 ##
+## A frame walks only the streams whose state some cell shows (`_live`, in the streams' order, kept
+## by `show` as a state's list fills or empties): a biome's rooms at rest hold hundreds of streams
+## and no cell giving off (perf plan F3, 2026-11-28: 476 streams in 28 rooms walked a frame, 0.56 ms).
+## A stream whose list is empty at a frame owes nothing from then, as the walk set it (`_dropped`:
+## one that empties and fills again between two frames, a fire moving on, keeps what it owed).
+##
 ## A stream that cannot be given off (a problem in its data, a mask, which needs art a cell has not,
 ## a standing source, or a start or a stop, which a cell that changes state has no clock for) says
 ## so each time a room is laid, naming its kind and state, and the others go on. A box's `spacing`
@@ -40,6 +46,8 @@ class Stream:
 	var group: int = 0
 	var owed: float = 0.0
 	var warned: bool = false
+	## Left `_live` since the last frame (listed in `_dropped`).
+	var dropped: bool = false
 	var named: String = ""
 	## Whether its kind is flat (the floor's), so the effects' row's `flat_share` scales its rate.
 	var flat: bool = false
@@ -61,6 +69,10 @@ var _group_of_cell: PackedInt32Array = PackedInt32Array()
 var _place_of_cell: PackedInt32Array = PackedInt32Array()
 ## The group of each kind's states: `_group_of_state[kind][state]` (-1: a state with no streams).
 var _group_of_state: Array[PackedInt32Array] = []
+## The streams whose group has cells, by their index in `_streams`, in that order (`_find_live`).
+var _live: PackedInt32Array = PackedInt32Array()
+## The streams that left `_live` since the last frame (`_settle_dropped`), each once.
+var _dropped: PackedInt32Array = PackedInt32Array()
 var _rng := RandomNumberGenerator.new()
 var _last: float = -1.0
 
@@ -71,6 +83,8 @@ func lay(layout: CoverLayout) -> void:
 	_streams.clear()
 	_cells.clear()
 	_group_of_state.clear()
+	_live = PackedInt32Array()
+	_dropped = PackedInt32Array()
 	_group_of_cell = PackedInt32Array()
 	_place_of_cell = PackedInt32Array()
 	if layout == null:
@@ -123,6 +137,8 @@ func show(cell: int, state: int) -> void:
 		_place_of_cell[last] = at
 		list.resize(list.size() - 1)
 		_cells[was] = list
+		if list.is_empty():
+			_find_live()
 	_group_of_cell[cell] = group
 	_place_of_cell[cell] = -1
 	if group >= 0:
@@ -131,6 +147,35 @@ func show(cell: int, state: int) -> void:
 		_place_of_cell[cell] = list.size()
 		list.append(cell)
 		_cells[group] = list
+		if list.size() == 1:
+			_find_live()
+
+
+## The streams whose group has cells into `_live`, in the streams' order; the others listed in
+## `_dropped`, to owe nothing at the next frame if still without a cell. Only when a group fills or
+## empties.
+func _find_live() -> void:
+	_live.resize(0)
+	for index in _streams.size():
+		var stream: Stream = _streams[index]
+		if not _cells[stream.group].is_empty():
+			_live.append(index)
+		elif not stream.dropped:
+			stream.dropped = true
+			_dropped.append(index)
+
+
+## At a frame's start: the streams dropped since the last that still have no cell owe nothing (what
+## the walk of every stream set them to while they had none).
+func _settle_dropped() -> void:
+	if _dropped.is_empty():
+		return
+	for index in _dropped:
+		var stream: Stream = _streams[index]
+		stream.dropped = false
+		if _cells[stream.group].is_empty():
+			stream.owed = 0.0
+	_dropped.resize(0)
 
 
 ## How many cells give off the motes of state `state` of the layout's kind `kind_id` (for tests).
@@ -150,12 +195,14 @@ func cells_giving_off(kind_id: StringName, state: int) -> int:
 func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
+	_settle_dropped()
 	var near: Rect2 = view.grow(VIEW_MARGIN) if view.has_area() else Rect2()
 	var budget: int = MOST_A_FRAME
 	if near.has_area() and _layout != null and not near.intersects(_layout.rect(), true):
 		_owe_far(dt, pool)
 		return
-	for stream in _streams:
+	for index in _live:
+		var stream: Stream = _streams[index]
 		var cells: PackedInt32Array = _cells[stream.group]
 		if pool == null or ramp_table == null or cells.is_empty():
 			stream.owed = 0.0
@@ -186,7 +233,8 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2()) -> void:
 ## had been rolled and passed by (the performance pass, 2026-11-21: a biome's rooms out of sight
 ## rolled their fires' motes each frame). Only the dice's order differs, and they are the view's.
 func _owe_far(dt: float, pool: MotesScript) -> void:
-	for stream in _streams:
+	for index in _live:
+		var stream: Stream = _streams[index]
 		var cells: PackedInt32Array = _cells[stream.group]
 		if pool == null or ramp_table == null or cells.is_empty():
 			stream.owed = 0.0

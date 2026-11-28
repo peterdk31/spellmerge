@@ -9,7 +9,16 @@ const Manager := preload("res://core/projectiles/projectile_manager.gd")
 
 ## Not state (core/sim/README.md): the manager, the other jobs this one calls and the manager's
 ## arrays it works on, each the manager's own array (shared, never a copy), linked by `link`.
-const DERIVED: Array[StringName] = [&"pm", &"_job_batches", &"_job_moves", &"_job_walls", &"_pos", &"_prev", &"_vel", &"_facing", &"_life", &"_radius", &"_ramp", &"_tag", &"_motion", &"_body", &"_look_light_intensity", &"_look_light_reach", &"_seq", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"_flags", &"_alive", &"_solids", &"_room_grid", &"_core", &"_look", &"_born", &"_nodes", &"_rooms", &"_buffers", &"_mirrors", &"_light_rows", &"_light_counts", &"_still_views", &"_draw_regions", &"_no_rows", &"_batch_counts", &"_body_meshes", &"_draw_out", &"spark_births", &"_tail_from", &"_tail_carry", &"_tail_n", &"_end_births", &"_group", &"_group_count", &"_groups", &"_group_at", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort"]
+const DERIVED: Array[StringName] = [&"pm", &"_job_batches", &"_job_moves", &"_job_walls", &"_pos", &"_prev", &"_vel", &"_facing", &"_life", &"_radius", &"_ramp", &"_tag", &"_motion", &"_body", &"_look_light_intensity", &"_look_light_reach", &"_seq", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"_flags", &"_alive", &"_solids", &"_room_grid", &"_core", &"_look", &"_born", &"_nodes", &"_rooms", &"_buffers", &"_mirrors", &"_light_rows", &"_light_counts", &"_still_views", &"_draw_regions", &"_no_rows", &"_batch_counts", &"_body_meshes", &"_draw_out", &"spark_births", &"_tail_from", &"_tail_carry", &"_tail_n", &"_end_births", &"_group", &"_group_count", &"_groups", &"_group_at", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_sparks", &"_sparks_refused", &"_spark_arrays"]
+## Of DERIVED, the members this job keeps itself (`link` takes the rest from the manager): the
+## manager's native kernel that took the sparks' numbers (`_spark_kernel`), one that refused them,
+## and the arrays the sparks are rolled from (SPARK_ARRAYS).
+const OWN: Array[StringName] = [&"pm", &"_sparks", &"_sparks_refused", &"_spark_arrays"]
+## The arrays `ShotKernel.give_off_sparks` reads, in its order: the manager's own (shared, never a copy).
+const SPARK_ARRAYS: Array[StringName] = [&"_groups", &"_group_start", &"_group_end", &"_group_share", &"_by_group", &"_alive", &"_flags",
+		&"_look", &"_motion", &"_pos", &"_prev", &"_vel", &"_ramp", &"_core", &"_tag", &"_born", &"_orbit_centre"]
+## The most tries a frame's sparks make (`_give_off_sparks`).
+const SPARK_TRIES_MOST: int = Manager.SPARK_BIRTHS_MAX * 4
 ## The drawing's functions (core/sim/README.md, "The line"): they read the game and write only what is drawn.
 const VIEW: Array[StringName] = [&"update_draw", &"_give_off_sparks", &"_give_off_spark"]
 
@@ -76,6 +85,9 @@ var _group_want: PackedFloat32Array
 var _group_frame: PackedInt32Array
 var _group_seen: PackedInt32Array
 var _group_sort: PackedFloat32Array
+var _sparks: Object = null
+var _sparks_refused: Object = null
+var _spark_arrays: Array = []
 
 
 ## Takes the manager's arrays and jobs, by the names in DERIVED: again whenever the manager's arrays
@@ -83,8 +95,11 @@ var _group_sort: PackedFloat32Array
 func link(manager: Manager) -> void:
 	pm = manager
 	for name: StringName in DERIVED:
-		if name != &"pm":
+		if not name in OWN:
 			set(name, manager.get(name))
+	_spark_arrays.clear()
+	for name: StringName in SPARK_ARRAYS:
+		_spark_arrays.append(manager.get(name))
 
 
 func update_draw(fraction: float = -1.0) -> void:
@@ -191,9 +206,16 @@ func _give_off_sparks(fraction: float) -> void:
 		spark_births.resize(Manager.SPARK_BIRTHS_MAX * Manager.SPARK_BIRTH_STRIDE)
 	if pm._high == 0:
 		return
-	var tries_left: int = Manager.SPARK_BIRTHS_MAX * 4
+	var tries_left: int = SPARK_TRIES_MOST
 	# The steps the frame's moments cover.
 	var span: float = float(moments) / Manager.SPARK_MOMENTS / maxf(pm._last_delta, 0.0001)
+	# Natively with the manager's kernel: the same births from the same dice (native/src/spark_roll.h).
+	var kernel: Object = _spark_kernel()
+	if kernel != null:
+		pm.spark_birth_count = kernel.call(&"give_off_sparks", _spark_arrays, spark_births, pm.spark_birth_count, pm._spark_rng.state, moments,
+				fraction, span, pm.sim_time, pm._group_live)
+		pm._spark_rng.state = kernel.call(&"spark_state")
+		return
 	for i in pm._group_live:
 		var group: int = _groups[i]
 		var first: int = _group_start[group]
@@ -205,6 +227,36 @@ func _give_off_sparks(fraction: float) -> void:
 		for n in tries:
 			if not _give_off_spark(_by_group[first + pm._spark_rng.randi_range(0, shots - 1)], fraction, span):
 				return
+
+
+## The manager's native kernel when it rolls the sparks, handed the numbers it rolls by
+## (`spark_config`) the first time; null without one, or for a kernel built before it rolled them or
+## that refused the numbers (the GDScript rolls then).
+func _spark_kernel() -> Object:
+	var kernel: Object = pm._kernel
+	if kernel == null or kernel == _sparks:
+		return kernel
+	if kernel == _sparks_refused or not kernel.has_method(&"give_off_sparks"):
+		return null
+	if not kernel.call(&"spark_configure", spark_config()):
+		push_error("Projectiles: the native ShotKernel does not take the sparks' numbers; rolling them in GDScript")
+		_sparks_refused = kernel
+		return null
+	_sparks = kernel
+	return kernel
+
+
+## The numbers the native kernel rolls the sparks by (`ShotKernel.spark_configure`), all the
+## manager's but SPARK_TRIES_MOST.
+static func spark_config() -> Dictionary:
+	var config: Dictionary = {"SPARK_TRIES_MOST": SPARK_TRIES_MOST}
+	var script: Script = Manager
+	var constants: Dictionary = script.get_script_constant_map()
+	for name: String in ["SPARK_RATES", "ORBIT_GROW", "EMITTING_MASK", "F_QUAD", "MOTION_ORBIT", "SPARK_BIRTHS_MAX", "SPARK_BIRTH_STRIDE", "SPARK_X",
+			"SPARK_Y", "SPARK_BACK_X", "SPARK_BACK_Y", "SPARK_KIND", "SPARK_RAMP", "SPARK_LOOK", "SPARK_CORE", "SPARK_TAG", "SPARK_TAG_BITS",
+			"SPARK_FLAG_STEP", "SPARK_FLAG_SHIFT", "SPARK_LAYER_MASK"]:
+		config[name] = constants.get(name)
+	return config
 
 
 ## One try of `_give_off_sparks` on the drawn shot in `slot`: a birth of one of its kinds, kept at

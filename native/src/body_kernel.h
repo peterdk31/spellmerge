@@ -19,6 +19,10 @@
 // worked out from where its node stands (`RoomGrid.place_at`, mirrored) and set as its `room`, the
 // twin of `RoomLife.gd_find_places` (gameplay/flow/room_life.gd); tests/gameplay/flow/test_room_life.gd
 // compares the two.
+//
+// `cover_look` (perf plan C3, its own file cover_look.cpp) is a room's cover look, the twin of
+// `CoverRoom.gd_look` (gameplay/cover/cover_room.gd); tests/gameplay/cover/test_cover_look.gd compares
+// the two to the bit.
 
 #pragma once
 
@@ -93,6 +97,17 @@ public:
 	bool places(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, Object *projectiles, const Array &rects,
 			const PackedByteArray &cells, const PackedByteArray &over, const PackedByteArray &mixed, const PackedByteArray &touched, int64_t w,
 			int64_t h, double cell, const Vector2 &origin, const PackedInt32Array &places) const;
+
+	// `CoverRoom.gd_look` (perf plan C3) on the room's danger bits (`row_bits`, `column_bits`, `danger_bits`
+	// of `words` a row; the room `columns` by `rows` cover cells from world pixel `origin`): the window
+	// within `reach` of `at` (`CoverSight.open`) written into `window` as its first cell's column and row,
+	// its columns, its rows and how many cells are marked, and its cells marked in `harms` (the sight's,
+	// all 0 on the way in, SIDE a row). -1: `at` is off the room's cover (nothing written); 0: no window
+	// (none of the room within reach); 1: a window; -2, logged, for arrays too small (the caller runs
+	// the GDScript).
+	int64_t cover_look(const PackedInt64Array &row_bits, const PackedInt64Array &column_bits, const PackedInt64Array &danger_bits, int64_t words,
+			int64_t columns, int64_t rows, const Vector2 &origin, const Vector2 &at, double reach, const PackedByteArray &harms,
+			const PackedInt32Array &window) const;
 
 protected:
 	static void _bind_methods();

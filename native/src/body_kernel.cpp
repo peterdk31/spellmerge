@@ -459,4 +459,7 @@ void BodyKernel::_bind_methods() {
 								 "crossed", "radius", "reach", "rects", "cells", "over", "mixed", "touched", "pw", "ph", "place_cell"),
 			&BodyKernel::walk_place);
 	ClassDB::bind_method(D_METHOD("gather", "nodes", "ids", "count", "places", "velocities"), &BodyKernel::gather);
+	ClassDB::bind_method(D_METHOD("cover_look", "row_bits", "column_bits", "danger_bits", "words", "columns", "rows", "origin", "at", "reach", "harms",
+								 "window"),
+			&BodyKernel::cover_look);
 }

@@ -215,10 +215,28 @@ func giving_cell(at: Vector2) -> int:
 
 ## Fill `sight` (cleared by the caller) with where the room's floor within `reach` of `at` would harm a
 ## body (the cover area's `look`), for `at` on the room's cover (`holds`; nothing for a point off it).
-## The window's rows and columns that hold danger are found first (`_row_bits`, `_column_bits`): with
-## none, nothing is read but those; else each such row is read from `_danger_bits`, a word or two
-## each. Inlined: a look is asked by every walking body every think. Allocates nothing.
+## A look is asked by every walking body every think, so it runs the native module's
+## `BodyKernel.cover_look` when it is loaded (perf plan C3: called straight, no wrapper), else
+## `gd_look`; tests/gameplay/cover/test_cover_look.gd compares the two to the bit. Allocates nothing.
 func look(at: Vector2, reach: float, sight: CoverSight) -> void:
+	if _danger == 0 or layout == null or _state.size() != layout.cells.size():
+		return
+	var kernel: Object = WallSlide.kernel()
+	if kernel != null:
+		sight.clear()
+		var opened: int = kernel.call(&"cover_look", _row_bits, _column_bits, _danger_bits, _words, layout.columns, layout.rows, layout.origin, at, reach, sight.cells(), sight.window())
+		if opened >= 0:
+			sight.take_window(layout.origin, opened == 1)
+			return
+		if opened == -1:
+			return
+	gd_look(at, reach, sight)
+
+
+## `look` in GDScript: the reference `BodyKernel.cover_look` mirrors, and the fallback. The window's
+## rows and columns that hold danger are found first (`_row_bits`, `_column_bits`): with none, nothing
+## is read but those; else each such row is read from `_danger_bits`, a word or two each.
+func gd_look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	if _danger == 0 or layout == null or _state.size() != layout.cells.size():
 		return
 	var columns: int = layout.columns

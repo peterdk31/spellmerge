@@ -30,10 +30,14 @@ var rows: int = 0
 var count: int = 0
 ## By window cell (row by row, SIDE a row): 1 where a body would be harmed.
 var _harms: PackedByteArray = PackedByteArray()
+## Where a native look (`BodyKernel.cover_look`, perf plan C3) writes its window: its first cell's
+## column and row, its columns, its rows and how many cells it marked (`take_window` reads it).
+var _window: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
 	_harms.resize(SIDE * SIDE)
+	_window.resize(5)
 
 
 ## Nothing seen: no window, every cell safe.
@@ -70,6 +74,29 @@ func open(world_at: Vector2, reach: float, room_columns: int, room_rows: int, gr
 	columns = x1 - x0 + 1
 	rows = y1 - y0 + 1
 	return true
+
+
+## The window's cells (row by row, SIDE a row), for a native look to mark in place (`BodyKernel.cover_look`);
+## all 0 while nothing is marked.
+func cells() -> PackedByteArray:
+	return _harms
+
+
+## Where a native look writes its window (`BodyKernel.cover_look`), read back by `take_window`.
+func window() -> PackedInt32Array:
+	return _window
+
+
+## A native look's answer taken in (`BodyKernel.cover_look`, after `clear`): what `open` and the marks
+## leave, the window `opened` or none, of a room whose grid starts at world pixel `grid_origin`.
+func take_window(grid_origin: Vector2, opened: bool) -> void:
+	offset = grid_origin
+	if not opened:
+		return
+	origin = Vector2i(_window[0], _window[1])
+	columns = _window[2]
+	rows = _window[3]
+	count = _window[4]
 
 
 ## The room cell at column `x`, row `y` (inside the window) would harm a body.

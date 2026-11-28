@@ -87,11 +87,15 @@ func window() -> PackedInt32Array:
 	return _window
 
 
-## A native look's answer taken in (`BodyKernel.cover_look`, after `clear`): what `open` and the marks
-## leave, the window `opened` or none, of a room whose grid starts at world pixel `grid_origin`.
+## A native look's answer taken in (`BodyKernel.cover_look`, on a sight with nothing marked): what
+## `open` and the marks leave, the window `opened` or none, of a room whose grid starts at world pixel
+## `grid_origin`.
 func take_window(grid_origin: Vector2, opened: bool) -> void:
 	offset = grid_origin
 	if not opened:
+		origin = Vector2i.ZERO
+		columns = 0
+		rows = 0
 		return
 	origin = Vector2i(_window[0], _window[1])
 	columns = _window[2]

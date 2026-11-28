@@ -23,7 +23,8 @@ int64_t BodyKernel::cover_look(const PackedInt64Array &row_bits, const PackedInt
 		int64_t columns, int64_t rows, const Vector2 &origin, const Vector2 &at, double reach, const PackedByteArray &harms,
 		const PackedInt32Array &window) const {
 	ERR_FAIL_COND_V_MSG(harms.size() < SIDE * SIDE || window.size() < 5, -2, "BodyKernel.cover_look: the sight's arrays are too small");
-	ERR_FAIL_COND_V_MSG(columns <= 0 || rows <= 0 || words <= 0 || danger_bits.size() < rows * words, -2, "BodyKernel.cover_look: the room's bits are too small");
+	ERR_FAIL_COND_V_MSG(columns <= 0 || rows <= 0 || words * BITS < columns || danger_bits.size() < rows * words, -2,
+			"BodyKernel.cover_look: the room's bits are too small");
 	// `look`: `holds(at)`, as `CoverLayout.cell_of` works it out.
 	const int64_t cx = floori(((double)at.x - (double)origin.x) / COVER_CELL);
 	const int64_t cy = floori(((double)at.y - (double)origin.y) / COVER_CELL);

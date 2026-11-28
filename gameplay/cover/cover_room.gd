@@ -217,18 +217,20 @@ func giving_cell(at: Vector2) -> int:
 ## body (the cover area's `look`), for `at` on the room's cover (`holds`; nothing for a point off it).
 ## A look is asked by every walking body every think, so it runs the native module's
 ## `BodyKernel.cover_look` when it is loaded (perf plan C3: called straight, no wrapper), else
-## `gd_look`; tests/gameplay/cover/test_cover_look.gd compares the two to the bit. Allocates nothing.
+## `gd_look`; tests/gameplay/cover/test_cover_look.gd compares the two to the bit. The native look
+## wants a sight with nothing marked (its cells all 0), as a cleared one is: a sight with marks left
+## in it is looked at by `gd_look`, so either way it ends as `gd_look` leaves it. Allocates nothing.
 func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	if _danger == 0 or layout == null or _state.size() != layout.cells.size():
 		return
 	var kernel: Object = WallSlide.kernel()
-	if kernel != null:
-		sight.clear()
+	if kernel != null and sight.count == 0 and kernel.has_method(&"cover_look"):
 		var opened: int = kernel.call(&"cover_look", _row_bits, _column_bits, _danger_bits, _words, layout.columns, layout.rows, layout.origin, at, reach, sight.cells(), sight.window())
+		if opened == -1:
+			# Off the room's cover: the sight is left as it was, as `gd_look` leaves it.
+			return
 		if opened >= 0:
 			sight.take_window(layout.origin, opened == 1)
-			return
-		if opened == -1:
 			return
 	gd_look(at, reach, sight)
 

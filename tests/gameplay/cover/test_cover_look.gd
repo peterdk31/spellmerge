@@ -4,14 +4,15 @@ extends "res://tests/support/suite.gd"
 ## loaded, leaves a `CoverSight` with the bits its GDScript twin `CoverRoom.gd_look` leaves (the window,
 ## its offset, the count and every cell), on a seeded spread of rooms (one to three words a row, grid
 ## origins off the cells and below 0, danger sparse, dense and in patches) looked at from on, near and
-## off their cover at every reach a look asks, each of the look's ways reached.
+## off their cover at every reach a look asks and more, by a sight cleared and by one left as the last
+## look left it, each of the look's ways reached.
 ##
 ## Without the native module the GDScript is still checked (SPELLMERGE_NATIVE=required fails the
 ## comparison instead).
 
 const BITS: int = 32
 const CELL: float = float(CoverLayout.CELL)
-const REACHES: Array[float] = [0.0, 7.5, 16.0, 32.0, 64.0, 100.0]
+const REACHES: Array[float] = [0.0, 7.5, 15.999, 16.0, 23.4, 32.0, 64.0, 100.0, -8.0]
 
 
 func after_each() -> void:
@@ -120,8 +121,11 @@ func test_the_native_cover_look_gives_the_twins_bits() -> void:
 			if n % 10 == 0:
 				at = origin + Vector2(rng.randi_range(0, columns), rng.randi_range(0, rows)) * CELL
 			var reach: float = REACHES[n % REACHES.size()]
-			sight.clear()
-			twin.clear()
+			if n % 3 != 0:
+				# Two looks in three by a cleared sight (the cover area's); the rest by a sight left as the
+				# last look left it, the same in both while they agree.
+				sight.clear()
+				twin.clear()
 			room.look(at, reach, sight)
 			room.gd_look(at, reach, twin)
 			looks += 1
@@ -129,7 +133,9 @@ func test_the_native_cover_look_gives_the_twins_bits() -> void:
 				differ += 1
 				if differ <= 3:
 					check(false, "room %d (%dx%d at %s), look at %s within %s: native %s, GDScript %s" % [room_n, columns, rows, origin, at, reach, _seen(sight), _seen(twin)])
-			if twin.columns == 0 and twin.offset == Vector2.ZERO:
+			if n % 3 == 0:
+				pass
+			elif twin.columns == 0 and twin.offset == Vector2.ZERO:
 				off += 1
 			elif twin.columns == 0:
 				no_window += 1
@@ -138,11 +144,40 @@ func test_the_native_cover_look_gives_the_twins_bits() -> void:
 			else:
 				marked += 1
 	check_equal(differ, 0, "every one of %d looks leaves the twin's bits (native %s)" % [looks, native])
-	check(off > 0 and empty > 0 and marked > 0, "looks off the cover, with a window and nothing in it, and marking: %d, %d, %d" % [off, empty, marked])
-	# A window clipped to nothing: a reach of 0 at a point whose cell is on the cover always opens one,
-	# so this way is only met by a point on the cover's edge pushed off by its own float subtraction;
-	# counted, not required.
-	print("cover looks: %d off the cover, %d no window, %d an empty window, %d marked" % [off, no_window, empty, marked])
+	check(off > 0 and no_window > 0 and empty > 0 and marked > 0, "looks off the cover, with no window (a negative reach), with a window and nothing in it, and marking: %d, %d, %d, %d" % [off, no_window, empty, marked])
+	print("cover looks (cleared sights): %d off the cover, %d no window, %d an empty window, %d marked" % [off, no_window, empty, marked])
+
+
+## A point on the room's cover by the look's own check (the point less the grid's corner, in doubles)
+## whose cell in the window (a Vector2's subtraction, in its floats) rounds past the last column: at a
+## reach of 0 its window is clipped to nothing, so the sight is left with the room's offset and no
+## window, natively as in GDScript.
+func test_a_window_clipped_to_nothing_at_the_covers_edge() -> void:
+	_native()
+	var danger := PackedByteArray()
+	danger.resize(9)
+	danger.fill(1)
+	# 0.00137 and 48.00137 as floats: 47.9999995 apart in doubles (column 2 of 3), 48 in floats (column 3).
+	var origin := Vector2(0.0013699999544769526, 0.0)
+	var at := Vector2(48.00136947631836, 8.0)
+	check(at.x - origin.x < 48.0 and (at - origin).x >= 48.0, "the point is on the cover in doubles and past it in floats")
+	var room: CoverRoom = _room(3, 3, origin, danger)
+	for dirty in [false, true]:
+		var sight := CoverSight.new()
+		var twin := CoverSight.new()
+		if dirty:
+			# An empty window from an earlier look, left in both.
+			room.look(origin + Vector2(8.0, 8.0), 0.0, sight)
+			room.gd_look(origin + Vector2(8.0, 8.0), 0.0, twin)
+			sight.clear()
+			twin.clear()
+			sight.columns = 5
+			twin.columns = 5
+		room.look(at, 0.0, sight)
+		room.gd_look(at, 0.0, twin)
+		check_equal(twin.columns, 0, "the GDScript opens no window")
+		check_equal(twin.offset, origin, "the GDScript's sight has the room's offset")
+		check_equal(_seen(sight), _seen(twin), "the native look leaves the GDScript's sight (an earlier window left: %s)" % dirty)
 
 
 ## A look with the module off is the GDScript's, and a look with nothing in danger leaves the sight

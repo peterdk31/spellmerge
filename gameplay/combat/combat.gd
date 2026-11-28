@@ -435,6 +435,9 @@ func setup() -> void:
 		return
 	if not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
+	if projectiles != null:
+		# Every hit the manager sends is a row of its hit table, applied here after its listeners.
+		projectiles.hit_table.applier = apply_hit_row
 	if not events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.connect(_on_player_downed)
 	if not events.player_revived.is_connected(_on_player_revived):
@@ -1178,10 +1181,29 @@ func _heal(by: int, row: int, amount: float) -> bool:
 	return true
 
 
-## A shot landed. Every shot is a spell's, described by `Spells.hit_profile(tag)` (damage,
-## knockback, status); a shot with no profile, or on a body Combat does not know (a decoy), does
-## nothing.
+## A hit sent on the bus by hand (a test's): applied as a row of the hit table would be, as
+## `impact_count` hits. A row's own `projectile_hit` is left to `apply_hit_row`.
 func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
+	if projectiles != null and projectiles.hit_table.applied_by(self):
+		return
+	_apply_hit(caster, target, position, tag, shot, maxi(projectiles.impact_count, 1) if projectiles != null else 1)
+
+
+## The row `row` of the projectile manager's hit table (perf plan H1): a hit the manager sent,
+## applied once its `projectile_hit` listeners have heard it (Spells' first, which may change what
+## the hit's profile is), in the order the manager sends them. Every hit Combat applies comes here,
+## but for one sent by hand (`_on_projectile_hit`). A manager sending on another bus than Combat's
+## is not heard (as its `projectile_hit` would not be).
+func apply_hit_row(table: HitTable, row: int) -> void:
+	if projectiles == null or projectiles.events != events:
+		return
+	_apply_hit(table.caster[row], table.target[row], table.at[row], table.tag[row], table.shot[row], table.count[row])
+
+
+## A spell's `count` hits landed (a merged hit's; 1 for any other). Every shot is a spell's,
+## described by `Spells.hit_profile(tag)` (damage, knockback, status); a shot with no profile, or on
+## a body Combat does not know (a decoy), does nothing.
+func _apply_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, count: int) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	var row: int = _row_of_node(target)
@@ -1200,7 +1222,7 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	_tag = tag
 	_slot = shot
 	_hit_spell = tag
-	_hit_count = maxi(projectiles.impact_count, 1) if projectiles != null else 1
+	_hit_count = maxi(count, 1)
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
 	_slot = saved_slot

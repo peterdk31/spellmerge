@@ -220,8 +220,14 @@ func test_an_enemy_staff_with_a_sigil_must_wind_up() -> void:
 	check(entry.problems().is_empty(), "a telegraph: fine (%s)" % [entry.problems()])
 	for id: StringName in [&"rime_crook", &"storm_fork"]:
 		var enemy: EnemyBase = _world.registry.get_resource(&"enemies", id) as EnemyBase
-		check(enemy != null and not enemy.staffs[0].sigils.is_empty(), "%s's staff has a sigil" % id)
-		check(enemy != null and enemy.staffs[0].staff.wind_up > 0.0, "and winds up")
+		# The staff with the sigil (the Rime Crook's frost pull is its second since enemy AI L7).
+		var signed: StaffCards = null
+		if enemy != null:
+			for entry_of: StaffCards in enemy.staffs:
+				if not entry_of.sigils.is_empty():
+					signed = entry_of
+		check(signed != null, "%s has a staff with a sigil" % id)
+		check(signed != null and signed.staff.wind_up > 0.0, "and it winds up")
 
 
 ## A registry that serves `_staff` as a staff and everything else from the real one.

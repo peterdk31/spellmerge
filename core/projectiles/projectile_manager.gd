@@ -2055,6 +2055,12 @@ func get_count() -> int:
 	return _count
 
 
+## One past the highest slot that may hold a live shot: a walk over the live shots (`is_alive`)
+## stops here (the stress run's count of each staff's shots, bench/stress_runner.gd).
+func get_high() -> int:
+	return _high
+
+
 ## Live projectiles in the drop bucket of `caster`'s budget (`Actors.budget_of`): a seat's
 ## actor counts its seat's shots; every actor no seat drives, and NO_PLAYER, the shared count.
 func get_count_for(caster: int) -> int:

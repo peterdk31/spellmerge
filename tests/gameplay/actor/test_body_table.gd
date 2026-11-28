@@ -79,7 +79,7 @@ func test_a_body_moved_from_outside_is_in_its_row_at_the_next_bodies_step() -> v
 	body.position = Vector2(20.0, 30.0)
 	body.velocity = Vector2(5.0, 0.0)
 	_run(1)
-	check(_world.table.is_still(prop.id), "the prop is still: never stepped")
+	check(_world.table.is_still(prop.id), "the prop is still: never stepped, so only the gather writes its row")
 	_check_rows("the still prop and the body gathered as the step started")
 	check_equal(_world.table.places[prop.id], Vector2(300.0, 200.0), "the still prop where it was put")
 
@@ -99,11 +99,39 @@ func test_spawns_downs_and_falls_are_in_the_flags() -> void:
 	rising.set_down(true)
 	check_equal(_world.table.body_flags[rising.id], ActorsScript.FLAG_BODY | ActorsScript.FLAG_DOWN, "downed")
 	rising.set_down(false)
-	# As `_fall` starts one (a fall on a real hole: tests/gameplay/actor/test_fall.gd).
-	rising.fall_left = HoleRules.FALL_SECONDS
-	rising.write_row()
-	check_equal(_world.table.body_flags[rising.id], ActorsScript.FLAG_BODY | ActorsScript.FLAG_DOWN | ActorsScript.FLAG_FALLING, "falling: down")
+	check_equal(_world.table.body_flags[rising.id], ActorsScript.FLAG_BODY, "up again at once")
 	_check_rows("every flag")
+
+
+## A fall on a real hole (tests/gameplay/actor/test_fall.gd's crack): the row is the node's on
+## every tick, as it falls (`_fall`), lands and, a body no seat owns, dies of it (`_land`).
+func test_a_fall_and_its_end_are_in_the_row_every_tick() -> void:
+	_world.projectiles.set_holes([Rect2(200.0, 0.0, 32.0, 360.0)] as Array[Rect2])
+	_world.combat.registry = _world.registry
+	var body: Actor = _body(Vector2(150.0, 100.0), [&"health", &"hurtbox", &"mover", &"caster"])
+	_run(2)
+	_world.bus.caster_move_requested.emit(body.caster_number(), &"teleport", Vector2(66.0, 0.0), 0.0, _world.tag_of(body))
+	var id: int = body.id
+	var fell: bool = false
+	for i in 40:
+		_run(1)
+		if not is_instance_valid(body) or not body.is_inside_tree():
+			break
+		fell = fell or body.is_falling()
+		if body.is_falling():
+			check_equal(_world.table.body_flags[id] & ActorsScript.FLAG_FALLING, ActorsScript.FLAG_FALLING, "falling, tick %d" % i)
+		_check_rows("tick %d" % i)
+	check(fell, "it fell")
+	check(not is_instance_valid(body) or body.is_dying(), "and died of it")
+
+
+## A swap moves another body in the middle of the bodies' step (`Mover`): its row hears it at once.
+func test_a_swap_is_in_the_moved_bodys_row_at_once() -> void:
+	var body: Actor = _body(START, [&"health", &"mover"])
+	_run(1)
+	_world.bus.target_move_requested.emit(0, body, Vector2(220.0, 140.0))
+	check_equal(body.global_position, Vector2(220.0, 140.0), "swapped there")
+	_check_rows("its row at once")
 
 
 func test_a_new_size_is_in_the_radius() -> void:

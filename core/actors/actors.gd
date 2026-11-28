@@ -128,7 +128,9 @@ var touch_ids: PackedInt32Array = PackedInt32Array()
 ## The body table (C1; see the class doc): per actor id, where its body stands (its global
 ## position, room pixels), its velocity, its radius against the walls (`Actor.wall_radius`) and its
 ## `FLAG_*` bits. An id not open, or open with no body yet, has an empty row (zeros). The table's own
-## arrays, for a kernel to read in place: read only, written by `write_row` alone.
+## arrays, for a kernel to read in place: read only. Written by the body's script alone
+## (gameplay/actor/actor.gd): through `write_row`, or, for its place and velocity in the tick's hot
+## paths (after its own tick, and `Actor.gather_rows`), straight into these arrays, an open id's only.
 var places: PackedVector2Array = PackedVector2Array()
 var velocities: PackedVector2Array = PackedVector2Array()
 var radii: PackedFloat32Array = PackedFloat32Array()

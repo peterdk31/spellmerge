@@ -356,7 +356,8 @@ func tick_step(delta: float, looks_later: bool = false) -> void:
 	if spawn_left <= 0.0:
 		move(delta)
 	if id != ActorsScript.NONE and actors != null:
-		# Its place and velocity after its own tick, in its row (`write_row`).
+		# Its place and velocity after its own tick, in its row (`write_row`'s two columns, written
+		# straight in: a call here, every body every tick, cost as much as the rest).
 		actors.places[id] = global_position
 		actors.velocities[id] = velocity
 

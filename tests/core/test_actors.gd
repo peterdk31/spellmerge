@@ -407,7 +407,8 @@ func test_rebuild_derived_empties_the_rows_of_ids_not_open() -> void:
 	var other: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
 	_actors.write_row(id, Vector2(7.0, 8.0), Vector2.ZERO, 2.0, 0)
 	_actors.write_row(other, Vector2(9.0, 9.0), Vector2.ZERO, 2.0, 0)
-	# As a restore writes the table's state back: `other` was not open in the snapshot.
+	# As a restore writes the table's state back (`other` was not open in the snapshot): only `_open`
+	# changes, the DERIVED rows are left as they were (`close` would empty the row itself).
 	_actors._open[other] = 0
 	_actors.rebuild_derived()
 	check_equal(_actors.body_flags[other], 0, "the id not open: empty")

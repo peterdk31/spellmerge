@@ -82,7 +82,8 @@ BOT_NATIVE_NAMES = frozenset({"SConstruct"})
 # What the module's C++ may include (check_native_source): the engine classes its build profile
 # names (native/build_profile.json, owner-only), godot-cpp's core and variant headers, a few
 # standard headers and its own.
-NATIVE_CLASS_HEADERS = frozenset({"ref_counted", "object", "node2d", "random_number_generator"})
+NATIVE_CLASS_HEADERS = frozenset({"ref_counted", "object", "node2d", "random_number_generator",
+                                  "canvas_item", "sprite2d", "image"})
 NATIVE_STD_HEADERS = frozenset({"cmath", "cstdint", "type_traits", "utility", "vector"})
 # Threads (shot scale H5; the owner, 2026-11-07: the module's own std::thread pool, allowed wherever
 # it is faster): one file runs a loop on several threads (native/src/jobs.h), and only it may
@@ -100,6 +101,10 @@ _NATIVE_BANNED = re.compile(
     r"GetProcAddress|CreateProcess\w*|ShellExecute\w*|fopen|freopen|getenv)\s*\(|\bstd::(jthread|async)\b|"
     r"\bpthread_\w+|\b(CreateThread|_beginthread\w*)\b|\b(asm|__asm__)\b|"
     r"(->|\.)\s*(call|callv|call_deferred)\s*\(|\bget_singleton\b|\bClassDB::instantiate\b|"
+    # Image's files (the owner's decision of 2026-11-28 lets a kernel fill an Image's bytes, never
+    # read or write a file with it) and swapping a script.
+    r"\b(save_(png|jpg|webp|exr|dds)\w*|load_from_file|load_\w+_from_buffer|set_script)\s*\(|"
+    r"\bImage::load\b|->\s*load\s*\(|"
     r"\bgdextension_interface::(?!object_get_instance_from_id\b)\w+")
 # The room server (server/signal/README.md; the owner's decision 9 of 2026-11-10,
 # docs/milestones/online-lobby.md): a few hundred lines of JavaScript that run on Cloudflare, never

@@ -3925,3 +3925,13 @@ The owner: "I think the dynamic camera, where it tries to fit nearby enemies int
 - **Every crypt template marks its `rune` zone**, so a secret rune stands somewhere chosen (the worked-out spot stays for a room without one and for a room's second rune). The spots were proposed by rule (a corner where the room has the space, clear of doorways, props, spawns, decor and the room's own things) and looked at on a sheet of all 27 rooms; the owner moves any in the room's scene.
 - **The floor mist stays a draw of its own**, not in the one pass (it is not renderer-neutral there).
 
+
+## 2026-11-28: speed work: what may change, and what the native module may do (owner decisions)
+
+- **The perf plan's top three changes plus the tick on its own thread** (desktop), in the plan's order (docs/milestones/perf-plan.md). The game may change a little for speed, case by case: each such change comes with numbers and screenshots, and merges only on the owner's yes. New native kernels keep their GDScript twin (the reference, the fallback, a byte-for-byte test).
+- **Bodies keep moving one by one**, each seeing where the bodies before it in the tick moved; the moves are not batched after the steps (that changed the game hash).
+- **The native module may set looks.** The build profile adds `CanvasItem`, `Sprite2D` and `Image`: a kernel may set the drawn look of view-only nodes it is handed by instance id, through typed setters, and fill an `Image`'s bytes, on the calling thread only; never an `Image`'s files (`_NATIVE_BANNED` in `ci/smbot/rules.py`) and never a node that is simulation state (native/README.md, "Looks set by a kernel"; AGENTS.md hard rule 4).
+- **The web build is threaded only**, with no single-threaded fallback; the page's reload script (for the headers threads need) is in an HTML shell under `ci/build/` (#998).
+- **`ci-tests` may run 10 minutes** (it was cancelled at 5 several times).
+- **The cover room's look stays in GDScript** (#1002 closed): its native twin saved 0.01 to 0.035 ms a tick, too little for a second copy to maintain.
+- **H2's four drawing differences are accepted** (#1001): a repeat flash in an online catch-up, other cues filling the flash slots before hits at the caps, death motes before the killing spray, a same-tick dying caster's hit in enemy colours.

@@ -36,7 +36,8 @@ A spell hit of element B on a body with status A runs the row (A, B) of `content
 `core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md).
 
 - Sends: `enemy_died`, `damage_dealt`, `status_applied`, `reaction_triggered`, `discharge_arc`, `hit_landed`, `heal_dealt`, `kill_landed`, `reaction_landed`, `reaction_struck`, `actor_hurt`, `shield_blocked`, `barrier_changed(actor, charges, seconds, tag, way, radius)`, `cue_shown` (`SHIELD_BLOCK_CUE`, `PULL_CUE`).
-- Listens to: `projectile_hit`, `wizard_shield_requested`, `pull_requested`, `carry_ended`, `health_gift_requested`, `crumble_requested`, `floor_strike_requested`, `player_downed`, `player_revived`.
+- Applies every hit the projectile manager sends as a row of its hit table (`apply_hit_row`, the table's applier: perf plan H1), once the row's `projectile_hit` listeners have heard it, Spells' first; a `projectile_hit` sent by hand (a test's) is applied by its listener.
+- Listens to: `projectile_hit` (hits sent by hand), `wizard_shield_requested`, `pull_requested`, `carry_ended`, `health_gift_requested`, `crumble_requested`, `floor_strike_requested`, `player_downed`, `player_revived`.
 
 ## Allowed files
 

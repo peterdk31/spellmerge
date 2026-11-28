@@ -283,6 +283,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	pm._ray_depth += 1
 	var outer_slot: int = pm._event_slot
 	pm._event_slot = -1
+	var row: int = pm.hit_table.write(caster, target, point, heading, tag, -1, 1, carrier_card, 0, Color.WHITE, 0)
 	pm.impact_carrier_card = carrier_card
 	pm.impact_core = Color.WHITE
 	pm.impact_look = 0
@@ -293,8 +294,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	# One hit, whatever merged hit's handler struck it (`impact_count`).
 	var outer_count: int = pm.impact_count
 	pm.impact_count = 1
-	pm._sent += 1
-	events.projectile_hit.emit(caster, target, point, tag, -1)
+	pm._send_hit_row(row)
 	pm.impact_count = outer_count
 	pm._ray_depth -= 1
 	pm._event_slot = outer_slot
@@ -507,6 +507,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	for i in found:
 		var node: Variant = nodes[i]
 		if events != null and is_instance_valid(node):
+			var row: int = pm.hit_table.write(caster, node, points[i], heads[i], tag, -1, 1, &"beam", 0, Color.WHITE, 0)
 			pm.impact_carrier_card = &"beam"
 			pm.impact_core = Color.WHITE
 			pm.impact_look = 0
@@ -519,8 +520,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			# One hit, whatever merged hit's handler fired the ray (`impact_count`).
 			var outer_count: int = pm.impact_count
 			pm.impact_count = 1
-			pm._sent += 1
-			events.projectile_hit.emit(caster, node, points[i], tag, -1)
+			pm._send_hit_row(row)
 			pm.impact_count = outer_count
 		nodes[i] = null
 	# A spark at every wall it turned at before it ended, and at the wall it ended on; then

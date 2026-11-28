@@ -413,6 +413,48 @@ func test_a_hit_on_an_enemy_a_listener_unregisters_counts_with_no_death() -> voi
 	check(deaths.is_empty(), "no death is sent for an enemy a listener removed")
 
 
+# --- The hit table (perf plan H1) -------------------------------------------------------------
+
+func test_a_hit_the_manager_sends_is_applied_once_from_its_row() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	_profile(1, 2)
+	var enemy: Node2D = _enemy(10, Vector2(100.0, 100.0))
+	var health_when_heard: Array[float] = []
+	# A listener connected after Combat still hears the hit before Combat applies it.
+	bus.projectile_hit.connect(func(_c: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		health_when_heard.append(combat.health_of(target)))
+	check(projectiles.strike(0, enemy, Vector2(100.0, 100.0), Vector2.RIGHT, 1, &"swing"), "the strike was sent")
+	check_equal(damage.size(), 1, "one hit, applied once (from its row, not also by the listener)")
+	check_equal(health_when_heard, [10.0] as Array[float], "every listener heard it before Combat applied it")
+	check(is_equal_approx(combat.health_of(enemy), 8.0), "its damage taken once")
+	check_equal(projectiles.hit_table.rows, 1, "one row in the table")
+
+
+func test_a_hit_sent_by_hand_is_still_applied() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	_profile(1, 3)
+	var enemy: Node2D = _enemy(10)
+	bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 1, -1)
+	check(is_equal_approx(combat.health_of(enemy), 7.0), "a hit no row stands for is applied by the listener")
+
+
+func test_merged_hits_land_as_their_row_counts_them() -> void:
+	_setup(0, true)
+	projectiles.events = bus
+	projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_profile(1, 2)
+	var enemy: Node2D = _enemy(50, Vector2(200.0, 100.0))
+	root.add_child(enemy)
+	for i in 3:
+		projectiles.spawn(0, Vector2(150.0, 100.0 + float(i)), Vector2(600.0, 0.0), 5.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, 1)
+	for _i in 10:
+		projectiles.step(1.0 / 60.0)
+	check_equal(damage.size(), 1, "three shots of one spell in one pass: one merged hit")
+	check(is_equal_approx(combat.health_of(enemy), 44.0), "the merged hit took three hits' damage (%s)" % combat.health_of(enemy))
+
+
 # --- Projectile targets ----------------------------------------------------------------------
 
 func test_a_registered_enemy_is_a_projectile_target() -> void:

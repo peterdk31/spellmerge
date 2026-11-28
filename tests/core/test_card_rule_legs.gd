@@ -9,13 +9,15 @@ extends "res://tests/support/suite.gd"
 ## (tests/support/card_rules_world.gd) and reads the hits of the second leg from the trace: a hit
 ## after the first wall (a bounce), on the second target (a chain jump), the second hit (an echo),
 ## or the parent's hits after its payload fired. The card shows there (its element on the hit, a
-## harder knockback, a target it reaches only by its homing or pierce) and not without it, so a
+## harder knockback, a target it reaches only by its homing) and not without it, so a
 ## leg that dropped the card fails, whatever the first leg did.
 const World := preload("res://tests/support/card_rules_world.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## Seconds a probe runs: every leg's shot has hit or ended by then.
 const SECONDS: float = 3.0
+## The spell node of the cast's own carrier, the parent of a payload (the trace's `wizard/n0`).
+const PARENT: String = "wizard/n0"
 ## The wall a bounce meets, this far ahead of the hand.
 const WALL_AHEAD: float = 40.0
 ## The aim of a bounce's cast: down and to the right, so the bolt comes back past the wizard.
@@ -77,57 +79,61 @@ func test_homing_survives_a_bounce() -> void:
 # The bolt hits A on its line and jumps to B; what B is hit with is the jump's.
 
 func test_an_infusion_survives_a_chain_jump() -> void:
-	var with: Array[Dictionary] = _hits([&"chain", &"fire", &"bolt"], _chain_scene())
-	var without: Array[Dictionary] = _hits([&"chain", &"bolt"], _chain_scene())
+	var with: Array[Dictionary] = _cast([&"chain", &"fire", &"bolt"], _chain_scene())
+	var without: Array[Dictionary] = _cast([&"chain", &"bolt"], _chain_scene())
 	check(_hit_on(with, &"B"), "the jump hits B (%s)" % [with])
 	check(_has_element(with, &"B", &"fire"), "with fire still on it: %s" % [with])
 	check(not _has_element(without, &"B", &"fire"), "(without fire, no fire on B: %s)" % [without])
 
 
 func test_heavy_survives_a_chain_jump() -> void:
-	var with: Array[Dictionary] = _hits([&"chain", &"heavy", &"bolt"], _chain_scene())
-	var without: Array[Dictionary] = _hits([&"chain", &"bolt"], _chain_scene())
+	var with: Array[Dictionary] = _cast([&"chain", &"heavy", &"bolt"], _chain_scene())
+	var without: Array[Dictionary] = _cast([&"chain", &"bolt"], _chain_scene())
 	check(_hit_on(with, &"B") and _hit_on(without, &"B"), "both jumps hit B (%s / %s)" % [with, without])
 	check(_knockback(with, &"B") > _knockback(without, &"B"), "heavy still knocks harder on the jump (%d against %d)" % [_knockback(with, &"B"), _knockback(without, &"B")])
 
 
 # --- An echo ---------------------------------------------------------------------------------------
-# The cast fires again a moment later at half damage; its hit is the second on the target.
+# The cast fires again a moment later at half damage: its hit is the one on the target with less
+# damage than the first (`_echo_of`), so a second hit of the first leg is never taken for it.
 
 func test_an_infusion_survives_an_echo() -> void:
-	var with: Array[Dictionary] = _hits_on([&"echo", &"fire", &"bolt"], &"A")
-	check(with.size() >= 2, "the bolt and its echo both hit A (%s)" % [with])
-	if with.size() >= 2:
-		check((with[1]["elements"] as PackedStringArray).has("fire"), "the echo still burns: %s" % [with[1]])
+	var echo: Dictionary = _echo_of(_hits_on([&"echo", &"fire", &"bolt"], &"A"))
+	var plain: Dictionary = _echo_of(_hits_on([&"echo", &"bolt"], &"A"))
+	check(not echo.is_empty() and not plain.is_empty(), "the bolt's echo hits A, at less damage (%s / %s)" % [echo, plain])
+	check(not echo.is_empty() and (echo["elements"] as PackedStringArray).has("fire"), "the echo still burns: %s" % [echo])
+	check(plain.is_empty() or not (plain["elements"] as PackedStringArray).has("fire"), "(a plain echo does not: %s)" % [plain])
 
 
 func test_heavy_survives_an_echo() -> void:
-	var with: Array[Dictionary] = _hits_on([&"echo", &"heavy", &"bolt"], &"A")
-	var without: Array[Dictionary] = _hits_on([&"echo", &"bolt"], &"A")
-	check(with.size() >= 2 and without.size() >= 2, "both bolts and their echoes hit A (%s / %s)" % [with, without])
-	if with.size() >= 2 and without.size() >= 2:
-		check(int(with[1]["knockback"]) > int(without[1]["knockback"]), "the echo of a heavy bolt still knocks harder (%d against %d)" % [with[1]["knockback"], without[1]["knockback"]])
+	var echo: Dictionary = _echo_of(_hits_on([&"echo", &"heavy", &"bolt"], &"A"))
+	var plain: Dictionary = _echo_of(_hits_on([&"echo", &"bolt"], &"A"))
+	check(not echo.is_empty() and not plain.is_empty(), "both echoes hit A, at less damage (%s / %s)" % [echo, plain])
+	if not echo.is_empty() and not plain.is_empty():
+		check(int(echo["knockback"]) > int(plain["knockback"]), "the echo of a heavy bolt still knocks harder (%d against %d)" % [echo["knockback"], plain["knockback"]])
 
 
 # --- A payload firing -------------------------------------------------------------------------------
 # A piercing bolt with `on hit` fires its payload (a plain bolt) at A and flies on; what it does
-# after is the parent's, with its own cards.
+# after is the parent's, with its own cards. Only the parent's hits are read (its spell node,
+# `PARENT`): the payload's own bolt may hit B too.
 
 func test_an_infusion_survives_a_payload_firing() -> void:
 	var scene: Dictionary = {&"A": Vector2(60.0, 0.0), &"B": Vector2(130.0, 0.0)}
-	var with: Array[Dictionary] = _hits([&"fire", &"pierce", &"on_hit", &"bolt", &"bolt"], scene)
-	var without: Array[Dictionary] = _hits([&"pierce", &"on_hit", &"bolt", &"bolt"], scene)
+	var with: Array[Dictionary] = _parent_hits(_cast([&"fire", &"pierce", &"on_hit", &"bolt", &"bolt"], scene))
+	var without: Array[Dictionary] = _parent_hits(_cast([&"pierce", &"on_hit", &"bolt", &"bolt"], scene))
+	check(_hit_on(with, &"A"), "the parent hits A, where its payload fires (%s)" % [with])
 	check(_hit_on(with, &"B"), "the parent flies on and hits B (%s)" % [with])
 	check(_has_element(with, &"B", &"fire"), "still burning after its payload fired: %s" % [with])
 	check(not _has_element(without, &"B", &"fire"), "(without fire, nothing burns B: %s)" % [without])
 
 
 func test_homing_survives_a_payload_firing() -> void:
-	# A close on the line, hit before the homing turns the bolt; B off the line past it: the parent
-	# reaches B only by homing on after its payload fired.
-	var scene: Dictionary = {&"A": Vector2(20.0, 0.0), &"B": Vector2(150.0, 45.0)}
-	var with: Array[Dictionary] = _hits([&"homing", &"pierce", &"on_hit", &"bolt", &"bolt"], scene)
-	var without: Array[Dictionary] = _hits([&"pierce", &"on_hit", &"bolt", &"bolt"], scene)
+	# A on the line, clear of the wizard; B off the line past it: the parent reaches B only by
+	# homing on after its payload fired at A.
+	var scene: Dictionary = {&"A": Vector2(40.0, 0.0), &"B": Vector2(150.0, 45.0)}
+	var with: Array[Dictionary] = _parent_hits(_cast([&"homing", &"pierce", &"on_hit", &"bolt", &"bolt"], scene))
+	var without: Array[Dictionary] = _parent_hits(_cast([&"pierce", &"on_hit", &"bolt", &"bolt"], scene))
 	check(_hit_on(with, &"A"), "the parent hits A first (%s)" % [with])
 	check(not _hit_on(without, &"B"), "without homing, nothing reaches B off the line (%s)" % [without])
 	check(_hit_on(with, &"B"), "with it, the parent still homes on after its payload and hits B: %s" % [with])
@@ -143,7 +149,7 @@ static func _chain_scene() -> Dictionary:
 ## Every hit of the wizard's cast of `cards` with `enemies` (label to place) standing, and walls
 ## where `wall_ahead` asks (a wall across the line that far ahead, cast at it along BOUNCE_AIM; 0
 ## for none), and `late` standing at LATE_STEP, in order:
-## {target, step, knockback, elements, after_wall}.
+## {target, node, step, profile, damage, knockback, elements, after_wall}.
 func _cast(cards: Array[StringName], enemies: Dictionary, wall_ahead: float = 0.0, late: Dictionary = {}) -> Array[Dictionary]:
 	var world := World.new(root, _shelf, _staff)
 	world.add_wizard(cards)
@@ -159,7 +165,7 @@ func _cast(cards: Array[StringName], enemies: Dictionary, wall_ahead: float = 0.
 	world.run(SECONDS)
 	var hits: Array[Dictionary] = []
 	var walled: bool = false
-	for line in world.trace:
+	for line: String in world.trace:
 		var words: PackedStringArray = line.split(" ")
 		if words.size() > 2 and words[1] == "wall" and words[2] == "wizard":
 			walled = true
@@ -172,23 +178,40 @@ func _cast(cards: Array[StringName], enemies: Dictionary, wall_ahead: float = 0.
 ## One `hit` line of the trace (card_rules_world.gd `_listen`: "<step> hit <caster> <node> <target>
 ## at <x,y> [d.. h.. s.. k.. <kind> <elements> <statuses>]") as a dictionary.
 static func _hit_of(line: String, words: PackedStringArray, walled: bool) -> Dictionary:
-	var profile: PackedStringArray = line.get_slice("[", 1).trim_suffix("]").split(" ")
-	var knockback: int = 0
-	var elements: PackedStringArray = PackedStringArray()
-	if profile.size() >= 6:
-		knockback = profile[3].trim_prefix("k").to_int()
-		elements = profile[5].split(",", false)
-	return {"target": StringName(words[4]), "step": words[0].to_int(), "knockback": knockback, "elements": elements, "after_wall": walled}
+	# (`split` keeps empty fields: an empty kind or no elements still leave them at their index.
+	# A hit with no profile is written `[none]`: `profile` false, which every probe refuses.)
+	var fields: PackedStringArray = line.get_slice("[", 1).trim_suffix("]").split(" ")
+	var known: bool = fields.size() >= 6 and fields[0].begins_with("d")
+	var damage: int = fields[0].trim_prefix("d").to_int() if known else 0
+	var knockback: int = fields[3].trim_prefix("k").to_int() if known else 0
+	var elements: PackedStringArray = fields[5].split(",", false) if known else PackedStringArray()
+	return {"target": StringName(words[4]), "node": words[3], "step": words[0].to_int(), "profile": known, "damage": damage, "knockback": knockback, "elements": elements, "after_wall": walled}
 
 
-func _hits(cards: Array[StringName], enemies: Dictionary) -> Array[Dictionary]:
-	return _cast(cards, enemies)
+## The hits of the cast's own carrier (`PARENT`), not of a payload it fired.
+static func _parent_hits(hits: Array[Dictionary]) -> Array[Dictionary]:
+	var own_hits: Array[Dictionary] = []
+	for hit: Dictionary in hits:
+		if hit["node"] == PARENT:
+			own_hits.append(hit)
+	return own_hits
+
+
+## The echo's hit among `hits` on one target: the first after the first hit with less damage than
+## it (an echo hits at SpellLimits.ECHO_DAMAGE); empty when there is none.
+static func _echo_of(hits: Array[Dictionary]) -> Dictionary:
+	if hits.is_empty():
+		return {}
+	for hit: Dictionary in hits.slice(1):
+		if hit["profile"] and int(hit["damage"]) < int(hits[0]["damage"]):
+			return hit
+	return {}
 
 
 ## The hits after the bolt met the wall just ahead (the leg after the bounce).
 func _hits_after_wall(cards: Array[StringName], enemies: Dictionary, late: Dictionary = {}) -> Array[Dictionary]:
 	var after: Array[Dictionary] = []
-	for hit in _cast(cards, enemies, WALL_AHEAD, late):
+	for hit: Dictionary in _cast(cards, enemies, WALL_AHEAD, late):
 		if hit["after_wall"]:
 			after.append(hit)
 	return after
@@ -197,30 +220,31 @@ func _hits_after_wall(cards: Array[StringName], enemies: Dictionary, late: Dicti
 ## The hits on `label`, one target on the bolt's line, in order.
 func _hits_on(cards: Array[StringName], label: StringName) -> Array[Dictionary]:
 	var on: Array[Dictionary] = []
-	for hit in _cast(cards, {label: Vector2(60.0, 0.0)}):
+	for hit: Dictionary in _cast(cards, {label: Vector2(60.0, 0.0)}):
 		if hit["target"] == label:
 			on.append(hit)
 	return on
 
 
 static func _hit_on(hits: Array[Dictionary], label: StringName) -> bool:
-	for hit in hits:
-		if hit["target"] == label:
+	for hit: Dictionary in hits:
+		if hit["target"] == label and hit["profile"]:
 			return true
 	return false
 
 
 static func _has_element(hits: Array[Dictionary], label: StringName, element: StringName) -> bool:
-	for hit in hits:
+	for hit: Dictionary in hits:
 		if hit["target"] == label and (hit["elements"] as PackedStringArray).has(String(element)):
 			return true
 	return false
 
 
-## The hardest knockback `label` took.
+## The hardest knockback `label` took (-1 when no hit with a profile reached it, so a lost profile
+## never reads as a softer hit).
 static func _knockback(hits: Array[Dictionary], label: StringName) -> int:
-	var most: int = 0
-	for hit in hits:
-		if hit["target"] == label:
+	var most: int = -1
+	for hit: Dictionary in hits:
+		if hit["target"] == label and hit["profile"]:
 			most = maxi(most, int(hit["knockback"]))
 	return most

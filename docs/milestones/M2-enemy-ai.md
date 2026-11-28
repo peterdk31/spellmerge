@@ -2,7 +2,7 @@
 
 **Goal:** one AI for every enemy, minion, boss and test bot. It **reads what its staffs will cast next** and plays them in any situation, so designing an enemy means designing its staffs and a few numbers, never code. Bosses add more staffs, other numbers and **phases**. Enemies **dodge**, **channel** sustained casts, and **look like they work together**.
 
-**Status (2026-11-02):** AI1–AI8 done; AI9 done by L5 on its second try (the bots play by the brain; ten 4-bot smoke runs all passed, mean clear 8.7 s against the old bot's 9.0 s); L1 (the cost measured, the target lookup made cheap), L2 (heal ally), L3 (spreading round a target) and L4 (the call) done. Left: L6 (difficulty, waiting for `difficulty_changed`) and L7 (strays with roles, the owner's picks). Designed with the owner in one session (the decisions are in "Owner decisions"). An owner exception like phases F, G and H (docs/ROADMAP.md): it is the **baseline** enemies are built on later. Designing actual new enemies and bosses on it stays M3 and later.
+**Status (2026-11-02):** AI1–AI8 done; AI9 done by L5 on its second try (the bots play by the brain; ten 4-bot smoke runs all passed, mean clear 8.7 s against the old bot's 9.0 s); L1 (the cost measured, the target lookup made cheap), L2 (heal ally), L3 (spreading round a target) and L4 (the call) done. Left: L6 (difficulty, waiting for `difficulty_changed`) and L7 (strays with roles, the owner's picks). **2026-11-27:** L6 moved to M3 (docs/BACKLOG.md); L7 built with the owner's picks. Designed with the owner in one session (the decisions are in "Owner decisions"). An owner exception like phases F, G and H (docs/ROADMAP.md): it is the **baseline** enemies are built on later. Designing actual new enemies and bosses on it stays M3 and later.
 
 **Why:** today's `AIController` (gameplay/ai/ai.gd) presses staff 0 and nothing else. Its numbers (`attack_range`, `windup_time`, `recover_time`) are exports in each enemy's scene, so enemies differ by hand-tuned constants, not by what they cast. The test bot (tests/bots/bot.gd) has its own state machine and its own rule that "RB is the dash staff". The owner's earlier rule "no AI knows what it casts next" (DECISIONS, 2026-11-01) was there to stop hard-coding like `if dash.is_next(): do_dash()`. This design keeps that goal by a different route: the AI knows **what a cast does** (numbers and yes/no answers), never **which card** it is.
 
@@ -249,6 +249,14 @@ Waits for gameplay/difficulty to send `difficulty_changed`. **Do:** `Entities` h
 ### L7. Strays with roles (content; owner's call)
 
 The strays still hold one staff each. The design meant them to show the system off: e.g. the Splinter a dash and a swing, the Rime Crook its frost bolt and a pull bolt on its own staff, the Bone Scepter a rain and a dash away, the Storm Fork a triple bolt and a wall. Content, one PR, tried in the enemy arena with the AI view; the owner picks the staffs.
+
+**Built (2026-11-27, the owner's picks: the plan's four).** Each keeps its staff and gains a second; no AI code changed. The AI plays a staff by what it casts, so a second staff that hits is also cast by `fight` when it is the one ready:
+- **Splinter:** its dash, and a swing (1 slot, 0.5 s wind-up, 1.25 s delay). The swing's reach gives it a range band it had none of (a dash is skipped there), so it now closes in through `position` and spreads round its target as other strays do, and still touches for its contact damage.
+- **Rime Crook:** a frost bolt (2 slots, 20 mana at 2 a second), cast by its AI at range, and its frost pull on its own staff (`frost · pull · bolt`, 0.7 s wind-up, 3 s delay, 12 mana at 2 a second) with Cast when Close, so a foe that comes close is still hooked in with frost, telegraphed (staff-language.md, "Enemies too"). Its two pools together cast a little more than its one staff did (4 a second of regen against 3).
+- **Bone Scepter:** its on-hit void rain, and a dash (0.4 s wind-up, 4 s delay): `evade` plays it as a step away when it is low or crowded; `dodge` may also spend it sideways from a shot, and `fight` on a foe in its 80 px when the rain is not ready.
+- **Storm Fork:** its triple lightning bolt, and a wall (0.9 s wind-up, 5 s delay) that `guard` stands when shots are coming; `fight` may also cast it on a foe within its 28 px.
+
+Tests: `tests/content/enemies/test_strays.gd` (every staff valid and affordable; the cards staff by staff; each second staff cast in a fight by its role, with no shots but at the Storm Fork; the Rime Crook pulled in by its frost pull; the Bone Scepter's dash taking it away).
 
 ## Self-critique against docs/DESIGN.md
 

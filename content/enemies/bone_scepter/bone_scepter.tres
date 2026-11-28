@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=8 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/enemies/bone_scepter/bone_scepter.tscn" id="2_scene"]
@@ -23,6 +23,23 @@ script = ExtResource("4_entry")
 staff = SubResource("Resource_staff")
 cards = Array[StringName]([&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"])
 
+[sub_resource type="Resource" id="Resource_dash_staff"]
+script = ExtResource("3_staff")
+id = &"bone_scepter"
+display_name = "Bone Scepter's step"
+slots = 1
+draw = 1
+wind_up = 0.4
+cooldown = 4.0
+spread = 0.0
+max_mana = 25.0
+mana_regen = 6.0
+
+[sub_resource type="Resource" id="Resource_dash_entry"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_dash_staff")
+cards = Array[StringName]([&"dash"])
+
 [resource]
 script = ExtResource("1_base")
 id = &"bone_scepter"
@@ -31,7 +48,7 @@ max_health = 18.0
 move_speed = 30.0
 contact_damage = 0
 scene = ExtResource("2_scene")
-staffs = Array[ExtResource("4_entry")]([SubResource("Resource_entry")])
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_entry"), SubResource("Resource_dash_entry")])
 profile = ExtResource("5_profile")
 biomes = Array[StringName]([&"crypt"])
 cost = 4

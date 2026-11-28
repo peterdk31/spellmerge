@@ -286,7 +286,6 @@ The order after F1 follows its profile.
 - **The per-view cost was the light's readers' copies** (`view_readers.gd`), 0.43 and 6.20 ms: each copy for the third and fourth views followed twice a frame (in Feel's step and at the pre-draw, the second outside Feel's timer), and every uniform of every reader's material read and copied to each view's material a frame. It is node and shader-parameter work, which the module may not do (`native/build_profile.json` holds no canvas class), so it stays GDScript. F2 made it follow once, and only what changed: 0.18 and 2.97 ms (Feel's "camera and split" 2.13 to 0.88 at 4 views).
 - What is left at 4 views: the light's grid at the pre-draw (2.65, already native), the readers' uniforms (1.9: 1,760 reads a frame, 120 changed), the cover's step (1.5 to 1.8 at any number of views), the bodies' looks (0.28 and 1.41), and in the spectacle the shadows (0.24, 0.75), the mists (0.17, 0.49), the stirs (0.09, 0.45), the source motes (0.23, 0.34), the motes' step (0.16, 0.40), the floor marks (0.05, 0.33) and the blockers (0.27).
 - **Next, by that profile:** (F3) the cover's look; (F2b) the readers' uniforms set where they are set (the light's numbers handed to each view's material by the light itself, not read back a frame); (F4) the bodies' looks in one call; (F5) on the workers.
-- **F4 (2026-11-28): the bodies' looks in one call.** The Tick steps every open body's looks in one pass (`Actor.step_all_looks`): which are due and on screen in one native call (`BodyKernel.looks_due`; the split's 4 views' cells too), every due body's staff animation in one more (`BodyKernel.pose_looks` into `StaffPoses.look_rows`), each with its GDScript twin. The looks' share of the frame (the Tick's `_process`, `--profile`, main against F4 back to back): the 4p play fight 1.15 and 1.23 to 0.88 and 0.93 ms; the desktop biome at 4 views 2.39 to 1.55, at 1 view 3.16 to 2.90; 1p near 0.21 to 0.22 (the same). What is left is each look's own node work in GDScript (the creature's hop and telegraph, the face's trail and blinks, the wizard's staff look): node setters, which the module cannot make without canvas classes.
 
 ### 2. The crowd's per-tick work in C++, on a body table
 
@@ -299,7 +298,7 @@ The order after F1 follows its profile.
 | PR | Measured parts it replaces (ms a tick) |
 |---|---|
 | C2 | the move 0.82, the Mover 0.33 |
-| C3 | chase 0.15, steering off harm 0.29, tracking 0.12 |
+| C3 | chase 0.15, steering off harm 0.29, tracking 0.12 (measured and dropped: C3 below) |
 | C4 | the caster's place sent: part of its 0.67, not timed apart (0.3 assumed) |
 | C5 | the line of fire's rays: part of their 0.42 |
 
@@ -358,6 +357,33 @@ Each is measured on `tick_hash.gd` (1 to 4 players) and both crowds.
   - **The batch (one call a tick).** It needs the owner's yes, because bodies would read each other's places as the tick started. With it, the rest of the move (6.4 us a body, its call, a held-up dash, holes, touches and the row among it) and the Mover (about 4 us) could go native together. That needs Combat's pace and push read from its own arrays by id. They already are arrays (`_status_left`, `_knock`), but they belong to the hit table session's area.
   - **C3** (chase, steering, tracking) meets the same order: the native code would be one call a foe, or a batch with the owner's yes. Read in a batch, the rows of the bodies before a foe would be where those bodies stood as the step started, not after their moves this tick.
   - **C6 and change 4** are unchanged by C2. A tick on its own thread keeps the bodies' order as it is, so it needs no batch.
+
+**Measured and dropped (C3, 2026-11-28): nothing built; the AI's kernels and the cover's look do not pay.**
+
+- **Measured first** (a timing patch kept out of the tree, 4p apart equal, 780 ticks, 16,000 thinks; ms a tick). What C3 was to cover is mostly calls into other areas, not computation in the AI:
+  - **Steering off harm, 0.18.** The floor look takes 0.17 of it: the cover room's look (`CoverRoom.look`) 0.11, the place lookup (`RoomGrid.place_at`) 0.035, and the signal and calls 0.02. The steering's own choice after the look (`harms_along`, the walls) takes 0.009.
+  - **Tracking, 0.077.** Half of it is the retarget, Projectiles' nearest target in up to three rings (core/projectiles). The rest is the down and dying checks, about 1.4 us a think.
+  - **Chase, 0.10.** The aim and the walk take 0.04, `Caster.cast_ready` 0.013, and an attack's start (rolls, the board, the aim's tuning, events) the rest.
+  - **The stress crowds split the same way.** The cover room's look is 143 of the floor look's 210 ms over the web run and 255 of 396 over the desktop run. The steering's choice is 27 and 24.
+- **The AI's kernels are dropped as not worth it.** A per-foe native call costs about 1 us (11 arguments, measured), against 1 to 2 us of work it would replace. The saving would be 0.02 to 0.04 ms a tick, inside the swing, for a kernel, a twin and a compare test to keep.
+- **The cover room's look, tried native and closed** (PR #1002, closed by the owner's decision of 2026-11-28: the gain does not pay for its twin). That PR asked `BodyKernel.cover_look` from `CoverRoom.look` straight, with no wrapper, and kept today's GDScript as the twin. A compare test held the two to the bit over 9,600 looks, and the whole game's state hash every tick (seed 11, 1 to 4 players) stayed identical to main, native on and off. Nothing of it is in the tree; its numbers are kept here.
+- **What the native look measured** (this 4-core machine, main and that branch alternating, two runs each):
+  - **The look a call, timed in place** (`Cover.look` around the room's look, a patch kept out of the tree):
+
+    | Run | main (us) | native look (us) |
+    |---|---|---|
+    | 4p apart equal, 12,000 looks | 7.8 / 8.2 | 7.0 / 7.5 |
+    | Web stress, about 24,000 looks | 5.6 / 5.6 | 4.3 / 4.2 |
+    | Desktop stress, about 49,000 looks | 4.8 / 4.5 | 4.1 / 4.0 |
+
+  - **Alone, on a 64 by 40 room:** the GDScript takes 1.9 us a look with danger in patches and 6.2 with dense danger; the native look takes 1.8 and 1.6. The bare native call is 1.0 us of that.
+  - **About 0.01 ms a tick in the 4p fight and 0.035 at the stress caps.** The in-game 8 us a look is mostly not the look's own work (it takes 1.9 us alone), so a faster look saves little. That is below the swing of the whole tick and the bodies' step, which `stress.gd` and `tick_hash.gd --profile-steps` showed within their noise in both directions over two rounds.
+- **What it showed for C4 to C6:**
+  - **A native call costs about 1 us from GDScript.** A kernel pays only where it replaces several us of GDScript a call: dense loops, or many calls folded into one. The look is cheap where the floor is quiet, so it gained little in these fights.
+  - **C4 (the caster's place sent, 0.3 assumed):** time it in place before building, as here. If it is a few property sets a cast, it is call overhead, not computation, and a kernel will not pay.
+  - **C5 (the line of fire's rays, 0.42):** the long rays are already native (SN4). What is left is the calls round them, so the gain is in folding a foe's rays into one call, not in faster rays.
+  - **C6:** unchanged. With C3 dropped, nothing in the AI reads the columns yet.
+  - **Not covered by any PR yet** (both in core/projectiles): the floor look's place lookup (`RoomGrid.place_at`, 0.035 ms a tick at 4p) and the retarget's nearest target (about 0.04). Time each in place first: both are reached through a chain of calls, as the look was.
 
 ### 3. Hits as one batch a tick, Feel's hit looks in its frame
 

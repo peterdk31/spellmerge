@@ -211,3 +211,74 @@ func test_a_frame_of_it_allocates_nothing() -> void:
 	_frames(motes, pool, 200, Rect2(), 2.0)
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of a burning patch make no object")
 	check(motes.given > 100, "while it gave off (%d)" % motes.given)
+
+
+## Every stream walked a frame, as before perf plan F3 (`_live` holding them all: the walk's own test
+## passes by a stream with no cell), for `test_walking_only_the_live_streams_gives_off_the_same`.
+func _walk_every_stream(motes: CoverMotesScript) -> void:
+	motes._live.resize(0)
+	for index in motes._streams.size():
+		motes._live.append(index)
+
+
+func test_walking_only_the_live_streams_gives_off_the_same() -> void:
+	# Perf plan F3 (2026-11-28): a frame walks only the streams some cell shows (`_live`); a biome's
+	# rooms at rest walked 476 streams a frame with no cell. The same motes, dice and debts as a walk
+	# of every stream, through cells catching, going out, a far view, the particles off, and back.
+	var kind: CoverKind = _grass(9.0)
+	kind.states[BURNING].motes.append(_look(4.0))
+	kind.states[2].motes = [_look(3.0)] as Array[MoteSource]
+	var live: CoverMotesScript = _motes(kind)
+	var every: CoverMotesScript = _motes(kind)
+	var pools: Array[MotesScript] = [_pool(), _pool()]
+	var both: Array[CoverMotesScript] = [live, every]
+	for motes in both:
+		motes._rng.seed = 7
+	check_equal(live._live.size(), 0, "at rest: no stream walked")
+	var near := Rect2(100, 100, 320, 180)
+	var far := Rect2(2000, 2000, 320, 180)
+	var at: float = 1.0
+	# Each step: the cells shown (cell, state), then frames at a view, the pool on or off.
+	var steps: Array = [
+		[[[_cell(12, 12), BURNING], [_cell(13, 12), BURNING]], 20, near, true],
+		[[[_cell(12, 12), 2]], 15, near, true],
+		[[[_cell(13, 12), 2], [_cell(14, 13), BURNING]], 12, far, true],
+		[[[_cell(14, 13), 0]], 9, near, false],
+		[[[_cell(12, 12), 0], [_cell(13, 12), 0]], 10, near, true],
+		[[[_cell(15, 15), BURNING]], 25, Rect2(), true],
+	]
+	for step: Array in steps:
+		for shown: Array in step[0]:
+			for motes in both:
+				motes.show(int(shown[0]), int(shown[1]))
+		for frame in int(step[1]):
+			at += STEP
+			_walk_every_stream(every)
+			for k in both.size():
+				both[k].give_off(at, pools[k] if bool(step[3]) else null, step[2])
+		check_equal(live.given, every.given, "the same motes given off (%d)" % every.given)
+		check_equal(live._rng.state, every._rng.state, "the same dice rolled")
+		for s in live._streams.size():
+			check_equal(live._streams[s].owed, every._streams[s].owed, "stream %d owes the same" % s)
+	check(every.given > 10, "while they gave off (%d)" % every.given)
+	check_equal(live._live.size(), 2, "the one burning cell's two streams walked")
+	# A fire moving on between two frames (one cell out, the next catching): its streams' lists empty
+	# and fill again, and they keep what they owed (the walk saw no frame without a cell).
+	var owed := PackedFloat64Array()
+	for stream in live._streams:
+		owed.append(stream.owed)
+	check(owed[0] > 0.0 or owed[1] > 0.0, "a part of a mote owed before the fire moves (%s)" % owed)
+	for motes in both:
+		motes.show(_cell(15, 15), 0)
+		motes.show(_cell(14, 14), BURNING)
+	for s in live._streams.size():
+		check_equal(live._streams[s].owed, owed[s], "stream %d keeps what it owed as the fire moves" % s)
+	for frame in 30:
+		at += STEP
+		_walk_every_stream(every)
+		for k in both.size():
+			both[k].give_off(at, pools[k], Rect2())
+	check_equal(live.given, every.given, "after it moved: the same motes given off (%d)" % every.given)
+	check_equal(live._rng.state, every._rng.state, "and the same dice rolled")
+	for s in live._streams.size():
+		check_equal(live._streams[s].owed, every._streams[s].owed, "stream %d owes the same" % s)

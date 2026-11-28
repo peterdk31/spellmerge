@@ -360,11 +360,15 @@ func tick_step(delta: float, looks_later: bool = false) -> void:
 ## The looks' share of the drawn frame (the Tick's `_process`, after the frame's ticks): its looks
 ## stepped once for every tick since they last were, unless the body is off screen, where they
 ## wait (at most LOOK_TIME_MOST seconds of them) until it is back. View: nothing the game plays by.
-func step_looks_due() -> void:
+## The Tick hands it the screen it worked out once for the frame (`view`'s visible rect grown by
+## ON_SCREEN_MARGIN, on its canvas: not while the screen is split); a body in another view, or
+## stepped with none, asks `_on_screen`.
+func step_looks_due(view: Viewport = null, screen: Rect2 = Rect2()) -> void:
 	if _look_time <= 0.0:
 		return
 	_look_time = minf(_look_time, LOOK_TIME_MOST)
-	if not _on_screen():
+	var on: bool = screen.has_point(get_global_transform_with_canvas().origin) if view != null and get_viewport() == view else _on_screen()
+	if not on:
 		return
 	var seconds: float = _look_time
 	_look_time = 0.0

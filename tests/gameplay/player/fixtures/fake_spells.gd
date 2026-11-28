@@ -129,6 +129,32 @@ class SetPoses:
 	func staff_infusions(actor: int) -> PackedColorArray:
 		return _part(actor, 10, PackedColorArray())
 
+	func may_play(actor: int) -> bool:
+		return (fake.get("staff_poses") as Dictionary).has(actor)
+
+	## The getters above, read at once as the runtime's `read_look` reads its own.
+	func read_look(actor: int, out: PackedFloat32Array) -> bool:
+		if not may_play(actor):
+			return false
+		var dir: Vector2 = staff_pose_dir(actor)
+		var pose: Vector3 = staff_pose(actor)
+		var tint: Color = staff_glow_tint(actor)
+		var mood: StringName = staff_mood(actor)
+		out[Look.DIR_X] = dir.x
+		out[Look.DIR_Y] = dir.y
+		out[Look.TURN] = pose.x
+		out[Look.LIFT] = pose.y
+		out[Look.PUSH] = pose.z
+		out[Look.GLOW] = staff_glow(actor)
+		out[Look.STRETCH] = staff_stretch(actor)
+		out[Look.SHAKE] = staff_shake(actor)
+		out[Look.MOOD] = float(CarrierCard.POSE_MOODS.find(mood) + 1)
+		out[Look.TINT_R] = tint.r
+		out[Look.TINT_G] = tint.g
+		out[Look.TINT_B] = tint.b
+		out[Look.TINT_A] = tint.a
+		return true
+
 	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint,
 	## land, land point, hammer, how much its cards grew its spell, its spell's infusions]), or `none`.
 	func _part(actor: int, n: int, none: Variant) -> Variant:

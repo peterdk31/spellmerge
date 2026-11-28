@@ -2052,6 +2052,20 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 	return true;
 }
 
+namespace {
+
+// The drawing's loops run on one thread below this many slots (the performance pass, 2026-11-28):
+// at 1,000 and 6,000 shots on four cores a loop took longer spread over the threads than alone,
+// the workers' waking costing more than their share of it (`count_draw` 0.15 ms threaded, 0.02 ms
+// alone at 1,000). A result never depends on the threads (jobs.h, rule T2).
+constexpr int64_t DRAW_THREADS_FROM = 16384;
+
+inline int draw_width(int64_t high, int width) {
+	return high >= DRAW_THREADS_FROM ? width : 1;
+}
+
+} // namespace
+
 // `_count_batches` (no solid shots): `_batch_counts` and every live shot's drawn data.
 void ShotKernel::count_draw(Object *m) {
 	const Names &k = *names;
@@ -2083,7 +2097,7 @@ void ShotKernel::count_draw(Object *m) {
 	// Each span counts its own batches (`_scratch->draw_counts`), added up after in span order.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
 	_scratch->draw_counts.assign(spans * batches, 0);
-	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
@@ -2349,7 +2363,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	// are not written, as in the GDScript.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
 	_scratch->draw_counts.assign(spans * batches, 0);
-	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] != 0) {
@@ -2366,7 +2380,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		}
 		used[b] = MIN(before, room[b]);
 	}
-	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *row = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
@@ -3273,4 +3287,8 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("field_pass", "manager", "fields", "count"), &ShotKernel::field_pass);
 	ClassDB::bind_method(D_METHOD("region_counts", "regions", "rows", "count"), &ShotKernel::region_counts);
 	ClassDB::bind_method(D_METHOD("region_rows", "regions", "rows", "count"), &ShotKernel::region_rows);
+	ClassDB::bind_method(D_METHOD("spark_configure", "config"), &ShotKernel::spark_configure);
+	ClassDB::bind_method(D_METHOD("give_off_sparks", "arrays", "births", "count", "state", "moments", "fraction", "span", "sim_time", "live"),
+			&ShotKernel::give_off_sparks);
+	ClassDB::bind_method(D_METHOD("spark_state"), &ShotKernel::spark_state);
 }

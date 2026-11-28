@@ -14,6 +14,9 @@ const NativeScript := preload("res://core/native/native.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
 const MistPartingScript := preload("res://gameplay/feel/mist_parting.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
+const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const SLOTS: int = 256
 const FRAMES: int = 40
@@ -245,3 +248,42 @@ func test_the_kernel_parts_the_mist_as_the_gdscript_does() -> void:
 			if not same:
 				return
 		check(most_live > 50, "%s: cells parted: %d at most" % [size, most_live])
+
+
+## A flash shown in a Feel takes its look's instance colour once (`_flash_look_color`, as
+## `ProjectileManager.look_color` of its ramp, zoom and look; an arc's after its zoom is its length),
+## and is special only when it follows a body; resizing the slots clears what a slot held.
+func test_a_shown_flash_takes_its_look_colour_once() -> void:
+	var bus := EventsScript.new()
+	var actors: Node = ActorSeats.table()
+	var feel: Node = FeelScript.new()
+	feel.set(&"events", bus)
+	feel.set(&"actors", actors)
+	feel.set(&"drive_engine", false)
+	feel.set(&"preset", FeelPresetScript.new())
+	root.add_child(feel)
+	var flashes: FeelFlashes = feel.get(&"_job_flashes") as FeelFlashes
+	var body := Node2D.new()
+	root.add_child(body)
+	var shown: Array[int] = [
+		flashes._show_flash(0, Vector2(10.0, 20.0), Vector2.RIGHT, Color.WHITE, 2, 5, 3, 0.5),
+		flashes._show_flash(FeelScript.KIND_ARC, Vector2(10.0, 20.0), Vector2.UP, Color.WHITE, 1, 0, 1, 0.5, 37.0),
+		flashes._show_flash(FeelScript.KIND_STATUS, Vector2(0.0, 0.0), Vector2.RIGHT, Color.WHITE, 3, 9, 2, 0.5, 0.0, body),
+	]
+	for slot in shown:
+		check(slot >= 0, "shown")
+		var want: Color = ProjectilesScript.look_color(flashes._flash_ramp[slot], flashes._flash_zoom[slot], flashes._flash_look[slot])
+		check_equal(flashes._flash_look_color[slot], want, "slot %d's look colour" % slot)
+	check_equal(flashes._flash_special[shown[0]], 0, "a plain flash is not special")
+	check_equal(flashes._flash_special[shown[2]], 1, "a followed one is")
+	feel.step(1.0 / 60.0)
+	check(flashes._flash_row_counts[FeelFlashes.ROWS_ARCS] == 1 and flashes._flash_row_counts[FeelFlashes.ROWS_STATUSES] == 1, "drawn: %s" % flashes._flash_row_counts)
+	body.free()
+	feel.step(1.0 / 60.0)
+	check_equal(flashes._flash_row_counts[FeelFlashes.ROWS_STATUSES], 0, "a flash whose body is gone ends")
+	feel.call(&"set_effect_slots", 64)
+	check_equal(flashes._flash_special.count(1), 0, "new slots hold nothing special")
+	check_equal(flashes._flash_aged.count(1), 0, "nor anything aged")
+	feel.free()
+	actors.free()
+	bus.free()

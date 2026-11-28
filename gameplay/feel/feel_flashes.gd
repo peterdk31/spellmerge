@@ -427,6 +427,8 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 		var steps: int = maxi(roundi(length / 4.0), 1)
 		_flash_zoom[slot] = steps
 		_flash_length[slot] = steps * 4.0
+	# Worked out once here: a slot's ramp, zoom and look are written nowhere else (a new writer of
+	# them works this out again), and so is whether it is special.
 	_flash_look_color[slot] = ProjectileManagerScript.look_color(ramp, _flash_zoom[slot], look)
 	_flash_special[slot] = 1 if follow != null or feel._cue_tip != ActorsScript.NONE or feel._cue_wind >= 0 else 0
 	_flash_aged[slot] = 0
@@ -467,6 +469,8 @@ func _step_flashes(real_delta: float) -> void:
 	(feel._floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	(feel._blast_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	var kernel: Object = feel._flash_kernel
+	# No batch shows last frame's rows should a step write none (a kernel that refused its arrays).
+	_flash_row_counts.fill(0)
 	var special: int = int(kernel.call(&"find_special", self, effect_slots)) if kernel != null else _find_special(effect_slots)
 	for k in special:
 		_step_special(_flash_special_slots[k], real_delta)

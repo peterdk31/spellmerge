@@ -174,6 +174,13 @@ constexpr int64_t RAY_WALK_KEEP = 64;
 // The slots one task of a loop over every shot takes (jobs.h: fixed, whatever the threads).
 constexpr int64_t SLOT_SPAN = 512;
 
+// The step's loops over every slot (the common pass) and over a behaviour's members run on one
+// thread below this many (the same pass): a shot's share of them is a few nanoseconds, so the
+// workers' wake-up outweighs it at every count a game reaches; one thread against three, the
+// common pass took 0.008 against 0.030 ms at 1,000 shots, 0.026 against 0.061 at 6,000, 0.087
+// against 0.103 at 24,000, and broke even between 50,000 and 100,000.
+constexpr int64_t STEP_THREADS_FROM = 65536;
+
 // What `hits` hands back to GDScript for the shot it stopped at (its n x 4 plus one of these).
 constexpr int64_t YIELD_WHOLE = 0; // the whole shot: its end, the bounds, a wall
 constexpr int64_t YIELD_FOUND = 1; // its hits (`_cand_*`, `_cand_found` of them), then what it left
@@ -1603,8 +1610,8 @@ void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 	prev.load(m, k.prev);
 	vel.load(m, k.vel);
 	ERR_FAIL_COND(top > alive.n || top > pos.n);
-	// Every shot alone: spread over the threads.
-	jobs::for_spans(top, SLOT_SPAN, _width, [&](int64_t, int64_t begin, int64_t end) {
+	// Every shot alone: spread over the threads past STEP_THREADS_FROM.
+	jobs::for_spans(top, SLOT_SPAN, jobs::width_from(top, STEP_THREADS_FROM, _width), [&](int64_t, int64_t begin, int64_t end) {
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
 				continue;
@@ -1822,7 +1829,7 @@ inline void write_quad(float *b, const Vector2 &dir, double diameter, const Vect
 // threads: each member is a shot of its own, and a pass writes only its shot's arrays.
 template <typename F>
 void each_member(int64_t first, int64_t count, int width, F &&body) {
-	jobs::for_spans(count, SLOT_SPAN, width, [&](int64_t, int64_t begin, int64_t end) {
+	jobs::for_spans(count, SLOT_SPAN, jobs::width_from(count, STEP_THREADS_FROM, width), [&](int64_t, int64_t begin, int64_t end) {
 		for (int64_t n = first + begin; n < first + end; n++) {
 			body(n);
 		}
@@ -2118,15 +2125,12 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 
 namespace {
 
-// The drawing's loops run on one thread below this many slots (the performance pass, 2026-11-28):
-// at 1,000 and 6,000 shots on four cores a loop took longer spread over the threads than alone,
-// the workers' waking costing more than their share of it (`count_draw` 0.15 ms threaded, 0.02 ms
-// alone at 1,000). A result never depends on the threads (jobs.h, rule T2).
-constexpr int64_t DRAW_THREADS_FROM = 16384;
-
-inline int draw_width(int64_t high, int width) {
-	return high >= DRAW_THREADS_FROM ? width : 1;
-}
+// The drawing's loops run on one thread below this many slots (the performance pass, 2026-11-28,
+// four cores, `update_draw` in tests/benchmark/shot_scale.gd's storm, one thread against three):
+// 0.95 against 1.18 ms at 24,000, 2.68 against 1.88 at 50,000; at 1,000 and 6,000 a loop took far
+// longer spread over the threads than alone (`count_draw` 0.15 ms threaded, 0.02 ms alone at
+// 1,000). A result never depends on the threads (jobs.h, rule T2).
+constexpr int64_t DRAW_THREADS_FROM = 32768;
 
 } // namespace
 
@@ -2161,7 +2165,7 @@ void ShotKernel::count_draw(Object *m) {
 	// Each span counts its own batches (`_scratch->draw_counts`), added up after in span order.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
 	_scratch->draw_counts.assign(spans * batches, 0);
-	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, jobs::width_from(high, DRAW_THREADS_FROM, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
@@ -2427,7 +2431,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	// are not written, as in the GDScript.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
 	_scratch->draw_counts.assign(spans * batches, 0);
-	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, jobs::width_from(high, DRAW_THREADS_FROM, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] != 0) {
@@ -2444,7 +2448,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		}
 		used[b] = MIN(before, room[b]);
 	}
-	jobs::for_spans(high, SLOT_SPAN, draw_width(high, _width), [&](int64_t span, int64_t begin, int64_t end) {
+	jobs::for_spans(high, SLOT_SPAN, jobs::width_from(high, DRAW_THREADS_FROM, _width), [&](int64_t span, int64_t begin, int64_t end) {
 		int64_t *row = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {

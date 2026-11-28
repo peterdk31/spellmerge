@@ -11,8 +11,8 @@ const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## Past the kernel's DRAW_THREADS_FROM (16,384 slots).
-const SHOTS: int = 17000
+## Past the kernel's DRAW_THREADS_FROM (32,768 slots).
+const SHOTS: int = 33000
 
 
 func test_the_drawing_past_its_threshold_is_the_same_on_four_threads_and_one() -> void:
@@ -20,7 +20,7 @@ func test_the_drawing_past_its_threshold_is_the_same_on_four_threads_and_one() -
 	mgr.native = true
 	mgr.actors = own(ActorSeats.table()) as ActorsScript
 	mgr.events = own(EventsScript.new()) as EventsScript
-	mgr.set_bounds(Rect2(0.0, 0.0, 4000.0, 4000.0))
+	mgr.set_bounds(Rect2(0.0, 0.0, 4000.0, 7600.0))
 	mgr.set_cap(SHOTS)
 	root.add_child(mgr)
 	if not mgr.is_native():

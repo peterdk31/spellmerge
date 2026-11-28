@@ -43,6 +43,11 @@ void shutdown();
 // The number of spans of `span` that cover `count`.
 constexpr int64_t spans_of(int64_t count, int64_t span) { return count <= 0 ? 0 : (count + span - 1) / span; }
 
+// The width for a loop of `count` items whose threads only pay from `from` items on: `width` from
+// there, 1 (the calling thread, no worker woken) below. Each kernel measures its own `from`: a
+// worker's wake-up costs tens of microseconds, more than a cheap loop's whole share of it.
+constexpr int width_from(int64_t count, int64_t from, int width) { return count >= from ? width : 1; }
+
 // `f(index, begin, end)` for each span [begin, end) of `span` items covering [0, count), on up to
 // `width` threads. `index` is the span's number (0 first), for a table of what each span found.
 template <typename F>

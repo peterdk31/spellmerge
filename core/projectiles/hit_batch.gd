@@ -101,6 +101,11 @@ var _held_n: int = 0
 ## The tags of the shots' ends kept for after the pass's hits.
 var _ended: PackedInt64Array = PackedInt64Array()
 var _ended_n: int = 0
+## The targets of the entries the native hit pass would open for the shot it handed back to ask
+## (hit batch A5), `ask_n` of them in turn: the manager asks Combat what `add` would for each
+## (`ask`, `keep_answers`), then the kernel opens them. Written by the kernel; sized by `fit_targets`.
+var ask_target: PackedInt32Array = PackedInt32Array()
+var ask_n: int = 0
 
 
 ## A pass of `shots` shots over `targets` targets begins: the tallies of the last are forgotten.
@@ -139,6 +144,7 @@ func fit_targets(targets: int) -> void:
 		_room_hex.resize(targets)
 		_room_charges.resize(targets)
 		_room_spares.resize(targets)
+		ask_target.resize(targets)
 
 
 ## False when the damage the pass's hits counted off `t`, every spell's, reaches its health.
@@ -212,11 +218,18 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	core[entry] = colour
 	look[entry] = look_bits
 	looked = entries
+	_ask_of(t, spell, alone, sent)
+	return entry
+
+
+## What a new entry on target `t` of `who`'s spell `spell` (`alone`: its shot hits alone) at the
+## manager's count of events `sent` must ask Combat (`add`, and the native hit pass's openings, hit
+## batch A5), left in `asks` with `room` and `damage` cleared for the answers: the room unless told
+## in this pass with no event since, the spell's damage likewise, by its slot in the spells' table.
+func _ask_of(t: int, spell: int, alone: bool, sent: int) -> void:
 	_asked_at = sent
 	_asked_alone = alone
 	asks = 0
-	# The room is fresh when told in this pass with no event since; the spell's damage likewise, by
-	# its slot in the spells' table (written out here: on the hot path a call costs more than this).
 	if _room_pass[t] != _pass or _room_at[t] != sent:
 		asks = ASK_ROOM
 		room.clear()
@@ -231,7 +244,34 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	if _kept < 0:
 		asks |= ASK_DAMAGE
 		damage.clear()
-	return entry
+
+
+## What the native hit pass's opening on target `t` of the spell `spell` (never a shot alone) at the
+## count of events `sent` asks Combat, as `add` would ask for that entry (hit batch A5): left in
+## `asks`, then the answers kept by `keep_answers`.
+func ask(t: int, spell: int, sent: int) -> void:
+	_ask_of(t, spell, false, sent)
+
+
+## The answers to what `ask` named for target `t` and the spell `spell`, kept for the pass as
+## `take_room` keeps them; the native hit pass then opens the entry from them.
+func keep_answers(t: int, spell: int) -> void:
+	if (asks & ASK_ROOM) != 0:
+		_keep_room(t)
+	if (asks & ASK_DAMAGE) != 0:
+		_keep_damage(spell, _asked_at)
+
+
+## `room` as Combat filled it for target `t`, kept for the pass at the count of events of the ask.
+func _keep_room(t: int) -> void:
+	_room_pass[t] = _pass
+	_room_at[t] = _asked_at
+	_room_known[t] = 1 if room.known else 0
+	_room_health[t] = room.health
+	_room_hexed[t] = 1 if room.hexed else 0
+	_room_hex[t] = room.hex
+	_room_charges[t] = room.charges
+	_room_spares[t] = room.spares
 
 
 ## `damage` as Combat filled it for the spell `spell`, kept for the pass at the count of events
@@ -257,15 +297,7 @@ func _keep_damage(spell: int, sent: int) -> void:
 func take_room(entry: int) -> void:
 	var t: int = target[entry]
 	if (asks & ASK_ROOM) != 0:
-		# The room as Combat told it, kept for the pass at the count of events of the ask.
-		_room_pass[t] = _pass
-		_room_at[t] = _asked_at
-		_room_known[t] = 1 if room.known else 0
-		_room_health[t] = room.health
-		_room_hexed[t] = 1 if room.hexed else 0
-		_room_hex[t] = room.hex
-		_room_charges[t] = room.charges
-		_room_spares[t] = room.spares
+		_keep_room(t)
 	var spell_damage: float
 	if (asks & ASK_DAMAGE) != 0:
 		spell_damage = damage.damage

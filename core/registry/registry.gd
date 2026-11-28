@@ -145,13 +145,16 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_sounds.clear()
 	_sound_clashes.clear()
 	_data.clear()
+	var content_sounds: PackedStringArray = PackedStringArray()
 	for folder_name: String in _list_dir(content_root, true):
+		var tres: PackedStringArray = PackedStringArray()
+		var seek: bool = folder_name != VARIANTS_FOLDER
+		_walk_content(content_root.path_join(folder_name), sound_extensions, true, seek, seek and folder_name == SOUNDS_FOLDER, tres, content_sounds)
+		tres.sort()
 		_order.append(StringName(folder_name))
-		_unloaded[StringName(folder_name)] = _find_files(content_root.path_join(folder_name), PackedStringArray(["tres"]), SOUNDS_FOLDER)
+		_unloaded[StringName(folder_name)] = tres
 	var sound_files: PackedStringArray = PackedStringArray()
 	_collect_sounds(audio_root, sound_extensions, true, sound_files)
-	var content_sounds: PackedStringArray = PackedStringArray()
-	_collect_sounds(content_root, sound_extensions, false, content_sounds)
 	content_sounds.sort()
 	sound_files.sort()
 	sound_files.append_array(content_sounds)
@@ -190,6 +193,29 @@ static func _collect_sounds(root: String, extensions: PackedStringArray, inside:
 		if sub == VARIANTS_FOLDER:
 			continue
 		_collect_sounds(root.path_join(sub), extensions, inside or sub == SOUNDS_FOLDER, found)
+
+
+## One walk of a content folder for both lists the scan makes, each directory opened once (the
+## scan's cost is the file system's): with `tres`, each `.tres` outside a `sounds/` folder
+## (what `_find_files(root, ["tres"], SOUNDS_FOLDER)` finds), and each sound file `_collect_sounds`
+## finds below the content root (with `seek`, not below a `variants/` folder; with `inside`, also
+## below a `sounds/` folder). Neither list is sorted here.
+static func _walk_content(root: String, extensions: PackedStringArray, tres: bool, seek: bool, inside: bool, tres_found: PackedStringArray, sounds_found: PackedStringArray) -> void:
+	var dir: DirAccess = DirAccess.open(root)
+	if dir == null:
+		return
+	for file_name: String in _visible(dir.get_files(), true):
+		var extension: String = file_name.get_extension()
+		if tres and extension == "tres":
+			tres_found.append(root.path_join(file_name))
+		if inside and extensions.has(extension):
+			sounds_found.append(root.path_join(file_name))
+	for sub: String in _visible(dir.get_directories(), false):
+		var sub_tres: bool = tres and sub != SOUNDS_FOLDER
+		# Below `variants/` no sound is an id of its own, and `_collect_sounds` looks no further.
+		var sub_seek: bool = seek and sub != VARIANTS_FOLDER
+		if sub_tres or sub_seek:
+			_walk_content(root.path_join(sub), extensions, sub_tres, sub_seek, sub_seek and (inside or sub == SOUNDS_FOLDER), tres_found, sounds_found)
 
 
 ## Every resource of the content folder `folder` (`cover`) under `content_root`, in id order, read
@@ -533,20 +559,26 @@ func get_sound(id: StringName) -> AudioStream:
 ## `.remap` or `.import` suffix; it is removed, so the same name works in the
 ## editor and in an export.
 static func _list_dir(path: String, directories: bool) -> PackedStringArray:
-	var names: PackedStringArray = PackedStringArray()
 	var dir: DirAccess = DirAccess.open(path)
 	if dir == null:
-		return names
-	var raw: PackedStringArray = dir.get_directories() if directories else dir.get_files()
+		return PackedStringArray()
+	return _visible(dir.get_directories() if directories else dir.get_files(), not directories)
+
+
+## `raw`'s names but the hidden ones, sorted and each once; with `files`, without an export's
+## `.remap` or `.import` suffix.
+static func _visible(raw: PackedStringArray, files: bool) -> PackedStringArray:
+	var names: PackedStringArray = PackedStringArray()
 	for entry: String in raw:
 		if entry.begins_with("."):
 			continue
-		if not directories:
-			entry = entry.trim_suffix(".remap").trim_suffix(".import")
-		if not names.has(entry):
-			names.append(entry)
+		names.append(entry.trim_suffix(".remap").trim_suffix(".import") if files else entry)
 	names.sort()
-	return names
+	var kept: PackedStringArray = PackedStringArray()
+	for entry: String in names:
+		if kept.is_empty() or kept[kept.size() - 1] != entry:
+			kept.append(entry)
+	return kept
 
 
 ## Every file with one of the extensions below `root`, in full-path sorted order.

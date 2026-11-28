@@ -709,10 +709,12 @@ func test_a_cell_the_pass_took_keeps_its_box_until_the_next_filling() -> void:
 
 
 ## A merged hit the kernel opens on a barriered body for a spell the barrier spares (hit batch A4):
-## shot 1 (spell 1) hits B, so GDScript asks B's room (a barrier of 5 sparing spell 2); shot 2
-## (spell 2) hits C, so it asks spell 2's damage; shot 3 (spell 2) hits B with both told: the kernel
-## opens that entry itself, and it meets no barrier (its damage counts; the charges stay for spell
-## 1), as the GDScript's does.
+## shot 1 (spell 1) hits B, so B's room is asked (a barrier of 5 sparing spell 2); shot 2 (spell 2)
+## hits C, so C's room and spell 2's damage are asked; shot 3 (spell 2) hits B with both told: the
+## kernel opens that entry itself, and it meets no barrier (its damage counts; the charges stay for
+## spell 1), as the GDScript's does. Shot 2's entry the kernel opens too, once GDScript asked for it
+## (hit batch A5: the same asks, in the same order); shot 1's, the pass's first, GDScript opens (the
+## batch grows for it).
 func test_the_kernel_opens_a_spared_spells_hit_as_the_gdscript() -> void:
 	if not _native_loaded():
 		return
@@ -721,12 +723,15 @@ func test_the_kernel_opens_a_spared_spells_hit_as_the_gdscript() -> void:
 		var b: Node2D = _add_body(side, "b", Vector2(200.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		_add_body(side, "c", Vector2(200.0, 300.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		mgr.events.hit_room_asked.connect(func(target: Node, room: HitRoom) -> void:
+			_events[side].append("room %s" % target.name)
 			room.known = true
 			room.health = 1000.0
 			if target == b:
 				room.charges = 5
 				room.spares = 2)
-		mgr.events.hit_damage_asked.connect(func(tag: int, _shot: int, answer: HitDamage) -> void: answer.damage = 4.0 if tag == 1 else 7.0)
+		mgr.events.hit_damage_asked.connect(func(tag: int, shot: int, answer: HitDamage) -> void:
+			_events[side].append("damage %d shot %d" % [tag, shot])
+			answer.damage = 4.0 if tag == 1 else 7.0)
 		mgr.events.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void:
 			_events[side].append("hit %d %s %d x%d" % [caster, target.name, tag, mgr.impact_count]))
 		mgr.spawn(0, Vector2(190.0, 100.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
@@ -735,9 +740,10 @@ func test_the_kernel_opens_a_spared_spells_hit_as_the_gdscript() -> void:
 	for side in 2:
 		_events[side].clear()
 		_mgrs[side].step(DT)
-	check_equal(_events[1], _events[0], "the same hits")
+	check_equal(_events[1], _events[0], "the same asks and hits, in the same order")
+	check_equal(_events[0].slice(0, 4), ["room b", "damage 1 shot 0", "room c", "damage 2 shot 1"], "B's room and spell 1's damage, then C's room and spell 2's: each asked once")
 	_compare_arrays(0)
-	check_equal(_mgrs[1].merged_opens, 1, "the kernel opened the spared spell's entry on B")
+	check_equal(_mgrs[1].merged_opens, 2, "the kernel opened shot 2's entry on C (after its asks) and the spared spell's on B")
 	var batch: HitBatch = _mgrs[1]._hit_batch
 	check_equal([batch._charges_used[0], batch._spent[0]], [1, 7.0], "spell 1's hit took a charge, spell 2's damage counted")
 
@@ -959,8 +965,9 @@ func _compare_arrays(step: int) -> void:
 
 
 ## The hit batch's scratch of its last `add` (what it asked, at which count, the damage slot kept):
-## an entry the native hit pass opens does not go through `add` (hit batch A4).
-const BATCH_SCRATCH: Array[StringName] = [&"asks", &"_asked_at", &"_asked_alone", &"_kept"]
+## an entry the native hit pass opens does not go through `add` (hit batch A4); and the targets the
+## kernel lists for its asks, which only the native side writes (hit batch A5).
+const BATCH_SCRATCH: Array[StringName] = [&"asks", &"_asked_at", &"_asked_alone", &"_kept", &"ask_target", &"ask_n"]
 
 
 ## Every packed array, int and float member of the two managers' hit batches, byte for byte.

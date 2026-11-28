@@ -157,6 +157,7 @@ bool take_int(const Dictionary &config, const char *key, int64_t &out) {
 
 MoteKernel::MoteKernel() {
 	mn();
+	_make_feel_names();
 }
 
 void MoteKernel::free_names() {
@@ -164,6 +165,7 @@ void MoteKernel::free_names() {
 	mote_names = nullptr;
 	delete region_names;
 	region_names = nullptr;
+	_free_feel_names();
 }
 
 bool MoteKernel::configure(const Dictionary &c) {
@@ -738,4 +740,5 @@ void MoteKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("give_off", "motes", "given", "count", "has_marks"), &MoteKernel::give_off);
 	ClassDB::bind_method(D_METHOD("check_regions", "regions"), &MoteKernel::check_regions);
 	ClassDB::bind_method(D_METHOD("region_rows", "regions", "motes", "from", "count", "now"), &MoteKernel::region_rows);
+	_bind_feel_methods();
 }

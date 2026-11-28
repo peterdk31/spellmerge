@@ -276,6 +276,9 @@ func step_in(table: ActorsScript, now: float, seen: ViewBoxesScript, blockers: L
 	_shown = swap
 	var before: int = _shown_count
 	_shown_count = 0
+	# Room for every row this step can write (a body standing, or one gone shrinking away), made
+	# once here rather than asked of the batch at every row.
+	_make_room(open + before)
 	for at in open:
 		var id: int = _ids[at]
 		var body := table.node_of(id) as Actor
@@ -292,7 +295,10 @@ func step_in(table: ActorsScript, now: float, seen: ViewBoxesScript, blockers: L
 			cast[id] = cast[id].move_toward(want, most)
 		_stamp[id] = _steps
 		_key[id] = key
-		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise_share(body.spawn_share(), _mark_end_of(body.spawn_style))
+		# A body that has stood up (the most) rises no more: its style's mark is not looked up.
+		var spawned: float = body.spawn_share()
+		var rise: float = 1.0 if spawned >= 1.0 else rise_share(spawned, _mark_end_of(body.spawn_style))
+		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise
 		if size_share < 1.0 and not has_drawn(body):
 			radius *= size_share
 		_last_feet[id] = feet.round()
@@ -457,13 +463,18 @@ func _index_lights() -> void:
 				links += 1
 
 
-## Row `at`: a shadow at `feet` (whole px), cast by `by` (whole px), `radius` px wide.
+## Room in the batch and the rows for `rows` rows (grown by doubling, never shrunk).
+func _make_room(rows: int) -> void:
+	if multimesh.instance_count >= rows:
+		return
+	var room: int = maxi(maxi(rows, multimesh.instance_count * 2), 16)
+	multimesh.instance_count = room
+	_rows.resize(room * STRIDE)
+
+
+## Row `at` (room made for it: `_make_room`): a shadow at `feet` (whole px), cast by `by` (whole
+## px), `radius` px wide.
 func _write_row(at: int, feet: Vector2, by: Vector2, radius: float) -> void:
-	if multimesh.instance_count <= at:
-		var room: int = maxi(at + 1, multimesh.instance_count * 2)
-		room = maxi(room, 16)
-		multimesh.instance_count = room
-		_rows.resize(room * STRIDE)
 	var size := Vector2(radius * 2.0 + absf(by.x) + 2.0, radius * 2.0 * FLAT + absf(by.y) + 2.0)
 	var middle: Vector2 = feet + by * 0.5
 	var i: int = at * STRIDE

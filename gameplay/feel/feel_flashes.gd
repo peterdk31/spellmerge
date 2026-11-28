@@ -19,11 +19,12 @@ const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## Not Feel's own: Feel, the other jobs this one calls and Feel's containers it works on, each
 ## Feel's own (shared, never a copy), linked by `link`. `_flash_offset` is read through `feel`: tests
 ## and a screenshot put their own in its place (test_feel_poof.gd, shot_staff_swap.gd).
-const LINKED: Array[StringName] = [&"feel", &"_cue_plans", &"_status_effect", &"_flash_buffer", &"_arc_buffer", &"_status_buffer", &"_floor_buffer", &"_blast_buffer", &"_flash_kind", &"_flash_at", &"_flash_dir", &"_flash_core", &"_flash_ramp", &"_flash_zoom", &"_flash_look", &"_flash_age", &"_flash_seconds", &"_flash_length", &"_flash_follow", &"_flash_light", &"_flash_tip", &"_flash_floor", &"_flash_wind", &"_flash_lasts_wind", &"_flash_kinds", &"_flash_codes", &"_flash_rows", &"_code_light", &"_table_floor"]
+const LINKED: Array[StringName] = [&"feel", &"_cue_plans", &"_status_effect", &"_flash_buffer", &"_arc_buffer", &"_status_buffer", &"_floor_buffer", &"_blast_buffer", &"_flash_kind", &"_flash_at", &"_flash_dir", &"_flash_core", &"_flash_ramp", &"_flash_zoom", &"_flash_look", &"_flash_age", &"_flash_seconds", &"_flash_length", &"_flash_follow", &"_flash_light", &"_flash_tip", &"_flash_floor", &"_flash_wind", &"_flash_lasts_wind", &"_flash_kinds", &"_flash_codes", &"_flash_rows", &"_code_light", &"_table_floor", &"_flash_look_color", &"_flash_special", &"_flash_aged", &"_flash_special_slots", &"_flash_row_counts"]
 
 static var _flash_mesh: ArrayMesh = null
 static var _blast_mesh: ArrayMesh = null
@@ -57,6 +58,19 @@ var _flash_rows: Dictionary
 var _code_light: Dictionary
 var _table_floor: PackedByteArray
 
+var _flash_look_color: PackedColorArray
+var _flash_special: PackedByteArray
+var _flash_aged: PackedByteArray
+var _flash_special_slots: PackedInt32Array
+var _flash_row_counts: PackedInt32Array
+
+## `_flash_row_counts`' places: the rows of the flares, arcs, statuses, the floor's and explosions.
+const ROWS_FLARES: int = 0
+const ROWS_ARCS: int = 1
+const ROWS_STATUSES: int = 2
+const ROWS_FLOORS: int = 3
+const ROWS_BLASTS: int = 4
+
 
 ## Takes Feel and its containers and jobs, by the names in LINKED (`Feel._link_jobs`).
 func link(owner: FeelScript) -> void:
@@ -64,6 +78,31 @@ func link(owner: FeelScript) -> void:
 	for name: StringName in LINKED:
 		if name != &"feel":
 			set(name, owner.get(name))
+
+
+## Find the special slots and write the rows with the native kernel (`Feel._flash_kernel`, a
+## `MoteKernel`: native/src/feel_loops.cpp) when
+## `on` and the module is loaded. The kernel is handed the numbers it needs and checks the members it
+## reads (this job's aliases of Feel's).
+func use_native(on: bool) -> void:
+	feel._flash_kernel = null
+	var kernel: Object = NativeScript.mote_kernel() if on else null
+	if kernel == null:
+		return
+	var numbers: Dictionary = {
+		"FLASH_STRIDE": FeelScript.FLASH_STRIDE, "FLASH_GRID": FeelScript.FLASH_GRID, "BLAST_SPAN": FeelScript.BLAST_SPAN,
+		"ARC_ACROSS": FeelScript.ARC_ACROSS, "ARC_MARGIN": FeelScript.ARC_MARGIN, "FLASH_FROM": FeelScript.FLASH_FROM,
+		"FLASH_SPAN": FeelScript.FLASH_SPAN, "KIND_ARC": FeelScript.KIND_ARC, "KIND_STATUS": FeelScript.KIND_STATUS,
+		"KIND_SHELL": FeelScript.KIND_SHELL, "KIND_FIREBALL": FeelScript.KIND_FIREBALL, "FLASH_TABLE": FeelScript.FLASH_TABLE,
+		"FLASH_TABLE_CODE": FeelScript.FLASH_TABLE_CODE,
+	}
+	var wrong: PackedStringArray = kernel.call(&"check_flash_fields", self)
+	if not kernel.call(&"configure_flashes", numbers):
+		wrong.append("its numbers")
+	if not wrong.is_empty():
+		push_error("FeelFlashes: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		return
+	feel._flash_kernel = kernel
 
 
 ## Discharge arcs showing right now (for tests).
@@ -171,6 +210,7 @@ func _make_flashes() -> void:
 	feel._blast_node = _make_flash_batch(BLAST_SHADER, blast_mesh())
 	_size_flashes(feel.effect_slots)
 	_read_flash_kinds()
+	use_native(feel.flash_native)
 
 
 ## Read the flash kinds (content/flashes) from the registry: each id's code and its row for a
@@ -311,6 +351,12 @@ func _size_flashes(slots: int) -> void:
 	_flash_wind.fill(-1)
 	_flash_lasts_wind.resize(slots)
 	_flash_lasts_wind.fill(0)
+	_flash_look_color.resize(slots)
+	_flash_special.resize(slots)
+	_flash_special.fill(0)
+	_flash_aged.resize(slots)
+	_flash_aged.fill(0)
+	_flash_special_slots.resize(slots)
 	feel._next_flash = 0
 	# The statuses shown lost their flashes; the next step shows them again.
 	_status_effect.fill(-1)
@@ -381,6 +427,11 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 		var steps: int = maxi(roundi(length / 4.0), 1)
 		_flash_zoom[slot] = steps
 		_flash_length[slot] = steps * 4.0
+	# Worked out once here: a slot's ramp, zoom and look are written nowhere else (a new writer of
+	# them works this out again), and so is whether it is special.
+	_flash_look_color[slot] = ProjectileManagerScript.look_color(ramp, _flash_zoom[slot], look)
+	_flash_special[slot] = 1 if follow != null or feel._cue_tip != ActorsScript.NONE or feel._cue_wind >= 0 else 0
+	_flash_aged[slot] = 0
 	return slot
 
 
@@ -401,20 +452,109 @@ func _place_on_tip(slot: int) -> void:
 	_flash_dir[slot] = way.normalized()
 
 
-## Age the flashes by `real_delta` and write the live ones into their batches, oldest first.
+## Age the flashes by `real_delta` and write the live ones into their batches, oldest first: the
+## special slots (`_flash_special`: following a body, on a staff tip or lasting a wind-up) first, by
+## what the game says (`_step_special`), then every slot's row (`_write_rows`, in the native kernel
+## where it is loaded). A slot's row depends on its own slot alone, so the order is the old one loop's.
 func _step_flashes(real_delta: float) -> void:
 	if feel._flash_node == null:
 		return
 	# Feel's numbers this reads, once (a read through `feel` is a lookup by name).
 	var effect_slots: int = feel.effect_slots
 	var next_flash: int = feel._next_flash
-	var spells: Node = feel.spells
 	var clock: float = feel._clock
 	(feel._flash_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	(feel._arc_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	(feel._status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	(feel._floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
 	(feel._blast_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", clock)
+	var kernel: Object = feel._flash_kernel
+	# No batch shows last frame's rows should a step write none (a kernel that refused its arrays).
+	_flash_row_counts.fill(0)
+	var special: int = int(kernel.call(&"find_special", self, effect_slots)) if kernel != null else _find_special(effect_slots)
+	for k in special:
+		_step_special(_flash_special_slots[k], real_delta)
+	if kernel != null:
+		kernel.call(&"write_rows", self, real_delta, next_flash, effect_slots)
+	else:
+		_write_rows(real_delta, next_flash, effect_slots)
+	var out: int = _flash_row_counts[ROWS_FLARES]
+	var arcs: int = _flash_row_counts[ROWS_ARCS]
+	var statuses: int = _flash_row_counts[ROWS_STATUSES]
+	var floors: int = _flash_row_counts[ROWS_FLOORS]
+	var blasts: int = _flash_row_counts[ROWS_BLASTS]
+	if out > 0:
+		feel._flash_node.multimesh.buffer = _flash_buffer
+	feel._flash_node.multimesh.visible_instance_count = out
+	if arcs > 0:
+		feel._arc_node.multimesh.buffer = _arc_buffer
+	feel._arc_node.multimesh.visible_instance_count = arcs
+	if statuses > 0:
+		feel._status_node.multimesh.buffer = _status_buffer
+	feel._status_node.multimesh.visible_instance_count = statuses
+	if floors > 0:
+		feel._floor_node.multimesh.buffer = _floor_buffer
+	feel._floor_node.multimesh.visible_instance_count = floors
+	if blasts > 0:
+		feel._blast_node.multimesh.buffer = _blast_buffer
+	feel._blast_node.multimesh.visible_instance_count = blasts
+	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_flashes`).
+	if feel._spectacle != null:
+		feel._spectacle.light_flashes(_flash_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
+
+
+## The live special slots (`_flash_special`) listed in `_flash_special_slots`, in slot order;
+## returns how many (`MoteKernel.find_special` does the same).
+func _find_special(effect_slots: int) -> int:
+	var found: int = 0
+	for slot in effect_slots:
+		if _flash_special[slot] != 0 and _flash_seconds[slot] > 0.0:
+			_flash_special_slots[found] = slot
+			found += 1
+	return found
+
+
+## A special slot aged by `real_delta`, ended when the body it follows is gone or its wind-up is
+## over, its time stretched to a wind-up it lasts, and moved to its staff tip or the body it
+## follows; marked aged (`_flash_aged`) so `_write_rows` does not age it again.
+func _step_special(slot: int, real_delta: float) -> void:
+	var spells: Node = feel.spells
+	_flash_age[slot] += real_delta
+	var through: float = _flash_age[slot] / _flash_seconds[slot]
+	# Read untyped: a freed body put in a typed variable reads as null, and its flash would
+	# stay on where it was instead of ending (S6, item 9's regression test).
+	var followed: Variant = _flash_follow[slot]
+	var follow: Node2D = null
+	if typeof(followed) == TYPE_OBJECT:
+		if is_instance_valid(followed):
+			follow = followed as Node2D
+		else:
+			through = 1.0
+	if _flash_wind[slot] >= 0 and spells != null and through < 1.0:
+		if not bool(spells.call("is_winding", _flash_tip[slot], _flash_wind[slot])):
+			# Its wind-up is over: the cast left, or was cancelled.
+			through = 1.0
+		elif _flash_lasts_wind[slot] == 1:
+			# As long as its wind-up: what has run plus what the wind-up has left.
+			var left: float = float(spells.call("cooldown_left", _flash_tip[slot], _flash_wind[slot]))
+			_flash_seconds[slot] = maxf(_flash_age[slot] + left, 0.01)
+			through = _flash_age[slot] / _flash_seconds[slot]
+	if through >= 1.0:
+		_flash_seconds[slot] = 0.0
+		_flash_follow[slot] = null
+		return
+	_flash_aged[slot] = 1
+	if _flash_tip[slot] != ActorsScript.NONE:
+		_place_on_tip(slot)
+	elif follow != null:
+		_flash_at[slot] = (follow.global_position + feel._flash_offset[slot]).round()
+
+
+## Every live slot from `next_flash` on (oldest first) aged by `real_delta` (but a special one
+## `_step_special` aged: its mark cleared), ended at its time, and its row written into its batch;
+## the rows of each batch counted in `_flash_row_counts`. `MoteKernel.write_rows` mirrors it to the
+## bit. A slot's `through` is its age over its seconds, as stored.
+func _write_rows(real_delta: float, next_flash: int, effect_slots: int) -> void:
 	var out: int = 0
 	var arcs: int = 0
 	var floors: int = 0
@@ -424,34 +564,14 @@ func _step_flashes(real_delta: float) -> void:
 		var slot: int = (next_flash + n) % effect_slots
 		if _flash_seconds[slot] <= 0.0:
 			continue
-		_flash_age[slot] += real_delta
+		if _flash_aged[slot] != 0:
+			_flash_aged[slot] = 0
+		else:
+			_flash_age[slot] += real_delta
+			if _flash_age[slot] / _flash_seconds[slot] >= 1.0:
+				_flash_seconds[slot] = 0.0
+				continue
 		var through: float = _flash_age[slot] / _flash_seconds[slot]
-		# Read untyped: a freed body put in a typed variable reads as null, and its flash would
-		# stay on where it was instead of ending (S6, item 9's regression test).
-		var followed: Variant = _flash_follow[slot]
-		var follow: Node2D = null
-		if typeof(followed) == TYPE_OBJECT:
-			if is_instance_valid(followed):
-				follow = followed as Node2D
-			else:
-				through = 1.0
-		if _flash_wind[slot] >= 0 and spells != null and through < 1.0:
-			if not bool(spells.call("is_winding", _flash_tip[slot], _flash_wind[slot])):
-				# Its wind-up is over: the cast left, or was cancelled.
-				through = 1.0
-			elif _flash_lasts_wind[slot] == 1:
-				# As long as its wind-up: what has run plus what the wind-up has left.
-				var left: float = float(spells.call("cooldown_left", _flash_tip[slot], _flash_wind[slot]))
-				_flash_seconds[slot] = maxf(_flash_age[slot] + left, 0.01)
-				through = _flash_age[slot] / _flash_seconds[slot]
-		if through >= 1.0:
-			_flash_seconds[slot] = 0.0
-			_flash_follow[slot] = null
-			continue
-		if _flash_tip[slot] != ActorsScript.NONE:
-			_place_on_tip(slot)
-		elif follow != null:
-			_flash_at[slot] = (follow.global_position + feel._flash_offset[slot]).round()
 		var kind: int = _flash_kind[slot]
 		var buffer: PackedFloat32Array = _flash_buffer
 		var i: int = out * FeelScript.FLASH_STRIDE
@@ -499,7 +619,7 @@ func _step_flashes(real_delta: float) -> void:
 		buffer[i + 5] = -dir.x * d
 		buffer[i + 6] = _flash_light[slot]
 		buffer[i + 7] = at.y
-		var data: Color = ProjectileManagerScript.look_color(_flash_ramp[slot], _flash_zoom[slot], _flash_look[slot])
+		var data: Color = _flash_look_color[slot]
 		buffer[i + 8] = data.r
 		buffer[i + 9] = data.g
 		buffer[i + 10] = data.b
@@ -510,24 +630,11 @@ func _step_flashes(real_delta: float) -> void:
 		buffer[i + 14] = core.b
 		# Its age beside its code (the flash shaders read it: `coded_age`).
 		buffer[i + 15] = 1.0 - (float(code) + FeelScript.FLASH_FROM + FeelScript.FLASH_SPAN * through) / 16.0
-	if out > 0:
-		feel._flash_node.multimesh.buffer = _flash_buffer
-	feel._flash_node.multimesh.visible_instance_count = out
-	if arcs > 0:
-		feel._arc_node.multimesh.buffer = _arc_buffer
-	feel._arc_node.multimesh.visible_instance_count = arcs
-	if statuses > 0:
-		feel._status_node.multimesh.buffer = _status_buffer
-	feel._status_node.multimesh.visible_instance_count = statuses
-	if floors > 0:
-		feel._floor_node.multimesh.buffer = _floor_buffer
-	feel._floor_node.multimesh.visible_instance_count = floors
-	if blasts > 0:
-		feel._blast_node.multimesh.buffer = _blast_buffer
-	feel._blast_node.multimesh.visible_instance_count = blasts
-	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_flashes`).
-	if feel._spectacle != null:
-		feel._spectacle.light_flashes(_flash_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
+	_flash_row_counts[ROWS_FLARES] = out
+	_flash_row_counts[ROWS_ARCS] = arcs
+	_flash_row_counts[ROWS_STATUSES] = statuses
+	_flash_row_counts[ROWS_FLOORS] = floors
+	_flash_row_counts[ROWS_BLASTS] = blasts
 
 
 ## How many flashes are showing (for tests and the sheets).

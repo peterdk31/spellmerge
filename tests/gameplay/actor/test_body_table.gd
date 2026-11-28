@@ -195,3 +195,52 @@ func _areas() -> Dictionary:
 		if is_instance_valid(body) and body.is_inside_tree() and body.id != ActorsScript.NONE:
 			areas["actor %d" % body.id] = body
 	return areas
+
+
+## The gather as the bodies' step starts (perf plan C2): the native module's `BodyKernel.gather` when
+## it is loaded writes the bits `Actor.gd_gather_rows` writes, for actors moved and pushed by hand,
+## a plain node on an id (no actor: its row left) and an open id with no node. The bodies' rows are
+## emptied between the two, so each pass's rows are its own writes.
+func test_the_native_gather_writes_the_twins_rows() -> void:
+	if not WallSlide.native_on() and OS.get_environment("SPELLMERGE_NATIVE") == "required":
+		check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
+	var table: ActorsScript = _world.table
+	var bodies: Array[Actor] = []
+	for i in 5:
+		bodies.append(_body(START + Vector2(30.0 * i, 7.0 * i), [&"health", &"mover"]))
+	var plain := Node2D.new()
+	root.add_child(plain)
+	plain.position = Vector2(77.0, 88.0)
+	var plain_id: int = table.open(0, 0)
+	table.set_node(plain_id, plain)
+	var empty_id: int = table.open(0, 0)
+	for i in bodies.size():
+		bodies[i].position = Vector2(12.5 + i * 41.25, 300.0 - i * 3.125)
+		bodies[i].velocity = Vector2(i * 1.5 - 3.0, 0.1 * i)
+	var ids := PackedInt32Array()
+	var n: int = table.open_ids(ids)
+	var marked := Vector2(-999.0, -999.0)
+	for i in bodies.size():
+		table.places[bodies[i].id] = Vector2.ZERO
+		table.velocities[bodies[i].id] = Vector2.ZERO
+	for native in [false, true]:
+		for id in [plain_id, empty_id]:
+			table.places[id] = marked
+			table.velocities[id] = marked
+		if native:
+			check(WallSlide.native_on() == false or WallSlide.kernel().call(&"gather", table.nodes(), ids, n, table.places, table.velocities), "the kernel gathered")
+			if not WallSlide.native_on():
+				Actor.gd_gather_rows(table, ids, n)
+		else:
+			Actor.gd_gather_rows(table, ids, n)
+		for i in bodies.size():
+			check_equal(var_to_bytes(table.places[bodies[i].id]), var_to_bytes(bodies[i].global_position), "body %d's place (native %s)" % [i, native])
+			check_equal(var_to_bytes(table.velocities[bodies[i].id]), var_to_bytes(bodies[i].velocity), "body %d's velocity (native %s)" % [i, native])
+		check_equal(table.places[plain_id], marked, "a plain node's row is left (native %s)" % native)
+		check_equal(table.velocities[empty_id], marked, "an id with no node is left (native %s)" % native)
+		for i in bodies.size():
+			table.places[bodies[i].id] = Vector2.ZERO
+			table.velocities[bodies[i].id] = Vector2.ZERO
+	table.close(plain_id)
+	table.close(empty_id)
+	plain.free()

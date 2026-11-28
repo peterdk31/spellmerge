@@ -199,6 +199,28 @@ func test_the_boss_never_falls() -> void:
 	check(not boss.is_falling() and not _world.projectiles.is_hole(boss.global_position), "a swap toward a hole too: %s" % boss.global_position)
 
 
+## The move takes its room from the walk's end (perf plan C2, `RoomGrid.walk_place`); a boss the
+## move then puts on the nearest ground has the room of where it stands, not of where the walk ended.
+func test_a_boss_put_on_ground_has_the_room_it_stands_in() -> void:
+	var grid: RoomGrid = _world.projectiles.grid()
+	# Two places split inside the crack, left of its middle: a walk ending at x 212 is in the right one,
+	# and the nearest ground (the crack's left lip) is in the left one.
+	var left: int = grid.add_place(Rect2(0.0, 0.0, 208.0, 360.0))
+	var right: int = grid.add_place(Rect2(208.0, 0.0, 432.0, 360.0))
+	var boss: Actor = _enemy(Vector2(150.0, 100.0))
+	var data := EnemyBase.new()
+	data.boss = true
+	boss.data = data
+	_run(1)
+	check_equal(boss.room, left, "in the left place")
+	for way in [Vector2(62.0, 0.0), Vector2(70.0, 0.0)]:
+		_ask(boss, &"teleport", way - (boss.global_position - Vector2(150.0, 100.0)), 0.0)
+		_run(1)
+		check(not grid.is_hole(boss.global_position), "put on ground: %s" % boss.global_position)
+		check_equal(boss.room, grid.place_at(boss.global_position), "its room is where it stands: %s" % boss.global_position)
+		check_equal(boss.room, left if way.x < 66.0 else right, "on the near lip's side: %s" % boss.global_position)
+
+
 func test_a_body_something_ends_at_no_health_is_ended_by_its_fall() -> void:
 	# A decoy (Entities ends it at 0, `downable`) falls as any body.
 	var decoy: Actor = _enemy(Vector2(150.0, 100.0))

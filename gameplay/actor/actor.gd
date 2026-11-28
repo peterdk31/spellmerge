@@ -388,8 +388,17 @@ func write_row() -> void:
 ## Tick's, as the bodies' step starts): what was done to the bodies since their own ticks (Flow
 ## placing them, a teleport, the steps before the bodies') is in the table. A node of an id that is
 ## no Actor (a plain Combat body) has no row. One loop, no call a body (0.06 ms a tick at 112 bodies,
-## the web's stress fight).
+## the web's stress fight). The native module's `BodyKernel.gather` when it is loaded
+## (`WallSlide.native_on`, perf plan C2), else `gd_gather_rows`, the reference it mirrors
+## (tests/gameplay/actor/test_body_table.gd compares them).
 static func gather_rows(table: ActorsScript, ids: PackedInt32Array, count: int) -> void:
+	var kernel: Object = WallSlide.kernel()
+	if kernel == null or not kernel.call(&"gather", table.nodes(), ids, count, table.places, table.velocities):
+		gd_gather_rows(table, ids, count)
+
+
+## `gather_rows` in GDScript: the reference `BodyKernel.gather` mirrors, and the fallback.
+static func gd_gather_rows(table: ActorsScript, ids: PackedInt32Array, count: int) -> void:
 	var nodes: PackedInt64Array = table.nodes()
 	var places: PackedVector2Array = table.places
 	var velocities: PackedVector2Array = table.velocities
@@ -477,13 +486,16 @@ func move(delta: float) -> void:
 	var holes: bool = grid != null and grid.has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
 	var found: int = 0
+	var place: int = RoomGrid.NO_PLACE
 	if grid != null:
-		# The slides and the holes at its end in one call (`RoomGrid.walk_body`, sim-native SN1).
-		# Whether it passes mouths is only asked where the room has some: the walk minds it only there.
+		# The slides, the holes at its end and the place it ends in, in one call (`RoomGrid.walk_place`:
+		# sim-native SN1, perf plan C2). Whether it passes mouths is only asked where the room has some:
+		# the walk minds it only there.
 		var radius: float = wall_radius()
-		var walked: Vector3 = grid.walk_body(from, motion, mover.crossing * delta, radius, grid.has_mouths() and passes_mouths(), radius + HoleRules.GROUND_MARGIN)
+		var walked: Vector4 = grid.walk_place(from, motion, mover.crossing * delta, radius, grid.has_mouths() and passes_mouths(), radius + HoleRules.GROUND_MARGIN)
 		to = Vector2(walked.x, walked.y)
 		found = int(walked.z)
+		place = int(walked.w)
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -492,7 +504,13 @@ func move(delta: float) -> void:
 		velocity = (to - from) / delta
 	if holes:
 		_check_ground(crossed, found)
-	_find_room_in(grid)
+	if grid != null and global_position == to:
+		# Its room (`find_room`): the walk's answer, where it ended.
+		room = place
+	else:
+		# Something since put it elsewhere (a boss on the nearest ground), or its node's place reads back
+		# other than it was set (a parent's transform): asked where it is now.
+		_find_room_in(grid)
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
 

@@ -30,7 +30,9 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/rect2.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/vector4.hpp>
 
 #include <vector>
 
@@ -55,6 +57,22 @@ public:
 	Vector3 walk(const PackedByteArray &walls, const PackedByteArray &walk, const PackedByteArray &ground, const PackedByteArray &holes, int64_t w,
 			int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
 			const Vector2 &crossed, double radius, double reach) const;
+
+	// `RoomGrid.gd_walk_place` (perf plan C2): `walk` where the grid has something laid (`flags` not 0;
+	// else the whole way), then the place its end is in, `RoomGrid.place_at` on the places (`rects`, the
+	// `place_cell` squares' `cells`, `over`, `mixed`, `touched`, `pw` by `ph` from `origin`): x and y where
+	// it ends, z the hole flags at its end, w the place (NO_PLACE, -1, for none). `Actor.move`'s grid work
+	// and its room in one call a body.
+	Vector4 walk_place(const PackedByteArray &walls, const PackedByteArray &walk_cells, const PackedByteArray &ground, const PackedByteArray &holes,
+			int64_t w, int64_t h, double cell, const Vector2 &origin, int64_t flags, int64_t mask, const Vector2 &from, const Vector2 &motion,
+			const Vector2 &crossed, double radius, double reach, const Array &rects, const PackedByteArray &cells, const PackedByteArray &over,
+			const PackedByteArray &mixed, const PackedByteArray &touched, int64_t pw, int64_t ph, double place_cell) const;
+	// `Actor.gd_gather_rows` (perf plan C2): for each of the first `count` actor ids in `ids`, the body
+	// whose instance id `nodes` keeps there, an actor's (its `room` an int), has its place and its
+	// `velocity` written into `places` and `velocities` at its id (the actor table's columns, written in
+	// place); another id's row is left. False, logged, for an id past the arrays.
+	bool gather(const PackedInt64Array &nodes, const PackedInt32Array &ids, int64_t count, const PackedVector2Array &places,
+			const PackedVector2Array &velocities) const;
 
 	// `RoomGrid.wall_hit` on `cells` (the grid has walls; sim-native SN4: the long rays of an AI's sight
 	// and line of fire, `RoomGrid` hands over only paths past its fast ones), t in [0, 1] or -1 (-2, logged, for a grid smaller than w * h).

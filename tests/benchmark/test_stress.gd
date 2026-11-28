@@ -37,6 +37,22 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the web run should skip only the desktop scenario, got %s" % [web])
 		quit(1)
 		return
+	# The costliest staffs the warning names (staffs D3): by hits plus mean live shots, ties by seat
+	# then staff; a staff with only shots is ranked too.
+	var hits: Dictionary = {Vector2i(1, 1): 220, Vector2i(2, 1): 186, Vector2i(0, 0): 10}
+	var shots: Dictionary = {Vector2i(2, 1): 98, Vector2i(3, 2): 30}
+	var ranked: Array[Dictionary] = RunnerScript.staffs_by_cost(hits, shots, 10)
+	var order: Array[Vector2i] = []
+	for row: Dictionary in ranked:
+		order.append(Vector2i(int(row["seat"]), int(row["staff"])))
+	if order != ([Vector2i(1, 1), Vector2i(2, 1), Vector2i(0, 0), Vector2i(3, 2)] as Array[Vector2i]) or not is_equal_approx(float(ranked[1]["shots"]), 9.8):
+		printerr("TEST FAILED: the staffs by cost are out of order or miscounted: %s" % [ranked])
+		quit(1)
+		return
+	if not RunnerScript.staffs_by_cost({}, {}, 0).is_empty():
+		printerr("TEST FAILED: no staff measured should rank none")
+		quit(1)
+		return
 	runner.set("warm_up", 3.0)
 	runner.set("measure", 2.0)
 	var shard: Vector2i = Suite.shard_of(OS.get_cmdline_user_args())

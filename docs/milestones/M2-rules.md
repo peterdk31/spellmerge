@@ -135,7 +135,7 @@ The owner's "pass that checks for the general rules", as a test that runs in the
 - Per-behaviour probes where a plain diff is not enough (homing needs a target off the line, bounce a wall, ghost a wall behind a target, timer a long life, on wall a wall, on kill a target that dies): a small table of scene setups per card, chosen by the card's behaviour or event, not per carrier.
 - Prints the matrix (✓, W, ✗) so the PR shows coverage; a ✗ fails.
 - The other way round (R4b, owner item 22): every W cell is also played with the card forced on (`StaffCompiler.keep_wasted`, a test-only switch that keeps what the waste table would drop; the runtime decides). If that changes the cast (effects only: a wasted card's costs are no effect), the listing is wrong: "`<card>` on `<carrier>` is listed as wasted (`<reason>`) but changes the cast". Done; it found no false W on main (2026-10-29), slam's was already fixed by hand.
-- Rule 2 checks in the same test: a card's effect survives a bounce, a chain jump, an echo and a payload firing (the trace of the second leg still shows it). **Deferred:** not built in #468; tracked in docs/BACKLOG.md ("Card rules R3, rule 2 checks"). Done-when 2 holds without it.
+- Rule 2 checks in the same test: a card's effect survives a bounce, a chain jump, an echo and a payload firing (the trace of the second leg still shows it). **Done** (2026-11-27), as hand-written probes on the bolt by the owner's choice (`tests/core/test_card_rule_legs.gd`): an infusion and heavy through a bounce, a chain jump and an echo, homing through a bounce, an infusion and homing through a payload firing. Each reads only the second leg's hits and checks the card shows there and not without it; a new behaviour gets its probe by hand.
 
 Build R3 right after R2 (it needs the honest compiler); R1 parts can land before or after.
 
@@ -150,7 +150,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 
 ### R4: decide with the owner, then implement (rules 1, 4, 5)
 
-**Done** (checked 2026-11-27): every cell below is decided and built (R4a-R4i, F1-F8). F1's last open question is answered: a blast's hits do not pull (the owner, 2026-11-27). The two items once left for the owner are settled: a rune, decoy or familiar is placed a step ahead, so its mirror lands behind it (F3), and two pulls on the wizard add up (F1). The rule 2 checks deferred from R3 stay in docs/BACKLOG.md.
+**Done** (checked 2026-11-27): every cell below is decided and built (R4a-R4i, F1-F8). F1's last open question is answered: a blast's hits do not pull (the owner, 2026-11-27). The two items once left for the owner are settled: a rune, decoy or familiar is placed a step ahead, so its mirror lands behind it (F3), and two pulls on the wizard add up (F1). The rule 2 checks deferred from R3 are built (`tests/core/test_card_rule_legs.gd`).
 
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 

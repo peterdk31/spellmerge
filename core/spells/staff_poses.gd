@@ -56,6 +56,8 @@ var _pose_ended: PackedByteArray = PackedByteArray()
 const POSE_CHANNELS: int = 8
 ## What `staff_infusions` answers with no spell (never written).
 const NO_INFUSIONS: PackedColorArray = []
+## The "hold" phase's number (`CarrierCard.POSE_PHASES`), looked up once.
+const HOLD_PHASE: int = CarrierCard.POSE_PHASES["hold"]
 ## Where `land` and `hammer` are among them.
 const LAND: int = 6
 const HAMMER: int = 7
@@ -317,6 +319,50 @@ func staff_mood(actor: int) -> StringName:
 	return CarrierCard.POSE_MOODS[_pose_out_mood - 1]
 
 
+## False when `actor`'s staff surely plays no animation now (none started, or the last one is known
+## to be over): what a look asks first every drawn frame, at the cost of two reads (performance,
+## 2026-11-28). True may still be an animation past its last key: `staff_pose_dir` tells.
+func may_play(actor: int) -> bool:
+	return actor >= 0 and actor < SpellRuntime.ACTORS and _pose_ended[actor] == 0 and is_finite(_pose_start[actor])
+
+
+## What `read_look` writes, in order: the aim it turns from (`staff_pose_dir`, x and y), the turn,
+## lift and push (`staff_pose`), the glow, stretch and shake (`staff_glow`, `staff_stretch`,
+## `staff_shake`), the mood (its number: 0 none, else 1 + its index in `CarrierCard.POSE_MOODS`), and
+## the glow's tint (`staff_glow_tint`: r, g, b, a).
+enum Look { DIR_X, DIR_Y, TURN, LIFT, PUSH, GLOW, STRETCH, SHAKE, MOOD, TINT_R, TINT_G, TINT_B, TINT_A, SIZE }
+
+
+## Everything a body's look shows of `actor`'s staff animation now, in one call (a look asks every
+## drawn frame: performance, 2026-11-28): into `out` (`Look.SIZE` numbers, in `Look`'s order; each
+## the same number its getter answers, as 32-bit floats). False, and `out` left as it was, when it
+## plays none. Allocation-free.
+func read_look(actor: int, out: PackedFloat32Array) -> bool:
+	if not _pose_now(actor):
+		return false
+	# `staff_pose_dir`, written out (its calls were most of this one's cost).
+	var dir: Vector2 = _pose_dir[actor]
+	if _pose_lock[actor] == 0:
+		var live: Vector2 = kit.aim_dir(actor)
+		if live.is_finite() and not live.is_zero_approx():
+			dir = live
+	out[Look.DIR_X] = dir.x
+	out[Look.DIR_Y] = dir.y
+	out[Look.TURN] = deg_to_rad(_pose_out[0]) * _pose_side[actor] + _pose_turned[actor]
+	out[Look.LIFT] = _pose_out[1]
+	out[Look.PUSH] = _pose_out[2]
+	out[Look.GLOW] = _pose_out[3]
+	out[Look.STRETCH] = _pose_out[4]
+	out[Look.SHAKE] = _pose_out[5]
+	out[Look.MOOD] = float(maxi(_pose_out_mood, 0))
+	var tint: Color = _pose_tint[actor]
+	out[Look.TINT_R] = tint.r
+	out[Look.TINT_G] = tint.g
+	out[Look.TINT_B] = tint.b
+	out[Look.TINT_A] = tint.a
+	return true
+
+
 ## The aim `actor`'s staff animation turns from, or zero when it plays none: the aim of the cast
 ## for a carrier that locks it (a swing, a slam), else the live aim (a held beam turns with it).
 func staff_pose_dir(actor: int) -> Vector2:
@@ -334,12 +380,14 @@ func staff_pose_dir(actor: int) -> Vector2:
 func _pose_now(actor: int) -> bool:
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]) or _pose_ended[actor] != 0:
 		return false
-	if _pose_out_actor == actor and _pose_out_clock == kit.clock():
+	# The runtime's clock, asked once.
+	var clock: float = kit.clock()
+	if _pose_out_actor == actor and _pose_out_clock == clock:
 		return _pose_out_mood >= 0
 	_pose_out_actor = actor
-	_pose_out_clock = kit.clock()
+	_pose_out_clock = clock
 	var keys: PackedFloat32Array = _pose_keys[actor]
-	var s: float = kit.clock() - _pose_start[actor]
+	var s: float = clock - _pose_start[actor]
 	var wind: float = _pose_wind[actor]
 	var strike: float = _pose_strike[actor]
 	var stride: int = CarrierCard.POSE_STRIDE
@@ -349,10 +397,11 @@ func _pose_now(actor: int) -> bool:
 	var from_key: int = -1
 	var from_t: float = 0.0
 	var mood: int = 0
+	var hold: int = HOLD_PHASE
 	var k: int = 0
 	while k < count:
 		var phase: int = roundi(keys[k * stride + CarrierCard.PK_PHASE])
-		if phase == CarrierCard.POSE_PHASES["hold"]:
+		if phase == hold:
 			# The run of hold keys, played round and round through the strike.
 			var first: int = k
 			while k < count and roundi(keys[k * stride + CarrierCard.PK_PHASE]) == phase:

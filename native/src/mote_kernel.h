@@ -22,6 +22,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 
 namespace godot {
 
@@ -50,6 +51,38 @@ public:
 	// At the module's end (register_types.cpp).
 	static void free_names();
 
+	// Feel's other per-frame loops (the performance pass, 2026-11-28), in feel_loops.cpp: the
+	// flashes' rows, the world's stirs and a room's mist parting (see there). On this class, the one
+	// Feel's native loops have (core/native/native.gd makes the listed classes alone).
+	// The flashes' numbers (`FeelFlashes.set_native`); false when one is missing.
+	bool configure_flashes(const Dictionary &config);
+	// One line for each member of `flashes` the flash loops read that is missing or of another type.
+	PackedStringArray check_flash_fields(Object *flashes) const;
+	// `FeelFlashes._find_special(effect_slots)`: returns how many slots it listed in `_flash_special_slots`.
+	int64_t find_special(Object *flashes, int64_t effect_slots);
+	// `FeelFlashes._write_rows(real_delta, next_flash, effect_slots)`.
+	void write_rows(Object *flashes, double real_delta, int64_t next_flash, int64_t effect_slots);
+	// The stirs' numbers (`Stirs.set_native`); false when one is missing.
+	bool configure_stirs(const Dictionary &config);
+	// One line for each member of `stirs` the stir step reads that is missing or of another type.
+	PackedStringArray check_stir_fields(Object *stirs) const;
+	// `Stirs._read(births, count)` then `Stirs._ease(delta)`, the cells whose shown way changed listed
+	// in `_changed` (in the live list's order); returns how many.
+	int64_t stir_step(Object *stirs, const PackedFloat32Array &births, int64_t count, double delta);
+	// The mist parting's numbers (`MistParting.set_native`); false when one is missing.
+	bool configure_parting(const Dictionary &config);
+	// One line for each member of `parting` the parting reads that is missing or of another type.
+	PackedStringArray check_parting_fields(Object *parting) const;
+	// `MistParting.work(delta, feet, count)`, the cells whose parting changed listed in `_changed`
+	// (in the live list's order); returns how many.
+	int64_t part_work(Object *parting, double delta, const PackedVector2Array &feet, int64_t count);
+
+protected:
+	static void _bind_feel_methods();
+	static void _make_feel_names();
+	static void _free_feel_names();
+
+
 protected:
 	static void _bind_methods();
 
@@ -65,6 +98,17 @@ private:
 	int64_t _enemy_source = 0, _exact_source = 0, _look_enemy_ramp = 0, _look_exact = 0;
 	double _life_max = 0.0, _height_max = 0.0, _source_code = 0.0, _kind_code = 0.0, _trail_speed = 0.0;
 	int64_t _look_layers = 0;
+	// feel_loops.cpp's numbers.
+	bool _flashes_ready = false;
+	int64_t _flash_stride = 0, _kind_arc = 0, _kind_status = 0, _kind_shell = 0, _kind_fireball = 0;
+	int64_t _table = 0, _table_code = 0;
+	double _grid = 0.0, _blast_span = 0.0, _arc_across = 0.0, _arc_margin = 0.0, _from = 0.0, _span = 0.0;
+	bool _stirs_ready = false;
+	int64_t _field_w = 0, _field_h = 0, _births_read = 0, _stir_birth_stride = 0;
+	int64_t _stir_spark_x = 0, _stir_spark_y = 0, _stir_back_x = 0, _stir_back_y = 0;
+	bool _parting_ready = false;
+	double _reach = 0.0, _reach_down = 0.0, _feet_drop = 0.0, _open_rate = 0.0, _close_rate = 0.0, _closed = 0.0;
+	double _cell = 0.0, _pass_push = 0.0, _shown_rate = 0.0, _wake_half = 0.0, _faded = 0.0;
 };
 
 } // namespace godot

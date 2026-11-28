@@ -15,7 +15,7 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is the game's (`
 - **No colour of its own:** ramps are the projectile manager's (`RAMP_COLORS`, `ramp_light`); other colours are rows of the ramp table.
 - **New drawn-only systems** go in the spectacle (`spectacle.gd`: made in its `_ready`, its setting through its own event, its cue parts in `cue_parts`) or a child node of their own; never more of `feel.gd` or its jobs ("Feel's jobs" below).
 - **Rules:** no per-frame allocations (pools and slots sized once); a batch is `Batches.multimesh()`; every shader is warmed before play; every texture Feel writes goes through its own `TextureUpload` (never `update` on a texture itself); view only, so the simulation reads nothing Feel draws; draw from the actor's state alone (a joiner or a restored snapshot draws the same); smooth by whole pixels (docs/STYLE.md, "Smooth"; the mist alone may be soft); its own clocks and dice (`rng`) are never the game's; sounds are asked from Audio (`Feel.audio`; Feel has no player) and stay silent when missing.
-- **Native twins:** the motes' births (`MoteKernel`), the light grid (`LightKernel`) and the ground drawing (`GroundKernel`) mirror their GDScript to the byte; the GDScript stays the reference and the fallback ([native/README.md](../../native/README.md)).
+- **Native twins:** the motes' births and Feel's flashes' rows, stirs and mist parting (`MoteKernel`; `tests/gameplay/feel/test_native_feel.gd`), the light grid (`LightKernel`) and the ground drawing (`GroundKernel`) mirror their GDScript to the byte; the GDScript stays the reference and the fallback ([native/README.md](../../native/README.md)).
 
 ### Feel's jobs
 

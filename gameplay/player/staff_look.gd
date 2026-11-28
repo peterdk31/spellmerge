@@ -198,11 +198,13 @@ func step(delta: float) -> void:
 	elif _dash_look:
 		_tick_trail(delta)
 	_step_poof(delta)
-	_place_body(_time)
-	apply_pose(_sprite, _face, moving or _dash_look)
+	# The staff animation's aim, read once for the step (each read walks its table).
+	var dir: Vector2 = pose_dir()
+	_place_body(_time, dir)
+	apply_pose(_sprite, _face, moving or _dash_look, dir)
 	if moving or _dash_look:
 		_apply_dash_look(moving)
-	_place_hammer()
+	_place_hammer(dir)
 	_update_invulnerable_look(down)
 	var progress: float = _downed.revive_progress() if _downed != null else 0.0
 	if not actor.aim.is_equal_approx(_drawn_aim) or down != _drawn_down or progress != _drawn_progress:
@@ -227,11 +229,17 @@ func is_poofing() -> bool:
 ## turned by it, so a swinging body steps through the columns while the swing's trail follows the
 ## true arc (down: flat, the way the staff faced).
 func direction() -> int:
+	return _direction(UNREAD)
+
+
+## `direction`, with `dir` the staff animation's aim when it was read this step (`UNREAD`: read here).
+func _direction(dir: Vector2) -> int:
 	if actor.is_downed():
 		return DIRECTIONS / 2 if _faces_left else 0
-	var dir: Vector2 = pose_dir()
+	if dir == UNREAD:
+		dir = pose_dir()
 	if not dir.is_zero_approx():
-		return direction_of(dir.rotated(actor.spells.poses().staff_pose(actor.id).x))
+		return direction_of(dir.rotated(pose_turn()))
 	return direction_of(actor.aim)
 
 
@@ -327,8 +335,9 @@ func _sprite_stretch() -> Vector2:
 
 
 ## The body on the hand (hovering), or flat on the floor while down, with the frame for the aim;
-## the face told where it went.
-func _place_body(time: float) -> void:
+## the face told where it went. `dir` as for `pose_offset`. The sprite is set only where it changed
+## (each set redraws it, and a frame's tells its listeners).
+func _place_body(time: float, dir: Vector2 = UNREAD) -> void:
 	if actor.aim.x < -0.01:
 		_faces_left = true
 	elif actor.aim.x > 0.01:
@@ -336,11 +345,14 @@ func _place_body(time: float) -> void:
 	var at: Vector2 = Vector2(0.0, -DOWN_LIFT)
 	if not actor.is_downed():
 		var phase: float = time * HOVER_RATE + float(maxi(actor.ramp, 0)) * HOVER_PHASE
-		at = _landed(actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time))
+		at = _landed(actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time, dir))
 	if _sprite != null:
-		_sprite.position = at
+		if _sprite.position != at:
+			_sprite.position = at
 		if _sprite.texture != null:
-			_sprite.frame_coords = Vector2i(direction(), clampi(actor.ramp, 0, RAMPS - 1))
+			var frame: Vector2i = Vector2i(_direction(dir), clampi(actor.ramp, 0, RAMPS - 1))
+			if _sprite.frame_coords != frame:
+				_sprite.frame_coords = frame
 	if _face != null:
 		_face.body_offset = at - actor.hand_offset
 
@@ -417,18 +429,22 @@ static func _hammer_down(dir: Vector2) -> Vector2:
 
 ## How far (0 to 1) the staff is a hammer now: its animation's `hammer` channel, none while it plays
 ## none (or it is down).
-func _hammer_amount(poses: StaffPoses) -> float:
-	return poses.staff_hammer(actor.id) if poses != null and not pose_dir().is_zero_approx() else 0.0
+func _hammer_amount(poses: StaffPoses, dir: Vector2 = UNREAD) -> float:
+	if poses == null:
+		return 0.0
+	if dir == UNREAD:
+		dir = pose_dir()
+	return poses.staff_hammer(actor.id) if not dir.is_zero_approx() else 0.0
 
 
 ## The hammer on the staff while its animation turns its head into one: on the drawn tip (the
 ## column's, as the sprite is stretched and leaned), as far turned and as big as the animation's
-## spell says, smushed while the staff is squashed, in its glow's colour.
-func _place_hammer() -> void:
+## spell says, smushed while the staff is squashed, in its glow's colour. `dir` as for `pose_offset`.
+func _place_hammer(dir: Vector2 = UNREAD) -> void:
 	if _hammer == null:
 		return
 	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
-	var amount: float = _hammer_amount(poses)
+	var amount: float = _hammer_amount(poses, dir)
 	_drawn_hammer = Vector2(amount, _hammer_size(poses))
 	_hammer.visible = amount > 0.0
 	if amount <= 0.0:
@@ -441,7 +457,7 @@ func _place_hammer() -> void:
 	# head smushes by its own rule (`hammer_squash`), not the sprite's squash along a screen axis.
 	_hammer.position = _sprite.position
 	_hammer.rotation = _sprite.rotation
-	var tip: Vector2 = _tip_from_grip(direction()) * _sprite_stretch()
+	var tip: Vector2 = _tip_from_grip(_direction(dir)) * _sprite_stretch()
 	var tint: Color = poses.staff_glow_tint(actor.id)
 	var colour: Color = light_color() if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
 	var material := _hammer.material as ShaderMaterial
@@ -450,10 +466,10 @@ func _place_hammer() -> void:
 	# Its head smushes while the staff is squashed as it lands (a negative stretch with `land`: a
 	# slam's landing), not by a crouch while it is raised.
 	material.set_shader_parameter(&"hammer_squash", maxf(-poses.staff_stretch(actor.id), 0.0) * poses.staff_land(actor.id))
-	var dir: Vector2 = tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT
-	material.set_shader_parameter(&"hammer_dir", dir)
+	var way: Vector2 = tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT
+	material.set_shader_parameter(&"hammer_dir", way)
 	# Its smush keeps its lowest corner, the one that hit the ground, where it is.
-	material.set_shader_parameter(&"hammer_down", _hammer_down(dir))
+	material.set_shader_parameter(&"hammer_down", _hammer_down(way))
 	material.set_shader_parameter(&"hammer_reach", tip.length())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))

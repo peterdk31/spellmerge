@@ -39,6 +39,14 @@ var actor: Actor = null
 ## stretched by its animation (to put its scale back once when it ends).
 var _glow_material: ShaderMaterial = null
 var _pose_stretched: bool = false
+## The Spells `pose_dir` last read its staff animations from, and its `StaffPoses` (asked once).
+var _poses_of: Node = null
+var _poses: StaffPoses = null
+## The glow's colour and strength last set on `_glow_material` (NaN: none yet).
+var _glow_colour_set: Color = Color(NAN, NAN, NAN, NAN)
+var _glow_set: float = NAN
+## The staff animation as `pose_dir` last read it (`StaffPoses.read_look`; `StaffPoses.Look`'s order).
+var _pose_look: PackedFloat32Array = _new_pose_look()
 
 
 func setup(owner_actor: Actor) -> void:
@@ -57,27 +65,42 @@ func step(_delta: float) -> void:
 
 
 ## The aim the actor's staff animation turns from, or zero while it plays none (or it is down).
+##
+## Asked by every look every drawn frame, so a body that plays none is answered from two reads
+## (`StaffPoses.may_play`, through the poses kept from its Spells: `_poses_of`), and one that plays
+## one has all of it read at once (`StaffPoses.read_look`, into `_pose_look`), which `pose_offset`,
+## `pose_scale`, `apply_pose` and `pose_turn` show when handed this step's `dir` (performance,
+## 2026-11-28: each read of a getter walked to the animation's memo again).
 func pose_dir() -> Vector2:
-	if actor == null or actor.spells == null or actor.is_down():
+	if actor == null or actor.spells == null:
 		return Vector2.ZERO
-	return actor.spells.poses().staff_pose_dir(actor.id)
+	if actor.spells != _poses_of:
+		_poses_of = actor.spells
+		_poses = actor.spells.poses()
+	if _poses == null or not _poses.may_play(actor.id) or actor.is_down() or not _poses.read_look(actor.id, _pose_look):
+		return Vector2.ZERO
+	return Vector2(_pose_look[StaffPoses.Look.DIR_X], _pose_look[StaffPoses.Look.DIR_Y])
+
+
+## The turn (radians) of the animation `dir` (this step's `pose_dir()`, not zero) plays now: its
+## `StaffPoses.staff_pose` x.
+func pose_turn() -> float:
+	return _pose_look[StaffPoses.Look.TURN]
 
 
 ## How far the animation moves the body now: up by its lift, along the aim by its push and about by
 ## its shake (at `time`, the look's own clock), in whole pixels; zero while it plays none.
 ##
 ## `dir` is `pose_dir()` when the caller read it already this step (a look asks several of these a
-## step, and each read walks the animation's table: `UNREAD` reads it here).
+## step: `UNREAD` reads it here).
 func pose_offset(time: float, dir: Vector2 = UNREAD) -> Vector2:
 	if dir == UNREAD:
 		dir = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ZERO
-	var poses: StaffPoses = actor.spells.poses()
-	var pose: Vector3 = poses.staff_pose(actor.id)
-	var shake: float = poses.staff_shake(actor.id)
+	var shake: float = _pose_look[StaffPoses.Look.SHAKE]
 	var jitter: Vector2 = Vector2(sin(time * SHAKE_RATE.x), cos(time * SHAKE_RATE.y)) * shake
-	return (Vector2(0.0, -pose.y) + dir * pose.z + jitter).round()
+	return (Vector2(0.0, -_pose_look[StaffPoses.Look.LIFT]) + dir * _pose_look[StaffPoses.Look.PUSH] + jitter).round()
 
 
 ## The body's scale for the animation's stretch: longer along the axis its aim runs most along,
@@ -87,7 +110,7 @@ func pose_scale(dir: Vector2 = UNREAD) -> Vector2:
 		dir = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ONE
-	var along: float = maxf(1.0 + actor.spells.poses().staff_stretch(actor.id), 0.2)
+	var along: float = maxf(1.0 + _pose_look[StaffPoses.Look.STRETCH], 0.2)
 	if absf(dir.x) >= absf(dir.y):
 		return Vector2(along, 1.0 / along)
 	return Vector2(1.0 / along, along)
@@ -102,18 +125,24 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool, dir: Vector2 = U
 		dir = pose_dir()
 	var posing: bool = not dir.is_zero_approx()
 	# While it plays none the scale is one, so only a body it stretched has its scale put back.
-	if sprite != null and not keep_scale and (posing or _pose_stretched):
+	# (An animation with no stretch leaves an unstretched body as it is.)
+	if sprite != null and not keep_scale and (posing or _pose_stretched) and (_pose_stretched or _pose_look[StaffPoses.Look.STRETCH] != 0.0):
 		var scale_now: Vector2 = pose_scale(dir)
 		if scale_now != Vector2.ONE or _pose_stretched:
 			_pose_stretched = scale_now != Vector2.ONE
-			# Times its art's detail: a 2x sprite is drawn at half its size (ArtDetail).
-			sprite.scale = scale_now * ArtDetail.draw_scale(sprite.texture)
+			# Times its art's detail: a 2x sprite is drawn at half its size (ArtDetail). Set only
+			# when it changed (each set moves the body's children too).
+			var drawn: Vector2 = scale_now * ArtDetail.draw_scale(sprite.texture)
+			if sprite.scale != drawn:
+				sprite.scale = drawn
 	if sprite != null:
-		_apply_glow(sprite, actor.spells.poses().staff_glow(actor.id) if posing else 0.0)
+		_apply_glow(sprite, _pose_look[StaffPoses.Look.GLOW] if posing else 0.0)
 	if face != null and posing:
-		var mood: StringName = actor.spells.poses().staff_mood(actor.id)
-		if POSE_MOODS.has(mood):
-			face.show_mood(POSE_MOODS[mood] as Face.Mood, POSE_MOOD_SECONDS)
+		var mood: int = roundi(_pose_look[StaffPoses.Look.MOOD])
+		if mood > 0:
+			var mood_name: StringName = CarrierCard.POSE_MOODS[mood - 1]
+			if POSE_MOODS.has(mood_name):
+				face.show_mood(POSE_MOODS[mood_name] as Face.Mood, POSE_MOOD_SECONDS)
 
 
 ## `apply_pose` then `pose_offset`, for a look that shows both every step: at once while no
@@ -142,9 +171,22 @@ func _apply_glow(sprite: Sprite2D, glow: float) -> void:
 		_glow_material = ShaderMaterial.new()
 		_glow_material.shader = SPRITE_SHADER
 		_glow_material.set_shader_parameter(&"core_override", Color(0.0, 0.0, 0.0, 0.0))
-	# The infusion's colour when it has one, else the actor's ramp's.
-	var tint: Color = actor.spells.poses().staff_glow_tint(actor.id)
+	# The infusion's colour when it has one, else the actor's ramp's (read with the glow: `pose_dir`).
+	# Each set only when it changed (a glowing body is drawn every frame, each set a call to the
+	# renderer).
+	var tint: Color = Color(_pose_look[StaffPoses.Look.TINT_R], _pose_look[StaffPoses.Look.TINT_G], _pose_look[StaffPoses.Look.TINT_B], _pose_look[StaffPoses.Look.TINT_A])
 	var colour: Color = ProjectilesScript.ramp_light(actor.ramp) if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
-	_glow_material.set_shader_parameter(&"glow_color", colour)
-	_glow_material.set_shader_parameter(&"sprite_glow", glow * POSE_GLOW)
-	sprite.material = _glow_material
+	if colour != _glow_colour_set:
+		_glow_colour_set = colour
+		_glow_material.set_shader_parameter(&"glow_color", colour)
+	if glow * POSE_GLOW != _glow_set:
+		_glow_set = glow * POSE_GLOW
+		_glow_material.set_shader_parameter(&"sprite_glow", _glow_set)
+	if sprite.material != _glow_material:
+		sprite.material = _glow_material
+
+
+static func _new_pose_look() -> PackedFloat32Array:
+	var look := PackedFloat32Array()
+	look.resize(StaffPoses.Look.SIZE)
+	return look

@@ -135,3 +135,37 @@ func test_an_animation_known_over_plays_again_when_cast_again_and_after_a_restor
 	_cast(&"posed_again")
 	arena.run(0.1)
 	check(arena.spells.poses().staff_pose(0).y > 1.0, "cast again, it plays again")
+
+
+## `read_look`, the one call a look makes every drawn frame, reads what every getter reads, at every
+## step of an animation (a turning, lifting, glowing, stretched, shaking one with a mood), and false
+## once it is over; `may_play` is false only when it surely plays none (performance, 2026-11-28).
+func test_read_look_reads_what_the_getters_read() -> void:
+	_card(&"posed", &"atom", [{"phase": "wind", "at": 0.5, "turn": 30, "lift": 2}, {"phase": "after", "at": 0.1, "turn": -40, "lift": 4, "push": -3, "glow": 0.5, "stretch": 0.3, "shake": 1.0, "ease": "out", "mood": "raised"}, {"phase": "after", "at": 0.3}] as Array[Dictionary])
+	var poses: StaffPoses = arena.spells.poses()
+	var out := PackedFloat32Array()
+	out.resize(StaffPoses.Look.SIZE)
+	check(not poses.may_play(0) and not poses.read_look(0, out), "none before its cast")
+	_cast(&"posed")
+	var played: int = 0
+	for n in 40:
+		arena.run(1.0 / 60.0)
+		var playing: bool = poses.read_look(0, out)
+		check(poses.may_play(0) or not playing, "may play while it plays (step %d)" % n)
+		if not playing:
+			check_equal(poses.staff_pose_dir(0), Vector2.ZERO, "over when it reads none (step %d)" % n)
+			continue
+		played += 1
+		var pose: Vector3 = poses.staff_pose(0)
+		var tint: Color = poses.staff_glow_tint(0)
+		var mood: StringName = poses.staff_mood(0)
+		var read: Array = [Vector2(out[StaffPoses.Look.DIR_X], out[StaffPoses.Look.DIR_Y]), Vector3(out[StaffPoses.Look.TURN], out[StaffPoses.Look.LIFT], out[StaffPoses.Look.PUSH]), out[StaffPoses.Look.GLOW], out[StaffPoses.Look.STRETCH], out[StaffPoses.Look.SHAKE], CarrierCard.POSE_MOODS[int(out[StaffPoses.Look.MOOD]) - 1] if out[StaffPoses.Look.MOOD] > 0.0 else &"", Color(out[StaffPoses.Look.TINT_R], out[StaffPoses.Look.TINT_G], out[StaffPoses.Look.TINT_B], out[StaffPoses.Look.TINT_A])]
+		var got: Array = [poses.staff_pose_dir(0), pose, poses.staff_glow(0), poses.staff_stretch(0), poses.staff_shake(0), mood, tint]
+		# Each as the 32-bit float its getter's number is stored as.
+		for i in got.size():
+			var want: Variant = got[i]
+			if want is float:
+				want = PackedFloat32Array([want])[0]
+			check_equal(read[i], want, "part %d at step %d" % [i, n])
+	check(played > 10, "it played for its after keys (%d steps)" % played)
+	check(not poses.read_look(0, out) and not poses.may_play(0), "and is known over after")

@@ -323,3 +323,25 @@ func test_a_face_of_its_own_draws_its_art_and_a_phase_its_row() -> void:
 	check_equal(face.art_row, 0, "back to its scene's row")
 	check_equal(face.style, Face.Style.STERN, "and style")
 	check_equal(eyes.modulate, Color.WHITE, "and glow")
+
+
+## A wind-up told by the body's look (`winding_told`, which asked its AI this frame: `CreatureLook`)
+## is shown for that step and forgotten; untold, the face asks its controller (performance,
+## 2026-11-28).
+func test_a_told_windup_is_shown_once_then_the_controller_is_asked() -> void:
+	var controller := Winding.new()
+	var body := _wearer(Face.Style.STRAY, Face.Mood.ANGRY, controller)
+	var face := _face(body)
+	_world.run(1)
+	face.winding_told = 1
+	face.step(1.0 / 60.0)
+	check_equal(face.brows_frame().x, int(Face.Mood.FURIOUS), "told, it is furious")
+	check_equal(face.winding_told, -1, "and forgets it")
+	face.step(1.0 / 60.0)
+	check_equal(face.brows_frame().x, int(Face.Mood.ANGRY), "untold, it asks the controller: not winding")
+	controller.winding = true
+	face.winding_told = 0
+	face.step(1.0 / 60.0)
+	check_equal(face.brows_frame().x, int(Face.Mood.ANGRY), "told it is not, it is not")
+	face.step(1.0 / 60.0)
+	check_equal(face.brows_frame().x, int(Face.Mood.FURIOUS), "then it asks, and it is")

@@ -174,17 +174,9 @@ func _process(_delta: float) -> void:
 	if not looks_per_frame or actors == null:
 		return
 	var n: int = actors.open_ids(_view_ids)
-	# The screen, worked out once for the frame's bodies (`Actor.step_looks_due`); none while it is
-	# split (each body asks the views).
-	var view: Viewport = get_viewport()
-	var views: ScreenViews = ScreenViews.on(view)
-	if views != null and views.is_split():
-		view = null
-	var screen: Rect2 = view.get_visible_rect().grow(Actor.ON_SCREEN_MARGIN) if view != null else Rect2()
-	for i in n:
-		var body: Actor = actors.node_of(_view_ids[i]) as Actor
-		if body != null and body.is_inside_tree():
-			body.step_looks_due(view, screen)
+	# Every open body's looks in one pass (perf plan F4): which are due and on screen, and their staff
+	# animations, each found in one call for all of them.
+	Actor.step_all_looks(actors, _view_ids, n, get_viewport())
 
 
 func _physics_process(_delta: float) -> void:
